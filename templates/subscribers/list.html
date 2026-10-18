@@ -2,7 +2,7 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h3 class="fw-bold mb-1">إدارة المشتركين والعقود (PPPoE / Hotspot)</h3>
-        <p class="text-muted small mb-0">سجل المشتركين المتكامل مع FreeRADIUS وقاعدة بيانات المشتركين</p>
+        <p class="text-muted small mb-0">سجل المشتركين المتكامل مع النظام وقاعدة بيانات المشتركين</p>
     </div>
     <a href="/subscribers/add" class="btn btn-primary fw-bold shadow-sm">
         <i class="bi bi-person-plus-fill me-1"></i> إضافة مشترك جديد
@@ -97,7 +97,7 @@
                         <a href="/subscribers/renew?username={{ .Username }}" class="btn btn-sm btn-outline-success me-1" onclick="return confirm('هل تريد تجديد اشتراك العميل {{ .FullName }} بناءً على كوتة ومدة باقته ({{ .Profile }})؟');">
                             <i class="bi bi-arrow-repeat"></i> تجديد
                         </a>
-                        <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من FreeRADIUS والقاعدة؟');">
+                        <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من النظام والقاعدة؟');">
                             <i class="bi bi-trash"></i> حذف
                         </a>
                     </td>

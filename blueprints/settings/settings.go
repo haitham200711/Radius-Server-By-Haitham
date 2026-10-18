@@ -29,7 +29,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mikrotikScript := fmt.Sprintf(`# ========================================================
-# MikroTik RouterOS FreeRADIUS Setup Script
+# MikroTik RouterOS RADIUS Setup Script
 # Server: %s | Secret: %s
 # ========================================================
 
@@ -45,10 +45,10 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 # 4. Remove previous Radius configuration if exists
 /radius remove [find address="%s"]
 
-# 5. Add FreeRADIUS Server
-/radius add address=%s secret="%s" service=ppp,hotspot,login authentication-port=1812 accounting-port=1813 timeout=3s comment="FreeRADIUS-Server-By-Haitham"
+# 5. Add RADIUS Server
+/radius add address=%s secret="%s" service=ppp,hotspot,login authentication-port=1812 accounting-port=1813 timeout=3s comment="Radius-Server-By-Haitham"
 
-:put ">>> FreeRADIUS Configuration Applied Successfully! <<<"
+:put ">>> RADIUS Configuration Applied Successfully! <<<"
 `, serverIP, secret, serverIP, serverIP, secret)
 
 	_ = bp.renderer.Render(w, "settings/index", map[string]interface{}{
