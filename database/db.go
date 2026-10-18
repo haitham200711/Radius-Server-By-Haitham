@@ -220,6 +220,27 @@ func (d *DB) InitSchema() error {
 			INDEX idx_radacct_session (acctsessionid),
 			INDEX idx_radacct_user (username)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+		// 8. Subscribers CRM Table (العملاء والعقود)
+		`CREATE TABLE IF NOT EXISTS subscribers (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			username VARCHAR(64) UNIQUE NOT NULL,
+			contract_no VARCHAR(32) UNIQUE NOT NULL,
+			full_name VARCHAR(150) NOT NULL,
+			phone VARCHAR(30) DEFAULT '',
+			address TEXT,
+			debt DECIMAL(10, 2) DEFAULT 0.00,
+			profile_name VARCHAR(64) DEFAULT '',
+			static_ip VARCHAR(32) DEFAULT '',
+			calling_mac VARCHAR(32) DEFAULT '',
+			quota_bytes BIGINT DEFAULT 0,
+			expiration_date DATETIME NULL,
+			status VARCHAR(20) DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			INDEX idx_subs_username (username),
+			INDEX idx_subs_contract (contract_no),
+			INDEX idx_subs_phone (phone)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -289,40 +310,99 @@ func (d *DB) GetMetrics() (*models.DashboardMetrics, error) {
 // --- FreeRADIUS Subscriber Management ---
 
 func (d *DB) AddSubscriber(username, password, profileName, staticIP, callingMAC string) error {
+	sub := &models.Subscriber{
+		Username:    username,
+		FullName:    username,
+		ProfileName: profileName,
+		StaticIP:    staticIP,
+		CallingMAC:  callingMAC,
+		Status:      "active",
+	}
+	return d.AddSubscriberCRM(sub, password)
+}
+
+func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 	tx, err := d.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	// 1. Password in radcheck (Cleartext-Password := password)
-	_, err = tx.Exec("DELETE FROM radcheck WHERE username = ?", username)
-	if err != nil {
-		return err
+	// Generate contract_no if empty
+	if sub.ContractNo == "" {
+		var count int
+		var nextID int64
+		_ = tx.QueryRow("SELECT COALESCE(MAX(id), 0) + 1 FROM subscribers").Scan(&nextID)
+		for {
+			candidate := fmt.Sprintf("CNT-%s-%05d", time.Now().Format("2006"), nextID)
+			_ = tx.QueryRow("SELECT COUNT(*) FROM subscribers WHERE contract_no = ?", candidate).Scan(&count)
+			if count == 0 {
+				sub.ContractNo = candidate
+				break
+			}
+			nextID++
+		}
 	}
-	_, err = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", username, password)
+	if sub.Status == "" {
+		sub.Status = "active"
+	}
+
+	// 1. Insert or update in subscribers table
+	query := `INSERT INTO subscribers (username, contract_no, full_name, phone, address, debt, profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE contract_no = VALUES(contract_no), full_name = VALUES(full_name), phone = VALUES(phone),
+		address = VALUES(address), debt = VALUES(debt), profile_name = VALUES(profile_name), static_ip = VALUES(static_ip),
+		calling_mac = VALUES(calling_mac), quota_bytes = VALUES(quota_bytes), expiration_date = VALUES(expiration_date), status = VALUES(status)`
+
+	var expDate interface{}
+	if sub.ExpirationDate.Valid {
+		expDate = sub.ExpirationDate.Time
+	}
+
+	_, err = tx.Exec(query, sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt,
+		sub.ProfileName, sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status)
 	if err != nil {
 		return err
 	}
 
-	// MAC binding check if provided
-	if callingMAC != "" {
-		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", username, callingMAC)
-	}
-
-	// 2. User group in radusergroup
-	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", username)
-	if profileName != "" {
-		_, err = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", username, profileName)
+	// 2. FreeRADIUS radcheck: Cleartext-Password
+	if password != "" {
+		_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", sub.Username)
+		_, err = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", sub.Username, password)
 		if err != nil {
 			return err
 		}
 	}
 
-	// 3. Static IP in radreply if provided
-	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ?", username)
-	if staticIP != "" {
-		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-IP-Address', ':=', ?)", username, staticIP)
+	// MAC binding check
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", sub.Username)
+	if sub.CallingMAC != "" {
+		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", sub.Username, sub.CallingMAC)
+	}
+
+	// Expiration in FreeRADIUS (Format: "02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", sub.Username)
+	if sub.ExpirationDate.Valid {
+		expStr := sub.ExpirationDate.Time.Format("02 Jan 2006 15:04:05")
+		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", sub.Username, expStr)
+	}
+
+	// 3. FreeRADIUS radusergroup
+	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", sub.Username)
+	if sub.ProfileName != "" {
+		_, err = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", sub.Username, sub.ProfileName)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 4. FreeRADIUS radreply
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ?", sub.Username)
+	if sub.StaticIP != "" {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-IP-Address', ':=', ?)", sub.Username, sub.StaticIP)
+	}
+	if sub.QuotaBytes > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", sub.Username, fmt.Sprintf("%d", sub.QuotaBytes))
 	}
 
 	return tx.Commit()
@@ -335,6 +415,7 @@ func (d *DB) DeleteSubscriber(username string) error {
 	}
 	defer tx.Rollback()
 
+	_, _ = tx.Exec("DELETE FROM subscribers WHERE username = ?", username)
 	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ?", username)
 	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ?", username)
 	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", username)

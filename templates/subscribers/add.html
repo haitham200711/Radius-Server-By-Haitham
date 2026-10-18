@@ -2,48 +2,152 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h3 class="fw-bold mb-1">إضافة مشترك جديد</h3>
-        <p class="text-muted small mb-0">تسجيل مشترك في FreeRADIUS (برودباند أو هوتسبوت)</p>
+        <p class="text-muted small mb-0">تسجيل بيانات العميل وإنشاء حساب PPPoE / Hotspot في FreeRADIUS</p>
     </div>
     <a href="/subscribers" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-right me-1"></i> رجوع للمشتركين
+        <i class="bi bi-arrow-right me-1"></i> رجوع لقائمة المشتركين
     </a>
 </div>
 
-<div class="card max-w-700 mx-auto" style="max-width: 650px;">
-    <div class="card-body p-4">
+<div class="row justify-content-center">
+    <div class="col-lg-9">
         <form method="POST" action="/subscribers/add">
-            <div class="mb-3">
-                <label class="form-label fw-bold">اسم المستخدم (Username):</label>
-                <input type="text" name="username" class="form-control" required placeholder="مثال: user01">
+            <!-- 1. CRM & Personal Data -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title fw-bold mb-0 text-primary">
+                        <i class="bi bi-person-badge me-2"></i> بيانات العميل والعقد (CRM)
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم العميل بالكامل <span class="text-danger">*</span></label>
+                            <input type="text" name="full_name" class="form-control" required placeholder="مثال: أحمد محمد علي">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">رقم الموبايل / الهاتف</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                <input type="text" name="phone" class="form-control" placeholder="مثال: 01012345678">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">رقم العقد</label>
+                            <input type="text" name="contract_no" class="form-control" placeholder="تلقائي: CNT-2026-XXXXX (اتركه فارغاً للتوليد الآلي)">
+                            <small class="text-muted">سيتم إنشاؤه تلقائياً بتسلسل دقيق إذا تُرك فارغاً.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">إجمالي المديونية / الديون الحالية (ج.م)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-cash-stack"></i></span>
+                                <input type="number" step="0.5" name="debt" class="form-control" value="0.00">
+                            </div>
+                            <small class="text-muted">مبلغ الديون المسجلة على العميل (إن وجد).</small>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold">العنوان بالتفصيل</label>
+                            <input type="text" name="address" class="form-control" placeholder="مثال: شارع الجمهورية - عمارة 5 - شقة 2">
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-bold">كلمة المرور (Password):</label>
-                <input type="text" name="password" class="form-control" required placeholder="كلمة المرور">
+            <!-- 2. Account & Radius Data -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title fw-bold mb-0 text-success">
+                        <i class="bi bi-shield-lock me-2"></i> بيانات الاتصال (FreeRADIUS & PPPoE)
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم المستخدم (Username) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <input type="text" name="username" class="form-control font-monospace" required placeholder="مثال: user01">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">كلمة المرور (Password) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                <input type="text" name="password" class="form-control font-monospace" required placeholder="كلمة المرور">
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">باقة السرعة المحددة <span class="text-danger">*</span></label>
+                            <select name="profile" class="form-select" required>
+                                {{ range .Profiles }}
+                                <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-bold">الباقة والسرعة المحددة:</label>
-                <select name="profile" class="form-select" required>
-                    {{ range .Profiles }}
-                    <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
-                    {{ end }}
-                </select>
+            <!-- 3. Quota & Expiration -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title fw-bold mb-0 text-warning">
+                        <i class="bi bi-speedometer2 me-2"></i> الكوتة وتاريخ انتهاء الصلاحية
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الكوتة الكلية (بالجيجابايت GB)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-hdd-network"></i></span>
+                                <input type="number" step="1" min="0" name="quota_gb" class="form-control" value="0" placeholder="0 = غير محدود">
+                                <span class="input-group-text">GB</span>
+                            </div>
+                            <small class="text-muted">أدخل 0 لكوتة مفتوحة غير محدودة.</small>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">تاريخ انتهاء الاشتراك</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                                <input type="datetime-local" name="expiration_date" class="form-control">
+                            </div>
+                            <small class="text-muted">يتوقف العميل عن الاتصال في FreeRADIUS تلقائياً عند حلول هذا التاريخ.</small>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-bold">تثبيت عنوان IP (Framed-IP - اختياري):</label>
-                <input type="text" name="static_ip" class="form-control" placeholder="مثال: 192.168.88.50">
+            <!-- 4. Advanced Network Settings (Optional) -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title fw-bold mb-0 text-secondary">
+                        <i class="bi bi-sliders me-2"></i> إعدادات شبكية متقدمة (اختياري)
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">تثبيت IP ثابت (Framed-IP-Address)</label>
+                            <input type="text" name="static_ip" class="form-control font-monospace" placeholder="مثال: 10.10.10.50">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">قفل على ماك الراوتر (Calling-Station-Id)</label>
+                            <input type="text" name="calling_mac" class="form-control font-monospace" placeholder="مثال: 00:1A:2B:3C:4D:5E">
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-bold">قفل على ماك الجهاز (Calling-Station-Id - اختياري):</label>
-                <input type="text" name="calling_mac" class="form-control" placeholder="مثال: AA:BB:CC:DD:EE:FF">
+            <div class="d-grid mb-5">
+                <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow">
+                    <i class="bi bi-check-circle-fill me-2"></i> حفظ وتفعيل المشترك في FreeRADIUS
+                </button>
             </div>
-
-            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
-                <i class="bi bi-check-circle me-1"></i> حفظ وتفعيل المشترك في FreeRADIUS
-            </button>
         </form>
     </div>
 </div>

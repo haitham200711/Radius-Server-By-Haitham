@@ -168,3 +168,24 @@ type DashboardMetrics struct {
 	TotalUpload      int64   `json:"total_upload"`
 	TotalRevenue     float64 `json:"total_revenue"`
 }
+
+// Subscriber represents an ISP subscriber with CRM and account details
+type Subscriber struct {
+	ID             int64        `json:"id"`
+	Username       string       `json:"username"`
+	Password       string       `json:"password,omitempty"`
+	ContractNo     string       `json:"contract_no"`
+	FullName       string       `json:"full_name"`
+	Phone          string       `json:"phone"`
+	Address        string       `json:"address"`
+	Debt           float64      `json:"debt"`
+	ProfileName    string       `json:"profile_name"`
+	StaticIP       string       `json:"static_ip"`
+	CallingMAC     string       `json:"calling_mac"`
+	QuotaBytes     int64        `json:"quota_bytes"` // in bytes (0 = unlimited)
+	ExpirationDate sql.NullTime `json:"expiration_date"`
+	Status         string       `json:"status"` // "active", "disabled", "expired"
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
+}
+
