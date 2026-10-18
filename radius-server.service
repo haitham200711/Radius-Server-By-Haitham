@@ -1,0 +1,15 @@
+[Unit]
+Description=Haitham RADIUS Server for MikroTik
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/radius-server
+ExecStart=/opt/radius-server/radius-server -web-addr :8080 -db /opt/radius-server/radius.db
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

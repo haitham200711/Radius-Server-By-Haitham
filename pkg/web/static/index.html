@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سيرفر راديوس مايكروتك - Haitham Radius Server</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header / Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-logo">HR</div>
+        <div class="brand-text">
+          <h1>RADIUS PRO</h1>
+          <span class="subtitle">MikroTik Edition - By Haitham</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <button class="nav-btn active" data-tab="dashboard">لوحة التحكم</button>
+        <button class="nav-btn" data-tab="users">المشتركين (<span id="userCountBadge">0</span>)</button>
+        <button class="nav-btn" data-tab="sessions">المتصلين الآن (<span id="sessionCountBadge">0</span>)</button>
+        <button class="nav-btn" data-tab="batch">توليد كروت</button>
+        <button class="nav-btn" data-tab="profiles">الباقات والسرعات</button>
+        <button class="nav-btn" data-tab="nas">أجهزة المايكروتك</button>
+        <button class="nav-btn" data-tab="logs">سجلات الاتصال</button>
+        <button class="nav-btn script-tab" data-tab="script">إعداد المايكروتك</button>
+      </nav>
+      <div class="header-status">
+        <span class="pulse-indicator"></span>
+        <span id="uptimeText">متصل</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard" class="tab-pane active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon users-icon">👥</div>
+          <div class="stat-data">
+            <span class="stat-label">إجمالي المشتركين</span>
+            <span class="stat-value" id="statTotalUsers">0</span>
+            <span class="stat-sub" id="statActiveUsers">0 نشط</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon online-icon">⚡</div>
+          <div class="stat-data">
+            <span class="stat-label">المتصلين أونلاين</span>
+            <span class="stat-value text-accent" id="statOnlineSessions">0</span>
+            <span class="stat-sub">جلسات نشطة بالمايكروتك</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon dl-icon">⬇️</div>
+          <div class="stat-data">
+            <span class="stat-label">إجمالي التحميل (Download)</span>
+            <span class="stat-value" id="statTotalDL">0 MB</span>
+            <span class="stat-sub">حركة المرور المستهلكة</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon ul-icon">⬆️</div>
+          <div class="stat-data">
+            <span class="stat-label">إجمالي الرفع (Upload)</span>
+            <span class="stat-value" id="statTotalUL">0 MB</span>
+            <span class="stat-sub">حركة المرور المرفوعة</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon router-icon">📡</div>
+          <div class="stat-data">
+            <span class="stat-label">راوترات المايكروتك</span>
+            <span class="stat-value" id="statTotalNAS">0</span>
+            <span class="stat-sub">أجهزة NAS المرتبطة</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon db-icon">💾</div>
+          <div class="stat-data">
+            <span class="stat-label">قاعدة البيانات والذاكرة</span>
+            <span class="stat-value" id="statDBSize">0 KB</span>
+            <span class="stat-sub">WAL Mode + RAM Cache</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Session Live Preview -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h3>⚡ الجلسات المتصلة حالياً على المايكروتك</h3>
+          <button class="btn btn-sm btn-outline" onclick="loadLiveSessions()">تحديث الجلسات</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>اسم المستخدم</th>
+                <th>عنوان IP</th>
+                <th>ماك الجهاز (MAC)</th>
+                <th>راوتر NAS</th>
+                <th>وقت الاتصال</th>
+                <th>التحميل</th>
+                <th>الرفع</th>
+                <th>إجراء سريع</th>
+              </tr>
+            </thead>
+            <tbody id="quickSessionsTable">
+              <tr><td colspan="8" class="text-center text-muted">لا يوجد جلسات نشطة حالياً</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: USERS -->
+    <section id="tab-users" class="tab-pane">
+      <div class="card">
+        <div class="card-header user-header-controls">
+          <div class="search-box">
+            <input type="text" id="userSearchInput" placeholder="بحث بالاسم أو الآيبي أو الماك..." onkeyup="handleUserSearch(event)">
+            <select id="userStatusFilter" onchange="loadUsers(1)">
+              <option value="">جميع الحالات</option>
+              <option value="active">نشط (Active)</option>
+              <option value="disabled">معطل (Disabled)</option>
+              <option value="expired">منتهي (Expired)</option>
+            </select>
+          </div>
+          <div class="user-actions">
+            <button class="btn btn-primary" onclick="openAddUserModal()">+ إضافة مشترك جديد</button>
+            <button class="btn btn-secondary" onclick="switchTab('batch')">⚡ توليد كروت دفعة واحدة</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>اسم المستخدم</th>
+                <th>كلمة المرور</th>
+                <th>الباقة / السرعة</th>
+                <th>IP ثابت</th>
+                <th>ربط الماك (MAC)</th>
+                <th>الحالة</th>
+                <th>الاستهلاك / الكوتة</th>
+                <th>الصلاحية</th>
+                <th>خيارات</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr><td colspan="10" class="text-center">جاري تحميل المشتركين...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-bar" id="userPagination"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: BATCH GENERATOR -->
+    <section id="tab-batch" class="tab-pane">
+      <div class="card max-w-700 mx-auto">
+        <div class="card-header">
+          <h3>⚡ توليد كروت هوتسبوت وبرودباند بكميات ضخمة</h3>
+        </div>
+        <div class="card-body">
+          <form id="batchForm" onsubmit="handleBatchGenerate(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>عدد الكروت المطلوبة:</label>
+                <input type="number" id="batchCount" value="100" min="1" max="50000" required>
+                <small class="text-muted">يدعم حتى 50,000 كارت في المرة الواحدة</small>
+              </div>
+
+              <div class="form-group">
+                <label>بادئة اسم المستخدم (Prefix):</label>
+                <input type="text" id="batchPrefix" placeholder="مثال: CARD-">
+              </div>
+
+              <div class="form-group">
+                <label>طول اسم المستخدم العشوائي:</label>
+                <input type="number" id="batchLen" value="6" min="4" max="16" required>
+              </div>
+
+              <div class="form-group">
+                <label>الباقة / السرعة المحددة:</label>
+                <select id="batchProfileSelect" required></select>
+              </div>
+
+              <div class="form-group">
+                <label>كوتة البيانات (جيجابايت GB - اختياري):</label>
+                <input type="number" id="batchDataLimit" value="0" min="0">
+                <small class="text-muted">0 = غير محدود</small>
+              </div>
+
+              <div class="form-group">
+                <label>فترة الصلاحية (بالأيام - اختياري):</label>
+                <input type="number" id="batchDays" value="30" min="0">
+                <small class="text-muted">0 = بدون انتهاء صلاحية</small>
+              </div>
+            </div>
+
+            <div class="form-actions mt-4">
+              <button type="submit" class="btn btn-primary btn-lg w-100" id="btnBatchSubmit">توليد الكروت فوراً</button>
+            </div>
+          </form>
+
+          <div id="batchResultNotice" class="alert mt-3" style="display:none;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: LIVE SESSIONS & COA -->
+    <section id="tab-sessions" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3>المتصلين الحاليين على راوترات المايكروتك (Live PPPoE & Hotspot)</h3>
+          <div>
+            <button class="btn btn-outline" onclick="loadLiveSessions()">تحديث القائمة</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>اسم المستخدم</th>
+                <th>معرف الجلسة (Session ID)</th>
+                <th>عنوان IP</th>
+                <th>MAC الجهاز</th>
+                <th>راوتر NAS</th>
+                <th>مدة الاتصال</th>
+                <th>التحميل (Download)</th>
+                <th>الرفع (Upload)</th>
+                <th>قطع الاتصال (CoA/PoD)</th>
+              </tr>
+            </thead>
+            <tbody id="fullSessionsTable">
+              <tr><td colspan="9" class="text-center">جاري الفحص...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: PROFILES -->
+    <section id="tab-profiles" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3>باقات السرعة والخدمات (MikroTik Profiles)</h3>
+          <button class="btn btn-primary" onclick="openAddProfileModal()">+ إضافة باقة جديدة</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>اسم الباقة</th>
+                <th>السرعة (Rate-Limit)</th>
+                <th>بول الآيبيهات (IP Pool)</th>
+                <th>وقت الجلسة (Session Timeout)</th>
+                <th>وقت الخمول (Idle Timeout)</th>
+                <th>قائمة العناوين (Address-List)</th>
+                <th>السعر</th>
+                <th>خيارات</th>
+              </tr>
+            </thead>
+            <tbody id="profilesTableBody">
+              <tr><td colspan="9" class="text-center">جاري تحميل الباقات...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: NAS (ROUTERS) -->
+    <section id="tab-nas" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3>أجهزة وسيرفرات المايكروتك المرتبطة (NAS Routers)</h3>
+          <button class="btn btn-primary" onclick="openAddNASModal()">+ إضافة راوتر مايكروتك</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>اسم الراوتر</th>
+                <th>عنوان IP</th>
+                <th>كلمة السر السرية (Secret)</th>
+                <th>منفذ CoA/PoD</th>
+                <th>الوصف</th>
+                <th>خيارات</th>
+              </tr>
+            </thead>
+            <tbody id="nasTableBody">
+              <tr><td colspan="7" class="text-center">جاري التحميل...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 7: ACCOUNTING LOGS -->
+    <section id="tab-logs" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3>سجلات الاتصال التاريخية (Accounting Logs)</h3>
+          <button class="btn btn-outline" onclick="loadLogs(0)">تحديث السجلات</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>المعرف</th>
+                <th>اسم المشترك</th>
+                <th>راوتر NAS</th>
+                <th>IP المشترك</th>
+                <th>MAC</th>
+                <th>وقت البدء</th>
+                <th>وقت الانتهاء</th>
+                <th>مدة الجلسة</th>
+                <th>التحميل</th>
+                <th>الرفع</th>
+                <th>سبب الفصل</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <tr><td colspan="11" class="text-center">جاري التحميل...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination-bar" id="logsPagination"></div>
+      </div>
+    </section>
+
+    <!-- TAB 8: MIKROTIK AUTO SCRIPT -->
+    <section id="tab-script" class="tab-pane">
+      <div class="card max-w-800 mx-auto">
+        <div class="card-header">
+          <h3>📋 كود الربط السريع لمايكروتك (MikroTik Terminal Script)</h3>
+        </div>
+        <div class="card-body">
+          <p class="mb-3 text-muted">قم بنسخ هذا الكود ولصقه مباشرة في نافذة <b>Terminal</b> في راوتر المايكروتك لربطه فوراً مع هذا الراديوس سيرفر وتفعيل الـ RADIUS للـ PPPoE والهوتسبوت والـ CoA Disconnect:</p>
+          <div class="script-config-row mb-3">
+            <div>
+              <label>عنوان IP سيرفر الراديوس:</label>
+              <input type="text" id="scriptServerIP" value="192.168.2.90" oninput="updateScript()">
+            </div>
+            <div>
+              <label>الباسورد المشترك (RADIUS Secret):</label>
+              <input type="text" id="scriptSecret" value="radius123" oninput="updateScript()">
+            </div>
+          </div>
+          <div class="code-box-wrapper">
+            <textarea id="mikrotikScriptText" readonly class="code-box" rows="12"></textarea>
+            <button class="btn btn-accent copy-code-btn" onclick="copyMikrotikScript()">نسخ الكود بالكامل</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: ADD/EDIT USER -->
+  <div id="userModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="userModalTitle">إضافة مشترك جديد</h3>
+        <span class="close-btn" onclick="closeModal('userModal')">&times;</span>
+      </div>
+      <form id="userForm" onsubmit="saveUserForm(event)">
+        <input type="hidden" id="userId" value="0">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>اسم المستخدم (Username):</label>
+            <input type="text" id="formUsername" required>
+          </div>
+          <div class="form-group">
+            <label>كلمة المرور (Password):</label>
+            <input type="text" id="formPassword" required>
+          </div>
+          <div class="form-group">
+            <label>الباقة / السرعة:</label>
+            <select id="formProfileId"></select>
+          </div>
+          <div class="form-group">
+            <label>الحالة:</label>
+            <select id="formStatus">
+              <option value="active">نشط (Active)</option>
+              <option value="disabled">معطل (Disabled)</option>
+              <option value="expired">منتهي (Expired)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>تثبيت عنوان IP (Framed-IP - اختياري):</label>
+            <input type="text" id="formIP" placeholder="مثال: 192.168.88.50">
+          </div>
+          <div class="form-group">
+            <label>قفل على ماك الجهاز (Lock to MAC - اختياري):</label>
+            <input type="text" id="formMAC" placeholder="مثال: AA:BB:CC:DD:EE:FF">
+          </div>
+          <div class="form-group">
+            <label>كوتة البيانات (جيجابايت GB - 0 غير محدود):</label>
+            <input type="number" id="formDataLimit" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label>تاريخ الانتهاء (اختياري):</label>
+            <input type="date" id="formExpiration">
+          </div>
+        </div>
+        <div class="modal-footer mt-4">
+          <button type="button" class="btn btn-outline" onclick="closeModal('userModal')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ المشترك</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT PROFILE -->
+  <div id="profileModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="profileModalTitle">إضافة باقة جديدة</h3>
+        <span class="close-btn" onclick="closeModal('profileModal')">&times;</span>
+      </div>
+      <form id="profileForm" onsubmit="saveProfileForm(event)">
+        <input type="hidden" id="profileId" value="0">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>اسم الباقة:</label>
+            <input type="text" id="profileName" placeholder="مثال: 10 Mega Unlimited" required>
+          </div>
+          <div class="form-group">
+            <label>محدد السرعة (Mikrotik-Rate-Limit):</label>
+            <input type="text" id="profileRateLimit" placeholder="مثال: 5M/10M أو 2048k/4096k" required>
+            <small class="text-muted">صيغة المايكروتك: Upload/Download (مثال: 5M/10M)</small>
+          </div>
+          <div class="form-group">
+            <label>اسم البول (IP Pool Name بالمايكروتك):</label>
+            <input type="text" id="profilePoolName" placeholder="pppoe-pool">
+          </div>
+          <div class="form-group">
+            <label>أقصى مدة جلسة (Session Timeout بالثواني):</label>
+            <input type="number" id="profileSessionTimeout" value="86400">
+          </div>
+          <div class="form-group">
+            <label>وقت الخمول (Idle Timeout بالثواني):</label>
+            <input type="number" id="profileIdleTimeout" value="3600">
+          </div>
+          <div class="form-group">
+            <label>إضافة في قائمة (Mikrotik-Address-List):</label>
+            <input type="text" id="profileAddressList" placeholder="speed_users">
+          </div>
+          <div class="form-group">
+            <label>السعر:</label>
+            <input type="number" id="profilePrice" value="150" step="0.5">
+          </div>
+        </div>
+        <div class="modal-footer mt-4">
+          <button type="button" class="btn btn-outline" onclick="closeModal('profileModal')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ الباقة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT NAS -->
+  <div id="nasModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="nasModalTitle">إضافة راوتر مايكروتك</h3>
+        <span class="close-btn" onclick="closeModal('nasModal')">&times;</span>
+      </div>
+      <form id="nasForm" onsubmit="saveNASForm(event)">
+        <input type="hidden" id="nasId" value="0">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>اسم الراوتر:</label>
+            <input type="text" id="nasName" placeholder="مثال: Main Routerboard 4011" required>
+          </div>
+          <div class="form-group">
+            <label>عنوان IP الراوتر (NAS IP):</label>
+            <input type="text" id="nasIP" placeholder="مثال: 192.168.2.1" required>
+          </div>
+          <div class="form-group">
+            <label>الباسورد السري المشترك (RADIUS Secret):</label>
+            <input type="text" id="nasSecret" value="radius123" required>
+          </div>
+          <div class="form-group">
+            <label>منفذ الـ CoA / Disconnect:</label>
+            <input type="number" id="nasCoAPort" value="3799" required>
+          </div>
+          <div class="form-group full-width">
+            <label>الوصف / الملاحظات:</label>
+            <input type="text" id="nasDesc" placeholder="موقع الراوتر أو البرج">
+          </div>
+        </div>
+        <div class="modal-footer mt-4">
+          <button type="button" class="btn btn-outline" onclick="closeModal('nasModal')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ الراوتر</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

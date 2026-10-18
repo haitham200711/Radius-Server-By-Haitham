@@ -1,0 +1,18 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+radius-server
+radius-server-linux-amd64
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# OS generated
+.DS_Store
+Thumbs.db
