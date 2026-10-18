@@ -290,11 +290,26 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 		_ = bp.db.BulkDeleteSubscribers(usernames)
 	case "renew":
 		profile := strings.TrimSpace(r.FormValue("profile"))
-		_ = bp.db.BulkRenewSubscribers(usernames, profile)
+		isPaid := r.FormValue("payment_status") != "unpaid"
+		adminUser := "admin"
+		if u := middleware.GetUser(r); u != nil {
+			adminUser = u.Username
+		}
+		for _, u := range usernames {
+			_ = bp.db.RenewSubscriberBilling(u, profile, 0, isPaid, "bulk", "تجديد اشتراك جماعي", adminUser)
+		}
 	case "add_quota":
 		quotaGB, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("quota_gb")), 64)
+		price, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("price")), 64)
+		isPaid := r.FormValue("payment_status") != "unpaid"
+		adminUser := "admin"
+		if u := middleware.GetUser(r); u != nil {
+			adminUser = u.Username
+		}
 		if quotaGB > 0 {
-			_ = bp.db.BulkAddQuota(usernames, quotaGB)
+			for _, u := range usernames {
+				_ = bp.db.AddQuotaBilling(u, quotaGB, price, isPaid, "bulk", "إضافة كوتة جماعية", adminUser)
+			}
 		}
 	case "add_debt":
 		amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("debt_amount")), 64)
@@ -398,24 +413,76 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 		profile = strings.TrimSpace(r.URL.Query().Get("profile"))
 	}
 
+	priceStr := strings.TrimSpace(r.FormValue("price"))
+	price, _ := strconv.ParseFloat(priceStr, 64)
+	isPaid := r.FormValue("payment_status") != "unpaid"
+	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
+	notes := strings.TrimSpace(r.FormValue("notes"))
+
+	adminUser := "admin"
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	status := r.FormValue("status")
+
 	if username != "" {
-		if err := bp.db.RenewSubscriber(username, profile); err != nil {
+		if err := bp.db.RenewSubscriberBilling(username, profile, price, isPaid, paymentMethod, notes, adminUser); err != nil {
 			fmt.Printf("[Subscribers] Error renewing subscriber %s: %v\n", username, err)
 		}
 	}
-	http.Redirect(w, r, "/subscribers", http.StatusFound)
+
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	quotaGB, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("quota_gb")), 64)
+	price, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("price")), 64)
+	isPaid := r.FormValue("payment_status") != "unpaid"
+	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
+	notes := strings.TrimSpace(r.FormValue("notes"))
+
+	adminUser := "admin"
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+	}
+
 	limit := r.FormValue("limit")
 	page := r.FormValue("page")
 	q := r.FormValue("q")
 	status := r.FormValue("status")
 
 	if username != "" && quotaGB > 0 {
-		_ = bp.db.BulkAddQuota([]string{username}, quotaGB)
+		_ = bp.db.AddQuotaBilling(username, quotaGB, price, isPaid, paymentMethod, notes, adminUser)
+	}
+
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
+	notes := strings.TrimSpace(r.FormValue("notes"))
+
+	adminUser := "admin"
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	status := r.FormValue("status")
+
+	if username != "" && amount > 0 {
+		_ = bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser)
 	}
 
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)

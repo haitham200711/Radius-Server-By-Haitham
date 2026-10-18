@@ -1,17 +1,269 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">سجلات المحاسبة التاريخية (RADIUS Accounting)</h3>
-        <p class="text-muted small mb-0">سجل كامل بجميع اتصالات المشتركين واستهلاك البيانات وأسباب انتهاء الجلسات</p>
+        <h3 class="fw-bold mb-1">التقارير وسجلات النظام</h3>
+        <p class="text-muted small mb-0">متابعة العمليات المالية والمديونيات والمحصلات، وسجلات استهلاك المشتركين</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/subscribers" class="btn btn-outline-primary fw-bold">
+            <i class="bi bi-people me-1"></i> إدارة المشتركين
+        </a>
     </div>
 </div>
 
-<div class="card mb-4">
+<!-- Tabs Navigation -->
+<ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded shadow-sm border">
+    <li class="nav-item">
+        <a class="nav-link fw-bold {{ if eq .ActiveTab "billing" }}active{{ end }}" href="/reports?tab=billing">
+            <i class="bi bi-cash-stack me-1"></i> العمليات المالية والديون
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold {{ if eq .ActiveTab "radius" }}active{{ end }}" href="/reports?tab=radius">
+            <i class="bi bi-hdd-network me-1"></i> سجلات جلسات المشتركين (RADIUS)
+        </a>
+    </li>
+</ul>
+
+{{ if eq .ActiveTab "billing" }}
+<!-- ========================================== -->
+<!-- 1. Billing & Financial Transactions Tab     -->
+<!-- ========================================== -->
+
+<!-- KPI Financial Summary Cards -->
+<div class="row g-3 mb-4">
+    <!-- Total Sales -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-primary border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-1">إجمالي المبيعات والخدمات</span>
+                        <h4 class="fw-bold text-primary mb-0 font-monospace">
+                            {{ if .BillingSummary }}{{ printf "%.2f" .BillingSummary.TotalSales }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small>
+                        </h4>
+                    </div>
+                    <div class="bg-primary-subtle text-primary p-3 rounded-circle">
+                        <i class="bi bi-graph-up-arrow fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Collected / Paid -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-success border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-1">إجمالي المحصل الفعلي</span>
+                        <h4 class="fw-bold text-success mb-0 font-monospace">
+                            {{ if .BillingSummary }}{{ printf "%.2f" .BillingSummary.TotalPaid }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small>
+                        </h4>
+                    </div>
+                    <div class="bg-success-subtle text-success p-3 rounded-circle">
+                        <i class="bi bi-wallet2 fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unpaid Transactions Debt -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-warning border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-1">عمليات غير مدفوعة (معلقة)</span>
+                        <h4 class="fw-bold text-warning mb-0 font-monospace">
+                            {{ if .BillingSummary }}{{ printf "%.2f" .BillingSummary.TotalUnpaidDebt }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small>
+                        </h4>
+                    </div>
+                    <div class="bg-warning-subtle text-warning p-3 rounded-circle">
+                        <i class="bi bi-clock-history fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Customer Outstanding Debt -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-danger border-4 h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-1">إجمالي مديونيات المشتركين الحالية</span>
+                        <h4 class="fw-bold text-danger mb-0 font-monospace">
+                            {{ if .BillingSummary }}{{ printf "%.2f" .BillingSummary.TotalCustomerDebt }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small>
+                        </h4>
+                    </div>
+                    <div class="bg-danger-subtle text-danger p-3 rounded-circle">
+                        <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="/reports" class="row g-2 align-items-center">
+            <input type="hidden" name="tab" value="billing">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="بحث باسم العميل، اسم المستخدم، أو رقم العقد..." value="{{ .SearchQuery }}">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="type" class="form-select">
+                    <option value="">-- جميع أنواع العمليات --</option>
+                    <option value="renew" {{ if eq .TypeFilter "renew" }}selected{{ end }}>تجديد اشتراك باقة</option>
+                    <option value="quota" {{ if eq .TypeFilter "quota" }}selected{{ end }}>إضافة كوتة رصيد</option>
+                    <option value="payment" {{ if eq .TypeFilter "payment" }}selected{{ end }}>سداد مديونية</option>
+                    <option value="adjustment" {{ if eq .TypeFilter "adjustment" }}selected{{ end }}>تسوية رصيد</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select">
+                    <option value="">-- كل الحالات --</option>
+                    <option value="paid" {{ if eq .StatusFilter "paid" }}selected{{ end }}>مدفوع فقط</option>
+                    <option value="unpaid" {{ if eq .StatusFilter "unpaid" }}selected{{ end }}>غير مدفوع (دين) فقط</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary fw-bold flex-grow-1">
+                    <i class="bi bi-filter me-1"></i> تصفية
+                </button>
+                {{ if or .SearchQuery .TypeFilter .StatusFilter }}
+                <a href="/reports?tab=billing" class="btn btn-outline-secondary" title="إلغاء الفلتر">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {{ end }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-receipt-cutoff text-primary me-2"></i> سجل العمليات والفواتير
+        </h5>
+        <span class="badge bg-secondary">إجمالي السجلات: {{ .TotalBilling }}</span>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 70px;">#</th>
+                    <th>المشترك / العميل</th>
+                    <th>نوع العملية</th>
+                    <th>البيان والتفاصيل</th>
+                    <th>المبلغ</th>
+                    <th>حالة الدفع</th>
+                    <th>طريقة الدفع</th>
+                    <th>بواسطة</th>
+                    <th>التاريخ والوقت</th>
+                    <th>ملاحظات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .BillingList }}
+                <tr>
+                    <td class="font-monospace small text-muted">#{{ .ID }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ .FullName }}</div>
+                        <div class="small font-monospace text-primary">{{ .Username }}</div>
+                        {{ if .ContractNo }}
+                        <div class="small text-muted"><i class="bi bi-file-earmark-text me-1"></i>عقد: {{ .ContractNo }}</div>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if eq .Type "renew" }}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                            <i class="bi bi-arrow-repeat me-1"></i> تجديد باقة
+                        </span>
+                        {{ else if eq .Type "quota" }}
+                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1">
+                            <i class="bi bi-database-add me-1"></i> إضافة كوتة
+                        </span>
+                        {{ else if eq .Type "payment" }}
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                            <i class="bi bi-cash-stack me-1"></i> سداد دين
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-secondary-subtle text-secondary px-2 py-1">{{ .Type }}</span>
+                        {{ end }}
+                    </td>
+                    <td class="fw-bold small">{{ .Description }}</td>
+                    <td>
+                        <span class="font-monospace fw-bold fs-6 {{ if eq .PaymentStatus "unpaid" }}text-danger{{ else }}text-dark{{ end }}">
+                            {{ printf "%.2f" .Amount }} ج.م
+                        </span>
+                    </td>
+                    <td>
+                        {{ if eq .PaymentStatus "paid" }}
+                        <span class="badge bg-success fw-bold">
+                            <i class="bi bi-check-circle-fill me-1"></i> مدفوع
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-danger fw-bold">
+                            <i class="bi bi-hourglass-split me-1"></i> غير مدفوع (دين)
+                        </span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">
+                            {{ if eq .PaymentMethod "cash" }}نقداً (Cash)
+                            {{ else if eq .PaymentMethod "vodafone_cash" }}فودافون كاش
+                            {{ else if eq .PaymentMethod "instapay" }}انستا باي
+                            {{ else if eq .PaymentMethod "bank" }}تحويل بنكي
+                            {{ else if eq .PaymentMethod "bulk" }}جماعي
+                            {{ else }}{{ .PaymentMethod }}{{ end }}
+                        </span>
+                    </td>
+                    <td class="small text-muted">
+                        <i class="bi bi-person me-1"></i>{{ .CreatedBy }}
+                    </td>
+                    <td class="small text-muted font-monospace">
+                        {{ .CreatedAt.Format "2006-01-02 15:04" }}
+                    </td>
+                    <td class="small text-muted">
+                        {{ if .Notes }}{{ .Notes }}{{ else }}-{{ end }}
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="10" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                        لا توجد حركات مالية مطابقة للبحث أو الفلتر
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ else }}
+<!-- ========================================== -->
+<!-- 2. RADIUS Accounting Sessions Tab          -->
+<!-- ========================================== -->
+
+<div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <form method="GET" action="/reports" class="row g-2">
+            <input type="hidden" name="tab" value="radius">
             <div class="col-md-10">
                 <div class="input-group">
-                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
                     <input type="text" name="q" class="form-control" placeholder="بحث باسم المشترك..." value="{{ .SearchQuery }}">
                 </div>
             </div>
@@ -22,7 +274,12 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-hdd-network text-primary me-2"></i> سجلات جلسات المشتركين التاريخية
+        </h5>
+    </div>
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
@@ -42,32 +299,37 @@
             <tbody>
                 {{ range .Logs }}
                 <tr>
-                    <td>{{ .RadAcctID }}</td>
-                    <td><strong>{{ .UserName }}</strong></td>
+                    <td class="font-monospace small text-muted">#{{ .RadAcctID }}</td>
+                    <td><strong class="text-primary font-monospace">{{ .UserName }}</strong></td>
                     <td>{{ .NASIPAddress }}</td>
-                    <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
-                    <td class="small">{{ .AcctStartTime.Format "2006-01-02 15:04" }}</td>
-                    <td class="small">
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ .FramedIPAddress }}</span></td>
+                    <td class="small font-monospace">{{ .AcctStartTime.Format "2006-01-02 15:04" }}</td>
+                    <td class="small font-monospace">
                         {{ if .AcctStopTime.Valid }}
                             {{ .AcctStopTime.Time.Format "2006-01-02 15:04" }}
                         {{ else }}
                             <span class="badge bg-success">متصل الآن</span>
                         {{ end }}
                     </td>
-                    <td>{{ .AcctSessionTime }} ثانية</td>
-                    <td>{{ .AcctInputOctets }} B</td>
-                    <td>{{ .AcctOutputOctets }} B</td>
-                    <td>{{ if .AcctTerminateCause }}{{ .AcctTerminateCause }}{{ else }}-{{ end }}</td>
+                    <td class="small">{{ .AcctSessionTime }} ثانية</td>
+                    <td class="font-monospace small">{{ .AcctInputOctets }} B</td>
+                    <td class="font-monospace small">{{ .AcctOutputOctets }} B</td>
+                    <td><span class="badge bg-secondary-subtle text-secondary">{{ if .AcctTerminateCause }}{{ .AcctTerminateCause }}{{ else }}-{{ end }}</span></td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="10" class="text-center py-5 text-muted">لا يوجد سجلات حتى الآن</td>
+                    <td colspan="10" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                        لا توجد سجلات جلسات حتى الآن
+                    </td>
                 </tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 </div>
+{{ end }}
+
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}

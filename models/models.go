@@ -264,3 +264,28 @@ type Subscriber struct {
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
+// BillingTransaction represents a financial or balance operation (renew, quota, payment, debt)
+type BillingTransaction struct {
+	ID            int64     `json:"id"`
+	Username      string    `json:"username"`
+	ContractNo    string    `json:"contract_no"`
+	FullName      string    `json:"full_name"`
+	Type          string    `json:"type"`           // "renew", "quota", "payment", "adjustment"
+	Description   string    `json:"description"`
+	Amount        float64   `json:"amount"`
+	PaymentStatus string    `json:"payment_status"` // "paid", "unpaid"
+	PaymentMethod string    `json:"payment_method"` // "cash", "vodafone_cash", "instapay", "bank"
+	Notes         string    `json:"notes"`
+	CreatedBy     string    `json:"created_by"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// BillingSummary represents financial metrics for reporting
+type BillingSummary struct {
+	TotalTransactions int64   `json:"total_transactions"`
+	TotalSales        float64 `json:"total_sales"`
+	TotalPaid         float64 `json:"total_paid"`
+	TotalUnpaidDebt   float64 `json:"total_unpaid_debt"`
+	TotalCustomerDebt float64 `json:"total_customer_debt"`
+}
+

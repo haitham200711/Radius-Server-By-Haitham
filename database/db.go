@@ -278,6 +278,26 @@ func (d *DB) InitSchema() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			INDEX idx_sstp_user (username)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 11. Billing Transactions & Debt Logs (سجل العمليات المالية والديون)
+		`CREATE TABLE IF NOT EXISTS billing_transactions (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			username VARCHAR(64) NOT NULL,
+			contract_no VARCHAR(32) DEFAULT '',
+			full_name VARCHAR(150) DEFAULT '',
+			type VARCHAR(32) NOT NULL,
+			description VARCHAR(255) NOT NULL,
+			amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+			payment_status VARCHAR(20) NOT NULL DEFAULT 'paid',
+			payment_method VARCHAR(50) DEFAULT 'cash',
+			notes TEXT,
+			created_by VARCHAR(64) DEFAULT 'admin',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_billing_user (username),
+			INDEX idx_billing_status (payment_status),
+			INDEX idx_billing_type (type),
+			INDEX idx_billing_date (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -1314,3 +1334,254 @@ func (d *DB) BulkAddDebt(usernames []string, amount float64) error {
 
 	return tx.Commit()
 }
+
+// --- Billing & Financial Operations ---
+
+func (d *DB) RenewSubscriberBilling(username, profileName string, price float64, isPaid bool, method, notes, adminUser string) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if profileName == "" {
+		_ = tx.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+	}
+
+	var p models.Profile
+	err = tx.QueryRow(`SELECT id, name, display_name, quota_bytes, validity_value, validity_unit, price FROM profiles WHERE name = ?`, profileName).Scan(
+		&p.ID, &p.Name, &p.DisplayName, &p.QuotaBytes, &p.ValidityValue, &p.ValidityUnit, &p.Price,
+	)
+	if err != nil {
+		return fmt.Errorf("profile %s not found: %w", profileName, err)
+	}
+
+	if price <= 0 {
+		price = p.Price
+	}
+
+	newExp := p.CalculateExpiration(time.Now())
+
+	_, err = tx.Exec(`UPDATE subscribers SET
+		profile_name = ?,
+		quota_bytes = ?,
+		expiration_date = ?,
+		status = 'active'
+		WHERE username = ?`, p.Name, p.QuotaBytes, newExp, username)
+	if err != nil {
+		return err
+	}
+
+	expStr := newExp.Format("02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
+	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, expStr)
+
+	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", username)
+	_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", username, p.Name)
+
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+	if p.QuotaBytes > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", p.QuotaBytes))
+	}
+
+	var contractNo, fullName string
+	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, '') FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName)
+	if fullName == "" {
+		fullName = username
+	}
+
+	payStatus := "paid"
+	if !isPaid {
+		payStatus = "unpaid"
+		if price > 0 {
+			_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", price, username)
+		}
+	}
+
+	if method == "" {
+		method = "cash"
+	}
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+
+	desc := fmt.Sprintf("تجديد باقة: %s", p.DisplayName)
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'renew', ?, ?, ?, ?, ?, ?)`,
+		username, contractNo, fullName, desc, price, payStatus, method, notes, adminUser)
+
+	return tx.Commit()
+}
+
+func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, isPaid bool, method, notes, adminUser string) error {
+	if quotaGB <= 0 {
+		return fmt.Errorf("invalid quota")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	addBytes := int64(quotaGB * 1024 * 1024 * 1024)
+
+	_, _ = tx.Exec("UPDATE subscribers SET quota_bytes = quota_bytes + ? WHERE username = ?", addBytes, username)
+
+	var currLimitStr string
+	errQ := tx.QueryRow("SELECT value FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username).Scan(&currLimitStr)
+	if errQ == nil {
+		currLimit, _ := strconv.ParseInt(currLimitStr, 10, 64)
+		newLimit := currLimit + addBytes
+		_, _ = tx.Exec("UPDATE radreply SET value = ? WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", fmt.Sprintf("%d", newLimit), username)
+	} else {
+		var newLimit int64
+		_ = tx.QueryRow("SELECT quota_bytes FROM subscribers WHERE username = ?", username).Scan(&newLimit)
+		if newLimit > 0 {
+			_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", newLimit))
+		}
+	}
+
+	var contractNo, fullName string
+	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, '') FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName)
+	if fullName == "" {
+		fullName = username
+	}
+
+	payStatus := "paid"
+	if !isPaid {
+		payStatus = "unpaid"
+		if price > 0 {
+			_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", price, username)
+		}
+	}
+
+	if method == "" {
+		method = "cash"
+	}
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+
+	desc := fmt.Sprintf("إضافة كوتة رصيد: %.1f GB", quotaGB)
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'quota', ?, ?, ?, ?, ?, ?)`,
+		username, contractNo, fullName, desc, price, payStatus, method, notes, adminUser)
+
+	return tx.Commit()
+}
+
+func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, adminUser string) error {
+	if amount <= 0 {
+		return fmt.Errorf("invalid amount")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var contractNo, fullName string
+	var currentDebt float64
+	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00) FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName, &currentDebt)
+	if fullName == "" {
+		fullName = username
+	}
+
+	newDebt := currentDebt - amount
+	if newDebt < 0 {
+		newDebt = 0
+	}
+
+	_, err = tx.Exec("UPDATE subscribers SET debt = ? WHERE username = ?", newDebt, username)
+	if err != nil {
+		return err
+	}
+
+	if method == "" {
+		method = "cash"
+	}
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+
+	desc := fmt.Sprintf("سداد نقدي من المديونية (متبقي: %.2f ج.م)", newDebt)
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
+		username, contractNo, fullName, desc, amount, method, notes, adminUser)
+
+	return tx.Commit()
+}
+
+func (d *DB) GetBillingTransactions(search, typeFilter, statusFilter string, limit, offset int) ([]models.BillingTransaction, int, error) {
+	query := `SELECT id, username, contract_no, full_name, type, description, amount, payment_status, payment_method, COALESCE(notes, ''), created_by, created_at
+		FROM billing_transactions WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM billing_transactions WHERE 1=1`
+
+	var args []interface{}
+	var countArgs []interface{}
+
+	if search != "" {
+		query += " AND (username LIKE ? OR full_name LIKE ? OR contract_no LIKE ? OR description LIKE ?)"
+		countQuery += " AND (username LIKE ? OR full_name LIKE ? OR contract_no LIKE ? OR description LIKE ?)"
+		sArg := "%" + search + "%"
+		args = append(args, sArg, sArg, sArg, sArg)
+		countArgs = append(countArgs, sArg, sArg, sArg, sArg)
+	}
+
+	if typeFilter != "" {
+		query += " AND type = ?"
+		countQuery += " AND type = ?"
+		args = append(args, typeFilter)
+		countArgs = append(countArgs, typeFilter)
+	}
+
+	if statusFilter != "" {
+		query += " AND payment_status = ?"
+		countQuery += " AND payment_status = ?"
+		args = append(args, statusFilter)
+		countArgs = append(countArgs, statusFilter)
+	}
+
+	var totalCount int
+	_ = d.QueryRow(countQuery, countArgs...).Scan(&totalCount)
+
+	query += " ORDER BY id DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := d.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var list []models.BillingTransaction
+	for rows.Next() {
+		var t models.BillingTransaction
+		if err := rows.Scan(
+			&t.ID, &t.Username, &t.ContractNo, &t.FullName, &t.Type, &t.Description,
+			&t.Amount, &t.PaymentStatus, &t.PaymentMethod, &t.Notes, &t.CreatedBy, &t.CreatedAt,
+		); err == nil {
+			list = append(list, t)
+		}
+	}
+
+	return list, totalCount, nil
+}
+
+func (d *DB) GetBillingFinancialSummary() (models.BillingSummary, error) {
+	var s models.BillingSummary
+
+	_ = d.QueryRow("SELECT COUNT(*) FROM billing_transactions").Scan(&s.TotalTransactions)
+	_ = d.QueryRow("SELECT COALESCE(SUM(amount), 0.00) FROM billing_transactions WHERE type IN ('renew', 'quota')").Scan(&s.TotalSales)
+	_ = d.QueryRow("SELECT COALESCE(SUM(amount), 0.00) FROM billing_transactions WHERE payment_status = 'paid'").Scan(&s.TotalPaid)
+	_ = d.QueryRow("SELECT COALESCE(SUM(amount), 0.00) FROM billing_transactions WHERE payment_status = 'unpaid'").Scan(&s.TotalUnpaidDebt)
+	_ = d.QueryRow("SELECT COALESCE(SUM(debt), 0.00) FROM subscribers").Scan(&s.TotalCustomerDebt)
+
+	return s, nil
+}
+
