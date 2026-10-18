@@ -81,9 +81,12 @@
 
                         <div class="col-md-12">
                             <label class="form-label fw-bold">باقة السرعة المحددة <span class="text-danger">*</span></label>
-                            <select name="profile" class="form-select" required>
+                            <select name="profile" id="profile_select" class="form-select" required onchange="onProfileSelected()">
+                                <option value="">-- اختر الباقة المحددة --</option>
                                 {{ range .Profiles }}
-                                <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                                <option value="{{ .Name }}" data-quota="{{ .QuotaGB }}" data-val="{{ .ValidityValue }}" data-unit="{{ .ValidityUnit }}">
+                                    {{ .DisplayName }} ({{ .Name }}) - [كوتة: {{ if gt .QuotaGB 0.0 }}{{ printf "%.1f" .QuotaGB }} GB{{ else }}مفتوح{{ end }} | مدة: {{ .ValidityDisplay }} | سرعة: {{ .RateLimit }}]
+                                </option>
                                 {{ end }}
                             </select>
                         </div>
@@ -104,19 +107,19 @@
                             <label class="form-label fw-bold">الكوتة الكلية (بالجيجابايت GB)</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-hdd-network"></i></span>
-                                <input type="number" step="1" min="0" name="quota_gb" class="form-control" value="0" placeholder="0 = غير محدود">
+                                <input type="number" step="1" min="0" name="quota_gb" id="quota_gb_input" class="form-control" value="0" placeholder="0 = غير محدود">
                                 <span class="input-group-text">GB</span>
                             </div>
-                            <small class="text-muted">أدخل 0 لكوتة مفتوحة غير محدودة.</small>
+                            <small class="text-muted">يتم ملؤها تلقائياً من الباقة، أو اتركها 0 إذا كانت الباقة مفتوحة.</small>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label fw-bold">تاريخ انتهاء الاشتراك</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
-                                <input type="datetime-local" name="expiration_date" class="form-control">
+                                <input type="datetime-local" name="expiration_date" id="expiration_date_input" class="form-control">
                             </div>
-                            <small class="text-muted">يتوقف العميل عن الاتصال في FreeRADIUS تلقائياً عند حلول هذا التاريخ.</small>
+                            <small class="text-muted">يتم حسابه تلقائياً من مدة الباقة، أو يمكنك تحديده يدوياً.</small>
                         </div>
                     </div>
                 </div>
@@ -154,4 +157,41 @@
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+{{ define "scripts" }}
+<script>
+function onProfileSelected() {
+    const sel = document.getElementById('profile_select');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.dataset) return;
+
+    const quota = parseFloat(opt.dataset.quota || 0);
+    const val = parseInt(opt.dataset.val || 30);
+    const unit = opt.dataset.unit || 'days';
+
+    // Auto-fill Quota
+    const quotaInput = document.getElementById('quota_gb_input');
+    if (quota > 0) {
+        quotaInput.value = quota;
+    }
+
+    // Auto-fill Expiration Date
+    const now = new Date();
+    if (unit === 'minutes') {
+        now.setMinutes(now.getMinutes() + val);
+    } else if (unit === 'hours') {
+        now.setHours(now.getHours() + val);
+    } else if (unit === 'days') {
+        now.setDate(now.getDate() + val);
+    } else if (unit === 'months') {
+        now.setMonth(now.getMonth() + val);
+    } else if (unit === 'years') {
+        now.setFullYear(now.getFullYear() + val);
+    }
+
+    // Format YYYY-MM-DDTHH:MM for datetime-local
+    const pad = n => String(n).padStart(2, '0');
+    const formatted = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    document.getElementById('expiration_date_input').value = formatted;
+}
+</script>
+{{ end }}

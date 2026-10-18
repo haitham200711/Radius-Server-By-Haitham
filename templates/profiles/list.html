@@ -2,43 +2,106 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h3 class="fw-bold mb-1">باقات السرعات والخدمات (MikroTik Profiles)</h3>
-        <p class="text-muted small mb-0">تحديد سرعات التحميل والرفع (Rate-Limit) وأسعار الاشتراكات والكروت</p>
+        <p class="text-muted small mb-0">تحديد سرعات التحميل والرفع، الكوتة الكلية، مدة الصلاحية، وسلوك انتهاء الكوتة أو الوقت</p>
     </div>
-    <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addProfileModal">
+    <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addProfileModal">
         <i class="bi bi-plus-circle me-1"></i> إضافة باقة جديدة
     </button>
 </div>
 
-<div class="card">
+<div class="card border-0 shadow-sm">
     <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
             <thead class="table-light">
                 <tr>
                     <th>كود الباقة</th>
                     <th>الاسم المعروض</th>
-                    <th>السرعة (Mikrotik-Rate-Limit)</th>
-                    <th>بول الآيبيهات (Pool)</th>
-                    <th>السعر الافتراضي</th>
+                    <th>السرعة (Rate-Limit)</th>
+                    <th>الكوتة الممنوحة</th>
+                    <th>مدة الصلاحية</th>
+                    <th>عند نفاد الكوتة</th>
+                    <th>عند انتهاء الوقت</th>
+                    <th>السعر</th>
                     <th class="text-end">خيارات</th>
                 </tr>
             </thead>
             <tbody>
                 {{ range .Profiles }}
                 <tr>
-                    <td><code>{{ .Name }}</code></td>
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ .Name }}</span></td>
                     <td><strong>{{ .DisplayName }}</strong></td>
-                    <td><span class="badge bg-info text-dark font-monospace fs-6">{{ .RateLimit }}</span></td>
-                    <td>{{ if .PoolName }}<code>{{ .PoolName }}</code>{{ else }}<span class="text-muted">افتراضي</span>{{ end }}</td>
+                    <td><span class="badge bg-info text-dark font-monospace">{{ .RateLimit }}</span></td>
+                    <td>
+                        {{ if gt .QuotaGB 0.0 }}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">
+                            <i class="bi bi-hdd-network me-1"></i>{{ printf "%.1f" .QuotaGB }} GB
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-secondary-subtle text-secondary border">مفتوح ∞</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle">
+                            <i class="bi bi-clock-history me-1"></i>{{ .ValidityDisplay }}
+                        </span>
+                    </td>
+                    <td>
+                        {{ if eq .OnQuotaAction "profile" }}
+                        <span class="badge bg-light text-primary border">
+                            <i class="bi bi-arrow-repeat me-1"></i>بروفايل: <strong>{{ .OnQuotaProfile }}</strong>
+                        </span>
+                        {{ else if eq .OnQuotaAction "pool" }}
+                        <span class="badge bg-light text-danger border">
+                            <i class="bi bi-signpost-2 me-1"></i>Pool: <code>{{ .OnQuotaPool }}</code>
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">فصل الخدمة</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if eq .OnTimeAction "profile" }}
+                        <span class="badge bg-light text-primary border">
+                            <i class="bi bi-arrow-repeat me-1"></i>بروفايل: <strong>{{ .OnTimeProfile }}</strong>
+                        </span>
+                        {{ else if eq .OnTimeAction "pool" }}
+                        <span class="badge bg-light text-danger border">
+                            <i class="bi bi-signpost-2 me-1"></i>Pool: <code>{{ .OnTimePool }}</code>
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">فصل الخدمة</span>
+                        {{ end }}
+                    </td>
                     <td><strong class="text-success">{{ printf "%.2f" .Price }} ج.م</strong></td>
                     <td class="text-end">
-                        <a href="/profiles/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة؟');">
+                        <button class="btn btn-sm btn-outline-primary me-1 btn-edit-profile"
+                            data-id="{{ .ID }}"
+                            data-name="{{ .Name }}"
+                            data-display="{{ .DisplayName }}"
+                            data-ratelimit="{{ .RateLimit }}"
+                            data-pool="{{ .PoolName }}"
+                            data-price="{{ .Price }}"
+                            data-quotagb="{{ .QuotaGB }}"
+                            data-validityval="{{ .ValidityValue }}"
+                            data-validityunit="{{ .ValidityUnit }}"
+                            data-onquotaaction="{{ .OnQuotaAction }}"
+                            data-onquotaprofile="{{ .OnQuotaProfile }}"
+                            data-onquotapool="{{ .OnQuotaPool }}"
+                            data-ontimeaction="{{ .OnTimeAction }}"
+                            data-ontimeprofile="{{ .OnTimeProfile }}"
+                            data-ontimepool="{{ .OnTimePool }}">
+                            <i class="bi bi-pencil-square"></i> تعديل
+                        </button>
+                        <a href="/profiles/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة نهائياً من FreeRADIUS؟');">
                             <i class="bi bi-trash"></i> حذف
                         </a>
                     </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">لا يوجد باقات مضافة</td>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                        لا توجد باقات سرعات مضافة حالياً
+                    </td>
                 </tr>
                 {{ end }}
             </tbody>
@@ -48,39 +111,269 @@
 
 <!-- Modal Add Profile -->
 <div class="modal fade" id="addProfileModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">إضافة باقة سرعة جديدة</h5>
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="bi bi-plus-circle me-1"></i> إضافة باقة خدمة جديدة
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/profiles/add">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">كود الباقة (اسم الجروب بالراديوس):</label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: SPEED_10M" required>
+                <div class="modal-body p-4">
+                    <!-- 1. الأساسيات -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-speedometer2 me-1"></i> البيانات الأساسية والسرعة (MikroTik)
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">كود الباقة (اسم الجروب بالراديوس): <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control font-monospace" placeholder="مثال: SPEED_10M_140G" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الاسم التجاري المعروض: <span class="text-danger">*</span></label>
+                            <input type="text" name="display_name" class="form-control" placeholder="مثال: باقة سوبر 10 ميجا - 140 جيجا" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">السرعة (Rate-Limit): <span class="text-danger">*</span></label>
+                            <input type="text" name="rate_limit" class="form-control font-monospace" placeholder="مثال: 5M/10M" required>
+                            <small class="text-muted">رفع / تحميل (Upload/Download)</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">بول الآيبيهات (IP Pool - اختياري):</label>
+                            <input type="text" name="pool_name" class="form-control font-monospace" placeholder="مثال: pppoe-pool">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">السعر الافتراضي (ج.م):</label>
+                            <input type="number" step="0.5" name="price" class="form-control" value="150" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">الاسم التجاري المعروض:</label>
-                        <input type="text" name="display_name" class="form-control" placeholder="مثال: 10 ميجا غير محدود" required>
+
+                    <!-- 2. الكوتة والصلاحية -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-hdd-network me-1"></i> الكوتة الممنوحة ومدة الصلاحية (عند التجديد)
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الكوتة الكلية الممنوحة للعميل:</label>
+                            <div class="input-group">
+                                <input type="number" step="1" min="0" name="quota_gb" class="form-control" value="0" placeholder="0">
+                                <span class="input-group-text">جيجابايت (GB)</span>
+                            </div>
+                            <small class="text-muted">ضع 0 لكوتة مفتوحة غير محدودة.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">مدة الصلاحية المعطاة للعميل:</label>
+                            <div class="input-group">
+                                <input type="number" min="1" name="validity_value" class="form-control" value="30" required>
+                                <select name="validity_unit" class="form-select" style="max-width: 140px;">
+                                    <option value="days" selected>أيام</option>
+                                    <option value="months">شهور</option>
+                                    <option value="years">سنوات</option>
+                                    <option value="hours">ساعات</option>
+                                    <option value="minutes">دقائق</option>
+                                </select>
+                            </div>
+                            <small class="text-muted">المدة التي تُضاف لتاريخ انتهاء العميل عند اشتراكه أو تجديده.</small>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">محدد السرعة للمايكروتك (Rate-Limit):</label>
-                        <input type="text" name="rate_limit" class="form-control" placeholder="مثال: 5M/10M أو 2048k/4096k" required>
-                        <small class="text-muted">صيغة المايكروتك: Upload/Download</small>
+
+                    <!-- 3. عند انتهاء الكوتة -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i> إجراء وسلوك النظام عند انتهاء الكوتة
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الإجراء عند نفاد الكوتة:</label>
+                            <select name="on_quota_action" id="add_on_quota_action" class="form-select" onchange="toggleQuotaAction(this.value, 'add')">
+                                <option value="disconnect">فصل الخدمة وتجميد الحساب</option>
+                                <option value="profile">تحويل إلى بروفايل سرعة آخر (FUP)</option>
+                                <option value="pool">تحويل إلى IP Pool محدد</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="add_on_quota_profile_box">
+                            <label class="form-label fw-bold">البروفايل البديل عند نفاد الكوتة:</label>
+                            <select name="on_quota_profile" class="form-select">
+                                <option value="">-- اختر البروفايل البديل --</option>
+                                {{ range .Profiles }}
+                                <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="add_on_quota_pool_box">
+                            <label class="form-label fw-bold">اسم الـ Pool البديل:</label>
+                            <input type="text" name="on_quota_pool" class="form-control font-monospace" placeholder="مثال: fup_pool">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">اسم بول الآيبيهات (IP Pool بالمايكروتك - اختياري):</label>
-                        <input type="text" name="pool_name" class="form-control" placeholder="pppoe-pool">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">السعر الافتراضي (ج.م):</label>
-                        <input type="number" step="0.5" name="price" class="form-control" value="150" required>
+
+                    <!-- 4. عند انتهاء الوقت -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-hourglass-bottom me-1"></i> إجراء وسلوك النظام عند انتهاء الوقت / الصلاحية
+                    </h6>
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الإجراء عند انتهاء الوقت:</label>
+                            <select name="on_time_action" id="add_on_time_action" class="form-select" onchange="toggleTimeAction(this.value, 'add')">
+                                <option value="disconnect">فصل الخدمة وتجميد الحساب</option>
+                                <option value="profile">تحويل إلى بروفايل سرعة آخر</option>
+                                <option value="pool">تحويل إلى IP Pool محدد</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="add_on_time_profile_box">
+                            <label class="form-label fw-bold">البروفايل البديل عند انتهاء الوقت:</label>
+                            <select name="on_time_profile" class="form-select">
+                                <option value="">-- اختر البروفايل البديل --</option>
+                                {{ range .Profiles }}
+                                <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="add_on_time_pool_box">
+                            <label class="form-label fw-bold">اسم الـ Pool البديل:</label>
+                            <input type="text" name="on_time_pool" class="form-control font-monospace" placeholder="مثال: expired_pool">
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">حفظ الباقة في FreeRADIUS</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> حفظ الباقة في FreeRADIUS
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Profile -->
+<div class="modal fade" id="editProfileModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="bi bi-pencil-square me-1"></i> تعديل باقة الخدمة
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/profiles/edit">
+                <input type="hidden" name="id" id="edit_id">
+                <div class="modal-body p-4">
+                    <!-- 1. الأساسيات -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-speedometer2 me-1"></i> البيانات الأساسية والسرعة
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">كود الباقة:</label>
+                            <input type="text" name="name" id="edit_name" class="form-control font-monospace" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الاسم التجاري المعروض: <span class="text-danger">*</span></label>
+                            <input type="text" name="display_name" id="edit_display_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">السرعة (Rate-Limit): <span class="text-danger">*</span></label>
+                            <input type="text" name="rate_limit" id="edit_rate_limit" class="form-control font-monospace" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">بول الآيبيهات (IP Pool):</label>
+                            <input type="text" name="pool_name" id="edit_pool_name" class="form-control font-monospace">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">السعر الافتراضي (ج.م):</label>
+                            <input type="number" step="0.5" name="price" id="edit_price" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <!-- 2. الكوتة والصلاحية -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-hdd-network me-1"></i> الكوتة الممنوحة ومدة الصلاحية
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الكوتة الكلية الممنوحة:</label>
+                            <div class="input-group">
+                                <input type="number" step="1" min="0" name="quota_gb" id="edit_quota_gb" class="form-control">
+                                <span class="input-group-text">جيجابايت (GB)</span>
+                            </div>
+                            <small class="text-muted">0 تعني مفتوح / غير محدود.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">مدة الصلاحية:</label>
+                            <div class="input-group">
+                                <input type="number" min="1" name="validity_value" id="edit_validity_value" class="form-control" required>
+                                <select name="validity_unit" id="edit_validity_unit" class="form-select" style="max-width: 140px;">
+                                    <option value="days">أيام</option>
+                                    <option value="months">شهور</option>
+                                    <option value="years">سنوات</option>
+                                    <option value="hours">ساعات</option>
+                                    <option value="minutes">دقائق</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. عند انتهاء الكوتة -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i> إجراء عند انتهاء الكوتة
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الإجراء:</label>
+                            <select name="on_quota_action" id="edit_on_quota_action" class="form-select" onchange="toggleQuotaAction(this.value, 'edit')">
+                                <option value="disconnect">فصل الخدمة وتجميد الحساب</option>
+                                <option value="profile">تحويل إلى بروفايل سرعة آخر (FUP)</option>
+                                <option value="pool">تحويل إلى IP Pool محدد</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="edit_on_quota_profile_box">
+                            <label class="form-label fw-bold">البروفايل البديل:</label>
+                            <select name="on_quota_profile" id="edit_on_quota_profile" class="form-select">
+                                <option value="">-- اختر البروفايل البديل --</option>
+                                {{ range .Profiles }}
+                                <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="edit_on_quota_pool_box">
+                            <label class="form-label fw-bold">اسم الـ Pool البديل:</label>
+                            <input type="text" name="on_quota_pool" id="edit_on_quota_pool" class="form-control font-monospace">
+                        </div>
+                    </div>
+
+                    <!-- 4. عند انتهاء الوقت -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-hourglass-bottom me-1"></i> إجراء عند انتهاء الوقت
+                    </h6>
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الإجراء:</label>
+                            <select name="on_time_action" id="edit_on_time_action" class="form-select" onchange="toggleTimeAction(this.value, 'edit')">
+                                <option value="disconnect">فصل الخدمة وتجميد الحساب</option>
+                                <option value="profile">تحويل إلى بروفايل سرعة آخر</option>
+                                <option value="pool">تحويل إلى IP Pool محدد</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="edit_on_time_profile_box">
+                            <label class="form-label fw-bold">البروفايل البديل:</label>
+                            <select name="on_time_profile" id="edit_on_time_profile" class="form-select">
+                                <option value="">-- اختر البروفايل البديل --</option>
+                                {{ range .Profiles }}
+                                <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-none" id="edit_on_time_pool_box">
+                            <label class="form-label fw-bold">اسم الـ Pool البديل:</label>
+                            <input type="text" name="on_time_pool" id="edit_on_time_pool" class="form-control font-monospace">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> حفظ التعديلات
+                    </button>
                 </div>
             </form>
         </div>
@@ -89,4 +382,65 @@
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+function toggleQuotaAction(val, prefix) {
+    const profBox = document.getElementById(prefix + '_on_quota_profile_box');
+    const poolBox = document.getElementById(prefix + '_on_quota_pool_box');
+    if (val === 'profile') {
+        profBox.classList.remove('d-none');
+        poolBox.classList.add('d-none');
+    } else if (val === 'pool') {
+        profBox.classList.add('d-none');
+        poolBox.classList.remove('d-none');
+    } else {
+        profBox.classList.add('d-none');
+        poolBox.classList.add('d-none');
+    }
+}
+
+function toggleTimeAction(val, prefix) {
+    const profBox = document.getElementById(prefix + '_on_time_profile_box');
+    const poolBox = document.getElementById(prefix + '_on_time_pool_box');
+    if (val === 'profile') {
+        profBox.classList.remove('d-none');
+        poolBox.classList.add('d-none');
+    } else if (val === 'pool') {
+        profBox.classList.add('d-none');
+        poolBox.classList.remove('d-none');
+    } else {
+        profBox.classList.add('d-none');
+        poolBox.classList.add('d-none');
+    }
+}
+
+document.querySelectorAll('.btn-edit-profile').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const d = this.dataset;
+        document.getElementById('edit_id').value = d.id;
+        document.getElementById('edit_name').value = d.name;
+        document.getElementById('edit_display_name').value = d.display;
+        document.getElementById('edit_rate_limit').value = d.ratelimit;
+        document.getElementById('edit_pool_name').value = d.pool;
+        document.getElementById('edit_price').value = d.price;
+        document.getElementById('edit_quota_gb').value = d.quotagb;
+        document.getElementById('edit_validity_value').value = d.validityval || 30;
+        document.getElementById('edit_validity_unit').value = d.validityunit || 'days';
+
+        document.getElementById('edit_on_quota_action').value = d.onquotaaction || 'disconnect';
+        document.getElementById('edit_on_quota_profile').value = d.onquotaprofile || '';
+        document.getElementById('edit_on_quota_pool').value = d.onquotapool || '';
+        toggleQuotaAction(d.onquotaaction || 'disconnect', 'edit');
+
+        document.getElementById('edit_on_time_action').value = d.ontimeaction || 'disconnect';
+        document.getElementById('edit_on_time_profile').value = d.ontimeprofile || '';
+        document.getElementById('edit_on_time_pool').value = d.ontimepool || '';
+        toggleTimeAction(d.ontimeaction || 'disconnect', 'edit');
+
+        const modal = new bootstrap.Modal(document.getElementById('editProfileModal'));
+        modal.show();
+    });
+});
+</script>
+{{ end }}

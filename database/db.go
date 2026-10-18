@@ -81,9 +81,17 @@ func (d *DB) InitSchema() error {
 			pool_name VARCHAR(64) DEFAULT '',
 			quota_bytes BIGINT DEFAULT 0,
 			uptime_seconds INT DEFAULT 0,
+			validity_value INT DEFAULT 30,
+			validity_unit VARCHAR(20) DEFAULT 'days',
 			price DECIMAL(10, 2) DEFAULT 0.00,
 			shared_users INT DEFAULT 1,
 			mikrotik_address_list VARCHAR(64) DEFAULT '',
+			on_quota_action VARCHAR(20) DEFAULT 'disconnect',
+			on_quota_profile VARCHAR(64) DEFAULT '',
+			on_quota_pool VARCHAR(64) DEFAULT '',
+			on_time_action VARCHAR(20) DEFAULT 'disconnect',
+			on_time_profile VARCHAR(64) DEFAULT '',
+			on_time_pool VARCHAR(64) DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
@@ -249,6 +257,21 @@ func (d *DB) InitSchema() error {
 		}
 	}
 
+	// Schema migrations for profiles
+	migrations := []string{
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS validity_value INT DEFAULT 30;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS validity_unit VARCHAR(20) DEFAULT 'days';`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_quota_action VARCHAR(20) DEFAULT 'disconnect';`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_quota_profile VARCHAR(64) DEFAULT '';`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_quota_pool VARCHAR(64) DEFAULT '';`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_action VARCHAR(20) DEFAULT 'disconnect';`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_profile VARCHAR(64) DEFAULT '';`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_pool VARCHAR(64) DEFAULT '';`,
+	}
+	for _, m := range migrations {
+		_, _ = d.Exec(m)
+	}
+
 	// Seed default Admin if not present
 	var adminCount int
 	_ = d.QueryRow("SELECT COUNT(*) FROM admins").Scan(&adminCount)
@@ -345,6 +368,23 @@ func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 	}
 	if sub.Status == "" {
 		sub.Status = "active"
+	}
+
+	// Auto-fill quota and expiration from profile if not explicitly set
+	if sub.ProfileName != "" && (sub.QuotaBytes == 0 || !sub.ExpirationDate.Valid) {
+		var profQuota int64
+		var valVal int
+		var valUnit string
+		err := tx.QueryRow("SELECT quota_bytes, validity_value, validity_unit FROM profiles WHERE name = ?", sub.ProfileName).Scan(&profQuota, &valVal, &valUnit)
+		if err == nil {
+			if sub.QuotaBytes == 0 && profQuota > 0 {
+				sub.QuotaBytes = profQuota
+			}
+			if !sub.ExpirationDate.Valid && valVal > 0 {
+				p := &models.Profile{ValidityValue: valVal, ValidityUnit: valUnit}
+				sub.ExpirationDate = sql.NullTime{Time: p.CalculateExpiration(time.Now()), Valid: true}
+			}
+		}
 	}
 
 	// 1. Insert or update in subscribers table
@@ -522,4 +562,203 @@ func randomLetters(n int) string {
 		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(b)
+}
+
+// --- Profile Methods ---
+
+func (d *DB) GetProfiles() ([]models.Profile, error) {
+	rows, err := d.Query(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
+		validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+		on_quota_action, on_quota_profile, on_quota_pool,
+		on_time_action, on_time_profile, on_time_pool, created_at
+		FROM profiles ORDER BY id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.Profile
+	for rows.Next() {
+		var p models.Profile
+		err := rows.Scan(
+			&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
+			&p.ValidityValue, &p.ValidityUnit, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
+			&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
+			&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
+		)
+		if err == nil {
+			if p.QuotaBytes > 0 {
+				p.QuotaGB = float64(p.QuotaBytes) / (1024 * 1024 * 1024)
+			}
+			list = append(list, p)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) GetProfile(id int64) (*models.Profile, error) {
+	var p models.Profile
+	err := d.QueryRow(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
+		validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+		on_quota_action, on_quota_profile, on_quota_pool,
+		on_time_action, on_time_profile, on_time_pool, created_at
+		FROM profiles WHERE id = ?`, id).Scan(
+		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
+		&p.ValidityValue, &p.ValidityUnit, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
+		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
+		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if p.QuotaBytes > 0 {
+		p.QuotaGB = float64(p.QuotaBytes) / (1024 * 1024 * 1024)
+	}
+	return &p, nil
+}
+
+func (d *DB) GetProfileByName(name string) (*models.Profile, error) {
+	var p models.Profile
+	err := d.QueryRow(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
+		validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+		on_quota_action, on_quota_profile, on_quota_pool,
+		on_time_action, on_time_profile, on_time_pool, created_at
+		FROM profiles WHERE name = ?`, name).Scan(
+		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
+		&p.ValidityValue, &p.ValidityUnit, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
+		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
+		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if p.QuotaBytes > 0 {
+		p.QuotaGB = float64(p.QuotaBytes) / (1024 * 1024 * 1024)
+	}
+	return &p, nil
+}
+
+func (d *DB) SaveProfile(p *models.Profile) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if p.ValidityValue <= 0 {
+		p.ValidityValue = 30
+	}
+	if p.ValidityUnit == "" {
+		p.ValidityUnit = "days"
+	}
+	if p.OnQuotaAction == "" {
+		p.OnQuotaAction = "disconnect"
+	}
+	if p.OnTimeAction == "" {
+		p.OnTimeAction = "disconnect"
+	}
+
+	if p.ID == 0 {
+		res, err := tx.Exec(`INSERT INTO profiles (name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
+			validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+			on_quota_action, on_quota_profile, on_quota_pool,
+			on_time_action, on_time_profile, on_time_pool)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
+			p.ValidityValue, p.ValidityUnit, p.Price, p.SharedUsers, p.MikrotikAddressList,
+			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
+			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool)
+		if err != nil {
+			return err
+		}
+		p.ID, _ = res.LastInsertId()
+	} else {
+		_, err := tx.Exec(`UPDATE profiles SET
+			name = ?, display_name = ?, rate_limit = ?, pool_name = ?, quota_bytes = ?, uptime_seconds = ?,
+			validity_value = ?, validity_unit = ?, price = ?, shared_users = ?, mikrotik_address_list = ?,
+			on_quota_action = ?, on_quota_profile = ?, on_quota_pool = ?,
+			on_time_action = ?, on_time_profile = ?, on_time_pool = ?
+			WHERE id = ?`,
+			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
+			p.ValidityValue, p.ValidityUnit, p.Price, p.SharedUsers, p.MikrotikAddressList,
+			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
+			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool, p.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update FreeRADIUS radgroupreply for Rate-Limit and Pool
+	_, _ = tx.Exec("DELETE FROM radgroupreply WHERE groupname = ? AND attribute IN ('Mikrotik-Rate-Limit', 'Framed-Pool')", p.Name)
+	if p.RateLimit != "" {
+		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?)", p.Name, p.RateLimit)
+	}
+	if p.PoolName != "" {
+		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Framed-Pool', ':=', ?)", p.Name, p.PoolName)
+	}
+
+	return tx.Commit()
+}
+
+func (d *DB) DeleteProfile(id int64) error {
+	var name string
+	_ = d.QueryRow("SELECT name FROM profiles WHERE id = ?", id).Scan(&name)
+	if name != "" {
+		_, _ = d.Exec("DELETE FROM profiles WHERE id = ?", id)
+		_, _ = d.Exec("DELETE FROM radgroupreply WHERE groupname = ?", name)
+		_, _ = d.Exec("DELETE FROM radgroupcheck WHERE groupname = ?", name)
+	}
+	return nil
+}
+
+func (d *DB) RenewSubscriber(username, profileName string) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// If profileName is empty, get from subscriber record
+	if profileName == "" {
+		_ = tx.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+	}
+
+	var p models.Profile
+	err = tx.QueryRow(`SELECT id, name, quota_bytes, validity_value, validity_unit FROM profiles WHERE name = ?`, profileName).Scan(
+		&p.ID, &p.Name, &p.QuotaBytes, &p.ValidityValue, &p.ValidityUnit,
+	)
+	if err != nil {
+		return fmt.Errorf("profile %s not found: %w", profileName, err)
+	}
+
+	// Calculate new expiration date: from now
+	newExp := p.CalculateExpiration(time.Now())
+
+	// Update subscribers table
+	_, err = tx.Exec(`UPDATE subscribers SET
+		profile_name = ?,
+		quota_bytes = ?,
+		expiration_date = ?,
+		status = 'active'
+		WHERE username = ?`, p.Name, p.QuotaBytes, newExp, username)
+	if err != nil {
+		return err
+	}
+
+	// Update radcheck Expiration
+	expStr := newExp.Format("02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
+	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, expStr)
+
+	// Update radusergroup
+	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", username)
+	_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", username, p.Name)
+
+	// Update radreply Mikrotik-Total-Limit
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+	if p.QuotaBytes > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", p.QuotaBytes))
+	}
+
+	return tx.Commit()
 }

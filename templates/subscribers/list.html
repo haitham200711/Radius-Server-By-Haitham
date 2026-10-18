@@ -91,6 +91,9 @@
                         {{ end }}
                     </td>
                     <td class="text-end">
+                        <a href="/subscribers/renew?username={{ .Username }}" class="btn btn-sm btn-outline-success me-1" onclick="return confirm('هل تريد تجديد اشتراك العميل {{ .FullName }} بناءً على كوتة ومدة باقته ({{ .Profile }})؟');">
+                            <i class="bi bi-arrow-repeat"></i> تجديد
+                        </a>
                         <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من FreeRADIUS والقاعدة؟');">
                             <i class="bi bi-trash"></i> حذف
                         </a>

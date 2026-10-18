@@ -77,6 +77,7 @@ func main() {
 	mux.HandleFunc("/subscribers", middleware.RequireAuth(subBP.ListHandler))
 	mux.HandleFunc("/subscribers/add", middleware.RequireAuth(subBP.AddHandler))
 	mux.HandleFunc("/subscribers/delete", middleware.RequireAuth(subBP.DeleteHandler))
+	mux.HandleFunc("/subscribers/renew", middleware.RequireAuth(subBP.RenewHandler))
 
 	// Cards Blueprint
 	cardsBP := cards.New(db, renderer)
@@ -92,6 +93,7 @@ func main() {
 	profBP := profiles.New(db, renderer)
 	mux.HandleFunc("/profiles", middleware.RequireAuth(profBP.ListHandler))
 	mux.HandleFunc("/profiles/add", middleware.RequireAuth(profBP.AddHandler))
+	mux.HandleFunc("/profiles/edit", middleware.RequireAuth(profBP.EditHandler))
 	mux.HandleFunc("/profiles/delete", middleware.RequireAuth(profBP.DeleteHandler))
 
 	// Routers (NAS) Blueprint

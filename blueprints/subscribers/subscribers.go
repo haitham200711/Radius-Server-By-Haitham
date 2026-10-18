@@ -116,16 +116,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		pRows, _ := bp.db.Query("SELECT id, name, display_name FROM profiles ORDER BY id ASC")
-		var profiles []models.Profile
-		if pRows != nil {
-			defer pRows.Close()
-			for pRows.Next() {
-				var p models.Profile
-				_ = pRows.Scan(&p.ID, &p.Name, &p.DisplayName)
-				profiles = append(profiles, p)
-			}
-		}
+		profiles, _ := bp.db.GetProfiles()
 
 		_ = bp.renderer.Render(w, "subscribers/add", map[string]interface{}{
 			"Title":       "إضافة مشترك جديد",
@@ -203,6 +194,24 @@ func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.URL.Query().Get("username")
 	if username != "" {
 		_ = bp.db.DeleteSubscriber(username)
+	}
+	http.Redirect(w, r, "/subscribers", http.StatusFound)
+}
+
+func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	profile := strings.TrimSpace(r.FormValue("profile"))
+	if username == "" {
+		username = strings.TrimSpace(r.URL.Query().Get("username"))
+	}
+	if profile == "" {
+		profile = strings.TrimSpace(r.URL.Query().Get("profile"))
+	}
+
+	if username != "" {
+		if err := bp.db.RenewSubscriber(username, profile); err != nil {
+			fmt.Printf("[Subscribers] Error renewing subscriber %s: %v\n", username, err)
+		}
 	}
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
 }

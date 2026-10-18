@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -66,12 +67,59 @@ type Profile struct {
 	DisplayName         string    `json:"display_name"`
 	RateLimit           string    `json:"rate_limit"` // e.g. "5M/10M" or "2048k/4096k"
 	PoolName            string    `json:"pool_name"`
-	QuotaBytes          int64     `json:"quota_bytes"`   // 0 = unlimited
+	QuotaBytes          int64     `json:"quota_bytes"`   // in bytes (0 = unlimited)
+	QuotaGB             float64   `json:"quota_gb"`      // in GB for display/forms
+	ValidityValue       int       `json:"validity_value"` // e.g. 30
+	ValidityUnit        string    `json:"validity_unit"`  // "minutes", "hours", "days", "months", "years"
 	UptimeSeconds       int64     `json:"uptime_seconds"` // 0 = unlimited
 	Price               float64   `json:"price"`
 	SharedUsers         int       `json:"shared_users"`
 	MikrotikAddressList string    `json:"mikrotik_address_list"`
+	OnQuotaAction       string    `json:"on_quota_action"`  // "disconnect", "profile", "pool"
+	OnQuotaProfile      string    `json:"on_quota_profile"` // fallback profile
+	OnQuotaPool         string    `json:"on_quota_pool"`    // fallback IP pool
+	OnTimeAction        string    `json:"on_time_action"`   // "disconnect", "profile", "pool"
+	OnTimeProfile       string    `json:"on_time_profile"`  // fallback profile
+	OnTimePool          string    `json:"on_time_pool"`     // fallback IP pool
 	CreatedAt           time.Time `json:"created_at"`
+}
+
+func (p *Profile) ValidityDisplay() string {
+	if p.ValidityValue <= 0 {
+		return "غير محدد"
+	}
+	unitMap := map[string]string{
+		"minutes": "دقيقة",
+		"hours":   "ساعة",
+		"days":    "يوم",
+		"months":  "شهر",
+		"years":   "سنة",
+	}
+	unit, ok := unitMap[p.ValidityUnit]
+	if !ok {
+		unit = p.ValidityUnit
+	}
+	return fmt.Sprintf("%d %s", p.ValidityValue, unit)
+}
+
+func (p *Profile) CalculateExpiration(from time.Time) time.Time {
+	if from.IsZero() {
+		from = time.Now()
+	}
+	switch p.ValidityUnit {
+	case "minutes":
+		return from.Add(time.Duration(p.ValidityValue) * time.Minute)
+	case "hours":
+		return from.Add(time.Duration(p.ValidityValue) * time.Hour)
+	case "days":
+		return from.AddDate(0, 0, p.ValidityValue)
+	case "months":
+		return from.AddDate(0, p.ValidityValue, 0)
+	case "years":
+		return from.AddDate(p.ValidityValue, 0, 0)
+	default:
+		return from.AddDate(0, 0, p.ValidityValue)
+	}
 }
 
 // Batch represents a generated batch of voucher cards

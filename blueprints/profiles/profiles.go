@@ -1,8 +1,10 @@
 package profiles
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
@@ -20,53 +22,147 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 }
 
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := bp.db.Query("SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds, price, created_at FROM profiles ORDER BY id ASC")
-	var profiles []models.Profile
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var p models.Profile
-			if err := rows.Scan(&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds, &p.Price, &p.CreatedAt); err == nil {
-				profiles = append(profiles, p)
-			}
-		}
+	profilesList, err := bp.db.GetProfiles()
+	if err != nil {
+		profilesList = []models.Profile{}
 	}
 
 	_ = bp.renderer.Render(w, "profiles/list", map[string]interface{}{
 		"Title":       "باقات السرعات والخدمات",
 		"ActiveMenu":  "profiles",
 		"CurrentUser": middleware.GetUser(r),
-		"Profiles":    profiles,
+		"Profiles":    profilesList,
 	})
 }
 
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		name := r.FormValue("name")
-		displayName := r.FormValue("display_name")
-		rateLimit := r.FormValue("rate_limit")
-		poolName := r.FormValue("pool_name")
-		price, _ := strconv.ParseFloat(r.FormValue("price"), 64)
-
-		if name != "" && rateLimit != "" {
-			_, err := bp.db.Exec(`INSERT INTO profiles (name, display_name, rate_limit, pool_name, price)
-				VALUES (?, ?, ?, ?, ?)`, name, displayName, rateLimit, poolName, price)
-			if err == nil {
-				_, _ = bp.db.Exec(`INSERT INTO radgroupreply (groupname, attribute, op, value)
-					VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?)`, name, rateLimit)
-			}
-		}
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/profiles", http.StatusFound)
+		return
 	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	displayName := strings.TrimSpace(r.FormValue("display_name"))
+	rateLimit := strings.TrimSpace(r.FormValue("rate_limit"))
+	poolName := strings.TrimSpace(r.FormValue("pool_name"))
+	price, _ := strconv.ParseFloat(r.FormValue("price"), 64)
+
+	// Quota (GB to bytes)
+	quotaGB, _ := strconv.ParseFloat(r.FormValue("quota_gb"), 64)
+	var quotaBytes int64
+	if quotaGB > 0 {
+		quotaBytes = int64(quotaGB * 1024 * 1024 * 1024)
+	}
+
+	// Validity
+	valVal, _ := strconv.Atoi(r.FormValue("validity_value"))
+	if valVal <= 0 {
+		valVal = 30
+	}
+	valUnit := strings.TrimSpace(r.FormValue("validity_unit"))
+	if valUnit == "" {
+		valUnit = "days"
+	}
+
+	// Fallback actions on quota
+	onQuotaAction := strings.TrimSpace(r.FormValue("on_quota_action"))
+	onQuotaProfile := strings.TrimSpace(r.FormValue("on_quota_profile"))
+	onQuotaPool := strings.TrimSpace(r.FormValue("on_quota_pool"))
+
+	// Fallback actions on time
+	onTimeAction := strings.TrimSpace(r.FormValue("on_time_action"))
+	onTimeProfile := strings.TrimSpace(r.FormValue("on_time_profile"))
+	onTimePool := strings.TrimSpace(r.FormValue("on_time_pool"))
+
+	if name != "" && rateLimit != "" {
+		if displayName == "" {
+			displayName = name
+		}
+		p := &models.Profile{
+			Name:           name,
+			DisplayName:    displayName,
+			RateLimit:      rateLimit,
+			PoolName:       poolName,
+			QuotaBytes:     quotaBytes,
+			ValidityValue:  valVal,
+			ValidityUnit:   valUnit,
+			Price:          price,
+			SharedUsers:    1,
+			OnQuotaAction:  onQuotaAction,
+			OnQuotaProfile: onQuotaProfile,
+			OnQuotaPool:    onQuotaPool,
+			OnTimeAction:   onTimeAction,
+			OnTimeProfile:  onTimeProfile,
+			OnTimePool:     onTimePool,
+		}
+		_ = bp.db.SaveProfile(p)
+	}
+
+	http.Redirect(w, r, "/profiles", http.StatusFound)
+}
+
+func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		idStr := r.URL.Query().Get("id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		p, err := bp.db.GetProfile(id)
+		if err != nil {
+			http.Error(w, "Profile not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(p)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		idStr := r.FormValue("id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		p, err := bp.db.GetProfile(id)
+		if err != nil {
+			http.Redirect(w, r, "/profiles", http.StatusFound)
+			return
+		}
+
+		p.DisplayName = strings.TrimSpace(r.FormValue("display_name"))
+		p.RateLimit = strings.TrimSpace(r.FormValue("rate_limit"))
+		p.PoolName = strings.TrimSpace(r.FormValue("pool_name"))
+		p.Price, _ = strconv.ParseFloat(r.FormValue("price"), 64)
+
+		quotaGB, _ := strconv.ParseFloat(r.FormValue("quota_gb"), 64)
+		if quotaGB > 0 {
+			p.QuotaBytes = int64(quotaGB * 1024 * 1024 * 1024)
+		} else {
+			p.QuotaBytes = 0
+		}
+
+		valVal, _ := strconv.Atoi(r.FormValue("validity_value"))
+		if valVal > 0 {
+			p.ValidityValue = valVal
+		}
+		if vu := strings.TrimSpace(r.FormValue("validity_unit")); vu != "" {
+			p.ValidityUnit = vu
+		}
+
+		p.OnQuotaAction = strings.TrimSpace(r.FormValue("on_quota_action"))
+		p.OnQuotaProfile = strings.TrimSpace(r.FormValue("on_quota_profile"))
+		p.OnQuotaPool = strings.TrimSpace(r.FormValue("on_quota_pool"))
+
+		p.OnTimeAction = strings.TrimSpace(r.FormValue("on_time_action"))
+		p.OnTimeProfile = strings.TrimSpace(r.FormValue("on_time_profile"))
+		p.OnTimePool = strings.TrimSpace(r.FormValue("on_time_pool"))
+
+		_ = bp.db.SaveProfile(p)
+	}
+
 	http.Redirect(w, r, "/profiles", http.StatusFound)
 }
 
 func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	var name string
-	_ = bp.db.QueryRow("SELECT name FROM profiles WHERE id = ?", id).Scan(&name)
-	if name != "" {
-		_, _ = bp.db.Exec("DELETE FROM profiles WHERE id = ?", id)
-		_, _ = bp.db.Exec("DELETE FROM radgroupreply WHERE groupname = ?", name)
+	idStr := r.URL.Query().Get("id")
+	id, _ := strconv.ParseInt(idStr, 10, 64)
+	if id > 0 {
+		_ = bp.db.DeleteProfile(id)
 	}
 	http.Redirect(w, r, "/profiles", http.StatusFound)
 }
