@@ -38,6 +38,8 @@ type SubscriberItem struct {
 	QuotaGB        float64
 	ExpirationDate string
 	Status         string
+	IsOnline       bool
+	OnlineIP       string
 }
 
 func getPageNumbers(current, total int) []int {
@@ -70,6 +72,7 @@ func getPageNumbers(current, total int) []int {
 
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	search := strings.TrimSpace(r.URL.Query().Get("q"))
+	statusFilter := strings.TrimSpace(r.URL.Query().Get("status")) // "online", "offline", or ""
 
 	// 1. Pagination & Limits (default 10, max 500)
 	limit := 10
@@ -85,7 +88,25 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		page = p
 	}
 
-	// 2. Count total matching subscribers
+	// 2. Fetch live connected sessions from radacct (acctstoptime IS NULL)
+	onlineMap := make(map[string]string)
+	activeRows, err := bp.db.Query(`SELECT username, framedipaddress FROM radacct WHERE acctstoptime IS NULL ORDER BY radacctid DESC`)
+	if err == nil {
+		defer activeRows.Close()
+		for activeRows.Next() {
+			var u, ip string
+			if err := activeRows.Scan(&u, &ip); err == nil && u != "" {
+				if _, exists := onlineMap[u]; !exists {
+					onlineMap[u] = ip
+				}
+			}
+		}
+	}
+
+	var onlineCount int
+	_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT username) FROM radacct WHERE acctstoptime IS NULL`).Scan(&onlineCount)
+
+	// 3. Count total matching subscribers
 	countQuery := `SELECT COUNT(DISTINCT rc.username)
 	FROM radcheck rc
 	LEFT JOIN subscribers s ON rc.username = s.username
@@ -96,6 +117,12 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		countQuery += " AND (rc.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?)"
 		searchArg := "%" + search + "%"
 		countArgs = append(countArgs, searchArg, searchArg, searchArg, searchArg)
+	}
+
+	if statusFilter == "online" {
+		countQuery += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+	} else if statusFilter == "offline" {
+		countQuery += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	}
 
 	var totalCount int
@@ -113,7 +140,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	// 3. Query paginated subscribers
+	// 4. Query paginated subscribers
 	query := `SELECT 
 		COALESCE(s.id, 0),
 		COALESCE(s.contract_no, '-'),
@@ -140,6 +167,13 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		searchArg := "%" + search + "%"
 		args = append(args, searchArg, searchArg, searchArg, searchArg)
 	}
+
+	if statusFilter == "online" {
+		query += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+	} else if statusFilter == "offline" {
+		query += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+	}
+
 	query += " GROUP BY rc.username ORDER BY COALESCE(s.id, rc.id) DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
@@ -173,6 +207,13 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					s.ExpirationDate = "غير محدد"
 				}
+
+				// Check active connection status & live IP
+				if liveIP, online := onlineMap[s.Username]; online {
+					s.IsOnline = true
+					s.OnlineIP = liveIP
+				}
+
 				list = append(list, s)
 			}
 		}
@@ -188,24 +229,26 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	profiles, _ := bp.db.GetProfiles()
 
 	_ = bp.renderer.Render(w, "subscribers/list", map[string]interface{}{
-		"Title":       "إدارة المشتركين والعقود",
-		"ActiveMenu":  "subscribers",
-		"CurrentUser": middleware.GetUser(r),
-		"Subscribers": list,
-		"SearchQuery": search,
-		"Page":        page,
-		"Limit":       limit,
-		"TotalCount":  totalCount,
-		"TotalPages":  totalPages,
-		"HasPrev":     page > 1,
-		"HasNext":     page < totalPages,
-		"PrevPage":    page - 1,
-		"NextPage":    page + 1,
-		"FromIndex":   fromIndex,
-		"ToIndex":     toIndex,
-		"PageNumbers": getPageNumbers(page, totalPages),
-		"PageSizes":   []int{10, 25, 50, 100, 200, 500},
-		"Profiles":    profiles,
+		"Title":        "إدارة المشتركين والعقود",
+		"ActiveMenu":   "subscribers",
+		"CurrentUser":  middleware.GetUser(r),
+		"Subscribers":  list,
+		"SearchQuery":  search,
+		"FilterStatus": statusFilter,
+		"OnlineCount":  onlineCount,
+		"Page":         page,
+		"Limit":        limit,
+		"TotalCount":   totalCount,
+		"TotalPages":   totalPages,
+		"HasPrev":      page > 1,
+		"HasNext":      page < totalPages,
+		"PrevPage":     page - 1,
+		"NextPage":     page + 1,
+		"FromIndex":    fromIndex,
+		"ToIndex":      toIndex,
+		"PageNumbers":  getPageNumbers(page, totalPages),
+		"PageSizes":    []int{10, 25, 50, 100, 200, 500},
+		"Profiles":     profiles,
 	})
 }
 

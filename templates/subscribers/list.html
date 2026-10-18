@@ -9,10 +9,35 @@
     </a>
 </div>
 
+<!-- Status Filter Tabs -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="d-flex gap-2">
+        <a href="/subscribers?limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "" }}btn-primary fw-bold{{ else }}btn-outline-secondary{{ end }}">
+            <i class="bi bi-people-fill me-1"></i> جميع المشتركين
+        </a>
+        <a href="/subscribers?status=online&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "online" }}btn-success fw-bold{{ else }}btn-outline-success{{ end }}">
+            <span class="spinner-grow spinner-grow-sm text-success me-1" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+            متصلين الآن ({{ .OnlineCount }})
+        </a>
+        <a href="/subscribers?status=offline&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "offline" }}btn-secondary fw-bold{{ else }}btn-outline-secondary{{ end }}">
+            <i class="bi bi-slash-circle me-1"></i> غير متصلين
+        </a>
+    </div>
+
+    {{ if .FilterStatus }}
+    <div>
+        <a href="/subscribers?limit={{ .Limit }}" class="badge bg-light text-dark text-decoration-none border p-2">
+            إلغاء الفلتر: {{ if eq .FilterStatus "online" }}متصلين فقط{{ else }}غير متصلين{{ end }} <i class="bi bi-x-circle ms-1"></i>
+        </a>
+    </div>
+    {{ end }}
+</div>
+
 <!-- Search & Page Size Filter -->
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
         <form method="GET" action="/subscribers" id="filterForm" class="row g-2 align-items-center">
+            <input type="hidden" name="status" value="{{ .FilterStatus }}">
             <div class="col-md-7">
                 <div class="input-group">
                     <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
@@ -82,6 +107,7 @@
                     <th style="width: 40px;" class="text-center">
                         <input type="checkbox" id="selectAllCheckbox" class="form-check-input" title="تحديد / إلغاء تحديد الكل في هذه الصفحة">
                     </th>
+                    <th>حالة الاتصال والآيبي</th>
                     <th>رقم العقد</th>
                     <th>اسم العميل</th>
                     <th>اسم المستخدم / المرور</th>
@@ -99,6 +125,28 @@
                 <tr id="row-{{ .Username }}">
                     <td class="text-center">
                         <input type="checkbox" class="form-check-input sub-checkbox" value="{{ .Username }}" onchange="updateSelectionState()">
+                    </td>
+                    <td>
+                        {{ if .IsOnline }}
+                        <div>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold">
+                                <span class="spinner-grow spinner-grow-sm text-success me-1" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                                متصل الآن
+                            </span>
+                        </div>
+                        <div class="font-monospace text-primary fw-bold small mt-1">
+                            <i class="bi bi-hdd-network me-1"></i>{{ if .OnlineIP }}{{ .OnlineIP }}{{ else }}ديناميكي{{ end }}
+                        </div>
+                        {{ else }}
+                        <div>
+                            <span class="badge bg-light text-muted border">
+                                <i class="bi bi-circle-fill text-secondary me-1" style="font-size: 0.55rem;"></i> غير متصل
+                            </span>
+                        </div>
+                        {{ if .IPAddress }}
+                        <small class="text-muted font-monospace d-block mt-1">ثابت: {{ .IPAddress }}</small>
+                        {{ end }}
+                        {{ end }}
                     </td>
                     <td><span class="badge bg-light text-dark border font-monospace">{{ .ContractNo }}</span></td>
                     <td>
@@ -159,7 +207,7 @@
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="11" class="text-center py-5 text-muted">
+                    <td colspan="12" class="text-center py-5 text-muted">
                         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
                         لا توجد بيانات مشتركين مطابقة
                     </td>
@@ -181,29 +229,29 @@
                 <ul class="pagination pagination-sm mb-0">
                     <!-- First Page -->
                     <li class="page-item {{ if eq .Page 1 }}disabled{{ end }}">
-                        <a class="page-link" href="/subscribers?page=1&limit={{ .Limit }}&q={{ .SearchQuery }}" title="الصفحة الأولى">
+                        <a class="page-link" href="/subscribers?page=1&limit={{ .Limit }}&q={{ .SearchQuery }}&status={{ .FilterStatus }}" title="الصفحة الأولى">
                             <i class="bi bi-chevron-double-right"></i>
                         </a>
                     </li>
                     <!-- Previous Page -->
                     <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
-                        <a class="page-link" href="/subscribers?page={{ .PrevPage }}&limit={{ .Limit }}&q={{ .SearchQuery }}">السابق</a>
+                        <a class="page-link" href="/subscribers?page={{ .PrevPage }}&limit={{ .Limit }}&q={{ .SearchQuery }}&status={{ .FilterStatus }}">السابق</a>
                     </li>
 
                     <!-- Page Numbers -->
                     {{ range .PageNumbers }}
                     <li class="page-item {{ if eq . $.Page }}active{{ end }}">
-                        <a class="page-link" href="/subscribers?page={{ . }}&limit={{ $.Limit }}&q={{ $.SearchQuery }}">{{ . }}</a>
+                        <a class="page-link" href="/subscribers?page={{ . }}&limit={{ $.Limit }}&q={{ $.SearchQuery }}&status={{ $.FilterStatus }}">{{ . }}</a>
                     </li>
                     {{ end }}
 
                     <!-- Next Page -->
                     <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
-                        <a class="page-link" href="/subscribers?page={{ .NextPage }}&limit={{ .Limit }}&q={{ .SearchQuery }}">التالي</a>
+                        <a class="page-link" href="/subscribers?page={{ .NextPage }}&limit={{ .Limit }}&q={{ .SearchQuery }}&status={{ .FilterStatus }}">التالي</a>
                     </li>
                     <!-- Last Page -->
                     <li class="page-item {{ if eq .Page .TotalPages }}disabled{{ end }}">
-                        <a class="page-link" href="/subscribers?page={{ .TotalPages }}&limit={{ .Limit }}&q={{ .SearchQuery }}" title="الصفحة الأخيرة">
+                        <a class="page-link" href="/subscribers?page={{ .TotalPages }}&limit={{ .Limit }}&q={{ .SearchQuery }}&status={{ .FilterStatus }}" title="الصفحة الأخيرة">
                             <i class="bi bi-chevron-double-left"></i>
                         </a>
                     </li>
@@ -235,6 +283,7 @@
                     <input type="hidden" name="limit" value="{{ .Limit }}">
                     <input type="hidden" name="page" value="{{ .Page }}">
                     <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
 
                     <p class="mb-2">أنت على وشك مسح <b class="text-danger bulk-count-text">0</b> مشترك محدد نهائياً.</p>
                     <div class="alert alert-warning small mb-0">
@@ -269,6 +318,7 @@
                     <input type="hidden" name="limit" value="{{ .Limit }}">
                     <input type="hidden" name="page" value="{{ .Page }}">
                     <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
 
                     <p class="mb-3">تجديد الاشتراك لعدد <b class="text-success bulk-count-text">0</b> مشترك محدد.</p>
 
@@ -311,6 +361,7 @@
                     <input type="hidden" name="limit" value="{{ .Limit }}">
                     <input type="hidden" name="page" value="{{ .Page }}">
                     <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
 
                     <p class="mb-3">إضافة كوتة رصيد بيانات لعدد <b class="text-primary bulk-count-text">0</b> مشترك محدد.</p>
 
@@ -358,6 +409,7 @@
                     <input type="hidden" name="limit" value="{{ .Limit }}">
                     <input type="hidden" name="page" value="{{ .Page }}">
                     <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
 
                     <p class="mb-3">تعديل رصيد / مديونية لعدد <b class="text-dark fw-bold bulk-count-text">0</b> مشترك محدد.</p>
 
