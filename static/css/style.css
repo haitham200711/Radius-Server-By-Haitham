@@ -1,0 +1,168 @@
+:root {
+    --sidebar-w: 250px;
+    --brand: #0d6efd;
+    --dark-bg: #1a2332;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cairo', sans-serif;
+    background: #f4f6f9;
+    color: #334155;
+    margin: 0;
+    padding: 0;
+}
+
+.sidebar {
+    width: var(--sidebar-w);
+    min-height: 100vh;
+    background: var(--dark-bg);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+}
+
+.sidebar-header {
+    padding: 22px 18px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    display: flex;
+    align-items: center;
+}
+.sidebar-header i { margin-left: 10px; color: var(--brand); font-size: 1.4rem; }
+
+.sidebar .nav-link {
+    color: #b8c2d6;
+    padding: 12px 20px;
+    border-right: 3px solid transparent;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+.sidebar .nav-link i { margin-left: 10px; font-size: 1.1rem; }
+.sidebar .nav-link:hover { background: rgba(255,255,255,.05); color: #fff; }
+.sidebar .nav-link.active {
+    background: rgba(13,110,253,.15);
+    color: #fff;
+    border-right-color: var(--brand);
+    font-weight: 600;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 16px 18px;
+    border-top: 1px solid rgba(255,255,255,.1);
+}
+.user-box { 
+    margin-bottom: 12px; 
+    color: #dfe6f0; 
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.role-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(13,110,253,0.3);
+    color: #60a5fa;
+}
+
+.content { min-height: 100vh; }
+
+.stat-card {
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    padding: 22px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
+    transition: transform 0.2s;
+}
+.stat-card:hover {
+    transform: translateY(-3px);
+}
+.stat-card .stat-value { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+.stat-card .stat-label { opacity: .9; font-size: 0.9rem; font-weight: 600; }
+.stat-card .bi { font-size: 2.2rem; opacity: .4; }
+
+.bg-grad-blue { background: linear-gradient(135deg,#0d6efd,#0a58ca); }
+.bg-grad-green { background: linear-gradient(135deg,#198754,#146c43); }
+.bg-grad-orange { background: linear-gradient(135deg,#fd7e14,#c85f0a); }
+.bg-grad-purple { background: linear-gradient(135deg,#6f42c1,#59339d); }
+.bg-grad-cyan { background: linear-gradient(135deg,#0dcaf0,#0891b2); }
+
+.card { 
+    border: none; 
+    border-radius: 12px; 
+    box-shadow: 0 1px 4px rgba(0,0,0,.06); 
+    background: #fff;
+}
+.card-header {
+    background: #fff;
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.25rem;
+    font-weight: 700;
+}
+
+.auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a2332, #0d6efd);
+}
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 16px;
+    padding: 25px;
+    background: #fff;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.template-thumb { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; }
+
+code.card-username { font-weight: 700; font-size: 1rem; color: #0d6efd; }
+
+/* Table enhancements */
+.table th {
+    font-weight: 700;
+    color: #64748b;
+    border-bottom-width: 1px;
+}
+.table td {
+    vertical-align: middle;
+}
+
+/* Card Print Layout (A4 Sheet) */
+@media print {
+    .sidebar, .btn, .no-print, header, footer {
+        display: none !important;
+    }
+    body, .content {
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .print-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    .print-card-box {
+        border: 1px dashed #94a3b8;
+        page-break-inside: avoid;
+    }
+}

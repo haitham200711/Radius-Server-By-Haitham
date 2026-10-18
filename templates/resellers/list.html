@@ -1,0 +1,111 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">إدارة الموزعين والوكلاء (Resellers)</h3>
+        <p class="text-muted small mb-0">إنشاء حسابات الموزعين وتحديد الصلاحيات والأرصدة المالية</p>
+    </div>
+    <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addResellerModal">
+        <i class="bi bi-person-plus me-1"></i> إضافة موزع جديد
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>اسم الموزع</th>
+                    <th>اسم المستخدم (Login)</th>
+                    <th>رقم الهاتف</th>
+                    <th>الرصيد المالي</th>
+                    <th>الحد الائتماني</th>
+                    <th>الحالة</th>
+                    <th class="text-end">خيارات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Resellers }}
+                <tr>
+                    <td><strong>{{ .Name }}</strong></td>
+                    <td><code>{{ .Username }}</code></td>
+                    <td>{{ if .Phone }}{{ .Phone }}{{ else }}<span class="text-muted">-</span>{{ end }}</td>
+                    <td><strong class="text-success fs-6">{{ printf "%.2f" .Balance }} ج.م</strong></td>
+                    <td>{{ printf "%.2f" .CreditLimit }} ج.م</td>
+                    <td>
+                        {{ if .IsActive }}
+                        <span class="badge bg-success">نشط</span>
+                        {{ else }}
+                        <span class="badge bg-danger">معطل</span>
+                        {{ end }}
+                    </td>
+                    <td class="text-end">
+                        <a href="/resellers/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا الموزع؟');">
+                            <i class="bi bi-trash"></i> حذف
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">لا يوجد أي موزع مسجل حالياً</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Add Reseller -->
+<div class="modal fade" id="addResellerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">إضافة موزع / وكيل جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/resellers/add">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم الموزع الكامل:</label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: سنتر النور للخدمات" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم الدخول (Username):</label>
+                            <input type="text" name="username" class="form-control" placeholder="مثال: elnoor" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">كلمة المرور:</label>
+                            <input type="password" name="password" class="form-control" placeholder="كلمة المرور" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">رقم الهاتف:</label>
+                        <input type="text" name="phone" class="form-control" placeholder="01xxxxxxxxx">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الرصيد الافتتاحي (ج.م):</label>
+                            <input type="number" step="10" name="balance" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الحد الائتماني (سلف):</label>
+                            <input type="number" step="10" name="credit_limit" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ملاحظات إضافية:</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="العنوان أو الملاحظات"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">حفظ الموزع</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

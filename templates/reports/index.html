@@ -1,0 +1,74 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">سجلات المحاسبة التاريخية (FreeRADIUS radacct)</h3>
+        <p class="text-muted small mb-0">سجل كامل بجميع اتصالات المشتركين واستهلاك البيانات وأسباب انتهاء الجلسات</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/reports" class="row g-2">
+            <div class="col-md-10">
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="بحث باسم المشترك..." value="{{ .SearchQuery }}">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-secondary w-100 fw-bold">بحث</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>المعرف</th>
+                    <th>اسم المشترك</th>
+                    <th>راوتر NAS</th>
+                    <th>IP المشترك</th>
+                    <th>وقت البدء</th>
+                    <th>وقت الانتهاء</th>
+                    <th>مدة الجلسة</th>
+                    <th>التحميل</th>
+                    <th>الرفع</th>
+                    <th>سبب الانتهاء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Logs }}
+                <tr>
+                    <td>{{ .RadAcctID }}</td>
+                    <td><strong>{{ .UserName }}</strong></td>
+                    <td>{{ .NASIPAddress }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
+                    <td class="small">{{ .AcctStartTime.Format "2006-01-02 15:04" }}</td>
+                    <td class="small">
+                        {{ if .AcctStopTime.Valid }}
+                            {{ .AcctStopTime.Time.Format "2006-01-02 15:04" }}
+                        {{ else }}
+                            <span class="badge bg-success">متصل الآن</span>
+                        {{ end }}
+                    </td>
+                    <td>{{ .AcctSessionTime }} ثانية</td>
+                    <td>{{ .AcctInputOctets }} B</td>
+                    <td>{{ .AcctOutputOctets }} B</td>
+                    <td>{{ if .AcctTerminateCause }}{{ .AcctTerminateCause }}{{ else }}-{{ end }}</td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="10" class="text-center py-5 text-muted">لا يوجد سجلات حتى الآن</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

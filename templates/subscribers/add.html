@@ -1,0 +1,53 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">إضافة مشترك جديد</h3>
+        <p class="text-muted small mb-0">تسجيل مشترك في FreeRADIUS (برودباند أو هوتسبوت)</p>
+    </div>
+    <a href="/subscribers" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-right me-1"></i> رجوع للمشتركين
+    </a>
+</div>
+
+<div class="card max-w-700 mx-auto" style="max-width: 650px;">
+    <div class="card-body p-4">
+        <form method="POST" action="/subscribers/add">
+            <div class="mb-3">
+                <label class="form-label fw-bold">اسم المستخدم (Username):</label>
+                <input type="text" name="username" class="form-control" required placeholder="مثال: user01">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">كلمة المرور (Password):</label>
+                <input type="text" name="password" class="form-control" required placeholder="كلمة المرور">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">الباقة والسرعة المحددة:</label>
+                <select name="profile" class="form-select" required>
+                    {{ range .Profiles }}
+                    <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                    {{ end }}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">تثبيت عنوان IP (Framed-IP - اختياري):</label>
+                <input type="text" name="static_ip" class="form-control" placeholder="مثال: 192.168.88.50">
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">قفل على ماك الجهاز (Calling-Station-Id - اختياري):</label>
+                <input type="text" name="calling_mac" class="form-control" placeholder="مثال: AA:BB:CC:DD:EE:FF">
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                <i class="bi bi-check-circle me-1"></i> حفظ وتفعيل المشترك في FreeRADIUS
+            </button>
+        </form>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

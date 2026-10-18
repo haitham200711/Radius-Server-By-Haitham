@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>طباعة دفعة الكروت {{ .BatchCode }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn-print {
+            background: #0d6efd;
+            color: #fff;
+            padding: 10px 24px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn-print:hover { background: #0b5ed7; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .card-box {
+            background: #fff;
+            border: 2px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 14px 16px;
+            position: relative;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            page-break-inside: avoid;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }
+        .brand-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .badge-price {
+            background: #ecfdf5;
+            color: #059669;
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+        .cred-row {
+            margin: 6px 0;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .cred-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #2563eb;
+            background: #eff6ff;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .card-footer {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-align: center;
+            margin-top: 8px;
+            border-top: 1px dashed #e2e8f0;
+            padding-top: 4px;
+        }
+
+        @media print {
+            body { background: #fff; padding: 0; }
+            .controls { display: none; }
+            .grid { gap: 8px; max-width: 100%; }
+            .card-box { border: 1px dashed #94a3b8; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button class="btn-print" onclick="window.print()">🖨️ طباعة شيت الكروت (A4)</button>
+    </div>
+
+    <div class="grid">
+        {{ range .Cards }}
+        <div class="card-box">
+            <div class="card-header">
+                <span class="brand-title">كارت شبكة واي فاي</span>
+                <span class="badge-price">{{ printf "%.0f" .Price }} ج.م</span>
+            </div>
+            <div class="cred-row">
+                <span>اسم المستخدم:</span>
+                <span class="cred-val">{{ .Username }}</span>
+            </div>
+            <div class="cred-row">
+                <span>كلمة المرور:</span>
+                <span class="cred-val">{{ .Password }}</span>
+            </div>
+            <div class="card-footer">
+                <span>الباقة: <strong>{{ .ProfileName }}</strong> | خدمة العملاء والدعم الفني</span>
+            </div>
+        </div>
+        {{ end }}
+    </div>
+</body>
+</html>

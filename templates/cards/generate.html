@@ -1,0 +1,67 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">توليد كروت جديدة بكميات ضخمة</h3>
+        <p class="text-muted small mb-0">إنشاء وتخزين الكروت في FreeRADIUS وتجهيزها للطباعة الفورية</p>
+    </div>
+    <a href="/cards" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-right me-1"></i> رجوع للدفعات
+    </a>
+</div>
+
+<div class="card max-w-700 mx-auto" style="max-width: 650px;">
+    <div class="card-body p-4">
+        <form method="POST" action="/cards/generate">
+            <div class="mb-3">
+                <label class="form-label fw-bold">عدد الكروت المطلوبة:</label>
+                <input type="number" name="count" class="form-control" value="100" min="1" max="50000" required>
+                <small class="text-muted">يدعم حتى 50,000 كارت دفعة واحدة بسرعة فائقة</small>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">بادئة اسم المستخدم (Prefix):</label>
+                    <input type="text" name="prefix" class="form-control" placeholder="مثال: CARD-">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">طول الاسم العشوائي:</label>
+                    <input type="number" name="char_len" class="form-control" value="6" min="4" max="16" required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">الباقة والسرعة المحددة:</label>
+                <select name="profile_id" class="form-select" required>
+                    {{ range .Profiles }}
+                    <option value="{{ .ID }}">{{ .DisplayName }} ({{ .Price }} ج.م)</option>
+                    {{ end }}
+                </select>
+            </div>
+
+            {{ if eq .CurrentUser.Role "admin" }}
+            <div class="mb-3">
+                <label class="form-label fw-bold">تخصيص لموزع (اختياري):</label>
+                <select name="reseller_id" class="form-select">
+                    <option value="0">المدير العام (بدون موزع)</option>
+                    {{ range .Resellers }}
+                    <option value="{{ .ID }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
+                    {{ end }}
+                </select>
+            </div>
+            {{ end }}
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">سعر البيع للكارت (ج.م - اختياري):</label>
+                <input type="number" step="0.5" name="price_per_card" class="form-control" placeholder="اتركه فارغاً لاعتماد سعر الباقة">
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                <i class="bi bi-lightning-charge me-1"></i> توليد الكروت وحفظها في FreeRADIUS فوراً
+            </button>
+        </form>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

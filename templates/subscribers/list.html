@@ -1,0 +1,65 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">إدارة المشتركين (PPPoE / Hotspot)</h3>
+        <p class="text-muted small mb-0">المشتركين المسجلين في قاعدة بيانات FreeRADIUS</p>
+    </div>
+    <a href="/subscribers/add" class="btn btn-primary fw-bold">
+        <i class="bi bi-person-plus me-1"></i> إضافة مشترك جديد
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/subscribers" class="row g-2">
+            <div class="col-md-10">
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="بحث باسم المشترك..." value="{{ .SearchQuery }}">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-secondary w-100 fw-bold">بحث</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>اسم المشترك</th>
+                    <th>كلمة المرور</th>
+                    <th>الباقة / الخدمة</th>
+                    <th>IP ثابت</th>
+                    <th class="text-end">خيارات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Subscribers }}
+                <tr>
+                    <td><strong>{{ .Username }}</strong></td>
+                    <td><code>{{ .Password }}</code></td>
+                    <td><span class="badge bg-primary">{{ .Profile }}</span></td>
+                    <td>{{ if .IPAddress }}<code>{{ .IPAddress }}</code>{{ else }}<span class="text-muted">ديناميكي</span>{{ end }}</td>
+                    <td class="text-end">
+                        <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك؟');">
+                            <i class="bi bi-trash"></i> حذف
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">لا يوجد مشتركين مطابقين</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

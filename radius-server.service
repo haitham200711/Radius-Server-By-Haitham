@@ -1,12 +1,15 @@
 [Unit]
-Description=Haitham RADIUS Server for MikroTik
-After=network.target
+Description=Haitham RADIUS Enterprise Platform & Dashboard
+After=network.target mariadb.service freeradius.service
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/opt/radius-server
-ExecStart=/opt/radius-server/radius-server -web-addr :8080 -db /opt/radius-server/radius.db
+Environment=WEB_ADDR=:5000
+Environment=DB_DRIVER=mysql
+Environment=DB_DSN=radius:radiuspass@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4
+ExecStart=/opt/radius-server/radius-platform
 Restart=always
 RestartSec=3
 LimitNOFILE=65535

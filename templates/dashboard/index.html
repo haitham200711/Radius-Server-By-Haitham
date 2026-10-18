@@ -1,0 +1,154 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">لوحة التحكم والمراقبة</h3>
+        <p class="text-muted small mb-0">نظام راديوس مايكروتك - FreeRADIUS Core مع إدارة الموزعين والكروت</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/cards/generate" class="btn btn-primary fw-bold">
+            <i class="bi bi-plus-circle me-1"></i> توليد كروت جديدة
+        </a>
+        <a href="/subscribers/add" class="btn btn-outline-primary fw-bold">
+            <i class="bi bi-person-plus me-1"></i> إضافة مشترك
+        </a>
+    </div>
+</div>
+
+<!-- Stat Cards Grid -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card bg-grad-blue">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="stat-label">المشتركين</span>
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="stat-value">{{ .Metrics.TotalSubscribers }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card bg-grad-green">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="stat-label">الكروت المتاحة</span>
+                <i class="bi bi-credit-card-2-front"></i>
+            </div>
+            <div class="stat-value">{{ .Metrics.ActiveCards }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card bg-grad-orange">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="stat-label">المتصلين الآن</span>
+                <i class="bi bi-activity"></i>
+            </div>
+            <div class="stat-value">{{ .Metrics.OnlineSessions }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card bg-grad-purple">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="stat-label">الراوترات NAS</span>
+                <i class="bi bi-hdd-network"></i>
+            </div>
+            <div class="stat-value">{{ .Metrics.TotalRouters }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card bg-grad-cyan">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="stat-label">الموزعين</span>
+                <i class="bi bi-shop"></i>
+            </div>
+            <div class="stat-value">{{ .Metrics.TotalResellers }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #047857);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="stat-label">المبيعات</span>
+                <i class="bi bi-cash-stack"></i>
+            </div>
+            <div class="stat-value">{{ printf "%.1f" .Metrics.TotalRevenue }} ج.م</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent Sessions -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-activity me-1 text-primary"></i> الجلسات النشطة حالياً على المايكروتك</span>
+                <a href="/sessions" class="btn btn-sm btn-outline-primary">عرض الكل</a>
+            </div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>المشترك</th>
+                            <th>IP المشترك</th>
+                            <th>MAC الجهاز</th>
+                            <th>راوتر NAS</th>
+                            <th>التحميل</th>
+                            <th>الرفع</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .RecentSessions }}
+                        <tr>
+                            <td><strong>{{ .UserName }}</strong></td>
+                            <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
+                            <td><code>{{ .CallingStationID }}</code></td>
+                            <td>{{ .NASIPAddress }}</td>
+                            <td>{{ .AcctInputOctets }} B</td>
+                            <td>{{ .AcctOutputOctets }} B</td>
+                        </tr>
+                        {{ else }}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">لا يوجد جلسات نشطة حالياً</td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Batches -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-1 text-primary"></i> آخر دفعات الكروت</span>
+                <a href="/cards" class="btn btn-sm btn-outline-primary">عرض الكل</a>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {{ range .RecentBatches }}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <strong class="d-block">{{ .BatchCode }}</strong>
+                            <small class="text-muted">{{ .ProfileName }} ({{ .Count }} كارت)</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-success">{{ printf "%.2f" .TotalPrice }} ج.م</span>
+                            <a href="/cards/print?batch={{ .BatchCode }}" class="btn btn-sm btn-outline-secondary d-block mt-1" target="_blank">
+                                <i class="bi bi-printer"></i> طباعة
+                            </a>
+                        </div>
+                    </li>
+                    {{ else }}
+                    <li class="list-group-item text-center py-4 text-muted">لم يتم توليد أي دفعات بعد</li>
+                    {{ end }}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

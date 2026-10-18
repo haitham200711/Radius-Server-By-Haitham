@@ -1,0 +1,81 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">إعدادات النظام والربط بمايكروتك</h3>
+        <p class="text-muted small mb-0">حالة خادم FreeRADIUS وكود التفعيل السريع لراوترات المايكروتك</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-1 text-primary"></i> بيانات ومعلومات السيرفر
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>محرك الراديوس:</span>
+                        <span class="badge bg-success">FreeRADIUS v3 (Active)</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>بورت المصادقة (Auth UDP):</span>
+                        <code class="fw-bold text-primary">1812</code>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>بورت المحاسبة (Acct UDP):</span>
+                        <code class="fw-bold text-primary">1813</code>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>بورت الفصل الفوري (CoA UDP):</span>
+                        <code class="fw-bold text-primary">3799</code>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>قاعدة البيانات:</span>
+                        <span class="badge bg-primary">MariaDB / FreeRADIUS Schema</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>نظام التشغيل:</span>
+                        <span>Ubuntu 22.04 LTS</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-terminal me-1 text-primary"></i> كود إعداد راوتر المايكروتك (MikroTik Terminal Script)
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">انسخ هذا الكود والصقه مباشرة في <b>New Terminal</b> في راوتر المايكروتك لتفعيل الراديوس لـ PPPoE والهوتسبوت والـ CoA:</p>
+                
+                <form method="GET" action="/settings" class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">آيبي سيرفر الراديوس:</label>
+                        <input type="text" name="server_ip" class="form-control form-control-sm" value="{{ .ServerIP }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">كلمة السر (Secret):</label>
+                        <input type="text" name="secret" class="form-control form-control-sm" value="{{ .Secret }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-sm btn-secondary w-100">تحديث</button>
+                    </div>
+                </form>
+
+                <div class="position-relative">
+                    <textarea class="form-control font-monospace bg-dark text-info p-3" rows="10" readonly id="scriptBox">{{ .MikrotikScript }}</textarea>
+                    <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" onclick="navigator.clipboard.writeText(document.getElementById('scriptBox').value); alert('تم نسخ كود إعداد المايكروتك بنجاح!');">
+                        <i class="bi bi-clipboard"></i> نسخ الكود
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

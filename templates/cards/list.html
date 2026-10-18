@@ -1,0 +1,55 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">دفعات كروت الواي فاي (Batches)</h3>
+        <p class="text-muted small mb-0">سجل دفعات الكروت المولدة والمطبوعة والمحفوظة في FreeRADIUS</p>
+    </div>
+    <a href="/cards/generate" class="btn btn-primary fw-bold">
+        <i class="bi bi-plus-circle me-1"></i> توليد دفعة كروت جديدة
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>كود الدفعة</th>
+                    <th>الباقة</th>
+                    <th>الموزع / التخصيص</th>
+                    <th>عدد الكروت</th>
+                    <th>سعر الكارت</th>
+                    <th>الإجمالي</th>
+                    <th>تاريخ التوليد</th>
+                    <th class="text-end">الطباعة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Batches }}
+                <tr>
+                    <td><strong>{{ .BatchCode }}</strong></td>
+                    <td><span class="badge bg-primary">{{ .ProfileName }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td><span class="fw-bold">{{ .Count }}</span></td>
+                    <td>{{ printf "%.2f" .PricePerCard }} ج.م</td>
+                    <td><strong class="text-success">{{ printf "%.2f" .TotalPrice }} ج.م</strong></td>
+                    <td class="small text-muted">{{ .CreatedAt.Format "2006-01-02 15:04" }}</td>
+                    <td class="text-end">
+                        <a href="/cards/print?batch={{ .BatchCode }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-printer"></i> طباعة شيت
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted">لا يوجد أي دفعات كروت حتى الآن</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

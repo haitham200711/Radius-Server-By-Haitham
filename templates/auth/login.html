@@ -1,0 +1,48 @@
+{{ define "auth_content" }}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 60px; height: 60px; font-size: 1.8rem;">
+                <i class="bi bi-router"></i>
+            </div>
+            <h3 class="fw-bold">تسجيل الدخول</h3>
+            <p class="text-muted small">نظام إدارة راديوس مايكروتك والموزعين</p>
+        </div>
+
+        {{ if .Error }}
+        <div class="alert alert-danger py-2 small" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ .Error }}
+        </div>
+        {{ end }}
+
+        <form method="POST" action="/auth/login">
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">اسم المستخدم:</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                    <input type="text" name="username" class="form-control" placeholder="اسم المستخدم" required autofocus>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold small">كلمة المرور:</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                    <input type="password" name="password" class="form-control" placeholder="كلمة المرور" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                <i class="bi bi-box-arrow-in-left me-1"></i> دخول إلى النظام
+            </button>
+        </form>
+
+        <div class="text-center mt-4 border-top pt-3">
+            <small class="text-muted">الافتراضي: <code>admin</code> / <code>admin123</code></small>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

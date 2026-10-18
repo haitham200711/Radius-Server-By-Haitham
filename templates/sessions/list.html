@@ -1,0 +1,59 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">المتصلين الآن (Live Sessions & CoA)</h3>
+        <p class="text-muted small mb-0">الجلسات المتصلة حالياً على راوترات المايكروتك المسجلة في FreeRADIUS (PPPoE / Hotspot)</p>
+    </div>
+    <a href="/sessions" class="btn btn-outline-primary fw-bold">
+        <i class="bi bi-arrow-clockwise me-1"></i> تحديث الجلسات
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>اسم المشترك</th>
+                    <th>معرف الجلسة (Session ID)</th>
+                    <th>عنوان IP</th>
+                    <th>MAC الجهاز</th>
+                    <th>راوتر NAS</th>
+                    <th>مدة الاتصال</th>
+                    <th>التحميل</th>
+                    <th>الرفع</th>
+                    <th class="text-end">قطع الاتصال</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Sessions }}
+                <tr>
+                    <td><strong>{{ .UserName }}</strong></td>
+                    <td><code>{{ .AcctSessionID }}</code></td>
+                    <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
+                    <td><code>{{ .CallingStationID }}</code></td>
+                    <td>{{ .NASIPAddress }}</td>
+                    <td>{{ .AcctSessionTime }} ثانية</td>
+                    <td>{{ .AcctInputOctets }} B</td>
+                    <td>{{ .AcctOutputOctets }} B</td>
+                    <td class="text-end">
+                        <a href="/sessions/disconnect?username={{ .UserName }}&session={{ .AcctSessionID }}&nas={{ .NASIPAddress }}&ip={{ .FramedIPAddress }}" 
+                           class="btn btn-sm btn-danger fw-bold" 
+                           onclick="return confirm('هل أنت متأكد من قطع اتصال المشترك وإرسال أمر Disconnect (PoD) للمايكروتك فوراً؟');">
+                            <i class="bi bi-power"></i> فصل (PoD)
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">لا يوجد جلسات نشطة حالياً على الراوترات</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}
