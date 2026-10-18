@@ -18,6 +18,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/routers"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/sessions"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/settings"
+	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/sstp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/subscribers"
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
@@ -76,6 +77,7 @@ func main() {
 	subBP := subscribers.New(db, renderer)
 	mux.HandleFunc("/subscribers", middleware.RequireAuth(subBP.ListHandler))
 	mux.HandleFunc("/subscribers/add", middleware.RequireAuth(subBP.AddHandler))
+	mux.HandleFunc("/subscribers/edit", middleware.RequireAuth(subBP.EditHandler))
 	mux.HandleFunc("/subscribers/delete", middleware.RequireAuth(subBP.DeleteHandler))
 	mux.HandleFunc("/subscribers/renew", middleware.RequireAuth(subBP.RenewHandler))
 
@@ -88,6 +90,9 @@ func main() {
 	// Card Templates Blueprint
 	tmplBP := card_templates.New(db, renderer)
 	mux.HandleFunc("/card-templates", middleware.RequireAuth(tmplBP.ListHandler))
+	mux.HandleFunc("/card-templates/add", middleware.RequireAuth(tmplBP.AddHandler))
+	mux.HandleFunc("/card-templates/edit", middleware.RequireAuth(tmplBP.EditHandler))
+	mux.HandleFunc("/card-templates/delete", middleware.RequireAuth(tmplBP.DeleteHandler))
 
 	// Profiles Blueprint
 	profBP := profiles.New(db, renderer)
@@ -101,6 +106,13 @@ func main() {
 	mux.HandleFunc("/routers", middleware.RequireAuth(routBP.ListHandler))
 	mux.HandleFunc("/routers/add", middleware.RequireAuth(routBP.AddHandler))
 	mux.HandleFunc("/routers/delete", middleware.RequireAuth(routBP.DeleteHandler))
+
+	// SSTP Server Blueprint
+	sstpBP := sstp.New(db, renderer)
+	mux.HandleFunc("/sstp", middleware.RequireAuth(sstpBP.ListHandler))
+	mux.HandleFunc("/sstp/settings", middleware.RequireAuth(sstpBP.SaveSettingsHandler))
+	mux.HandleFunc("/sstp/clients/add", middleware.RequireAuth(sstpBP.AddClientHandler))
+	mux.HandleFunc("/sstp/clients/delete", middleware.RequireAuth(sstpBP.DeleteClientHandler))
 
 	// Resellers Blueprint (Admin Only)
 	resBP := resellers.New(db, renderer)

@@ -157,6 +157,7 @@ type CardTemplate struct {
 	ID              int64     `json:"id"`
 	Name            string    `json:"name"`
 	BackgroundImage string    `json:"background_image"`
+	BackgroundColor string    `json:"background_color"`
 	WidthMM         float64   `json:"width_mm"`
 	HeightMM        float64   `json:"height_mm"`
 	ShowQR          bool      `json:"show_qr"`
@@ -164,7 +165,33 @@ type CardTemplate struct {
 	ShowPrice       bool      `json:"show_price"`
 	ShowProfile     bool      `json:"show_profile"`
 	ShowExpiry      bool      `json:"show_expiry"`
+	IsDefault       bool      `json:"is_default"`
 	CreatedAt       time.Time `json:"created_at"`
+}
+
+// SSTPSettings represents the Accel-PPP SSTP VPN Server configuration
+type SSTPSettings struct {
+	ID        int64     `json:"id"`
+	Enabled   bool      `json:"enabled"`
+	Port      int       `json:"port"`
+	GatewayIP string    `json:"gateway_ip"`
+	IPPool    string    `json:"ip_pool"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SSTPClient represents a MikroTik router connected to the server via SSTP VPN
+type SSTPClient struct {
+	ID         int64        `json:"id"`
+	Name       string       `json:"name"`
+	Username   string       `json:"username"`
+	Password   string       `json:"password"`
+	AssignedIP string       `json:"assigned_ip"`
+	Notes      string       `json:"notes"`
+	Enabled    bool         `json:"enabled"`
+	IsOnline   bool         `json:"is_online"`
+	LastSeen   sql.NullTime `json:"last_seen"`
+	CreatedAt  time.Time    `json:"created_at"`
+	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
 // NAS represents MikroTik router clients (FreeRADIUS `nas` table)

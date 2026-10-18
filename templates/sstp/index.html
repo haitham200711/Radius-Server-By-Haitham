@@ -1,0 +1,298 @@
+{{ define "content" }}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">إدارة سيرفر SSTP VPN للمايكروتك (Accel-PPP)</h3>
+        <p class="text-muted small mb-0">ربط راوترات المايكروتك البعيدة بنفق مشفر وإدارتها عن بعد عبر واجهة النظام</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addClientModal">
+            <i class="bi bi-router me-1"></i> إضافة راوتر SSTP جديد
+        </button>
+        <button class="btn btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#settingsModal">
+            <i class="bi bi-gear me-1"></i> إعدادات السيرفر
+        </button>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-primary bg-opacity-10 text-primary rounded p-3 me-3">
+                    <i class="bi bi-shield-lock-fill fs-3"></i>
+                </div>
+                <div>
+                    <span class="text-muted small">حالة سيرفر SSTP</span>
+                    <h5 class="fw-bold mb-0 text-success">
+                        <i class="bi bi-check-circle-fill me-1"></i> نشط (منفذ {{ .Settings.Port }})
+                    </h5>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-success bg-opacity-10 text-success rounded p-3 me-3">
+                    <i class="bi bi-broadcast fs-3"></i>
+                </div>
+                <div>
+                    <span class="text-muted small">الراوترات المتصلة أونلاين</span>
+                    <h5 class="fw-bold mb-0 text-dark">{{ .OnlineCount }} متصل</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-info bg-opacity-10 text-info rounded p-3 me-3">
+                    <i class="bi bi-hdd-network fs-3"></i>
+                </div>
+                <div>
+                    <span class="text-muted small">بوابة الشبكة (Gateway)</span>
+                    <h5 class="fw-bold mb-0 font-monospace text-dark">{{ .Settings.GatewayIP }}</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Connect Script for MikroTik -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom">
+        <h5 class="card-title fw-bold mb-0 text-primary">
+            <i class="bi bi-terminal me-2"></i> كود ربط سريع لمايكروتك (RouterOS v6 / v7 Terminal Script)
+        </h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-2">انسخ السطر التالي وضعه في نافذة Terminal بمايكروتك لإنشاء اتصال SSTP مباشر بالسيرفر:</p>
+        <div class="input-group">
+            <input type="text" id="quickScript" class="form-control font-monospace bg-light" readonly
+                value="/interface sstp-client add name=sstp-radius connect-to={{ .ServerHost }}:{{ .Settings.Port }} user={{ .RandUser }} password={{ .RandPass }} profile=default authentication=mschap2,chap,pap verify-server-certificate=no disabled=no">
+            <button class="btn btn-outline-primary fw-bold" onclick="copyQuickScript()">
+                <i class="bi bi-clipboard me-1"></i> نسخ الكود
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- SSTP Routers Table -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="card-title fw-bold mb-0">
+            <i class="bi bi-router-fill me-2"></i> راوترات وفروع المايكروتك المسجلة
+        </h5>
+        <span class="badge bg-light text-dark border">{{ len .Clients }} راوتر</span>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th>اسم الفرع / الراوتر</th>
+                    <th>اسم مستخدم SSTP</th>
+                    <th>كلمة المرور</th>
+                    <th>آي بي النفق (VPN IP)</th>
+                    <th>حالة الاتصال</th>
+                    <th>ملاحظات</th>
+                    <th class="text-end">خيارات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Clients }}
+                <tr>
+                    <td><strong>{{ .Name }}</strong></td>
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ .Username }}</span></td>
+                    <td><code>{{ .Password }}</code></td>
+                    <td>
+                        {{ if .AssignedIP }}
+                        <code class="text-primary">{{ .AssignedIP }}</code>
+                        {{ else }}
+                        <span class="text-muted">تلقائي من الـ Pool</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if .IsOnline }}
+                        <span class="badge bg-success"><i class="bi bi-record-fill me-1"></i>متصل الآن (Online)</span>
+                        {{ else }}
+                        <span class="badge bg-secondary">غير متصل (Offline)</span>
+                        {{ end }}
+                    </td>
+                    <td><small class="text-muted">{{ if .Notes }}{{ .Notes }}{{ else }}-{{ end }}</small></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-info me-1" onclick="copyRouterScript('{{ .Username }}', '{{ .Password }}')">
+                            <i class="bi bi-code-slash"></i> كود المايكروتك
+                        </button>
+                        <a href="/sstp/clients/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف هذا الراوتر من SSTP؟');">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="bi bi-router fs-2 d-block mb-2"></i>
+                        لا يوجد راوترات SSTP مسجلة حتى الآن
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Active Live Sessions -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom">
+        <h5 class="card-title fw-bold mb-0 text-success">
+            <i class="bi bi-activity me-2"></i> الجلسات والراوترات المتصلة حالياً بالسيرفر (Active Tunnels)
+        </h5>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th>الواجهة (Interface)</th>
+                    <th>المستخدم</th>
+                    <th>الآي بي الحقيقي للراوتر</th>
+                    <th>آي بي نفق الـ VPN</th>
+                    <th>النوع</th>
+                    <th>الحالة</th>
+                    <th>مدة الاتصال</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .ActiveSessions }}
+                <tr>
+                    <td><code class="fw-bold">{{ .IfName }}</code></td>
+                    <td><strong>{{ .Username }}</strong></td>
+                    <td><code>{{ .CallingIP }}</code></td>
+                    <td><span class="badge bg-primary font-monospace">{{ .IP }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .Type }}</span></td>
+                    <td><span class="badge bg-success">{{ .State }}</span></td>
+                    <td><small class="text-muted"><i class="bi bi-clock me-1"></i>{{ .Uptime }}</small></td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        لا يوجد جلسات SSTP متصلة حالياً
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Add Client -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="bi bi-plus-circle me-1"></i> إضافة راوتر / فرع SSTP
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/sstp/clients/add">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم الراوتر أو الفرع: <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: راوتر فرع المعادي" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">اسم مستخدم SSTP:</label>
+                            <input type="text" name="username" class="form-control font-monospace" value="{{ .RandUser }}">
+                            <small class="text-muted">تلقائي إذا تُرك فارغاً</small>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">كلمة مرور SSTP:</label>
+                            <input type="text" name="password" class="form-control font-monospace" value="{{ .RandPass }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">آي بي الـ VPN الثابت (اختياري):</label>
+                        <input type="text" name="assigned_ip" class="form-control font-monospace" placeholder="مثال: 10.10.10.25 (اتركه فارغاً للتلقائي)">
+                        <small class="text-muted">الآي بي الذي سيحصل عليه المايكروتك داخل نفق الـ VPN.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ملاحظات إضافية:</label>
+                        <input type="text" name="notes" class="form-control" placeholder="مثال: راوتر CCR2004 - فرع 2">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">حفظ وتوليد الكود</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Server Settings -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-gear me-1"></i> إعدادات سيرفر SSTP VPN
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/sstp/settings">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">منفذ الاتصال (SSTP Port):</label>
+                        <input type="number" name="port" class="form-control font-monospace" value="{{ .Settings.Port }}" required>
+                        <small class="text-muted">الافتراضي في نظام مايكروتك هو 4444 أو 443.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">عنوان بوابة السيرفر (Gateway IP):</label>
+                        <input type="text" name="gateway_ip" class="form-control font-monospace" value="{{ .Settings.GatewayIP }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">نطاق الآيبيهات للراوترات (IP Pool):</label>
+                        <input type="text" name="ip_pool" class="form-control font-monospace" value="{{ .Settings.IPPool }}" required>
+                        <small class="text-muted">مثال: 10.10.10.2-254</small>
+                    </div>
+
+                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                        <input class="form-check-input" type="checkbox" name="enabled" id="sstp_enabled" value="1" {{ if .Settings.Enabled }}checked{{ end }}>
+                        <label class="form-check-label fw-bold" for="sstp_enabled">تفعيل سيرفر SSTP على النظام</label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">حفظ وتطبيق الإعدادات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+function copyQuickScript() {
+    const input = document.getElementById('quickScript');
+    input.select();
+    navigator.clipboard.writeText(input.value);
+    alert('تم نسخ كود المايكروتك بنجاح!');
+}
+
+function copyRouterScript(user, pass) {
+    const script = `/interface sstp-client add name=sstp-radius connect-to={{ .ServerHost }}:{{ .Settings.Port }} user=${user} password=${pass} profile=default authentication=mschap2,chap,pap verify-server-certificate=no disabled=no`;
+    navigator.clipboard.writeText(script);
+    alert('تم نسخ كود الراوتر بنجاح:\n\n' + script);
+}
+</script>
+{{ end }}

@@ -215,3 +215,91 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
 }
+
+func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	if username == "" {
+		username = strings.TrimSpace(r.FormValue("username"))
+	}
+
+	if r.Method == http.MethodGet {
+		sub, err := bp.db.GetSubscriber(username)
+		if err != nil {
+			http.Redirect(w, r, "/subscribers", http.StatusFound)
+			return
+		}
+
+		profiles, _ := bp.db.GetProfiles()
+
+		var quotaGB float64
+		if sub.QuotaBytes > 0 {
+			quotaGB = float64(sub.QuotaBytes) / (1024 * 1024 * 1024)
+		}
+
+		var expStr string
+		if sub.ExpirationDate.Valid {
+			expStr = sub.ExpirationDate.Time.Format("2006-01-02T15:04")
+		}
+
+		_ = bp.renderer.Render(w, "subscribers/edit", map[string]interface{}{
+			"Title":          "تعديل بيانات المشترك: " + sub.FullName,
+			"ActiveMenu":     "subscribers",
+			"CurrentUser":    middleware.GetUser(r),
+			"Sub":            sub,
+			"Profiles":       profiles,
+			"QuotaGB":        quotaGB,
+			"ExpirationDate": expStr,
+		})
+		return
+	}
+
+	password := strings.TrimSpace(r.FormValue("password"))
+	fullName := strings.TrimSpace(r.FormValue("full_name"))
+	phone := strings.TrimSpace(r.FormValue("phone"))
+	address := strings.TrimSpace(r.FormValue("address"))
+	profile := strings.TrimSpace(r.FormValue("profile"))
+	staticIP := strings.TrimSpace(r.FormValue("static_ip"))
+	callingMAC := strings.TrimSpace(r.FormValue("calling_mac"))
+	debtStr := strings.TrimSpace(r.FormValue("debt"))
+	quotaGBStr := strings.TrimSpace(r.FormValue("quota_gb"))
+	expStr := strings.TrimSpace(r.FormValue("expiration_date"))
+	status := strings.TrimSpace(r.FormValue("status"))
+	if status == "" {
+		status = "active"
+	}
+
+	debt, _ := strconv.ParseFloat(debtStr, 64)
+	quotaGB, _ := strconv.ParseFloat(quotaGBStr, 64)
+	var quotaBytes int64
+	if quotaGB > 0 {
+		quotaBytes = int64(quotaGB * 1024 * 1024 * 1024)
+	}
+
+	var expNullTime sql.NullTime
+	if expStr != "" {
+		t, err := time.Parse("2006-01-02T15:04", expStr)
+		if err != nil {
+			t, err = time.Parse("2006-01-02", expStr)
+		}
+		if err == nil {
+			expNullTime = sql.NullTime{Time: t, Valid: true}
+		}
+	}
+
+	sub := &models.Subscriber{
+		Username:       username,
+		FullName:       fullName,
+		Phone:          phone,
+		Address:        address,
+		Debt:           debt,
+		ProfileName:    profile,
+		StaticIP:       staticIP,
+		CallingMAC:     callingMAC,
+		QuotaBytes:     quotaBytes,
+		ExpirationDate: expNullTime,
+		Status:         status,
+	}
+
+	_ = bp.db.UpdateSubscriberCRM(sub, password)
+	http.Redirect(w, r, "/subscribers", http.StatusFound)
+}

@@ -1,34 +1,275 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">أشكال وتصاميم كروت الواي فاي</h3>
-        <p class="text-muted small mb-0">تخصيص أبعاد الكروت، الخلفيات، الـ Barcode، والـ QR Code لطباعة احترافية</p>
+        <h3 class="fw-bold mb-1">أشكال وتصاميم كروت الواي فاي (Card Templates)</h3>
+        <p class="text-muted small mb-0">تخصيص أبعاد الكروت، الألوان، الباركود، والـ QR Code للطباعة</p>
     </div>
+    <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+        <i class="bi bi-plus-circle me-1"></i> إضافة تصميم كارت جديد
+    </button>
 </div>
 
 <div class="row g-4">
+    {{ range .Templates }}
     <div class="col-md-6 col-lg-4">
-        <div class="card h-100 border">
-            <div class="card-body text-center p-4">
-                <div class="bg-primary text-white rounded p-3 mb-3 d-flex flex-column justify-content-between" style="height: 140px; background: linear-gradient(135deg, #0d6efd, #0a58ca);">
-                    <div class="d-flex justify-content-between">
-                        <small class="fw-bold">كارت شبكة واي فاي</small>
-                        <small>5.00 ج.م</small>
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body p-4 text-center">
+                <!-- Visual Card Mockup -->
+                <div class="rounded p-3 mb-3 d-flex flex-column justify-content-between text-white shadow-sm" 
+                     style="height: 155px; background: linear-gradient(135deg, {{ if .BackgroundColor }}{{ .BackgroundColor }}{{ else }}#0d6efd{{ end }}, #212529); position: relative; overflow: hidden;">
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="fw-bold"><i class="bi bi-wifi me-1"></i>كارت شبكة بريميوم</small>
+                        {{ if .ShowPrice }}
+                        <span class="badge bg-light text-dark fw-bold">10.00 ج.م</span>
+                        {{ end }}
                     </div>
-                    <div>
-                        <code class="text-white fs-5 fw-bold">USER: CARD-9831</code><br>
-                        <code class="text-white small">PASS: 849201</code>
+
+                    <div class="my-auto">
+                        <div class="fs-5 fw-bold font-monospace bg-dark bg-opacity-50 rounded py-1 px-2 d-inline-block">
+                            USER: CARD-8849
+                        </div>
+                        <div class="small font-monospace opacity-75 mt-1">PASS: 928312</div>
                     </div>
-                    <small style="font-size: 0.7rem; opacity: 0.8;">باقة 1 جيجا - صالح 24 ساعة</small>
+
+                    <div class="d-flex justify-content-between align-items-end" style="font-size: 0.75rem; opacity: 0.9;">
+                        <div>
+                            {{ if .ShowProfile }}<span class="me-2"><i class="bi bi-speedometer2"></i> 10 Mega</span>{{ end }}
+                            {{ if .ShowExpiry }}<span><i class="bi bi-clock"></i> 30 يوم</span>{{ end }}
+                        </div>
+                        <div class="d-flex gap-1">
+                            {{ if .ShowQR }}<i class="bi bi-qr-code fs-6"></i>{{ end }}
+                            {{ if .ShowBarcode }}<i class="bi bi-upc-scan fs-6"></i>{{ end }}
+                        </div>
+                    </div>
                 </div>
-                <h5 class="fw-bold">القالب الافتراضي الكلاسيكي</h5>
-                <p class="text-muted small">شيت A4 قياسي - 30 كارت في الصفحة الواحدة مع خطوط قص واضحة</p>
-                <span class="badge bg-success">القالب المفعل</span>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="fw-bold mb-0 text-dark">{{ .Name }}</h5>
+                    {{ if .IsDefault }}
+                    <span class="badge bg-success"><i class="bi bi-check2-circle me-1"></i>الافتراضي للطباعة</span>
+                    {{ end }}
+                </div>
+
+                <p class="text-muted small mb-3">
+                    الأبعاد: <strong>{{ printf "%.1f" .WidthMM }} × {{ printf "%.1f" .HeightMM }} مم</strong>
+                </p>
+
+                <div class="d-flex flex-wrap justify-content-center gap-1 mb-3">
+                    {{ if .ShowQR }}<span class="badge bg-light text-dark border">QR Code</span>{{ end }}
+                    {{ if .ShowBarcode }}<span class="badge bg-light text-dark border">Barcode</span>{{ end }}
+                    {{ if .ShowPrice }}<span class="badge bg-light text-dark border">السعر</span>{{ end }}
+                    {{ if .ShowProfile }}<span class="badge bg-light text-dark border">الباقة</span>{{ end }}
+                    {{ if .ShowExpiry }}<span class="badge bg-light text-dark border">الانتهاء</span>{{ end }}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary flex-grow-1 btn-edit-template"
+                        data-id="{{ .ID }}"
+                        data-name="{{ .Name }}"
+                        data-bgcolor="{{ .BackgroundColor }}"
+                        data-width="{{ .WidthMM }}"
+                        data-height="{{ .HeightMM }}"
+                        data-qr="{{ .ShowQR }}"
+                        data-barcode="{{ .ShowBarcode }}"
+                        data-price="{{ .ShowPrice }}"
+                        data-profile="{{ .ShowProfile }}"
+                        data-expiry="{{ .ShowExpiry }}"
+                        data-default="{{ .IsDefault }}">
+                        <i class="bi bi-pencil-square me-1"></i> تعديل التصميم
+                    </button>
+                    <a href="/card-templates/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا التصميم؟');">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </div>
             </div>
+        </div>
+    </div>
+    {{ else }}
+    <div class="col-12 text-center py-5 text-muted">
+        <i class="bi bi-credit-card-2-front fs-1 d-block mb-2"></i>
+        لا توجد تصاميم كروت مضافة حتى الآن
+    </div>
+    {{ end }}
+</div>
+
+<!-- Modal Add Template -->
+<div class="modal fade" id="addTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="bi bi-plus-circle me-1"></i> إضافة تصميم كارت جديد
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/card-templates/add">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم التصميم: <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: كروت مقاس قياسي أزرق" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">لون خلفية الكارت الرئيسية:</label>
+                        <div class="input-group">
+                            <input type="color" name="background_color" class="form-control form-control-color" value="#0d6efd" title="اختر اللون">
+                            <input type="text" class="form-control font-monospace" value="#0d6efd" placeholder="#0d6efd" readonly>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">العرض (مم):</label>
+                            <input type="number" step="0.5" name="width_mm" class="form-control" value="85.60" required>
+                            <small class="text-muted">القياسي: 85.6 مم</small>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">الارتفاع (مم):</label>
+                            <input type="number" step="0.5" name="height_mm" class="form-control" value="54.00" required>
+                            <small class="text-muted">القياسي: 54.0 مم</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold d-block">عناصر الكارت المطبوعة:</label>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_qr" id="add_show_qr" value="1" checked>
+                            <label class="form-check-label" for="add_show_qr">QR Code تسجيل الدخول</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_barcode" id="add_show_barcode" value="1">
+                            <label class="form-check-label" for="add_show_barcode">Barcode</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_price" id="add_show_price" value="1" checked>
+                            <label class="form-check-label" for="add_show_price">السعر</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_profile" id="add_show_profile" value="1" checked>
+                            <label class="form-check-label" for="add_show_profile">اسم الباقة</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_expiry" id="add_show_expiry" value="1" checked>
+                            <label class="form-check-label" for="add_show_expiry">مدة الصلاحية</label>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                        <input class="form-check-input" type="checkbox" name="is_default" id="add_is_default" value="1">
+                        <label class="form-check-label fw-bold" for="add_is_default">تعيين هذا التصميم كقالب افتراضي لطباعة الكروت</label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> حفظ القالب
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Template -->
+<div class="modal fade" id="editTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="bi bi-pencil-square me-1"></i> تعديل تصميم الكارت
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/card-templates/edit">
+                <input type="hidden" name="id" id="edit_tmpl_id">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم التصميم: <span class="text-danger">*</span></label>
+                        <input type="text" name="name" id="edit_tmpl_name" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">لون خلفية الكارت الرئيسية:</label>
+                        <div class="input-group">
+                            <input type="color" name="background_color" id="edit_tmpl_color" class="form-control form-control-color">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">العرض (مم):</label>
+                            <input type="number" step="0.5" name="width_mm" id="edit_tmpl_width" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">الارتفاع (مم):</label>
+                            <input type="number" step="0.5" name="height_mm" id="edit_tmpl_height" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold d-block">عناصر الكارت المطبوعة:</label>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_qr" id="edit_tmpl_qr" value="1">
+                            <label class="form-check-label" for="edit_tmpl_qr">QR Code</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_barcode" id="edit_tmpl_barcode" value="1">
+                            <label class="form-check-label" for="edit_tmpl_barcode">Barcode</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_price" id="edit_tmpl_price" value="1">
+                            <label class="form-check-label" for="edit_tmpl_price">السعر</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_profile" id="edit_tmpl_profile" value="1">
+                            <label class="form-check-label" for="edit_tmpl_profile">اسم الباقة</label>
+                        </div>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="checkbox" name="show_expiry" id="edit_tmpl_expiry" value="1">
+                            <label class="form-check-label" for="edit_tmpl_expiry">الصلاحية</label>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                        <input class="form-check-input" type="checkbox" name="is_default" id="edit_tmpl_default" value="1">
+                        <label class="form-check-label fw-bold" for="edit_tmpl_default">تعيين كقالب افتراضي للطباعة</label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+document.querySelectorAll('.btn-edit-template').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const d = this.dataset;
+        document.getElementById('edit_tmpl_id').value = d.id;
+        document.getElementById('edit_tmpl_name').value = d.name;
+        document.getElementById('edit_tmpl_color').value = d.bgcolor || '#0d6efd';
+        document.getElementById('edit_tmpl_width').value = d.width;
+        document.getElementById('edit_tmpl_height').value = d.height;
+        document.getElementById('edit_tmpl_qr').checked = (d.qr === 'true');
+        document.getElementById('edit_tmpl_barcode').checked = (d.barcode === 'true');
+        document.getElementById('edit_tmpl_price').checked = (d.price === 'true');
+        document.getElementById('edit_tmpl_profile').checked = (d.profile === 'true');
+        document.getElementById('edit_tmpl_expiry').checked = (d.expiry === 'true');
+        document.getElementById('edit_tmpl_default').checked = (d.default === 'true');
+
+        const modal = new bootstrap.Modal(document.getElementById('editTemplateModal'));
+        modal.show();
+    });
+});
+</script>
+{{ end }}

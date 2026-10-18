@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"os"
+	"os/exec"
+	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -249,6 +252,31 @@ func (d *DB) InitSchema() error {
 			INDEX idx_subs_contract (contract_no),
 			INDEX idx_subs_phone (phone)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 9. SSTP VPN Settings
+		`CREATE TABLE IF NOT EXISTS sstp_settings (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			enabled TINYINT(1) DEFAULT 1,
+			port INT DEFAULT 4444,
+			gateway_ip VARCHAR(32) DEFAULT '10.10.10.1',
+			ip_pool VARCHAR(64) DEFAULT '10.10.10.2-254',
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 10. SSTP VPN Clients / Routers
+		`CREATE TABLE IF NOT EXISTS sstp_clients (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(100) NOT NULL,
+			username VARCHAR(64) UNIQUE NOT NULL,
+			password VARCHAR(64) NOT NULL,
+			assigned_ip VARCHAR(32) DEFAULT '',
+			notes VARCHAR(255) DEFAULT '',
+			enabled TINYINT(1) DEFAULT 1,
+			last_seen DATETIME NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			INDEX idx_sstp_user (username)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -257,7 +285,7 @@ func (d *DB) InitSchema() error {
 		}
 	}
 
-	// Schema migrations for profiles
+	// Schema migrations for profiles and card templates
 	migrations := []string{
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS validity_value INT DEFAULT 30;`,
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS validity_unit VARCHAR(20) DEFAULT 'days';`,
@@ -267,6 +295,8 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_action VARCHAR(20) DEFAULT 'disconnect';`,
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_profile VARCHAR(64) DEFAULT '';`,
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_pool VARCHAR(64) DEFAULT '';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS is_default TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS background_color VARCHAR(30) DEFAULT '#0d6efd';`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -300,6 +330,23 @@ func (d *DB) InitSchema() error {
 			VALUES ('5M_UNLIMITED', 'Mikrotik-Rate-Limit', ':=', '2560k/5120k'),
 			       ('10M_UNLIMITED', 'Mikrotik-Rate-Limit', ':=', '5120k/10240k'),
 			       ('HS_1GB_1D', 'Mikrotik-Rate-Limit', ':=', '2M/4M');`)
+	}
+
+	// Seed default Card Template
+	var tmplCount int
+	_ = d.QueryRow("SELECT COUNT(*) FROM card_templates").Scan(&tmplCount)
+	if tmplCount == 0 {
+		_, _ = d.Exec(`INSERT INTO card_templates (name, background_color, width_mm, height_mm, show_qr, show_barcode, show_price, show_profile, show_expiry, is_default)
+			VALUES ('القالب الافتراضي الأزرق', '#0d6efd', 85.60, 54.00, 1, 0, 1, 1, 1, 1),
+			       ('قالب الكروت المدمجة', '#198754', 70.00, 45.00, 1, 1, 1, 1, 1, 0);`)
+	}
+
+	// Seed default SSTP Settings
+	var sstpCount int
+	_ = d.QueryRow("SELECT COUNT(*) FROM sstp_settings").Scan(&sstpCount)
+	if sstpCount == 0 {
+		_, _ = d.Exec(`INSERT INTO sstp_settings (enabled, port, gateway_ip, ip_pool)
+			VALUES (1, 4444, '10.10.10.1', '10.10.10.2-254')`)
 	}
 
 	// Seed default NAS
@@ -761,4 +808,410 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 	}
 
 	return tx.Commit()
+}
+
+// --- Subscriber CRM Edit Methods ---
+
+func (d *DB) GetSubscriber(username string) (*models.Subscriber, error) {
+	var s models.Subscriber
+	var exp sql.NullTime
+	err := d.QueryRow(`SELECT id, username, contract_no, full_name, phone, address, debt,
+		profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status, created_at, updated_at
+		FROM subscribers WHERE username = ?`, username).Scan(
+		&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Address, &s.Debt,
+		&s.ProfileName, &s.StaticIP, &s.CallingMAC, &s.QuotaBytes, &exp, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			var pass string
+			errCheck := d.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", username).Scan(&pass)
+			if errCheck != nil {
+				return nil, err
+			}
+			s = models.Subscriber{
+				Username:   username,
+				Password:   pass,
+				FullName:   username,
+				ContractNo: fmt.Sprintf("CNT-%s", username),
+				Status:     "active",
+			}
+			_ = d.QueryRow("SELECT groupname FROM radusergroup WHERE username = ?", username).Scan(&s.ProfileName)
+			_ = d.QueryRow("SELECT value FROM radreply WHERE username = ? AND attribute = 'Framed-IP-Address'", username).Scan(&s.StaticIP)
+			_ = d.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", username).Scan(&s.CallingMAC)
+			var quotaStr string
+			if errQ := d.QueryRow("SELECT value FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username).Scan(&quotaStr); errQ == nil {
+				s.QuotaBytes, _ = strconv.ParseInt(quotaStr, 10, 64)
+			}
+			var expStr string
+			if errE := d.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username).Scan(&expStr); errE == nil {
+				if t, errP := time.Parse("02 Jan 2006 15:04:05", expStr); errP == nil {
+					s.ExpirationDate = sql.NullTime{Time: t, Valid: true}
+				}
+			}
+			return &s, nil
+		}
+		return nil, err
+	}
+	s.ExpirationDate = exp
+	_ = d.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", username).Scan(&s.Password)
+	return &s, nil
+}
+
+func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var expDate interface{}
+	if sub.ExpirationDate.Valid {
+		expDate = sub.ExpirationDate.Time
+	}
+
+	if sub.ContractNo == "" {
+		sub.ContractNo = fmt.Sprintf("CNT-%d-%05d", time.Now().Year(), time.Now().UnixNano()%100000)
+	}
+
+	_, err = tx.Exec(`INSERT INTO subscribers (
+		username, contract_no, full_name, phone, address, debt, profile_name,
+		static_ip, calling_mac, quota_bytes, expiration_date, status, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+	ON DUPLICATE KEY UPDATE
+		full_name = VALUES(full_name),
+		phone = VALUES(phone),
+		address = VALUES(address),
+		debt = VALUES(debt),
+		profile_name = VALUES(profile_name),
+		static_ip = VALUES(static_ip),
+		calling_mac = VALUES(calling_mac),
+		quota_bytes = VALUES(quota_bytes),
+		expiration_date = VALUES(expiration_date),
+		status = VALUES(status),
+		updated_at = NOW()`,
+		sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt, sub.ProfileName,
+		sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status)
+	if err != nil {
+		return err
+	}
+
+	// Update Cleartext-Password
+	if password != "" {
+		_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", sub.Username)
+		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", sub.Username, password)
+	}
+
+	// Calling-Station-Id
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", sub.Username)
+	if sub.CallingMAC != "" {
+		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", sub.Username, sub.CallingMAC)
+	}
+
+	// Expiration
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", sub.Username)
+	if sub.ExpirationDate.Valid {
+		expStr := sub.ExpirationDate.Time.Format("02 Jan 2006 15:04:05")
+		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", sub.Username, expStr)
+	}
+
+	// Profile group
+	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", sub.Username)
+	if sub.ProfileName != "" {
+		_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", sub.Username, sub.ProfileName)
+	}
+
+	// Reply items
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Framed-IP-Address', 'Mikrotik-Total-Limit')", sub.Username)
+	if sub.StaticIP != "" {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-IP-Address', ':=', ?)", sub.Username, sub.StaticIP)
+	}
+	if sub.QuotaBytes > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", sub.Username, fmt.Sprintf("%d", sub.QuotaBytes))
+	}
+
+	return tx.Commit()
+}
+
+// --- Card Template Methods ---
+
+func (d *DB) GetCardTemplates() ([]models.CardTemplate, error) {
+	rows, err := d.Query(`SELECT id, name, background_image, background_color, width_mm, height_mm,
+		show_qr, show_barcode, show_price, show_profile, show_expiry, is_default, created_at
+		FROM card_templates ORDER BY is_default DESC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.CardTemplate
+	for rows.Next() {
+		var t models.CardTemplate
+		var qr, bar, pri, prof, exp, isDef int
+		err := rows.Scan(
+			&t.ID, &t.Name, &t.BackgroundImage, &t.BackgroundColor, &t.WidthMM, &t.HeightMM,
+			&qr, &bar, &pri, &prof, &exp, &isDef, &t.CreatedAt,
+		)
+		if err == nil {
+			t.ShowQR = (qr == 1)
+			t.ShowBarcode = (bar == 1)
+			t.ShowPrice = (pri == 1)
+			t.ShowProfile = (prof == 1)
+			t.ShowExpiry = (exp == 1)
+			t.IsDefault = (isDef == 1)
+			list = append(list, t)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) GetCardTemplate(id int64) (*models.CardTemplate, error) {
+	var t models.CardTemplate
+	var qr, bar, pri, prof, exp, isDef int
+	err := d.QueryRow(`SELECT id, name, background_image, background_color, width_mm, height_mm,
+		show_qr, show_barcode, show_price, show_profile, show_expiry, is_default, created_at
+		FROM card_templates WHERE id = ?`, id).Scan(
+		&t.ID, &t.Name, &t.BackgroundImage, &t.BackgroundColor, &t.WidthMM, &t.HeightMM,
+		&qr, &bar, &pri, &prof, &exp, &isDef, &t.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	t.ShowQR = (qr == 1)
+	t.ShowBarcode = (bar == 1)
+	t.ShowPrice = (pri == 1)
+	t.ShowProfile = (prof == 1)
+	t.ShowExpiry = (exp == 1)
+	t.IsDefault = (isDef == 1)
+	return &t, nil
+}
+
+func (d *DB) SaveCardTemplate(t *models.CardTemplate) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	isDef := 0
+	if t.IsDefault {
+		isDef = 1
+		_, _ = tx.Exec("UPDATE card_templates SET is_default = 0")
+	}
+
+	qr := 0
+	if t.ShowQR {
+		qr = 1
+	}
+	bar := 0
+	if t.ShowBarcode {
+		bar = 1
+	}
+	pri := 0
+	if t.ShowPrice {
+		pri = 1
+	}
+	prof := 0
+	if t.ShowProfile {
+		prof = 1
+	}
+	exp := 0
+	if t.ShowExpiry {
+		exp = 1
+	}
+
+	if t.ID == 0 {
+		_, err = tx.Exec(`INSERT INTO card_templates (name, background_image, background_color, width_mm, height_mm,
+			show_qr, show_barcode, show_price, show_profile, show_expiry, is_default)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.Name, t.BackgroundImage, t.BackgroundColor, t.WidthMM, t.HeightMM,
+			qr, bar, pri, prof, exp, isDef)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = tx.Exec(`UPDATE card_templates SET
+			name = ?, background_image = ?, background_color = ?, width_mm = ?, height_mm = ?,
+			show_qr = ?, show_barcode = ?, show_price = ?, show_profile = ?, show_expiry = ?, is_default = ?
+			WHERE id = ?`,
+			t.Name, t.BackgroundImage, t.BackgroundColor, t.WidthMM, t.HeightMM,
+			qr, bar, pri, prof, exp, isDef, t.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (d *DB) DeleteCardTemplate(id int64) error {
+	_, err := d.Exec("DELETE FROM card_templates WHERE id = ?", id)
+	return err
+}
+
+// --- SSTP Server Methods ---
+
+func (d *DB) GetSSTPSettings() (*models.SSTPSettings, error) {
+	var s models.SSTPSettings
+	var en int
+	err := d.QueryRow("SELECT id, enabled, port, gateway_ip, ip_pool, updated_at FROM sstp_settings ORDER BY id ASC LIMIT 1").Scan(
+		&s.ID, &en, &s.Port, &s.GatewayIP, &s.IPPool, &s.UpdatedAt,
+	)
+	if err != nil {
+		return &models.SSTPSettings{
+			Enabled:   true,
+			Port:      4444,
+			GatewayIP: "10.10.10.1",
+			IPPool:    "10.10.10.2-254",
+		}, nil
+	}
+	s.Enabled = (en == 1)
+	return &s, nil
+}
+
+func (d *DB) SaveSSTPSettings(s *models.SSTPSettings) error {
+	en := 0
+	if s.Enabled {
+		en = 1
+	}
+	var count int
+	_ = d.QueryRow("SELECT COUNT(*) FROM sstp_settings").Scan(&count)
+	if count == 0 {
+		_, err := d.Exec("INSERT INTO sstp_settings (enabled, port, gateway_ip, ip_pool) VALUES (?, ?, ?, ?)",
+			en, s.Port, s.GatewayIP, s.IPPool)
+		return err
+	}
+	_, err := d.Exec("UPDATE sstp_settings SET enabled = ?, port = ?, gateway_ip = ?, ip_pool = ?",
+		en, s.Port, s.GatewayIP, s.IPPool)
+	return err
+}
+
+func (d *DB) GetSSTPClients() ([]models.SSTPClient, error) {
+	rows, err := d.Query(`SELECT id, name, username, password, assigned_ip, notes, enabled, last_seen, created_at, updated_at
+		FROM sstp_clients ORDER BY id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.SSTPClient
+	for rows.Next() {
+		var c models.SSTPClient
+		var en int
+		if err := rows.Scan(&c.ID, &c.Name, &c.Username, &c.Password, &c.AssignedIP, &c.Notes, &en, &c.LastSeen, &c.CreatedAt, &c.UpdatedAt); err == nil {
+			c.Enabled = (en == 1)
+			list = append(list, c)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) SaveSSTPClient(c *models.SSTPClient) error {
+	en := 0
+	if c.Enabled {
+		en = 1
+	}
+	if c.ID == 0 {
+		_, err := d.Exec(`INSERT INTO sstp_clients (name, username, password, assigned_ip, notes, enabled)
+			VALUES (?, ?, ?, ?, ?, ?)`, c.Name, c.Username, c.Password, c.AssignedIP, c.Notes, en)
+		return err
+	}
+	_, err := d.Exec(`UPDATE sstp_clients SET name = ?, username = ?, password = ?, assigned_ip = ?, notes = ?, enabled = ?
+		WHERE id = ?`, c.Name, c.Username, c.Password, c.AssignedIP, c.Notes, en, c.ID)
+	return err
+}
+
+func (d *DB) DeleteSSTPClient(id int64) error {
+	_, err := d.Exec("DELETE FROM sstp_clients WHERE id = ?", id)
+	return err
+}
+
+func (d *DB) SyncSSTPFiles() error {
+	settings, err := d.GetSSTPSettings()
+	if err != nil {
+		return err
+	}
+
+	// 1. Generate /etc/ppp/chap-secrets
+	chap := fmt.Sprintf("gw-ip-address * \"\" %s\n", settings.GatewayIP)
+	clients, err := d.GetSSTPClients()
+	if err == nil {
+		for _, c := range clients {
+			if c.Enabled {
+				ip := c.AssignedIP
+				if ip == "" {
+					ip = "*"
+				}
+				chap += fmt.Sprintf("\"%s\" * \"%s\" %s\n", c.Username, c.Password, ip)
+			}
+		}
+	}
+
+	_ = os.MkdirAll("/etc/ppp", 0755)
+	_ = os.WriteFile("/etc/ppp/chap-secrets", []byte(chap), 0600)
+
+	// 2. Generate /etc/accel-ppp.conf
+	conf := fmt.Sprintf(`[modules]
+sstp
+auth_chap_md5
+auth_pap
+auth_mschap_v1
+auth_mschap_v2
+chap-secrets
+ippool
+log_file
+
+[core]
+thread-count=2
+
+[cli]
+verbose=1
+tcp=127.0.0.1:2001
+
+[sstp]
+verbose=1
+accept=ssl
+bind=0.0.0.0
+port=%d
+ssl-pemfile=/etc/ssl/certs/ssl-cert-snakeoil.pem
+ssl-keyfile=/etc/ssl/private/ssl-cert-snakeoil.key
+mppe=require
+
+[ppp]
+verbose=1
+min-mtu=1280
+mtu=1400
+mru=1400
+ipv4=require
+ipv6=deny
+lcp-echo-interval=20
+lcp-echo-failure=3
+
+[client-ip-range]
+0.0.0.0/0
+
+[ip-pool]
+gw-ip-address=%s
+%s
+
+[chap-secrets]
+gw-ip-address=%s
+chap-secrets=/etc/ppp/chap-secrets
+
+[log]
+log-file=/var/log/accel-ppp/accel-ppp.log
+log-emerg=/var/log/accel-ppp/emerg.log
+log-fail-file=/var/log/accel-ppp/auth-fail.log
+copy=1
+level=3
+`, settings.Port, settings.GatewayIP, settings.IPPool, settings.GatewayIP)
+
+	_ = os.WriteFile("/etc/accel-ppp.conf", []byte(conf), 0644)
+
+	// 3. Reload or Restart accel-ppp
+	if exec.Command("which", "accel-cmd").Run() == nil {
+		_ = exec.Command("accel-cmd", "reload").Run()
+	} else {
+		_ = exec.Command("systemctl", "restart", "accel-ppp").Run()
+	}
+
+	return nil
 }

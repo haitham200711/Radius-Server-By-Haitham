@@ -28,6 +28,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"dashboard/index":     {"templates/base.html", "templates/dashboard/index.html"},
 		"subscribers/list":    {"templates/base.html", "templates/subscribers/list.html"},
 		"subscribers/add":     {"templates/base.html", "templates/subscribers/add.html"},
+		"subscribers/edit":    {"templates/base.html", "templates/subscribers/edit.html"},
 		"cards/list":          {"templates/base.html", "templates/cards/list.html"},
 		"cards/generate":      {"templates/base.html", "templates/cards/generate.html"},
 		"cards/print":         {"templates/cards/print.html"},
@@ -36,6 +37,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"routers/list":        {"templates/base.html", "templates/routers/list.html"},
 		"resellers/list":      {"templates/base.html", "templates/resellers/list.html"},
 		"sessions/list":       {"templates/base.html", "templates/sessions/list.html"},
+		"sstp/index":          {"templates/base.html", "templates/sstp/index.html"},
 		"reports/index":       {"templates/base.html", "templates/reports/index.html"},
 		"settings/index":      {"templates/base.html", "templates/settings/index.html"},
 	}
