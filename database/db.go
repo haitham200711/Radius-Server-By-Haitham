@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -1214,4 +1215,102 @@ level=3
 	}
 
 	return nil
+}
+
+// --- Bulk Subscriber Operations ---
+
+func (d *DB) BulkDeleteSubscribers(usernames []string) error {
+	if len(usernames) == 0 {
+		return nil
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, u := range usernames {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		_, _ = tx.Exec("DELETE FROM subscribers WHERE username = ?", u)
+		_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ?", u)
+		_, _ = tx.Exec("DELETE FROM radreply WHERE username = ?", u)
+		_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", u)
+		_, _ = tx.Exec("DELETE FROM cards WHERE username = ?", u)
+	}
+
+	return tx.Commit()
+}
+
+func (d *DB) BulkRenewSubscribers(usernames []string, targetProfile string) error {
+	if len(usernames) == 0 {
+		return nil
+	}
+	for _, u := range usernames {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		_ = d.RenewSubscriber(u, targetProfile)
+	}
+	return nil
+}
+
+func (d *DB) BulkAddQuota(usernames []string, quotaGB float64) error {
+	if len(usernames) == 0 || quotaGB <= 0 {
+		return nil
+	}
+	addBytes := int64(quotaGB * 1024 * 1024 * 1024)
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, u := range usernames {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		_, _ = tx.Exec("UPDATE subscribers SET quota_bytes = quota_bytes + ? WHERE username = ?", addBytes, u)
+
+		var currLimitStr string
+		errQ := tx.QueryRow("SELECT value FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", u).Scan(&currLimitStr)
+		if errQ == nil {
+			currLimit, _ := strconv.ParseInt(currLimitStr, 10, 64)
+			newLimit := currLimit + addBytes
+			_, _ = tx.Exec("UPDATE radreply SET value = ? WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", fmt.Sprintf("%d", newLimit), u)
+		} else {
+			var newLimit int64
+			_ = tx.QueryRow("SELECT quota_bytes FROM subscribers WHERE username = ?", u).Scan(&newLimit)
+			if newLimit > 0 {
+				_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", u, fmt.Sprintf("%d", newLimit))
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (d *DB) BulkAddDebt(usernames []string, amount float64) error {
+	if len(usernames) == 0 {
+		return nil
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, u := range usernames {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", amount, u)
+	}
+
+	return tx.Commit()
 }

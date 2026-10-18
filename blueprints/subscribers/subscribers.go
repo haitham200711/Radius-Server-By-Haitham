@@ -40,8 +40,80 @@ type SubscriberItem struct {
 	Status         string
 }
 
+func getPageNumbers(current, total int) []int {
+	if total <= 7 {
+		var pages []int
+		for i := 1; i <= total; i++ {
+			pages = append(pages, i)
+		}
+		return pages
+	}
+	start := current - 2
+	end := current + 2
+	if start < 1 {
+		start = 1
+		end = 5
+	}
+	if end > total {
+		end = total
+		start = total - 4
+		if start < 1 {
+			start = 1
+		}
+	}
+	var pages []int
+	for i := start; i <= end; i++ {
+		pages = append(pages, i)
+	}
+	return pages
+}
+
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	search := strings.TrimSpace(r.URL.Query().Get("q"))
+
+	// 1. Pagination & Limits (default 10, max 500)
+	limit := 10
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+		if limit > 500 {
+			limit = 500
+		}
+	}
+
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
+		page = p
+	}
+
+	// 2. Count total matching subscribers
+	countQuery := `SELECT COUNT(DISTINCT rc.username)
+	FROM radcheck rc
+	LEFT JOIN subscribers s ON rc.username = s.username
+	WHERE rc.attribute = 'Cleartext-Password'`
+
+	var countArgs []interface{}
+	if search != "" {
+		countQuery += " AND (rc.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?)"
+		searchArg := "%" + search + "%"
+		countArgs = append(countArgs, searchArg, searchArg, searchArg, searchArg)
+	}
+
+	var totalCount int
+	_ = bp.db.QueryRow(countQuery, countArgs...).Scan(&totalCount)
+
+	totalPages := (totalCount + limit - 1) / limit
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	offset := (page - 1) * limit
+	if offset < 0 {
+		offset = 0
+	}
+
+	// 3. Query paginated subscribers
 	query := `SELECT 
 		COALESCE(s.id, 0),
 		COALESCE(s.contract_no, '-'),
@@ -68,7 +140,8 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		searchArg := "%" + search + "%"
 		args = append(args, searchArg, searchArg, searchArg, searchArg)
 	}
-	query += " ORDER BY COALESCE(s.id, rc.id) DESC LIMIT 200"
+	query += " GROUP BY rc.username ORDER BY COALESCE(s.id, rc.id) DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
 
 	rows, err := bp.db.Query(query, args...)
 	var list []SubscriberItem
@@ -105,13 +178,87 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	fromIndex := offset + 1
+	toIndex := offset + len(list)
+	if totalCount == 0 {
+		fromIndex = 0
+		toIndex = 0
+	}
+
+	profiles, _ := bp.db.GetProfiles()
+
 	_ = bp.renderer.Render(w, "subscribers/list", map[string]interface{}{
 		"Title":       "إدارة المشتركين والعقود",
 		"ActiveMenu":  "subscribers",
 		"CurrentUser": middleware.GetUser(r),
 		"Subscribers": list,
 		"SearchQuery": search,
+		"Page":        page,
+		"Limit":       limit,
+		"TotalCount":  totalCount,
+		"TotalPages":  totalPages,
+		"HasPrev":     page > 1,
+		"HasNext":     page < totalPages,
+		"PrevPage":    page - 1,
+		"NextPage":    page + 1,
+		"FromIndex":   fromIndex,
+		"ToIndex":     toIndex,
+		"PageNumbers": getPageNumbers(page, totalPages),
+		"PageSizes":   []int{10, 25, 50, 100, 200, 500},
+		"Profiles":    profiles,
 	})
+}
+
+func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+
+	_ = r.ParseForm()
+	action := r.FormValue("action")
+	usernames := r.Form["usernames"]
+	if len(usernames) == 0 {
+		raw := r.FormValue("usernames_csv")
+		if raw != "" {
+			parts := strings.Split(raw, ",")
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					usernames = append(usernames, p)
+				}
+			}
+		}
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s", limit, page, q)
+
+	if len(usernames) == 0 {
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+		return
+	}
+
+	switch action {
+	case "delete":
+		_ = bp.db.BulkDeleteSubscribers(usernames)
+	case "renew":
+		profile := strings.TrimSpace(r.FormValue("profile"))
+		_ = bp.db.BulkRenewSubscribers(usernames, profile)
+	case "add_quota":
+		quotaGB, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("quota_gb")), 64)
+		if quotaGB > 0 {
+			_ = bp.db.BulkAddQuota(usernames, quotaGB)
+		}
+	case "add_debt":
+		amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("debt_amount")), 64)
+		_ = bp.db.BulkAddDebt(usernames, amount)
+	}
+
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {

@@ -9,27 +9,79 @@
     </a>
 </div>
 
+<!-- Search & Page Size Filter -->
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
-        <form method="GET" action="/subscribers" class="row g-2">
-            <div class="col-md-10">
+        <form method="GET" action="/subscribers" id="filterForm" class="row g-2 align-items-center">
+            <div class="col-md-7">
                 <div class="input-group">
                     <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
                     <input type="text" name="q" class="form-control" placeholder="بحث باسم العميل، اسم المستخدم، رقم العقد، أو رقم الهاتف..." value="{{ .SearchQuery }}">
                 </div>
             </div>
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-white small fw-bold">عرض بالصفحة:</span>
+                    <select name="limit" class="form-select font-monospace" onchange="document.getElementById('filterForm').submit()">
+                        {{ range .PageSizes }}
+                        <option value="{{ . }}" {{ if eq $.Limit . }}selected{{ end }}>{{ . }} مشترك</option>
+                        {{ end }}
+                    </select>
+                </div>
+            </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-secondary w-100 fw-bold">بحث</button>
+                <button type="submit" class="btn btn-secondary w-100 fw-bold">
+                    <i class="bi bi-filter me-1"></i> تصفية
+                </button>
             </div>
         </form>
     </div>
 </div>
 
+<!-- Bulk Actions Toolbar (Appears dynamically when rows are selected) -->
+<div id="bulkActionBar" class="card mb-4 border-primary shadow-sm bg-primary-subtle d-none">
+    <div class="card-body py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-check2-circle fs-4 text-primary"></i>
+            <div>
+                <span class="fw-bold text-primary">تم تحديد <span id="selectedCount" class="badge bg-primary fs-6">0</span> مشترك</span>
+                <span class="text-muted small ms-2">(من أصل {{ len .Subscribers }} في الصفحة الحالية)</span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <!-- 1. Bulk Delete -->
+            <button type="button" class="btn btn-sm btn-danger fw-bold" onclick="openBulkDeleteModal()">
+                <i class="bi bi-trash me-1"></i> مسح المحدد
+            </button>
+            <!-- 2. Bulk Renew -->
+            <button type="button" class="btn btn-sm btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#bulkRenewModal">
+                <i class="bi bi-arrow-repeat me-1"></i> تجديد للمحدد
+            </button>
+            <!-- 3. Bulk Add Quota -->
+            <button type="button" class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkQuotaModal">
+                <i class="bi bi-database-add me-1"></i> إضافة كوتة للمحدد
+            </button>
+            <!-- 4. Bulk Add Debt / Balance -->
+            <button type="button" class="btn btn-sm btn-warning fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#bulkDebtModal">
+                <i class="bi bi-cash-stack me-1"></i> إضافة / تسوية مديونية
+            </button>
+            <!-- Deselect -->
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
+                <i class="bi bi-x-circle me-1"></i> إلغاء التحديد
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Subscribers Table -->
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0 text-nowrap">
             <thead class="table-light">
                 <tr>
+                    <th style="width: 40px;" class="text-center">
+                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input" title="تحديد / إلغاء تحديد الكل في هذه الصفحة">
+                    </th>
                     <th>رقم العقد</th>
                     <th>اسم العميل</th>
                     <th>اسم المستخدم / المرور</th>
@@ -44,7 +96,10 @@
             </thead>
             <tbody>
                 {{ range .Subscribers }}
-                <tr>
+                <tr id="row-{{ .Username }}">
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input sub-checkbox" value="{{ .Username }}" onchange="updateSelectionState()">
+                    </td>
                     <td><span class="badge bg-light text-dark border font-monospace">{{ .ContractNo }}</span></td>
                     <td>
                         <div class="fw-bold">{{ .FullName }}</div>
@@ -91,20 +146,20 @@
                         {{ end }}
                     </td>
                     <td class="text-end">
-                        <a href="/subscribers/edit?username={{ .Username }}" class="btn btn-sm btn-outline-primary me-1">
+                        <a href="/subscribers/edit?username={{ .Username }}" class="btn btn-sm btn-outline-primary me-1" title="تعديل بيانات المشترك">
                             <i class="bi bi-pencil-square"></i> تعديل
                         </a>
-                        <a href="/subscribers/renew?username={{ .Username }}" class="btn btn-sm btn-outline-success me-1" onclick="return confirm('هل تريد تجديد اشتراك العميل {{ .FullName }} بناءً على كوتة ومدة باقته ({{ .Profile }})؟');">
+                        <a href="/subscribers/renew?username={{ .Username }}" class="btn btn-sm btn-outline-success me-1" onclick="return confirm('هل تريد تجديد اشتراك العميل {{ .FullName }} بناءً على كوتة ومدة باقته ({{ .Profile }})؟');" title="تجديد الاشتراك">
                             <i class="bi bi-arrow-repeat"></i> تجديد
                         </a>
-                        <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من النظام والقاعدة؟');">
+                        <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من النظام والقاعدة؟');" title="حذف المشترك">
                             <i class="bi bi-trash"></i> حذف
                         </a>
                     </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="10" class="text-center py-5 text-muted">
+                    <td colspan="11" class="text-center py-5 text-muted">
                         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
                         لا توجد بيانات مشتركين مطابقة
                     </td>
@@ -113,8 +168,292 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination Footer -->
+    {{ if gt .TotalCount 0 }}
+    <div class="card-footer bg-white py-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="text-muted small">
+            عرض المشتركين من <b class="text-dark">{{ .FromIndex }}</b> إلى <b class="text-dark">{{ .ToIndex }}</b> من إجمالي <b class="text-primary">{{ .TotalCount }}</b> مشترك
+            (صفحة <b class="text-dark">{{ .Page }}</b> من <b class="text-dark">{{ .TotalPages }}</b>)
+        </div>
+        <div>
+            <nav aria-label="Page navigation">
+                <ul class="pagination pagination-sm mb-0">
+                    <!-- First Page -->
+                    <li class="page-item {{ if eq .Page 1 }}disabled{{ end }}">
+                        <a class="page-link" href="/subscribers?page=1&limit={{ .Limit }}&q={{ .SearchQuery }}" title="الصفحة الأولى">
+                            <i class="bi bi-chevron-double-right"></i>
+                        </a>
+                    </li>
+                    <!-- Previous Page -->
+                    <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                        <a class="page-link" href="/subscribers?page={{ .PrevPage }}&limit={{ .Limit }}&q={{ .SearchQuery }}">السابق</a>
+                    </li>
+
+                    <!-- Page Numbers -->
+                    {{ range .PageNumbers }}
+                    <li class="page-item {{ if eq . $.Page }}active{{ end }}">
+                        <a class="page-link" href="/subscribers?page={{ . }}&limit={{ $.Limit }}&q={{ $.SearchQuery }}">{{ . }}</a>
+                    </li>
+                    {{ end }}
+
+                    <!-- Next Page -->
+                    <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                        <a class="page-link" href="/subscribers?page={{ .NextPage }}&limit={{ .Limit }}&q={{ .SearchQuery }}">التالي</a>
+                    </li>
+                    <!-- Last Page -->
+                    <li class="page-item {{ if eq .Page .TotalPages }}disabled{{ end }}">
+                        <a class="page-link" href="/subscribers?page={{ .TotalPages }}&limit={{ .Limit }}&q={{ .SearchQuery }}" title="الصفحة الأخيرة">
+                            <i class="bi bi-chevron-double-left"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {{ end }}
 </div>
+
+<!-- ========================================== -->
+<!-- Modals for Bulk Operations                 -->
+<!-- ========================================== -->
+
+<!-- 1. Bulk Delete Modal -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> تأكيد مسح المشتركين المحددين
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+
+                    <p class="mb-2">أنت على وشك مسح <b class="text-danger bulk-count-text">0</b> مشترك محدد نهائياً.</p>
+                    <div class="alert alert-warning small mb-0">
+                        <i class="bi bi-info-circle me-1"></i> سيتم حذف المشتركين من سجلات الراديوس وقاعدة البيانات وجلسات الاتصال نهائياً ولا يمكن التراجع عن هذا الإجراء!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger fw-bold">
+                        <i class="bi bi-trash me-1"></i> نعم، حذف نهائي
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Bulk Renew Modal -->
+<div class="modal fade" id="bulkRenewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-arrow-repeat me-2"></i> تجديد اشتراك المشتركين المحددين
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="renew">
+                    <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+
+                    <p class="mb-3">تجديد الاشتراك لعدد <b class="text-success bulk-count-text">0</b> مشترك محدد.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختر باقة التجديد:</label>
+                        <select name="profile" class="form-select">
+                            <option value="">-- التجديد التلقائي حسب الباقة الحالية لكل مشترك (مستحسن) --</option>
+                            {{ range .Profiles }}
+                            <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }})</option>
+                            {{ end }}
+                        </select>
+                        <small class="text-muted">إذا تركت الخيار التلقائي، سيتم تجديد كل عميل وفقاً لكوتة ومدة باقته الحالية المسجلة له.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> تنفيذ التجديد الجماعي
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Bulk Add Quota Modal -->
+<div class="modal fade" id="bulkQuotaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-database-add me-2"></i> إضافة كوتة بيانات إضافية
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add_quota">
+                    <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+
+                    <p class="mb-3">إضافة كوتة رصيد بيانات لعدد <b class="text-primary bulk-count-text">0</b> مشترك محدد.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">كمية الكوتة الإضافية (بالجيجابايت GB):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.5" min="0.1" name="quota_gb" id="bulkQuotaInput" class="form-control form-control-lg font-monospace fw-bold" value="10" required>
+                            <span class="input-group-text fw-bold">GB</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('bulkQuotaInput').value=5">+5 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('bulkQuotaInput').value=10">+10 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('bulkQuotaInput').value=20">+20 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('bulkQuotaInput').value=50">+50 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('bulkQuotaInput').value=100">+100 GB</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-plus-circle me-1"></i> إضافة الكوتة فوراً
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Bulk Add/Adjust Debt Modal -->
+<div class="modal fade" id="bulkDebtModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-cash-stack me-2"></i> إضافة أو تسوية مديونية
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add_debt">
+                    <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+
+                    <p class="mb-3">تعديل رصيد / مديونية لعدد <b class="text-dark fw-bold bulk-count-text">0</b> مشترك محدد.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المبلغ المطلوب إضافته / خصمه (ج.م):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.5" name="debt_amount" class="form-control form-control-lg font-monospace fw-bold" placeholder="مثال: 50 لإضافة دين، أو -50 لسداد دين" required>
+                            <span class="input-group-text fw-bold">ج.م</span>
+                        </div>
+                        <small class="text-muted">أدخل رقماً موجباً لإضافة مديونية جديدة على المشتركين، أو رقماً سالباً (مثلاً <code>-50</code>) لخصم سداد من ديونهم.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark">
+                        <i class="bi bi-check-circle me-1"></i> تطبيق التعديل
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+// Selection Management
+const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+const rowCheckboxes = document.querySelectorAll('.sub-checkbox');
+const bulkActionBar = document.getElementById('bulkActionBar');
+const selectedCountBadge = document.getElementById('selectedCount');
+const bulkUsernamesFields = document.querySelectorAll('.bulk-usernames-field');
+const bulkCountTexts = document.querySelectorAll('.bulk-count-text');
+
+if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', function() {
+        const checked = this.checked;
+        rowCheckboxes.forEach(cb => {
+            cb.checked = checked;
+            const row = document.getElementById('row-' + cb.value);
+            if (row) {
+                if (checked) row.classList.add('table-primary');
+                else row.classList.remove('table-primary');
+            }
+        });
+        updateSelectionState();
+    });
+}
+
+function updateSelectionState() {
+    const selected = [];
+    rowCheckboxes.forEach(cb => {
+        const row = document.getElementById('row-' + cb.value);
+        if (cb.checked) {
+            selected.push(cb.value);
+            if (row) row.classList.add('table-primary');
+        } else {
+            if (row) row.classList.remove('table-primary');
+        }
+    });
+
+    const count = selected.length;
+    if (selectedCountBadge) selectedCountBadge.textContent = count;
+    bulkCountTexts.forEach(el => el.textContent = count);
+
+    const csv = selected.join(',');
+    bulkUsernamesFields.forEach(el => el.value = csv);
+
+    if (count > 0) {
+        bulkActionBar.classList.remove('d-none');
+    } else {
+        bulkActionBar.classList.add('d-none');
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+    }
+
+    if (selectAllCheckbox && rowCheckboxes.length > 0) {
+        selectAllCheckbox.checked = (count === rowCheckboxes.length);
+    }
+}
+
+function deselectAll() {
+    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+    rowCheckboxes.forEach(cb => {
+        cb.checked = false;
+        const row = document.getElementById('row-' + cb.value);
+        if (row) row.classList.remove('table-primary');
+    });
+    updateSelectionState();
+}
+
+function openBulkDeleteModal() {
+    const modal = new bootstrap.Modal(document.getElementById('bulkDeleteModal'));
+    modal.show();
+}
+</script>
+{{ end }}

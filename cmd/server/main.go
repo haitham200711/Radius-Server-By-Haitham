@@ -80,6 +80,7 @@ func main() {
 	mux.HandleFunc("/subscribers/edit", middleware.RequireAuth(subBP.EditHandler))
 	mux.HandleFunc("/subscribers/delete", middleware.RequireAuth(subBP.DeleteHandler))
 	mux.HandleFunc("/subscribers/renew", middleware.RequireAuth(subBP.RenewHandler))
+	mux.HandleFunc("/subscribers/bulk", middleware.RequireAuth(subBP.BulkHandler))
 
 	// Cards Blueprint
 	cardsBP := cards.New(db, renderer)
