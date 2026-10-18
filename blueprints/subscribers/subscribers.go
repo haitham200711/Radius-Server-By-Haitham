@@ -406,6 +406,22 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
 }
 
+func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	quotaGB, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("quota_gb")), 64)
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	status := r.FormValue("status")
+
+	if username != "" && quotaGB > 0 {
+		_ = bp.db.BulkAddQuota([]string{username}, quotaGB)
+	}
+
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
 func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.URL.Query().Get("username"))
 	if username == "" {

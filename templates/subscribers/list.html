@@ -248,6 +248,9 @@
                         {{ end }}
                     </td>
                     <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="openAddQuotaModal('{{ .Username }}', '{{ .FullName }}', '{{ printf "%.1f" .QuotaGB }}')" title="إضافة كوتة رصيد إضافية">
+                            <i class="bi bi-database-add"></i> +كوتة
+                        </button>
                         <a href="/subscribers/edit?username={{ .Username }}" class="btn btn-sm btn-outline-primary me-1" title="تعديل بيانات المشترك">
                             <i class="bi bi-pencil-square"></i> تعديل
                         </a>
@@ -484,6 +487,65 @@
                 </div>
             </form>
         </div>
+    <!-- 5. Single Subscriber Add Quota Modal -->
+<div class="modal fade" id="singleQuotaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-dark">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-database-add me-2"></i> إضافة كوتة رصيد للمشترك
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/add-quota">
+                <div class="modal-body">
+                    <input type="hidden" name="username" id="singleQuotaUsername">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم العميل:</span>
+                                <span class="fw-bold text-dark" id="singleQuotaFullName">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم المستخدم:</span>
+                                <span class="font-monospace fw-bold text-primary" id="singleQuotaUserDisplay">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">الكوتة الحالية:</span>
+                                <span class="badge bg-primary" id="singleQuotaCurrent">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">حجم الكوتة الإضافية (بالجيجابايت GB):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.5" min="0.1" name="quota_gb" id="singleQuotaInput" class="form-control form-control-lg font-monospace fw-bold" value="10" required>
+                            <span class="input-group-text fw-bold">GB</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('singleQuotaInput').value=5">+5 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('singleQuotaInput').value=10">+10 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('singleQuotaInput').value=20">+20 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('singleQuotaInput').value=50">+50 GB</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('singleQuotaInput').value=100">+100 GB</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-info fw-bold text-dark">
+                        <i class="bi bi-plus-circle me-1"></i> إضافة الكوتة فوراً
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -622,6 +684,15 @@ function deselectAll() {
 
 function openBulkDeleteModal() {
     const modal = new bootstrap.Modal(document.getElementById('bulkDeleteModal'));
+    modal.show();
+}
+
+function openAddQuotaModal(username, fullName, currentQuotaGB) {
+    document.getElementById('singleQuotaUsername').value = username;
+    document.getElementById('singleQuotaUserDisplay').textContent = username;
+    document.getElementById('singleQuotaFullName').textContent = fullName;
+    document.getElementById('singleQuotaCurrent').textContent = currentQuotaGB + ' GB';
+    const modal = new bootstrap.Modal(document.getElementById('singleQuotaModal'));
     modal.show();
 }
 </script>
