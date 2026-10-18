@@ -33,12 +33,12 @@
     {{ end }}
 </div>
 
-<!-- Search & Page Size Filter -->
+<!-- Search, Page Size & Column Customization Filter -->
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
         <form method="GET" action="/subscribers" id="filterForm" class="row g-2 align-items-center">
             <input type="hidden" name="status" value="{{ .FilterStatus }}">
-            <div class="col-md-7">
+            <div class="col-md-5">
                 <div class="input-group">
                     <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
                     <input type="text" name="q" class="form-control" placeholder="بحث باسم العميل، اسم المستخدم، رقم العقد، أو رقم الهاتف..." value="{{ .SearchQuery }}">
@@ -58,6 +58,60 @@
                 <button type="submit" class="btn btn-secondary w-100 fw-bold">
                     <i class="bi bi-filter me-1"></i> تصفية
                 </button>
+            </div>
+            <div class="col-md-2">
+                <!-- Column Visibility Dropdown -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-dark w-100 dropdown-toggle fw-bold" type="button" id="columnsDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                        <i class="bi bi-view-list me-1"></i> تخصيص الأعمدة
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="min-width: 260px;">
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <span class="fw-bold small text-muted"><i class="bi bi-sliders me-1"></i> اختيار الحقول</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-primary fw-bold" onclick="resetColumns()">إعادة ضبط</button>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-online" data-column="col-online" checked>
+                            <label class="form-check-label small" for="toggle-col-online">حالة الاتصال والآيبي</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-contract" data-column="col-contract" checked>
+                            <label class="form-check-label small" for="toggle-col-contract">رقم العقد</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-name" data-column="col-name" checked>
+                            <label class="form-check-label small" for="toggle-col-name">اسم العميل والعنوان</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-username" data-column="col-username" checked>
+                            <label class="form-check-label small" for="toggle-col-username">اسم المستخدم / كلمة السر</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-phone" data-column="col-phone" checked>
+                            <label class="form-check-label small" for="toggle-col-phone">رقم الموبايل</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-profile" data-column="col-profile" checked>
+                            <label class="form-check-label small" for="toggle-col-profile">الباقة</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-debt" data-column="col-debt" checked>
+                            <label class="form-check-label small" for="toggle-col-debt">المديونية</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-quota" data-column="col-quota" checked>
+                            <label class="form-check-label small" for="toggle-col-quota">الكوتة</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-expiry" data-column="col-expiry" checked>
+                            <label class="form-check-label small" for="toggle-col-expiry">تاريخ الانتهاء</label>
+                        </div>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-status" data-column="col-status" checked>
+                            <label class="form-check-label small" for="toggle-col-status">الحالة (نشط/معطل)</label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>
@@ -107,16 +161,16 @@
                     <th style="width: 40px;" class="text-center">
                         <input type="checkbox" id="selectAllCheckbox" class="form-check-input" title="تحديد / إلغاء تحديد الكل في هذه الصفحة">
                     </th>
-                    <th>حالة الاتصال والآيبي</th>
-                    <th>رقم العقد</th>
-                    <th>اسم العميل</th>
-                    <th>اسم المستخدم / المرور</th>
-                    <th>رقم الموبايل</th>
-                    <th>الباقة</th>
-                    <th>المديونية</th>
-                    <th>الكوتة</th>
-                    <th>تاريخ الانتهاء</th>
-                    <th>الحالة</th>
+                    <th class="col-online">حالة الاتصال والآيبي</th>
+                    <th class="col-contract">رقم العقد</th>
+                    <th class="col-name">اسم العميل</th>
+                    <th class="col-username">اسم المستخدم / المرور</th>
+                    <th class="col-phone">رقم الموبايل</th>
+                    <th class="col-profile">الباقة</th>
+                    <th class="col-debt">المديونية</th>
+                    <th class="col-quota">الكوتة</th>
+                    <th class="col-expiry">تاريخ الانتهاء</th>
+                    <th class="col-status">الحالة</th>
                     <th class="text-end">خيارات</th>
                 </tr>
             </thead>
@@ -126,7 +180,7 @@
                     <td class="text-center">
                         <input type="checkbox" class="form-check-input sub-checkbox" value="{{ .Username }}" onchange="updateSelectionState()">
                     </td>
-                    <td>
+                    <td class="col-online">
                         {{ if .IsOnline }}
                         <div>
                             <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold">
@@ -148,16 +202,16 @@
                         {{ end }}
                         {{ end }}
                     </td>
-                    <td><span class="badge bg-light text-dark border font-monospace">{{ .ContractNo }}</span></td>
-                    <td>
+                    <td class="col-contract"><span class="badge bg-light text-dark border font-monospace">{{ .ContractNo }}</span></td>
+                    <td class="col-name">
                         <div class="fw-bold">{{ .FullName }}</div>
                         {{ if .Address }}<small class="text-muted"><i class="bi bi-geo-alt"></i> {{ .Address }}</small>{{ end }}
                     </td>
-                    <td>
+                    <td class="col-username">
                         <div class="font-monospace fw-bold text-primary">{{ .Username }}</div>
                         <small class="text-muted font-monospace">Pass: {{ .Password }}</small>
                     </td>
-                    <td>
+                    <td class="col-phone">
                         {{ if .Phone }}
                         <a href="tel:{{ .Phone }}" class="text-decoration-none text-dark">
                             <i class="bi bi-telephone text-muted me-1"></i>{{ .Phone }}
@@ -166,8 +220,8 @@
                         <span class="text-muted">-</span>
                         {{ end }}
                     </td>
-                    <td><span class="badge bg-info text-dark">{{ .Profile }}</span></td>
-                    <td>
+                    <td class="col-profile"><span class="badge bg-info text-dark">{{ .Profile }}</span></td>
+                    <td class="col-debt">
                         {{ if gt .Debt 0.0 }}
                         <span class="badge bg-danger-subtle text-danger fw-bold border border-danger-subtle">
                             {{ printf "%.2f" .Debt }} ج.م
@@ -176,17 +230,17 @@
                         <span class="badge bg-success-subtle text-success border border-success-subtle">0.00 ج.م</span>
                         {{ end }}
                     </td>
-                    <td>
+                    <td class="col-quota">
                         {{ if gt .QuotaGB 0.0 }}
                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ printf "%.1f" .QuotaGB }} GB</span>
                         {{ else }}
                         <span class="text-muted">مفتوح ∞</span>
                         {{ end }}
                     </td>
-                    <td>
+                    <td class="col-expiry">
                         <span class="small">{{ .ExpirationDate }}</span>
                     </td>
-                    <td>
+                    <td class="col-status">
                         {{ if eq .Status "active" }}
                         <span class="badge bg-success">نشط</span>
                         {{ else }}
@@ -439,7 +493,70 @@
 
 {{ define "scripts" }}
 <script>
-// Selection Management
+// 1. Column Visibility Management with localStorage Persistence
+const colToggles = document.querySelectorAll('.col-toggle');
+const STORAGE_KEY = 'haitham_subscribers_columns';
+
+function applyColumnVisibility() {
+    let saved = {};
+    try {
+        saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch (e) {
+        saved = {};
+    }
+
+    colToggles.forEach(toggle => {
+        const colClass = toggle.dataset.column;
+        let isVisible = true;
+        if (saved[colClass] !== undefined) {
+            isVisible = saved[colClass];
+            toggle.checked = isVisible;
+        } else {
+            isVisible = toggle.checked;
+        }
+
+        const elements = document.querySelectorAll('.' + colClass);
+        elements.forEach(el => {
+            if (isVisible) {
+                el.classList.remove('d-none');
+            } else {
+                el.classList.add('d-none');
+            }
+        });
+    });
+}
+
+colToggles.forEach(toggle => {
+    toggle.addEventListener('change', function() {
+        const colClass = this.dataset.column;
+        const isVisible = this.checked;
+
+        document.querySelectorAll('.' + colClass).forEach(el => {
+            if (isVisible) el.classList.remove('d-none');
+            else el.classList.add('d-none');
+        });
+
+        let saved = {};
+        try {
+            saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        } catch (e) {}
+        saved[colClass] = isVisible;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    });
+});
+
+function resetColumns() {
+    localStorage.removeItem(STORAGE_KEY);
+    colToggles.forEach(t => {
+        t.checked = true;
+        document.querySelectorAll('.' + t.dataset.column).forEach(el => el.classList.remove('d-none'));
+    });
+}
+
+// Initial application of column preferences
+applyColumnVisibility();
+
+// 2. Selection & Bulk Action Management
 const selectAllCheckbox = document.getElementById('selectAllCheckbox');
 const rowCheckboxes = document.querySelectorAll('.sub-checkbox');
 const bulkActionBar = document.getElementById('bulkActionBar');
