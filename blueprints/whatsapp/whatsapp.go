@@ -2,9 +2,13 @@ package whatsapp
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
@@ -30,6 +34,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		settings = &models.WhatsAppSettings{ID: 1, Enabled: true}
 	}
+	templates, _ := bp.db.GetWhatsAppTemplates()
 	logs, _ := bp.db.GetWhatsAppLogs(50)
 
 	successMsg := r.URL.Query().Get("success")
@@ -46,11 +51,12 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = bp.renderer.Render(w, "whatsapp/index", map[string]interface{}{
-		"Title":          "ربط واتساب (WhatsApp)",
+		"Title":          "ربط وإشعارات واتساب (WhatsApp)",
 		"ActiveMenu":     "whatsapp",
 		"CurrentUser":    user,
 		"Status":         status,
 		"Settings":       settings,
+		"Templates":      templates,
 		"Logs":           logs,
 		"FlashMessage":   flashMsg,
 		"FlashType":      flashType,
@@ -139,16 +145,14 @@ func (bp *Blueprint) TestMessageHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 1. Try internal whatsmeow
 	status := whatsapp.GetWhatsAppStatus()
 	var err error
 	if status.IsLoggedIn {
 		err = whatsapp.SendWhatsAppMessage(phone, message)
 	} else if settings != nil && settings.APIEndpoint != "" {
-		// 2. Try external fallback API
 		err = whatsapp.SendWhatsAppExternalFallback(settings.APIEndpoint, settings.APIToken, settings.InstanceID, phone, message)
 	} else {
-		err = http.ErrNoCookie // WhatsApp not connected
+		err = fmt.Errorf("خدمة واتساب غير مقترنة بعد")
 	}
 
 	if err != nil {
@@ -168,6 +172,16 @@ func (bp *Blueprint) SaveSettingsHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	days, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("debt_reminder_days")))
+	if days <= 0 {
+		days = 3
+	}
+
+	minDebt, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("debt_reminder_min_debt")), 64)
+	if minDebt < 0 {
+		minDebt = 1.00
+	}
+
 	settings := &models.WhatsAppSettings{
 		ID:                    1,
 		Enabled:               r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on",
@@ -178,6 +192,9 @@ func (bp *Blueprint) SaveSettingsHandler(w http.ResponseWriter, r *http.Request)
 		NotifyOnNewSubscriber: r.FormValue("notify_on_new_subscriber") == "1" || r.FormValue("notify_on_new_subscriber") == "on",
 		NotifyOnExpiry:        r.FormValue("notify_on_expiry") == "1" || r.FormValue("notify_on_expiry") == "on",
 		NotifyOnPayment:       r.FormValue("notify_on_payment") == "1" || r.FormValue("notify_on_payment") == "on",
+		DebtReminderEnabled:   r.FormValue("debt_reminder_enabled") == "1" || r.FormValue("debt_reminder_enabled") == "on",
+		DebtReminderDays:      days,
+		DebtReminderMinDebt:   minDebt,
 	}
 
 	if err := bp.db.SaveWhatsAppSettings(settings); err != nil {
@@ -186,4 +203,71 @@ func (bp *Blueprint) SaveSettingsHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	http.Redirect(w, r, "/whatsapp?success="+url.QueryEscape("تم حفظ إعدادات واتساب بنجاح"), http.StatusFound)
+}
+
+// SaveTemplateHandler saves/updates a specific notification message template
+func (bp *Blueprint) SaveTemplateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Redirect(w, r, "/whatsapp", http.StatusFound)
+		return
+	}
+
+	key := strings.TrimSpace(r.FormValue("event_key"))
+	if key == "" {
+		http.Redirect(w, r, "/whatsapp?error="+url.QueryEscape("مفتاح القالب غير محدد"), http.StatusFound)
+		return
+	}
+
+	enabled := r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on"
+	text := strings.TrimSpace(r.FormValue("template_text"))
+
+	if err := bp.db.SaveWhatsAppTemplate(key, enabled, text); err != nil {
+		http.Redirect(w, r, "/whatsapp?error="+url.QueryEscape("فشل حفظ القالب: "+err.Error()), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/whatsapp?success="+url.QueryEscape("تم حفظ قالب الرسالة بنجاح"), http.StatusFound)
+}
+
+// RunDebtRemindersHandler manually triggers sending debt reminders to all indebted subscribers
+func (bp *Blueprint) RunDebtRemindersHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Redirect(w, r, "/whatsapp", http.StatusFound)
+		return
+	}
+
+	count, err := bp.db.RunDebtReminders()
+	if err != nil {
+		http.Redirect(w, r, "/whatsapp?error="+url.QueryEscape("حدث خطأ أثناء إرسال تذكيرات الديون: "+err.Error()), http.StatusFound)
+		return
+	}
+
+	if count == 0 {
+		http.Redirect(w, r, "/whatsapp?success="+url.QueryEscape("لم يتم العثور على عملاء تنطبق عليهم شروط التذكير في الوقت الحالي."), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/whatsapp?success="+url.QueryEscape(fmt.Sprintf("تم إرسال رسائل تذكير المديونية بنجاح إلى (%d) عميل مدين!", count)), http.StatusFound)
+}
+
+// StartWhatsAppAutomator launches a background engine that regularly checks quotas, expirations, and debt reminders
+func (bp *Blueprint) StartWhatsAppAutomator() {
+	go func() {
+		// Initial wait to let server boot cleanly
+		time.Sleep(15 * time.Second)
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			// 1. Quota & Expiry Automations
+			if err := bp.db.CheckQuotaAndExpiryAutomations(); err != nil {
+				log.Printf("[WHATSAPP-AUTO] Quota/Expiry check error: %v\n", err)
+			}
+
+			// 2. Scheduled Debt Reminders (Respects interval days and min debt)
+			if _, err := bp.db.RunDebtReminders(); err != nil {
+				log.Printf("[WHATSAPP-AUTO] Debt reminder check error: %v\n", err)
+			}
+		}
+	}()
 }

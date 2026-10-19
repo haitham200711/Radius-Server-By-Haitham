@@ -13,6 +13,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	_ "modernc.org/sqlite"
 )
 
@@ -353,6 +354,17 @@ func (d *DB) InitSchema() error {
 			INDEX idx_wa_status (status),
 			INDEX idx_wa_date (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 16. WhatsApp Message Templates (قوالب رسائل وإشعارات الواتساب)
+		`CREATE TABLE IF NOT EXISTS whatsapp_templates (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			event_key VARCHAR(64) UNIQUE NOT NULL,
+			event_name VARCHAR(128) NOT NULL,
+			enabled TINYINT(1) DEFAULT 1,
+			template_text TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			INDEX idx_wa_tmpl_key (event_key)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -373,6 +385,16 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_pool VARCHAR(64) DEFAULT '';`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS is_default TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS background_color VARCHAR(30) DEFAULT '#0d6efd';`,
+		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_enabled TINYINT(1) DEFAULT 1;`,
+		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_days INT DEFAULT 3;`,
+		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_min_debt DECIMAL(10,2) DEFAULT 1.00;`,
+		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_last_run DATETIME NULL;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS last_renewed_at DATETIME NULL;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS notified_expired TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS notified_quota_50 TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS notified_quota_75 TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS notified_quota_100 TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS last_debt_reminder_at DATETIME NULL;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -380,6 +402,58 @@ func (d *DB) InitSchema() error {
 
 	// Ensure default WhatsApp settings row exists
 	_, _ = d.Exec("INSERT IGNORE INTO whatsapp_settings (id, enabled, admin_phone) VALUES (1, 1, '')")
+
+	// Seed default WhatsApp event notification templates
+	defaultTemplates := []struct {
+		key  string
+		name string
+		text string
+	}{
+		{
+			key:  "time_expired",
+			name: "انتهاء وقت واشتراك العميل",
+			text: "عزيزي المشترك {name}، نود إعلامكم بأن اشتراككم رقم ({contract_no}) قد انتهى بتاريخ {expiry_date}. يرجى سرعة التجديد لضمان استمرار الخدمة.",
+		},
+		{
+			key:  "quota_50",
+			name: "استهلاك 50% من كوتة العميل",
+			text: "مرحباً {name}، لقد تم استهلاك 50% من كوتة الإنترنت الخاصة بك ({quota_used} جيجا من إجمالي {quota_total} جيجا). المتبقي: {quota_remaining} جيجا.",
+		},
+		{
+			key:  "quota_75",
+			name: "استهلاك 75% من كوتة العميل",
+			text: "تنبيه: مرحباً {name}، لقد استهلكت 75% من كوتة الإنترنت. المتبقي لديك: {quota_remaining} جيجا. تاريخ الانتهاء: {expiry_date}.",
+		},
+		{
+			key:  "quota_100",
+			name: "استهلاك 100% من كوتة العميل",
+			text: "تنبيه هام: مرحباً {name}، لقد تم استهلاك 100% من كوتة الإنترنت بالكامل. يرجى شحن كوتة إضافية أو تجديد الباقة لاستعادة السرعة الكاملة.",
+		},
+		{
+			key:  "renew",
+			name: "تجديد اشتراك العميل",
+			text: "مرحباً {name}، تم تجديد اشتراككم بنجاح على باقة ({profile}). تاريخ الانتهاء الجديد: {expiry_date}. شكراً لثقتكم بنا.",
+		},
+		{
+			key:  "debt_added",
+			name: "تسجيل أو إضافة مديونية جديدة",
+			text: "مرحباً {name}، تم تسجيل مديونية على حسابكم بمبلغ {amount} ج.م. إجمالي الدين المستحق الحالي: {debt} ج.م.",
+		},
+		{
+			key:  "debt_paid",
+			name: "سداد دفعة من الدين",
+			text: "مرحباً {name}، تم استلام سداد بمبلغ {amount} ج.م بنجاح. المتبقي من الدين: {debt} ج.م. شكراً لتعاملكم الراقي معنا.",
+		},
+		{
+			key:  "debt_reminder",
+			name: "التذكير الدوري بالديون المستحقة",
+			text: "عزيزي المشترك {name}، نود تذكيركم بوجود مديونية مستحقة بقيمة {debt} ج.م على اشتراككم رقم ({contract_no}). يرجى سرعة السداد لتفادي توقف الخدمة.",
+		},
+	}
+	for _, dt := range defaultTemplates {
+		_, _ = d.Exec(`INSERT IGNORE INTO whatsapp_templates (event_key, event_name, enabled, template_text) VALUES (?, ?, 1, ?)`,
+			dt.key, dt.name, dt.text)
+	}
 
 	// Seed default Admin if not present
 	var adminCount int
@@ -1591,7 +1665,36 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 	) VALUES (?, ?, ?, 'renew', ?, ?, ?, ?, ?, ?)`,
 		username, contractNo, fullName, desc, price, payStatus, method, notes, adminUser)
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Reset notification flags and cycle start for the new period
+	_, _ = d.Exec(`UPDATE subscribers SET
+		last_renewed_at = NOW(),
+		notified_expired = 0,
+		notified_quota_50 = 0,
+		notified_quota_75 = 0,
+		notified_quota_100 = 0
+		WHERE username = ?`, username)
+
+	// Trigger WhatsApp notifications asynchronously
+	go func() {
+		sub, err := d.GetSubscriber(username)
+		if err == nil && sub != nil {
+			_ = d.TriggerWhatsAppEvent("renew", sub, map[string]string{
+				"{amount}":  fmt.Sprintf("%.2f", price),
+				"{profile}": p.DisplayName,
+			})
+			if !isPaid && price > 0 {
+				_ = d.TriggerWhatsAppEvent("debt_added", sub, map[string]string{
+					"{amount}": fmt.Sprintf("%.2f", price),
+				})
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, isPaid bool, method, notes, adminUser string) error {
@@ -1650,7 +1753,26 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 	) VALUES (?, ?, ?, 'quota', ?, ?, ?, ?, ?, ?)`,
 		username, contractNo, fullName, desc, price, payStatus, method, notes, adminUser)
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Reset quota 100 notification flag when quota is expanded
+	_, _ = d.Exec(`UPDATE subscribers SET notified_quota_100 = 0 WHERE username = ?`, username)
+
+	// Trigger debt added if unpaid
+	go func() {
+		sub, err := d.GetSubscriber(username)
+		if err == nil && sub != nil {
+			if !isPaid && price > 0 {
+				_ = d.TriggerWhatsAppEvent("debt_added", sub, map[string]string{
+					"{amount}": fmt.Sprintf("%.2f", price),
+				})
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, adminUser string) error {
@@ -1694,7 +1816,22 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
 		username, contractNo, fullName, desc, amount, method, notes, adminUser)
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Trigger WhatsApp notification for debt payment
+	go func() {
+		sub, err := d.GetSubscriber(username)
+		if err == nil && sub != nil {
+			_ = d.TriggerWhatsAppEvent("debt_paid", sub, map[string]string{
+				"{amount}": fmt.Sprintf("%.2f", amount),
+				"{debt}":   fmt.Sprintf("%.2f", newDebt),
+			})
+		}
+	}()
+
+	return nil
 }
 
 func (d *DB) GetBillingTransactions(search, typeFilter, statusFilter string, limit, offset int) ([]models.BillingTransaction, int, error) {
@@ -1765,26 +1902,39 @@ func (d *DB) GetBillingFinancialSummary() (models.BillingSummary, error) {
 	return s, nil
 }
 
-// --- WhatsApp Settings & Logs ---
+// --- WhatsApp Settings & Logs & Automations ---
 
 func (d *DB) GetWhatsAppSettings() (*models.WhatsAppSettings, error) {
-	s := &models.WhatsAppSettings{ID: 1, Enabled: true}
+	s := &models.WhatsAppSettings{
+		ID:                  1,
+		Enabled:             true,
+		DebtReminderEnabled: true,
+		DebtReminderDays:    3,
+		DebtReminderMinDebt: 1.00,
+	}
+	var lastRun sql.NullTime
 	err := d.QueryRow(`SELECT id, enabled, admin_phone, api_endpoint, api_token, instance_id,
-		notify_on_new_subscriber, notify_on_expiry, notify_on_payment, updated_at
+		notify_on_new_subscriber, notify_on_expiry, notify_on_payment,
+		COALESCE(debt_reminder_enabled, 1), COALESCE(debt_reminder_days, 3), COALESCE(debt_reminder_min_debt, 1.00), debt_reminder_last_run, updated_at
 		FROM whatsapp_settings WHERE id = 1`).Scan(
 		&s.ID, &s.Enabled, &s.AdminPhone, &s.APIEndpoint, &s.APIToken, &s.InstanceID,
-		&s.NotifyOnNewSubscriber, &s.NotifyOnExpiry, &s.NotifyOnPayment, &s.UpdatedAt,
+		&s.NotifyOnNewSubscriber, &s.NotifyOnExpiry, &s.NotifyOnPayment,
+		&s.DebtReminderEnabled, &s.DebtReminderDays, &s.DebtReminderMinDebt, &lastRun, &s.UpdatedAt,
 	)
 	if err != nil {
 		return s, nil
+	}
+	if lastRun.Valid {
+		s.DebtReminderLastRun = lastRun.Time
 	}
 	return s, nil
 }
 
 func (d *DB) SaveWhatsAppSettings(s *models.WhatsAppSettings) error {
 	_, err := d.Exec(`INSERT INTO whatsapp_settings (id, enabled, admin_phone, api_endpoint, api_token, instance_id,
-		notify_on_new_subscriber, notify_on_expiry, notify_on_payment)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+		notify_on_new_subscriber, notify_on_expiry, notify_on_payment,
+		debt_reminder_enabled, debt_reminder_days, debt_reminder_min_debt)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE
 		enabled = VALUES(enabled),
 		admin_phone = VALUES(admin_phone),
@@ -1793,11 +1943,310 @@ func (d *DB) SaveWhatsAppSettings(s *models.WhatsAppSettings) error {
 		instance_id = VALUES(instance_id),
 		notify_on_new_subscriber = VALUES(notify_on_new_subscriber),
 		notify_on_expiry = VALUES(notify_on_expiry),
-		notify_on_payment = VALUES(notify_on_payment)`,
+		notify_on_payment = VALUES(notify_on_payment),
+		debt_reminder_enabled = VALUES(debt_reminder_enabled),
+		debt_reminder_days = VALUES(debt_reminder_days),
+		debt_reminder_min_debt = VALUES(debt_reminder_min_debt)`,
 		s.Enabled, s.AdminPhone, s.APIEndpoint, s.APIToken, s.InstanceID,
 		s.NotifyOnNewSubscriber, s.NotifyOnExpiry, s.NotifyOnPayment,
+		s.DebtReminderEnabled, s.DebtReminderDays, s.DebtReminderMinDebt,
 	)
 	return err
+}
+
+func (d *DB) GetWhatsAppTemplates() ([]models.WhatsAppTemplate, error) {
+	rows, err := d.Query(`SELECT id, event_key, event_name, enabled, template_text, updated_at
+		FROM whatsapp_templates ORDER BY id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.WhatsAppTemplate
+	for rows.Next() {
+		var t models.WhatsAppTemplate
+		if err := rows.Scan(&t.ID, &t.EventKey, &t.EventName, &t.Enabled, &t.TemplateText, &t.UpdatedAt); err == nil {
+			list = append(list, t)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) GetWhatsAppTemplate(eventKey string) (*models.WhatsAppTemplate, error) {
+	var t models.WhatsAppTemplate
+	err := d.QueryRow(`SELECT id, event_key, event_name, enabled, template_text, updated_at
+		FROM whatsapp_templates WHERE event_key = ?`, eventKey).Scan(
+		&t.ID, &t.EventKey, &t.EventName, &t.Enabled, &t.TemplateText, &t.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (d *DB) SaveWhatsAppTemplate(eventKey string, enabled bool, text string) error {
+	_, err := d.Exec(`UPDATE whatsapp_templates SET enabled = ?, template_text = ? WHERE event_key = ?`,
+		enabled, text, eventKey)
+	return err
+}
+
+func (d *DB) TriggerWhatsAppEvent(eventKey string, sub *models.Subscriber, extraVars map[string]string) error {
+	waSettings, err := d.GetWhatsAppSettings()
+	if err != nil || !waSettings.Enabled {
+		return nil
+	}
+
+	tmpl, err := d.GetWhatsAppTemplate(eventKey)
+	if err != nil || !tmpl.Enabled || strings.TrimSpace(tmpl.TemplateText) == "" {
+		return nil
+	}
+
+	if sub == nil || strings.TrimSpace(sub.Phone) == "" {
+		return nil
+	}
+
+	vars := map[string]string{
+		"{name}":            sub.FullName,
+		"{username}":        sub.Username,
+		"{contract_no}":     sub.ContractNo,
+		"{phone}":           sub.Phone,
+		"{profile}":         sub.ProfileName,
+		"{debt}":            fmt.Sprintf("%.2f", sub.Debt),
+		"{quota_total}":     fmt.Sprintf("%.1f", float64(sub.QuotaBytes)/(1024*1024*1024)),
+		"{date}":            time.Now().Format("2006-01-02"),
+		"{time}":            time.Now().Format("15:04"),
+	}
+	if sub.ExpirationDate.Valid {
+		vars["{expiry_date}"] = sub.ExpirationDate.Time.Format("2006-01-02")
+	} else {
+		vars["{expiry_date}"] = "غير محدد"
+	}
+
+	for k, v := range extraVars {
+		vars[k] = v
+	}
+
+	text := tmpl.TemplateText
+	for k, v := range vars {
+		text = strings.ReplaceAll(text, k, v)
+	}
+
+	var sendErr error
+	status := whatsapp.GetWhatsAppStatus()
+	if status.IsLoggedIn {
+		sendErr = whatsapp.SendWhatsAppMessage(sub.Phone, text)
+	} else if waSettings.APIEndpoint != "" {
+		sendErr = whatsapp.SendWhatsAppExternalFallback(waSettings.APIEndpoint, waSettings.APIToken, waSettings.InstanceID, sub.Phone, text)
+	} else {
+		sendErr = fmt.Errorf("خدمة واتساب غير مقترنة")
+	}
+
+	logStatus := "sent"
+	errStr := ""
+	if sendErr != nil {
+		logStatus = "failed"
+		errStr = sendErr.Error()
+	}
+	_ = d.LogWhatsAppMessage(sub.Phone, sub.FullName, eventKey, text, logStatus, errStr)
+	return sendErr
+}
+
+func (d *DB) RunDebtReminders() (int, error) {
+	waSettings, err := d.GetWhatsAppSettings()
+	if err != nil || !waSettings.Enabled || !waSettings.DebtReminderEnabled {
+		return 0, nil
+	}
+
+	tmpl, err := d.GetWhatsAppTemplate("debt_reminder")
+	if err != nil || !tmpl.Enabled || strings.TrimSpace(tmpl.TemplateText) == "" {
+		return 0, nil
+	}
+
+	intervalDays := waSettings.DebtReminderDays
+	if intervalDays <= 0 {
+		intervalDays = 3
+	}
+	minDebt := waSettings.DebtReminderMinDebt
+	if minDebt <= 0 {
+		minDebt = 1.00
+	}
+
+	query := `SELECT id, username, contract_no, full_name, phone, debt, profile_name, expiration_date
+		FROM subscribers
+		WHERE debt >= ? AND phone != '' AND (last_debt_reminder_at IS NULL OR TIMESTAMPDIFF(DAY, last_debt_reminder_at, NOW()) >= ?)`
+
+	rows, err := d.Query(query, minDebt, intervalDays)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type IndebtedSub struct {
+		ID         int64
+		Username   string
+		ContractNo string
+		FullName   string
+		Phone      string
+		Debt       float64
+		Profile    string
+		ExpDate    sql.NullTime
+	}
+	var targets []IndebtedSub
+	for rows.Next() {
+		var s IndebtedSub
+		if err := rows.Scan(&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Debt, &s.Profile, &s.ExpDate); err == nil {
+			targets = append(targets, s)
+		}
+	}
+
+	count := 0
+	for _, s := range targets {
+		subModel := &models.Subscriber{
+			ID:             s.ID,
+			Username:       s.Username,
+			ContractNo:     s.ContractNo,
+			FullName:       s.FullName,
+			Phone:          s.Phone,
+			Debt:           s.Debt,
+			ProfileName:    s.Profile,
+			ExpirationDate: s.ExpDate,
+		}
+		err := d.TriggerWhatsAppEvent("debt_reminder", subModel, map[string]string{
+			"{debt}": fmt.Sprintf("%.2f", s.Debt),
+		})
+		if err == nil {
+			_, _ = d.Exec("UPDATE subscribers SET last_debt_reminder_at = NOW() WHERE id = ?", s.ID)
+			count++
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	_, _ = d.Exec("UPDATE whatsapp_settings SET debt_reminder_last_run = NOW() WHERE id = 1")
+	return count, nil
+}
+
+func (d *DB) CheckQuotaAndExpiryAutomations() error {
+	waSettings, err := d.GetWhatsAppSettings()
+	if err != nil || !waSettings.Enabled {
+		return nil
+	}
+
+	// 1. Time Expired check
+	expTmpl, err := d.GetWhatsAppTemplate("time_expired")
+	if err == nil && expTmpl.Enabled {
+		rows, err := d.Query(`SELECT id, username, contract_no, full_name, phone, debt, profile_name, expiration_date
+			FROM subscribers
+			WHERE expiration_date IS NOT NULL AND expiration_date <= NOW() AND notified_expired = 0 AND phone != ''`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var s models.Subscriber
+				if err := rows.Scan(&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Debt, &s.ProfileName, &s.ExpirationDate); err == nil {
+					_ = d.TriggerWhatsAppEvent("time_expired", &s, nil)
+					_, _ = d.Exec("UPDATE subscribers SET notified_expired = 1 WHERE id = ?", s.ID)
+					time.Sleep(150 * time.Millisecond)
+				}
+			}
+		}
+	}
+
+	// 2. Quota Usage Checks (50%, 75%, 100%)
+	q50Tmpl, _ := d.GetWhatsAppTemplate("quota_50")
+	q75Tmpl, _ := d.GetWhatsAppTemplate("quota_75")
+	q100Tmpl, _ := d.GetWhatsAppTemplate("quota_100")
+
+	if (q50Tmpl != nil && q50Tmpl.Enabled) || (q75Tmpl != nil && q75Tmpl.Enabled) || (q100Tmpl != nil && q100Tmpl.Enabled) {
+		rows, err := d.Query(`SELECT s.id, s.username, s.contract_no, s.full_name, s.phone, s.debt, s.profile_name,
+			s.quota_bytes, s.expiration_date, s.last_renewed_at, s.created_at,
+			COALESCE(s.notified_quota_50, 0), COALESCE(s.notified_quota_75, 0), COALESCE(s.notified_quota_100, 0)
+			FROM subscribers s
+			WHERE s.quota_bytes > 0 AND s.phone != '' AND s.status = 'active'`)
+		if err == nil {
+			defer rows.Close()
+			type SubQuotaData struct {
+				ID            int64
+				Username      string
+				ContractNo    string
+				FullName      string
+				Phone         string
+				Debt          float64
+				Profile       string
+				QuotaBytes    int64
+				ExpDate       sql.NullTime
+				LastRenewedAt sql.NullTime
+				CreatedAt     time.Time
+				NotifiedQ50   int
+				NotifiedQ75   int
+				NotifiedQ100  int
+			}
+			var subList []SubQuotaData
+			for rows.Next() {
+				var sq SubQuotaData
+				if err := rows.Scan(&sq.ID, &sq.Username, &sq.ContractNo, &sq.FullName, &sq.Phone, &sq.Debt, &sq.Profile,
+					&sq.QuotaBytes, &sq.ExpDate, &sq.LastRenewedAt, &sq.CreatedAt,
+					&sq.NotifiedQ50, &sq.NotifiedQ75, &sq.NotifiedQ100); err == nil {
+					subList = append(subList, sq)
+				}
+			}
+
+			for _, sq := range subList {
+				cycleStart := sq.CreatedAt
+				if sq.LastRenewedAt.Valid {
+					cycleStart = sq.LastRenewedAt.Time
+				}
+
+				var usedBytes int64
+				_ = d.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+					FROM radacct
+					WHERE username = ? AND acctstarttime >= ?`, sq.Username, cycleStart).Scan(&usedBytes)
+
+				if sq.QuotaBytes <= 0 {
+					continue
+				}
+
+				usagePercent := (float64(usedBytes) / float64(sq.QuotaBytes)) * 100.0
+				remainingBytes := sq.QuotaBytes - usedBytes
+				if remainingBytes < 0 {
+					remainingBytes = 0
+				}
+
+				extraVars := map[string]string{
+					"{quota_total}":     fmt.Sprintf("%.1f", float64(sq.QuotaBytes)/(1024*1024*1024)),
+					"{quota_used}":      fmt.Sprintf("%.1f", float64(usedBytes)/(1024*1024*1024)),
+					"{quota_remaining}": fmt.Sprintf("%.1f", float64(remainingBytes)/(1024*1024*1024)),
+					"{quota_percent}":   fmt.Sprintf("%.0f%%", usagePercent),
+				}
+
+				subModel := &models.Subscriber{
+					ID:             sq.ID,
+					Username:       sq.Username,
+					ContractNo:     sq.ContractNo,
+					FullName:       sq.FullName,
+					Phone:          sq.Phone,
+					Debt:           sq.Debt,
+					ProfileName:    sq.Profile,
+					QuotaBytes:     sq.QuotaBytes,
+					ExpirationDate: sq.ExpDate,
+				}
+
+				if usagePercent >= 100.0 && sq.NotifiedQ100 == 0 && q100Tmpl != nil && q100Tmpl.Enabled {
+					_ = d.TriggerWhatsAppEvent("quota_100", subModel, extraVars)
+					_, _ = d.Exec("UPDATE subscribers SET notified_quota_100 = 1, notified_quota_75 = 1, notified_quota_50 = 1 WHERE id = ?", sq.ID)
+					time.Sleep(150 * time.Millisecond)
+				} else if usagePercent >= 75.0 && sq.NotifiedQ75 == 0 && q75Tmpl != nil && q75Tmpl.Enabled {
+					_ = d.TriggerWhatsAppEvent("quota_75", subModel, extraVars)
+					_, _ = d.Exec("UPDATE subscribers SET notified_quota_75 = 1, notified_quota_50 = 1 WHERE id = ?", sq.ID)
+					time.Sleep(150 * time.Millisecond)
+				} else if usagePercent >= 50.0 && sq.NotifiedQ50 == 0 && q50Tmpl != nil && q50Tmpl.Enabled {
+					_ = d.TriggerWhatsAppEvent("quota_50", subModel, extraVars)
+					_, _ = d.Exec("UPDATE subscribers SET notified_quota_50 = 1 WHERE id = ?", sq.ID)
+					time.Sleep(150 * time.Millisecond)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (d *DB) GetWhatsAppLogs(limit int) ([]models.WhatsAppLog, error) {
@@ -1828,5 +2277,6 @@ func (d *DB) LogWhatsAppMessage(phone, recipient, msgType, content, status, errM
 	)
 	return err
 }
+
 
 

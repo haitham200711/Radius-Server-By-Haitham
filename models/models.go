@@ -315,7 +315,21 @@ type WhatsAppSettings struct {
 	NotifyOnNewSubscriber bool      `json:"notify_on_new_subscriber"`
 	NotifyOnExpiry        bool      `json:"notify_on_expiry"`
 	NotifyOnPayment       bool      `json:"notify_on_payment"`
+	DebtReminderEnabled   bool      `json:"debt_reminder_enabled"`
+	DebtReminderDays      int       `json:"debt_reminder_days"`
+	DebtReminderMinDebt   float64   `json:"debt_reminder_min_debt"`
+	DebtReminderLastRun   time.Time `json:"debt_reminder_last_run"`
 	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+// WhatsAppTemplate holds customizable notification messages for events
+type WhatsAppTemplate struct {
+	ID           int64     `json:"id"`
+	EventKey     string    `json:"event_key"`
+	EventName    string    `json:"event_name"`
+	Enabled      bool      `json:"enabled"`
+	TemplateText string    `json:"template_text"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // WhatsAppLog holds sent/received message logs

@@ -153,6 +153,7 @@ func main() {
 
 	// WhatsApp Blueprint
 	waBP := whatsappBP.New(db, renderer)
+	waBP.StartWhatsAppAutomator()
 	mux.HandleFunc("/whatsapp", middleware.RequireAuth(waBP.IndexHandler))
 	mux.HandleFunc("/whatsapp/start-pairing", middleware.RequireAuth(waBP.StartPairingHandler))
 	mux.HandleFunc("/whatsapp/pair-phone", middleware.RequireAuth(waBP.PairPhoneHandler))
@@ -160,6 +161,8 @@ func main() {
 	mux.HandleFunc("/whatsapp/logout", middleware.RequireAuth(waBP.LogoutHandler))
 	mux.HandleFunc("/whatsapp/test", middleware.RequireAuth(waBP.TestMessageHandler))
 	mux.HandleFunc("/whatsapp/settings", middleware.RequireAuth(waBP.SaveSettingsHandler))
+	mux.HandleFunc("/whatsapp/templates/save", middleware.RequireAuth(waBP.SaveTemplateHandler))
+	mux.HandleFunc("/whatsapp/debt-reminders/run-now", middleware.RequireAuth(waBP.RunDebtRemindersHandler))
 
 	// Wrap mux with Session Authentication middleware
 	handler := middleware.AuthMiddleware(cfg.SessionSecret)(mux)
