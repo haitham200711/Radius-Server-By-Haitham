@@ -116,6 +116,8 @@ func main() {
 	mux.HandleFunc("/sstp/settings", middleware.RequireAuth(sstpBP.SaveSettingsHandler))
 	mux.HandleFunc("/sstp/clients/add", middleware.RequireAuth(sstpBP.AddClientHandler))
 	mux.HandleFunc("/sstp/clients/delete", middleware.RequireAuth(sstpBP.DeleteClientHandler))
+	mux.HandleFunc("/sstp/token/generate", middleware.RequireAuth(sstpBP.GenerateTokenHandler))
+	mux.HandleFunc("/sstp/script", sstpBP.ScriptHandler)
 
 	// Resellers Blueprint (Admin Only)
 	resBP := resellers.New(db, renderer)

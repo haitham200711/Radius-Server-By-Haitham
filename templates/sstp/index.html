@@ -67,13 +67,12 @@
         </h5>
     </div>
     <div class="card-body">
-        <p class="text-muted small mb-2">انسخ السطر التالي وضعه في نافذة Terminal بمايكروتك لإنشاء اتصال SSTP مباشر بالسيرفر:</p>
-        <div class="input-group">
-            <input type="text" id="quickScript" class="form-control font-monospace bg-light" readonly
-                value="/interface sstp-client add name=sstp-radius connect-to={{ .ServerHost }}:{{ .Settings.Port }} user={{ .RandUser }} password={{ .RandPass }} profile=default authentication=mschap2,chap,pap verify-server-certificate=no disabled=no">
-            <button class="btn btn-outline-primary fw-bold" id="btnQuickCopy" onclick="copyQuickScript()">
-                <i class="bi bi-clipboard me-1"></i> نسخ الكود
+        <p class="text-muted small mb-2">توليد ملف كونفجريشن <code>.rsc</code> برابط مؤقت (للاستخدام لمرة واحدة) لتثبيت بروفايل <b>Radius-VPN</b> ونفق <b>Radius-Pro</b> مع مراقبة <b>Netwatch</b>:</p>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button class="btn btn-primary fw-bold" onclick="openRouterScriptModal(0, 'ربط مايكروتك جديد', '{{ .RandUser }}', '{{ .RandPass }}')">
+                <i class="bi bi-file-earmark-code me-1"></i> توليد كود ورابط ملف التثبيت المباشر (.rsc)
             </button>
+            <span class="text-muted small">يتم إنشاء ملف كامل لمرة واحدة برابط مؤقت يمكن استيراده بضغطة زر.</span>
         </div>
     </div>
 </div>
@@ -121,8 +120,8 @@
                     </td>
                     <td><small class="text-muted">{{ if .Notes }}{{ .Notes }}{{ else }}-{{ end }}</small></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-info me-1 fw-bold" onclick="showRouterScript('{{ .Name }}', '{{ .Username }}', '{{ .Password }}')">
-                            <i class="bi bi-code-slash"></i> كود المايكروتك
+                        <button class="btn btn-sm btn-outline-primary me-1 fw-bold" onclick="openRouterScriptModal({{ .ID }}, '{{ .Name }}', '{{ .Username }}', '{{ .Password }}')" title="كود ورابط ملف التثبيت المباشر">
+                            <i class="bi bi-file-earmark-code me-1"></i> كود المايكروتك (.rsc)
                         </button>
                         <a href="/sstp/clients/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف هذا الراوتر من SSTP؟');">
                             <i class="bi bi-trash"></i>
@@ -276,51 +275,114 @@
         </div>
     </div>
 </div>
-<!-- Modal for MikroTik Terminal Script -->
+<!-- Modal for MikroTik Terminal One-Time Script (.rsc) -->
 <div class="modal fade" id="routerScriptModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-terminal-fill me-2 text-info"></i> كود ربط المايكروتك (MikroTik RouterOS Script)
-                </h5>
+                <div>
+                    <h5 class="modal-title fw-bold mb-1">
+                        <i class="bi bi-file-earmark-code-fill me-2 text-warning"></i> كود وملف ربط المايكروتك التلقائي (.rsc)
+                    </h5>
+                    <span class="badge bg-warning text-dark small fw-bold">
+                        <i class="bi bi-shield-lock-fill me-1"></i> رابط صالح لمرة واحدة (One-Time Link)
+                    </span>
+                </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                    <div>
-                        <span class="text-muted small d-block">اسم الراوتر / الفرع:</span>
-                        <strong class="text-dark fs-5" id="modalRouterName">-</strong>
+                <!-- Router Details Summary -->
+                <div class="card bg-light border-0 mb-3">
+                    <div class="card-body py-2 px-3">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-4">
+                                <span class="text-muted small d-block">اسم الراوتر / الفرع:</span>
+                                <strong class="text-dark" id="modalRouterName">-</strong>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-muted small d-block">مستخدم SSTP:</span>
+                                <span class="badge bg-white text-primary border font-monospace px-2 py-1" id="modalRouterUser">-</span>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-muted small d-block">بروفايل ونفق المايكروتك:</span>
+                                <span class="badge bg-primary me-1">Radius-VPN</span>
+                                <span class="badge bg-success">Radius-Pro</span>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <span class="badge bg-light text-dark border font-monospace px-3 py-2">
-                            User: <span id="modalRouterUser" class="text-primary fw-bold">-</span>
+                </div>
+
+                <!-- 1. Fastest: One-Line Terminal Command (Recommended) -->
+                <div class="card border-primary border-2 mb-3 shadow-sm">
+                    <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+                        <span class="fw-bold small">
+                            <i class="bi bi-terminal-fill me-1"></i> الطريقة الأولى (الأسهل والأسرع): أمر التيرمينال بضغطة واحدة
                         </span>
+                        <span class="badge bg-white text-primary fw-bold">موصى به</span>
+                    </div>
+                    <div class="card-body p-3">
+                        <p class="text-muted small mb-2">انسخ السطر التالي وضعه في نافذة <b>Terminal</b> بمايكروتك واضغط <b>Enter</b>، سيتم استيراد البروفايل والنفق والمراقبة تلقائياً:</p>
+                        <div class="input-group mb-2">
+                            <input type="text" id="modalFetchCmd" class="form-control font-monospace bg-light fw-bold text-primary" readonly value="جاري توليد الرابط والكود...">
+                            <button type="button" class="btn btn-primary fw-bold px-3" id="btnCopyFetchCmd" onclick="copyFetchCommand()">
+                                <i class="bi bi-clipboard-check me-1"></i> نسخ أمر التيرمينال
+                            </button>
+                        </div>
+                        <div class="small text-muted">
+                            <i class="bi bi-info-circle me-1"></i> يقوم الأمر بتحميل ملف <code>Radius-Pro.rsc</code> وتنفيذه فوراً ثم مسح الملف المؤقت من الراوتر.
+                        </div>
                     </div>
                 </div>
 
-                <label class="form-label fw-bold">أمر التيرمينال (Terminal Command):</label>
-                <div class="position-relative mb-3">
-                    <textarea id="modalScriptContent" class="form-control font-monospace bg-dark text-light p-3" rows="4" readonly style="resize: none; font-size: 0.95rem; line-height: 1.5;"></textarea>
+                <!-- 2. Direct Download Link for .rsc File -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-body p-3">
+                        <label class="form-label fw-bold small text-dark mb-1">
+                            <i class="bi bi-link-45deg me-1"></i> الرابط المباشر لملف الكونفجريشن (.rsc):
+                        </label>
+                        <div class="input-group mb-2">
+                            <input type="text" id="modalDirectUrl" class="form-control font-monospace form-control-sm bg-white" readonly value="جاري التوليد...">
+                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="copyDirectUrl()">
+                                <i class="bi bi-clipboard me-1"></i> نسخ الرابط
+                            </button>
+                            <a id="btnDownloadRsc" href="#" class="btn btn-outline-primary btn-sm fw-bold" target="_blank" download="Radius-Pro.rsc">
+                                <i class="bi bi-download me-1"></i> تحميل ملف .rsc
+                            </a>
+                        </div>
+                        <div class="alert alert-warning py-1 px-2 small mb-0 d-flex align-items-center gap-1">
+                            <i class="bi bi-shield-exclamation text-warning fs-6"></i>
+                            <span><b>تنبيه أمان:</b> هذا الرابط يعمل <b>لمرة واحدة فقط</b>. بمجرد تحميله أو استيراده في الراوتر، تصبح صلاحيته منتهية تلقائياً.</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="alert alert-info small mb-0 d-flex align-items-start gap-2">
-                    <i class="bi bi-info-circle-fill fs-5 mt-1"></i>
-                    <div>
-                        <strong>طريقة التركيب في المايكروتك:</strong>
-                        <ol class="mb-0 ps-3 mt-1">
-                            <li>افتح برنامج <b>WinBox</b> وسجل دخول للراوتر.</li>
-                            <li>من القائمة الجانبية اضغط على <b>New Terminal</b>.</li>
-                            <li>الصق الكود واضغط <b>Enter</b> على الكيبورد لإنشاء اتصال SSTP فوراً.</li>
-                        </ol>
+                <!-- 3. Full Script Content Preview & Netwatch Details -->
+                <div class="accordion" id="rscAccordion">
+                    <div class="accordion-item border">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2 small fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseScript">
+                                <i class="bi bi-code-slash me-2 text-primary"></i> معاينة أوامر ملف الكونفجريشن ومراقبة Netwatch
+                            </button>
+                        </h2>
+                        <div id="collapseScript" class="accordion-collapse collapse" data-bs-parent="#rscAccordion">
+                            <div class="accordion-body p-2 bg-dark">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-muted small">محتوى ملف <code>Radius-Pro.rsc</code>:</span>
+                                    <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" onclick="copyRscContent()">
+                                        <i class="bi bi-clipboard"></i> نسخ الكود كاملاً
+                                    </button>
+                                </div>
+                                <textarea id="modalRscContent" class="form-control font-monospace bg-dark text-info border-secondary p-2" rows="7" readonly style="font-size: 0.85rem; line-height: 1.4;"></textarea>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
-                <button type="button" class="btn btn-success fw-bold px-4" id="btnModalCopy" onclick="copyModalScript()">
-                    <i class="bi bi-clipboard-check me-1"></i> نسخ الكود للحافظة
+            <div class="modal-footer bg-light d-flex justify-content-between">
+                <button type="button" class="btn btn-warning fw-bold text-dark" id="btnRegenerate" onclick="regenerateCurrentToken()">
+                    <i class="bi bi-arrow-repeat me-1"></i> توليد رابط جديد الآن
                 </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
@@ -331,58 +393,107 @@
 
 {{ define "scripts" }}
 <script>
-function copyQuickScript() {
-    const input = document.getElementById('quickScript');
-    if (!input) return;
-    const text = input.value;
-    input.select();
-    window.copyToClipboard(text, function() {
-        const btn = document.getElementById('btnQuickCopy');
-        if (btn) {
-            const original = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ!';
-            btn.classList.replace('btn-outline-primary', 'btn-success');
-            setTimeout(() => {
-                btn.innerHTML = original;
-                btn.classList.replace('btn-success', 'btn-outline-primary');
-            }, 2000);
-        }
-        window.showCopyToast('تم نسخ كود الربط السريع بنجاح!');
-    }, function() {
-        alert('يرجى تحديد النص والنسخ يدوياً عبر لوحة المفاتيح: Ctrl + C');
-    });
-}
+let currentClient = {
+    id: 0,
+    name: '',
+    username: '',
+    password: ''
+};
 
-function showRouterScript(name, user, pass) {
-    const script = `/interface sstp-client add name=sstp-radius connect-to={{ .ServerHost }}:{{ .Settings.Port }} user=${user} password=${pass} profile=default authentication=mschap2,chap,pap verify-server-certificate=no disabled=no`;
-    
-    // 1. Fill modal info
-    document.getElementById('modalRouterName').textContent = name || user;
-    document.getElementById('modalRouterUser').textContent = user;
-    document.getElementById('modalScriptContent').value = script;
+function openRouterScriptModal(id, name, username, password) {
+    currentClient.id = id || 0;
+    currentClient.name = name || 'راوتر مايكروتك';
+    currentClient.username = username || '';
+    currentClient.password = password || '';
 
-    // 2. Automatically copy it immediately to clipboard
-    window.copyToClipboard(script, function() {
-        window.showCopyToast('تم نسخ كود المايكروتك للحافظة بنجاح!');
-    });
+    document.getElementById('modalRouterName').textContent = currentClient.name;
+    document.getElementById('modalRouterUser').textContent = currentClient.username;
+    document.getElementById('modalFetchCmd').value = 'جاري الاتصال بالسيرفر وتوليد الرابط الآمن...';
+    document.getElementById('modalDirectUrl').value = 'جاري التوليد...';
+    document.getElementById('modalRscContent').value = '# جاري إنشاء محتوى الملف...';
 
-    // 3. Open modal so user can view/copy easily
-    const modal = new bootstrap.Modal(document.getElementById('routerScriptModal'));
+    const modalEl = document.getElementById('routerScriptModal');
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
     modal.show();
+
+    loadOneTimeRsc();
 }
 
-function copyModalScript() {
-    const ta = document.getElementById('modalScriptContent');
-    if (!ta) return;
-    ta.select();
-    window.copyToClipboard(ta.value, function() {
-        const btn = document.getElementById('btnModalCopy');
+function loadOneTimeRsc() {
+    const btnRegen = document.getElementById('btnRegenerate');
+    if (btnRegen) {
+        btnRegen.disabled = true;
+        btnRegen.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري التوليد...';
+    }
+
+    const url = `/sstp/token/generate?client_id=${currentClient.id}&username=${encodeURIComponent(currentClient.username)}&password=${encodeURIComponent(currentClient.password)}`;
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById('modalFetchCmd').value = data.fetch_command;
+                document.getElementById('modalDirectUrl').value = data.url;
+                document.getElementById('btnDownloadRsc').href = data.url;
+                document.getElementById('modalRscContent').value = data.rsc_content;
+
+                // Automatically copy the 1-line terminal command for convenience
+                window.copyToClipboard(data.fetch_command, function() {
+                    window.showCopyToast('تم توليد الرابط ونسخ أمر التيرمينال بنجاح!');
+                });
+            } else {
+                alert('حدث خطأ أثناء توليد الرابط: ' + (data.error || 'غير معروف'));
+            }
+        })
+        .catch(err => {
+            console.error('Error generating token:', err);
+            alert('تعذر الاتصال بالسيرفر لتوليد الرابط.');
+        })
+        .finally(() => {
+            if (btnRegen) {
+                btnRegen.disabled = false;
+                btnRegen.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> توليد رابط جديد الآن';
+            }
+        });
+}
+
+function regenerateCurrentToken() {
+    loadOneTimeRsc();
+}
+
+function copyFetchCommand() {
+    const input = document.getElementById('modalFetchCmd');
+    if (!input || !input.value) return;
+    input.select();
+    window.copyToClipboard(input.value, function() {
+        const btn = document.getElementById('btnCopyFetchCmd');
         if (btn) {
             const orig = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ بنجاح!';
-            setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ!';
+            btn.classList.replace('btn-primary', 'btn-success');
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.replace('btn-success', 'btn-primary');
+            }, 2000);
         }
-        window.showCopyToast('تم نسخ كود المايكروتك بنجاح!');
+        window.showCopyToast('تم نسخ أمر التيرمينال للحافظة!');
+    });
+}
+
+function copyDirectUrl() {
+    const input = document.getElementById('modalDirectUrl');
+    if (!input || !input.value) return;
+    input.select();
+    window.copyToClipboard(input.value, function() {
+        window.showCopyToast('تم نسخ رابط التحميل المباشر!');
+    });
+}
+
+function copyRscContent() {
+    const ta = document.getElementById('modalRscContent');
+    if (!ta || !ta.value) return;
+    ta.select();
+    window.copyToClipboard(ta.value, function() {
+        window.showCopyToast('تم نسخ كود الكونفجريشن بالكامل!');
     });
 }
 </script>

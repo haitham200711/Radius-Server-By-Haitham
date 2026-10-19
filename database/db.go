@@ -298,6 +298,18 @@ func (d *DB) InitSchema() error {
 			INDEX idx_billing_type (type),
 			INDEX idx_billing_date (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 12. SSTP One-Time Script Tokens (روابط تثبيت المايكروتك لمرة واحدة)
+		`CREATE TABLE IF NOT EXISTS sstp_tokens (
+			token VARCHAR(64) PRIMARY KEY,
+			client_id BIGINT DEFAULT 0,
+			username VARCHAR(64) NOT NULL,
+			password VARCHAR(64) NOT NULL,
+			used TINYINT(1) DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			used_at DATETIME NULL,
+			INDEX idx_token_used (token, used)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -1143,6 +1155,42 @@ func (d *DB) SaveSSTPClient(c *models.SSTPClient) error {
 func (d *DB) DeleteSSTPClient(id int64) error {
 	_, err := d.Exec("DELETE FROM sstp_clients WHERE id = ?", id)
 	return err
+}
+
+func (d *DB) GetSSTPClientByID(id int64) (*models.SSTPClient, error) {
+	var c models.SSTPClient
+	var en int
+	err := d.QueryRow(`SELECT id, name, username, password, assigned_ip, notes, enabled, last_seen, created_at, updated_at
+		FROM sstp_clients WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Username, &c.Password, &c.AssignedIP, &c.Notes, &en, &c.LastSeen, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	c.Enabled = (en == 1)
+	return &c, nil
+}
+
+func (d *DB) CreateSSTPToken(clientID int64, username, password string) (string, error) {
+	token := randomAlphanumeric(32)
+	_, err := d.Exec(`INSERT INTO sstp_tokens (token, client_id, username, password, used, created_at)
+		VALUES (?, ?, ?, ?, 0, NOW())`, token, clientID, username, password)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (d *DB) ConsumeSSTPToken(token string) (clientID int64, username, password string, err error) {
+	var used int
+	err = d.QueryRow(`SELECT client_id, username, password, used FROM sstp_tokens WHERE token = ?`, token).Scan(&clientID, &username, &password, &used)
+	if err != nil {
+		return 0, "", "", fmt.Errorf("token not found")
+	}
+	if used == 1 {
+		return 0, "", "", fmt.Errorf("token already used")
+	}
+
+	_, _ = d.Exec(`UPDATE sstp_tokens SET used = 1, used_at = NOW() WHERE token = ?`, token)
+	return clientID, username, password, nil
 }
 
 func (d *DB) SyncSSTPFiles() error {

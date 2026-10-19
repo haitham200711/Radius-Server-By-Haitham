@@ -1,6 +1,7 @@
 package sstp
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -199,4 +200,142 @@ func randomAlpha(n int) string {
 		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(b)
+}
+
+func (bp *Blueprint) generateRSCScript(serverHost string, sstpPort int, gatewayIP, username, password string) string {
+	if sstpPort <= 0 {
+		sstpPort = 4444
+	}
+	if gatewayIP == "" {
+		gatewayIP = "10.10.10.1"
+	}
+	return fmt.Sprintf(`# ========================================================
+# Haitham RADIUS Cloud - Automated SSTP VPN Setup Script
+# Target: MikroTik RouterOS v6 / v7
+# Generated: %s
+# Connection Name: Radius-Pro
+# Profile Name:    Radius-VPN
+# Gateway Watchdog: %s
+# ========================================================
+
+:log info "[RADIUS-SETUP] Starting automated VPN configuration..."
+
+# 1. Clean previous setup if already present (Idempotency)
+:do { /interface sstp-client remove [find name="Radius-Pro"] } on-error={}
+:do { /ppp profile remove [find name="Radius-VPN"] } on-error={}
+:do { /tool netwatch remove [find comment="SSTP-Radius-Pro-Watchdog"] } on-error={}
+
+# 2. Create PPP Profile (Radius-VPN)
+/ppp profile add name=Radius-VPN use-encryption=yes comment="Haitham RADIUS VPN Profile"
+:log info "[RADIUS-SETUP] Profile Radius-VPN created successfully."
+
+# 3. Create SSTP Client Connection (Radius-Pro)
+/interface sstp-client add name=Radius-Pro connect-to=%s:%d user="%s" password="%s" profile=Radius-VPN authentication=mschap2,chap,pap verify-server-certificate=no disabled=no comment="Haitham RADIUS SSTP Tunnel"
+:log info "[RADIUS-SETUP] Connection Radius-Pro created and enabled."
+
+# 4. Create Netwatch Watchdog on VPN Gateway
+/tool netwatch add host=%s interval=10s timeout=1000ms down-script="/interface sstp-client disable [find name=\"Radius-Pro\"]; :delay 2s; /interface sstp-client enable [find name=\"Radius-Pro\"]; :log warning \"[SSTP-Watchdog] VPN Gateway unreachable, restarting Radius-Pro...\"" comment="SSTP-Radius-Pro-Watchdog"
+:log info "[RADIUS-SETUP] Netwatch Watchdog installed on Gateway: %s"
+
+:log info "[RADIUS-SETUP] Configuration completed successfully!"
+`, time.Now().Format("2006-01-02 15:04:05"), gatewayIP, serverHost, sstpPort, username, password, gatewayIP, gatewayIP)
+}
+
+func (bp *Blueprint) GenerateTokenHandler(w http.ResponseWriter, r *http.Request) {
+	clientID, _ := strconv.ParseInt(r.URL.Query().Get("client_id"), 10, 64)
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	password := strings.TrimSpace(r.URL.Query().Get("password"))
+
+	if clientID > 0 {
+		client, err := bp.db.GetSSTPClientByID(clientID)
+		if err == nil && client != nil {
+			username = client.Username
+			password = client.Password
+		}
+	}
+
+	if username == "" || password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "missing client credentials"})
+		return
+	}
+
+	token, err := bp.db.CreateSSTPToken(clientID, username, password)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	serverHost := strings.Split(r.Host, ":")[0]
+	if serverHost == "" || serverHost == "localhost" || serverHost == "127.0.0.1" {
+		serverHost = "192.168.2.90"
+	}
+
+	hostWithPort := r.Host
+	if !strings.Contains(hostWithPort, ":") {
+		hostWithPort = serverHost + ":5000"
+	}
+
+	settings, err := bp.db.GetSSTPSettings()
+	if err != nil || settings == nil {
+		settings = &models.SSTPSettings{Enabled: true, Port: 4444, GatewayIP: "10.10.10.1", IPPool: "10.10.10.2-254"}
+	}
+
+	fetchURL := fmt.Sprintf("http://%s/sstp/script?token=%s", hostWithPort, token)
+	fetchCmd := fmt.Sprintf(`/tool fetch url="%s" mode=http dst-path=Radius-Pro.rsc; :delay 2s; /import Radius-Pro.rsc; /file remove Radius-Pro.rsc`, fetchURL)
+	rscScript := bp.generateRSCScript(serverHost, settings.Port, settings.GatewayIP, username, password)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":        "success",
+		"token":         token,
+		"url":           fetchURL,
+		"fetch_command": fetchCmd,
+		"rsc_content":   rscScript,
+		"username":      username,
+		"gateway_ip":    settings.GatewayIP,
+		"port":          settings.Port,
+	})
+}
+
+func (bp *Blueprint) ScriptHandler(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	if token == "" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, "# ERROR: Missing one-time token.")
+		return
+	}
+
+	_, username, password, err := bp.db.ConsumeSSTPToken(token)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprintf(w, `# ========================================================
+# ERROR: This one-time setup link has already been used or expired!
+# Please generate a new one-time link from the RADIUS Dashboard.
+# ========================================================
+:log error "[RADIUS-SETUP] Token '%s' is already used or expired! Please generate a new link from the dashboard."
+`, token)
+		return
+	}
+
+	serverHost := strings.Split(r.Host, ":")[0]
+	if serverHost == "" || serverHost == "localhost" || serverHost == "127.0.0.1" {
+		serverHost = "192.168.2.90"
+	}
+
+	settings, err := bp.db.GetSSTPSettings()
+	if err != nil || settings == nil {
+		settings = &models.SSTPSettings{Enabled: true, Port: 4444, GatewayIP: "10.10.10.1", IPPool: "10.10.10.2-254"}
+	}
+
+	rscScript := bp.generateRSCScript(serverHost, settings.Port, settings.GatewayIP, username, password)
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"Radius-Pro.rsc\"")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(rscScript))
 }
