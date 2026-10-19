@@ -144,6 +144,102 @@
     </div>
 </div>
 
+<!-- Static Routing Management Section -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h5 class="card-title fw-bold mb-0 text-dark">
+                <i class="bi bi-diagram-3-fill me-2 text-primary"></i> جدول التوجيه الثابت للشبكات والفروع (Linux Static Routing)
+            </h5>
+            <p class="text-muted small mb-0">توجيه الترافيك لشبكات أجهزة الفروع (مثل <code>192.168.100.0/24</code>) عبر آي بي نفق الـ SSTP للراوتر وتطبيقها بكيرنل لينكس</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#addRouteModal">
+                <i class="bi bi-plus-circle me-1"></i> إضافة مسار ثابت جديد
+            </button>
+            <a href="/sstp/routes/apply" class="btn btn-outline-secondary btn-sm fw-bold" title="إعادة مزامنة وتطبيق كافة المسارات النشطة في كيرنل لينكس فوراً">
+                <i class="bi bi-arrow-clockwise me-1"></i> مزامنة المسارات
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th>شبكة الوجهة (Destination Subnet)</th>
+                    <th>عبر البوابة (Via Gateway IP)</th>
+                    <th>الراوتر / الفرع المرتبط</th>
+                    <th>واجهة النفق (Interface)</th>
+                    <th>البيان والوصف</th>
+                    <th>الحالة في لينكس</th>
+                    <th class="text-end">خيارات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .StaticRoutes }}
+                <tr>
+                    <td>
+                        <span class="badge bg-dark-subtle text-dark border font-monospace fs-6 px-2 py-1">
+                            {{ .DestinationCIDR }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-primary-subtle text-primary border font-monospace fs-6 px-2 py-1">
+                            via {{ .GatewayIP }}
+                        </span>
+                    </td>
+                    <td>
+                        {{ if .ClientName }}
+                        <strong class="text-dark">{{ .ClientName }}</strong>
+                        {{ else }}
+                        <span class="text-muted">يدوي (Manual)</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if .ActiveDev }}
+                        <code class="fw-bold text-success">{{ .ActiveDev }}</code>
+                        {{ else }}
+                        <span class="text-muted small">تلقائي (auto)</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <small class="text-dark">{{ if .Description }}{{ .Description }}{{ else }}-{{ end }}</small>
+                    </td>
+                    <td>
+                        {{ if not .Enabled }}
+                        <span class="badge bg-secondary">معطل</span>
+                        {{ else if .IsApplied }}
+                        <span class="badge bg-success">
+                            <i class="bi bi-check-circle-fill me-1"></i> نشط ومطبق في لينكس
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-warning text-dark">
+                            <i class="bi bi-clock-history me-1"></i> معلق (في انتظار اتصال الراوتر)
+                        </span>
+                        {{ end }}
+                    </td>
+                    <td class="text-end text-nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-warning text-dark me-1 fw-bold" onclick="openEditRouteModal({{ .ID }}, '{{ .DestinationCIDR }}', '{{ .GatewayIP }}', {{ .ClientID }}, '{{ .Description }}', {{ .Enabled }})" title="تعديل المسار">
+                            <i class="bi bi-pencil-square"></i> تعديل
+                        </button>
+                        <a href="/sstp/routes/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف هذا المسار الثابت ومسحه من لينكس نهائياً؟');" title="حذف المسار">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-signpost-split fs-2 d-block mb-2"></i>
+                        لا توجد مسارات ثابتة مضافة حتى الآن. يمكنك إضافة مسار مثل <code>192.168.100.0/24 via 10.171.171.2</code>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Active Live Sessions -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3 border-bottom">
@@ -292,6 +388,108 @@
                     <div class="form-check form-switch mt-3 pt-2 border-top">
                         <input class="form-check-input" type="checkbox" name="enabled" id="editClientEnabled" value="1">
                         <label class="form-check-label fw-bold" for="editClientEnabled">تفعيل الراوتر والسماح له بالاتصال</label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark">
+                        <i class="bi bi-check-lg me-1"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add Static Route -->
+<div class="modal fade" id="addRouteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-signpost-split me-1"></i> إضافة مسار توجيه ثابت جديد (Static Route)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/sstp/routes/add">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">شبكة الأجهزة المستهدفة (Destination CIDR):</label>
+                        <input type="text" name="destination_cidr" class="form-control font-monospace form-control-lg fw-bold" placeholder="مثال: 192.168.100.0/24" required>
+                        <small class="text-muted">الرينج أو السابنت الخاص بالفرع (مثال: <code>192.168.100.0/24</code> أو <code>172.16.0.0/16</code>).</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختيار الراوتر / الفرع المرتبط (اختياري):</label>
+                        <select id="addRouteClientSelect" class="form-select" onchange="onSelectRouteClient(this, 'addRouteGatewayInput')">
+                            <option value="" data-id="0">-- اختر راوتر SSTP لملء الآي بي تلقائياً (أو اكتبه يدوياً) --</option>
+                            {{ range .Clients }}
+                            <option value="{{ .AssignedIP }}" data-id="{{ .ID }}">{{ .Name }} ({{ .Username }}) - {{ if .AssignedIP }}{{ .AssignedIP }}{{ else }}Pool{{ end }}</option>
+                            {{ end }}
+                        </select>
+                        <input type="hidden" name="client_id" id="addRouteClientID" value="0">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">عبر بوابة نفق الـ VPN (Gateway IP):</label>
+                        <input type="text" name="gateway_ip" id="addRouteGatewayInput" class="form-control font-monospace fw-bold" placeholder="مثال: 10.171.171.2" required>
+                        <small class="text-muted">آي بي الراوتر داخل نفق الـ VPN (مثل <code>10.171.171.2</code>) الذي سيتم توجيه الترافيك من خلاله.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">البيان / الوصف:</label>
+                        <input type="text" name="description" class="form-control" placeholder="مثال: شبكة أجهزة كمبيوتر وطابعات فرع الهرم">
+                    </div>
+
+                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                        <input class="form-check-input" type="checkbox" name="enabled" id="addRouteEnabled" value="1" checked>
+                        <label class="form-check-label fw-bold" for="addRouteEnabled">تفعيل وتطبيق المسار في كيرنل لينكس فوراً</label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> حفظ وتطبيق المسار
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Static Route -->
+<div class="modal fade" id="editRouteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-pencil-square me-1"></i> تعديل مسار التوجيه الثابت
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/sstp/routes/edit">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id" id="editRouteID">
+                    <input type="hidden" name="client_id" id="editRouteClientID" value="0">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">شبكة الأجهزة المستهدفة (Destination CIDR):</label>
+                        <input type="text" name="destination_cidr" id="editRouteDest" class="form-control font-monospace form-control-lg fw-bold" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">عبر بوابة نفق الـ VPN (Gateway IP):</label>
+                        <input type="text" name="gateway_ip" id="editRouteGateway" class="form-control font-monospace fw-bold" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">البيان / الوصف:</label>
+                        <input type="text" name="description" id="editRouteDesc" class="form-control">
+                    </div>
+
+                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                        <input class="form-check-input" type="checkbox" name="enabled" id="editRouteEnabled" value="1">
+                        <label class="form-check-label fw-bold" for="editRouteEnabled">تفعيل المسار وتطبيقه في لينكس</label>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
@@ -579,6 +777,28 @@ function openEditClientModal(id, name, user, pass, assignedIP, notes, enabled) {
     document.getElementById('editClientEnabled').checked = Boolean(enabled);
 
     const modal = new bootstrap.Modal(document.getElementById('editClientModal'));
+    modal.show();
+}
+
+function onSelectRouteClient(selectEl, targetInputId) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    const ip = opt.value;
+    const clientId = opt.dataset.id || '0';
+    if (ip) {
+        document.getElementById(targetInputId).value = ip;
+    }
+    document.getElementById('addRouteClientID').value = clientId;
+}
+
+function openEditRouteModal(id, dest, gw, clientId, desc, enabled) {
+    document.getElementById('editRouteID').value = id;
+    document.getElementById('editRouteDest').value = dest;
+    document.getElementById('editRouteGateway').value = gw;
+    document.getElementById('editRouteClientID').value = clientId || '0';
+    document.getElementById('editRouteDesc').value = desc || '';
+    document.getElementById('editRouteEnabled').checked = Boolean(enabled);
+
+    const modal = new bootstrap.Modal(document.getElementById('editRouteModal'));
     modal.show();
 }
 </script>

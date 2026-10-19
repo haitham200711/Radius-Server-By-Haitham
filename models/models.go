@@ -194,6 +194,21 @@ type SSTPClient struct {
 	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
+// SSTPStaticRoute represents a static IP route in Linux kernel for remote branch subnets
+type SSTPStaticRoute struct {
+	ID              int64     `json:"id"`
+	DestinationCIDR string    `json:"destination_cidr"`
+	GatewayIP       string    `json:"gateway_ip"`
+	ClientID        int64     `json:"client_id"`
+	ClientName      string    `json:"client_name"`
+	Description     string    `json:"description"`
+	Enabled         bool      `json:"enabled"`
+	IsApplied       bool      `json:"is_applied"`
+	ActiveDev       string    `json:"active_dev"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 // NAS represents MikroTik router clients (FreeRADIUS `nas` table)
 type NAS struct {
 	ID          int64     `json:"id"`

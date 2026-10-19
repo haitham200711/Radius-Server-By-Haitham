@@ -310,6 +310,20 @@ func (d *DB) InitSchema() error {
 			used_at DATETIME NULL,
 			INDEX idx_token_used (token, used)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 13. SSTP Static Routes (توجيه الشبكات الثابت للفروع)
+		`CREATE TABLE IF NOT EXISTS sstp_static_routes (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			destination_cidr VARCHAR(64) NOT NULL,
+			gateway_ip VARCHAR(32) NOT NULL,
+			client_id BIGINT DEFAULT 0,
+			description VARCHAR(255) DEFAULT '',
+			enabled TINYINT(1) DEFAULT 1,
+			is_applied TINYINT(1) DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			INDEX idx_route_gw (gateway_ip)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -1201,6 +1215,82 @@ func (d *DB) ConsumeSSTPToken(token string) (clientID int64, username, password 
 
 	_, _ = d.Exec(`UPDATE sstp_tokens SET used = 1, used_at = NOW() WHERE token = ?`, token)
 	return clientID, username, password, nil
+}
+
+func (d *DB) GetSSTPStaticRoutes() ([]models.SSTPStaticRoute, error) {
+	query := `SELECT r.id, r.destination_cidr, r.gateway_ip, r.client_id, COALESCE(c.name, ''), r.description,
+		r.enabled, r.is_applied, r.created_at, r.updated_at
+		FROM sstp_static_routes r
+		LEFT JOIN sstp_clients c ON r.client_id = c.id
+		ORDER BY r.id DESC`
+	rows, err := d.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.SSTPStaticRoute
+	for rows.Next() {
+		var sr models.SSTPStaticRoute
+		var en, app int
+		if err := rows.Scan(&sr.ID, &sr.DestinationCIDR, &sr.GatewayIP, &sr.ClientID, &sr.ClientName, &sr.Description,
+			&en, &app, &sr.CreatedAt, &sr.UpdatedAt); err == nil {
+			sr.Enabled = (en == 1)
+			sr.IsApplied = (app == 1)
+			list = append(list, sr)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) SaveSSTPStaticRoute(r *models.SSTPStaticRoute) error {
+	en := 0
+	if r.Enabled {
+		en = 1
+	}
+	app := 0
+	if r.IsApplied {
+		app = 1
+	}
+
+	if r.ID == 0 {
+		res, err := d.Exec(`INSERT INTO sstp_static_routes (destination_cidr, gateway_ip, client_id, description, enabled, is_applied)
+			VALUES (?, ?, ?, ?, ?, ?)`, r.DestinationCIDR, r.GatewayIP, r.ClientID, r.Description, en, app)
+		if err != nil {
+			return err
+		}
+		id, _ := res.LastInsertId()
+		r.ID = id
+		return nil
+	}
+
+	_, err := d.Exec(`UPDATE sstp_static_routes SET destination_cidr = ?, gateway_ip = ?, client_id = ?, description = ?, enabled = ?, is_applied = ?
+		WHERE id = ?`, r.DestinationCIDR, r.GatewayIP, r.ClientID, r.Description, en, app, r.ID)
+	return err
+}
+
+func (d *DB) DeleteSSTPStaticRoute(id int64) (*models.SSTPStaticRoute, error) {
+	var sr models.SSTPStaticRoute
+	var en, app int
+	err := d.QueryRow(`SELECT id, destination_cidr, gateway_ip, client_id, description, enabled, is_applied
+		FROM sstp_static_routes WHERE id = ?`, id).Scan(&sr.ID, &sr.DestinationCIDR, &sr.GatewayIP, &sr.ClientID, &sr.Description, &en, &app)
+	if err != nil {
+		return nil, err
+	}
+	sr.Enabled = (en == 1)
+	sr.IsApplied = (app == 1)
+
+	_, _ = d.Exec("DELETE FROM sstp_static_routes WHERE id = ?", id)
+	return &sr, nil
+}
+
+func (d *DB) SetSSTPRouteApplied(id int64, applied bool) error {
+	app := 0
+	if applied {
+		app = 1
+	}
+	_, err := d.Exec("UPDATE sstp_static_routes SET is_applied = ? WHERE id = ?", app, id)
+	return err
 }
 
 func (d *DB) SyncSSTPFiles() error {

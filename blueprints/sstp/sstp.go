@@ -22,7 +22,18 @@ type Blueprint struct {
 }
 
 func New(db *database.DB, r *web.Renderer) *Blueprint {
-	return &Blueprint{db: db, renderer: r}
+	bp := &Blueprint{db: db, renderer: r}
+	go bp.startRouteWatcher()
+	return bp
+}
+
+func (bp *Blueprint) startRouteWatcher() {
+	// Periodic sync every 5 seconds ensures routes apply as soon as clients connect
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		bp.SyncAllRoutes()
+	}
 }
 
 type SessionInfo struct {
@@ -33,6 +44,89 @@ type SessionInfo struct {
 	Type       string
 	State      string
 	Uptime     string
+}
+
+func (bp *Blueprint) getActiveSessions() ([]SessionInfo, map[string]string) {
+	var activeSessions []SessionInfo
+	ipToIf := make(map[string]string)
+
+	out, err := exec.Command("accel-cmd", "show", "sessions").Output()
+	if err == nil {
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			parts := strings.Split(line, "|")
+			if len(parts) >= 8 {
+				ifname := strings.TrimSpace(parts[0])
+				if ifname == "ifname" || strings.HasPrefix(ifname, "-") || ifname == "" {
+					continue
+				}
+				ip := strings.TrimSpace(parts[3])
+				s := SessionInfo{
+					IfName:    ifname,
+					Username:  strings.TrimSpace(parts[1]),
+					CallingIP: strings.TrimSpace(parts[2]),
+					IP:        ip,
+					Type:      strings.TrimSpace(parts[4]),
+					State:     strings.TrimSpace(parts[6]),
+					Uptime:    strings.TrimSpace(parts[7]),
+				}
+				activeSessions = append(activeSessions, s)
+				if ip != "" {
+					ipToIf[ip] = ifname
+				}
+			}
+		}
+	}
+	return activeSessions, ipToIf
+}
+
+func (bp *Blueprint) SyncAllRoutes() {
+	routes, err := bp.db.GetSSTPStaticRoutes()
+	if err != nil {
+		return
+	}
+
+	_, activeMap := bp.getActiveSessions()
+	kernelRoutesOut, _ := exec.Command("ip", "route", "show").Output()
+	kernelRoutesStr := string(kernelRoutesOut)
+
+	for _, r := range routes {
+		dest := strings.TrimSpace(r.DestinationCIDR)
+		gw := strings.TrimSpace(r.GatewayIP)
+		if dest == "" || gw == "" {
+			continue
+		}
+
+		if !r.Enabled {
+			if strings.Contains(kernelRoutesStr, dest) {
+				_ = exec.Command("ip", "route", "del", dest).Run()
+			}
+			_ = bp.db.SetSSTPRouteApplied(r.ID, false)
+			continue
+		}
+
+		// If enabled: try to apply/replace route
+		applied := false
+		if ifname, ok := activeMap[gw]; ok && ifname != "" {
+			err := exec.Command("ip", "route", "replace", dest, "via", gw, "dev", ifname).Run()
+			if err == nil {
+				applied = true
+			}
+		}
+
+		if !applied {
+			err := exec.Command("ip", "route", "replace", dest, "via", gw).Run()
+			if err == nil {
+				applied = true
+			}
+		}
+
+		if applied {
+			_ = bp.db.SetSSTPRouteApplied(r.ID, true)
+		} else {
+			_ = bp.db.SetSSTPRouteApplied(r.ID, false)
+		}
+	}
 }
 
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
@@ -47,30 +141,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch active sessions from accel-cmd
-	var activeSessions []SessionInfo
-	out, err := exec.Command("accel-cmd", "show", "sessions").Output()
-	if err == nil {
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
-			parts := strings.Split(line, "|")
-			if len(parts) >= 8 {
-				ifname := strings.TrimSpace(parts[0])
-				if ifname == "ifname" || strings.HasPrefix(ifname, "-") {
-					continue
-				}
-				s := SessionInfo{
-					IfName:    ifname,
-					Username:  strings.TrimSpace(parts[1]),
-					CallingIP: strings.TrimSpace(parts[2]),
-					IP:        strings.TrimSpace(parts[3]),
-					Type:      strings.TrimSpace(parts[4]),
-					State:     strings.TrimSpace(parts[6]),
-					Uptime:    strings.TrimSpace(parts[7]),
-				}
-				activeSessions = append(activeSessions, s)
-			}
-		}
-	}
+	activeSessions, activeMap := bp.getActiveSessions()
 
 	// Mark clients online if session exists
 	onlineCount := 0
@@ -81,6 +152,14 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				onlineCount++
 				break
 			}
+		}
+	}
+
+	// Fetch static routes and check kernel status
+	staticRoutes, _ := bp.db.GetSSTPStaticRoutes()
+	for i := range staticRoutes {
+		if ifname, ok := activeMap[staticRoutes[i].GatewayIP]; ok {
+			staticRoutes[i].ActiveDev = ifname
 		}
 	}
 
@@ -99,6 +178,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"CurrentUser":    middleware.GetUser(r),
 		"Settings":       settings,
 		"Clients":        clients,
+		"StaticRoutes":   staticRoutes,
 		"ActiveSessions": activeSessions,
 		"OnlineCount":    onlineCount,
 		"ServerHost":     serverHost,
@@ -368,4 +448,97 @@ func (bp *Blueprint) ScriptHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\"Radius-Pro.rsc\"")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(rscScript))
+}
+
+func (bp *Blueprint) AddRouteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/sstp", http.StatusFound)
+		return
+	}
+
+	dest := strings.TrimSpace(r.FormValue("destination_cidr"))
+	gw := strings.TrimSpace(r.FormValue("gateway_ip"))
+	clientID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("client_id")), 10, 64)
+	desc := strings.TrimSpace(r.FormValue("description"))
+	enabled := r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on"
+
+	if dest == "" || gw == "" {
+		http.Redirect(w, r, "/sstp?err=missing_route_fields", http.StatusFound)
+		return
+	}
+
+	sr := &models.SSTPStaticRoute{
+		DestinationCIDR: dest,
+		GatewayIP:       gw,
+		ClientID:        clientID,
+		Description:     desc,
+		Enabled:         enabled,
+	}
+
+	if err := bp.db.SaveSSTPStaticRoute(sr); err != nil {
+		http.Redirect(w, r, "/sstp?err=save_route_failed", http.StatusFound)
+		return
+	}
+
+	bp.SyncAllRoutes()
+	http.Redirect(w, r, "/sstp?msg=route_added", http.StatusFound)
+}
+
+func (bp *Blueprint) EditRouteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/sstp", http.StatusFound)
+		return
+	}
+
+	id, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("id")), 10, 64)
+	dest := strings.TrimSpace(r.FormValue("destination_cidr"))
+	gw := strings.TrimSpace(r.FormValue("gateway_ip"))
+	clientID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("client_id")), 10, 64)
+	desc := strings.TrimSpace(r.FormValue("description"))
+	enabled := r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on"
+
+	if id <= 0 || dest == "" || gw == "" {
+		http.Redirect(w, r, "/sstp?err=missing_route_fields", http.StatusFound)
+		return
+	}
+
+	sr := &models.SSTPStaticRoute{
+		ID:              id,
+		DestinationCIDR: dest,
+		GatewayIP:       gw,
+		ClientID:        clientID,
+		Description:     desc,
+		Enabled:         enabled,
+	}
+
+	if err := bp.db.SaveSSTPStaticRoute(sr); err != nil {
+		http.Redirect(w, r, "/sstp?err=save_route_failed", http.StatusFound)
+		return
+	}
+
+	bp.SyncAllRoutes()
+	http.Redirect(w, r, "/sstp?msg=route_updated", http.StatusFound)
+}
+
+func (bp *Blueprint) DeleteRouteHandler(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if id > 0 {
+		sr, err := bp.db.DeleteSSTPStaticRoute(id)
+		if err == nil && sr != nil {
+			_ = exec.Command("ip", "route", "del", sr.DestinationCIDR).Run()
+		}
+	}
+	bp.SyncAllRoutes()
+	http.Redirect(w, r, "/sstp?msg=route_deleted", http.StatusFound)
+}
+
+func (bp *Blueprint) ApplyRoutesHandler(w http.ResponseWriter, r *http.Request) {
+	bp.SyncAllRoutes()
+	http.Redirect(w, r, "/sstp?msg=routes_applied", http.StatusFound)
+}
+
+func (bp *Blueprint) HookUpHandler(w http.ResponseWriter, r *http.Request) {
+	bp.SyncAllRoutes()
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
 }
