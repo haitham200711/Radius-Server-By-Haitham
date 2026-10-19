@@ -1,12 +1,14 @@
 package dashboard
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/sysinfo"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -22,6 +24,7 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r)
 	metrics, _ := bp.db.GetMetrics()
+	systemRes := sysinfo.GetResources()
 
 	rows, err := bp.db.Query(`SELECT radacctid, acctsessionid, username, nasipaddress, acctstarttime, acctsessiontime,
 		acctinputoctets, acctoutputoctets, framedipaddress, callingstationid
@@ -64,11 +67,21 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = bp.renderer.Render(w, "dashboard/index", map[string]interface{}{
-		"Title":          "لوحة التحكم الإحصائية",
+		"Title":          "لوحة التحكم الإحصائية ومراقبة السيرفر",
 		"ActiveMenu":     "dashboard",
 		"CurrentUser":    user,
 		"Metrics":        metrics,
 		"RecentSessions": recentSessions,
 		"RecentBatches":  recentBatches,
+		"System":         systemRes,
 	})
 }
+
+// APIResourcesHandler provides real-time system metrics as JSON for Ajax polling
+func (bp *Blueprint) APIResourcesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	res := sysinfo.GetResources()
+	_ = json.NewEncoder(w).Encode(res)
+}
+

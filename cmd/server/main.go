@@ -72,6 +72,8 @@ func main() {
 	// Dashboard Blueprint
 	dashBP := dashboard.New(db, renderer)
 	mux.HandleFunc("/dashboard", middleware.RequireAuth(dashBP.IndexHandler))
+	mux.HandleFunc("/dashboard/api/resources", middleware.RequireAuth(dashBP.APIResourcesHandler))
+
 
 	// Subscribers Blueprint
 	subBP := subscribers.New(db, renderer)
