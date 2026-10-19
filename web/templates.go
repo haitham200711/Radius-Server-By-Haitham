@@ -40,6 +40,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"sstp/index":          {"templates/base.html", "templates/sstp/index.html"},
 		"reports/index":       {"templates/base.html", "templates/reports/index.html"},
 		"settings/index":      {"templates/base.html", "templates/settings/index.html"},
+		"whatsapp/index":      {"templates/base.html", "templates/whatsapp/index.html"},
 	}
 
 	for key, files := range pages {

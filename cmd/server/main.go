@@ -20,9 +20,11 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/settings"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/sstp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/subscribers"
+	whatsappBP "github.com/haitham200711/Radius-Server-By-Haitham/blueprints/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -48,6 +50,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to initialize template renderer: %v", err)
 	}
+
+	// Initialize WhatsApp Subsystem
+	whatsapp.InitWhatsApp()
 
 	// 3. Register Blueprints
 	mux := http.NewServeMux()
@@ -145,6 +150,16 @@ func main() {
 	// Settings Blueprint
 	settBP := settings.New(db, renderer)
 	mux.HandleFunc("/settings", middleware.RequireAuth(settBP.IndexHandler))
+
+	// WhatsApp Blueprint
+	waBP := whatsappBP.New(db, renderer)
+	mux.HandleFunc("/whatsapp", middleware.RequireAuth(waBP.IndexHandler))
+	mux.HandleFunc("/whatsapp/start-pairing", middleware.RequireAuth(waBP.StartPairingHandler))
+	mux.HandleFunc("/whatsapp/pair-phone", middleware.RequireAuth(waBP.PairPhoneHandler))
+	mux.HandleFunc("/whatsapp/status", middleware.RequireAuth(waBP.StatusHandler))
+	mux.HandleFunc("/whatsapp/logout", middleware.RequireAuth(waBP.LogoutHandler))
+	mux.HandleFunc("/whatsapp/test", middleware.RequireAuth(waBP.TestMessageHandler))
+	mux.HandleFunc("/whatsapp/settings", middleware.RequireAuth(waBP.SaveSettingsHandler))
 
 	// Wrap mux with Session Authentication middleware
 	handler := middleware.AuthMiddleware(cfg.SessionSecret)(mux)

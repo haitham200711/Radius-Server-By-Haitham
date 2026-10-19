@@ -304,3 +304,30 @@ type BillingSummary struct {
 	TotalCustomerDebt float64 `json:"total_customer_debt"`
 }
 
+// WhatsAppSettings holds configuration for WhatsApp notifications and gateways
+type WhatsAppSettings struct {
+	ID                    int64     `json:"id"`
+	Enabled               bool      `json:"enabled"`
+	AdminPhone            string    `json:"admin_phone"`
+	APIEndpoint           string    `json:"api_endpoint"`
+	APIToken              string    `json:"api_token"`
+	InstanceID            string    `json:"instance_id"`
+	NotifyOnNewSubscriber bool      `json:"notify_on_new_subscriber"`
+	NotifyOnExpiry        bool      `json:"notify_on_expiry"`
+	NotifyOnPayment       bool      `json:"notify_on_payment"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+// WhatsAppLog holds sent/received message logs
+type WhatsAppLog struct {
+	ID            int64     `json:"id"`
+	Phone         string    `json:"phone"`
+	RecipientName string    `json:"recipient_name"`
+	MessageType   string    `json:"message_type"`
+	Content       string    `json:"content"`
+	Status        string    `json:"status"` // "sent", "failed"
+	ErrorMessage  string    `json:"error_message"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+

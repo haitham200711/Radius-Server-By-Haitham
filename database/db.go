@@ -324,6 +324,35 @@ func (d *DB) InitSchema() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			INDEX idx_route_gw (gateway_ip)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 14. WhatsApp Settings (إعدادات وإشعارات الواتساب)
+		`CREATE TABLE IF NOT EXISTS whatsapp_settings (
+			id INT PRIMARY KEY,
+			enabled TINYINT(1) DEFAULT 1,
+			admin_phone VARCHAR(32) DEFAULT '',
+			api_endpoint VARCHAR(255) DEFAULT '',
+			api_token VARCHAR(255) DEFAULT '',
+			instance_id VARCHAR(64) DEFAULT '',
+			notify_on_new_subscriber TINYINT(1) DEFAULT 1,
+			notify_on_expiry TINYINT(1) DEFAULT 1,
+			notify_on_payment TINYINT(1) DEFAULT 1,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 15. WhatsApp Logs (سجل رسائل الواتساب المرسلة)
+		`CREATE TABLE IF NOT EXISTS whatsapp_logs (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			phone VARCHAR(32) NOT NULL,
+			recipient_name VARCHAR(128) DEFAULT '',
+			message_type VARCHAR(32) DEFAULT 'text',
+			content TEXT,
+			status VARCHAR(32) DEFAULT 'sent',
+			error_message TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_wa_phone (phone),
+			INDEX idx_wa_status (status),
+			INDEX idx_wa_date (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -348,6 +377,9 @@ func (d *DB) InitSchema() error {
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
 	}
+
+	// Ensure default WhatsApp settings row exists
+	_, _ = d.Exec("INSERT IGNORE INTO whatsapp_settings (id, enabled, admin_phone) VALUES (1, 1, '')")
 
 	// Seed default Admin if not present
 	var adminCount int
@@ -1732,4 +1764,69 @@ func (d *DB) GetBillingFinancialSummary() (models.BillingSummary, error) {
 
 	return s, nil
 }
+
+// --- WhatsApp Settings & Logs ---
+
+func (d *DB) GetWhatsAppSettings() (*models.WhatsAppSettings, error) {
+	s := &models.WhatsAppSettings{ID: 1, Enabled: true}
+	err := d.QueryRow(`SELECT id, enabled, admin_phone, api_endpoint, api_token, instance_id,
+		notify_on_new_subscriber, notify_on_expiry, notify_on_payment, updated_at
+		FROM whatsapp_settings WHERE id = 1`).Scan(
+		&s.ID, &s.Enabled, &s.AdminPhone, &s.APIEndpoint, &s.APIToken, &s.InstanceID,
+		&s.NotifyOnNewSubscriber, &s.NotifyOnExpiry, &s.NotifyOnPayment, &s.UpdatedAt,
+	)
+	if err != nil {
+		return s, nil
+	}
+	return s, nil
+}
+
+func (d *DB) SaveWhatsAppSettings(s *models.WhatsAppSettings) error {
+	_, err := d.Exec(`INSERT INTO whatsapp_settings (id, enabled, admin_phone, api_endpoint, api_token, instance_id,
+		notify_on_new_subscriber, notify_on_expiry, notify_on_payment)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+		enabled = VALUES(enabled),
+		admin_phone = VALUES(admin_phone),
+		api_endpoint = VALUES(api_endpoint),
+		api_token = VALUES(api_token),
+		instance_id = VALUES(instance_id),
+		notify_on_new_subscriber = VALUES(notify_on_new_subscriber),
+		notify_on_expiry = VALUES(notify_on_expiry),
+		notify_on_payment = VALUES(notify_on_payment)`,
+		s.Enabled, s.AdminPhone, s.APIEndpoint, s.APIToken, s.InstanceID,
+		s.NotifyOnNewSubscriber, s.NotifyOnExpiry, s.NotifyOnPayment,
+	)
+	return err
+}
+
+func (d *DB) GetWhatsAppLogs(limit int) ([]models.WhatsAppLog, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := d.Query(`SELECT id, phone, recipient_name, message_type, content, status, error_message, created_at
+		FROM whatsapp_logs ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.WhatsAppLog
+	for rows.Next() {
+		var l models.WhatsAppLog
+		if err := rows.Scan(&l.ID, &l.Phone, &l.RecipientName, &l.MessageType, &l.Content, &l.Status, &l.ErrorMessage, &l.CreatedAt); err == nil {
+			logs = append(logs, l)
+		}
+	}
+	return logs, nil
+}
+
+func (d *DB) LogWhatsAppMessage(phone, recipient, msgType, content, status, errMsg string) error {
+	_, err := d.Exec(`INSERT INTO whatsapp_logs (phone, recipient_name, message_type, content, status, error_message)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		phone, recipient, msgType, content, status, errMsg,
+	)
+	return err
+}
+
 
