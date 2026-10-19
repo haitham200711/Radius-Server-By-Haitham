@@ -192,6 +192,36 @@ func (bp *Blueprint) DeleteClientHandler(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/sstp?msg=client_deleted", http.StatusFound)
 }
 
+func (bp *Blueprint) EditClientHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/sstp", http.StatusFound)
+		return
+	}
+
+	idStr := strings.TrimSpace(r.FormValue("id"))
+	id, _ := strconv.ParseInt(idStr, 10, 64)
+	if id <= 0 {
+		http.Redirect(w, r, "/sstp?err=invalid_id", http.StatusFound)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		name = "راوتر مايكروتك"
+	}
+	assignedIP := strings.TrimSpace(r.FormValue("assigned_ip"))
+	notes := strings.TrimSpace(r.FormValue("notes"))
+	enabled := r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on"
+
+	if err := bp.db.UpdateSSTPClient(id, name, assignedIP, notes, enabled); err != nil {
+		http.Redirect(w, r, "/sstp?err=update_failed", http.StatusFound)
+		return
+	}
+
+	_ = bp.db.SyncSSTPFiles()
+	http.Redirect(w, r, "/sstp?msg=client_updated", http.StatusFound)
+}
+
 func randomAlpha(n int) string {
 	const chars = "abcdefghjkmnpqrstuvwxyz23456789"
 	b := make([]byte, n)

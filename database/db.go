@@ -1157,6 +1157,16 @@ func (d *DB) DeleteSSTPClient(id int64) error {
 	return err
 }
 
+func (d *DB) UpdateSSTPClient(id int64, name, assignedIP, notes string, enabled bool) error {
+	en := 0
+	if enabled {
+		en = 1
+	}
+	_, err := d.Exec(`UPDATE sstp_clients SET name = ?, assigned_ip = ?, notes = ?, enabled = ? WHERE id = ?`,
+		name, assignedIP, notes, en, id)
+	return err
+}
+
 func (d *DB) GetSSTPClientByID(id int64) (*models.SSTPClient, error) {
 	var c models.SSTPClient
 	var en int
