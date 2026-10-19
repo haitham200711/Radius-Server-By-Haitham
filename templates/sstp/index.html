@@ -71,7 +71,7 @@
         <div class="input-group">
             <input type="text" id="quickScript" class="form-control font-monospace bg-light" readonly
                 value="/interface sstp-client add name=sstp-radius connect-to={{ .ServerHost }}:{{ .Settings.Port }} user={{ .RandUser }} password={{ .RandPass }} profile=default authentication=mschap2,chap,pap verify-server-certificate=no disabled=no">
-            <button class="btn btn-outline-primary fw-bold" onclick="copyQuickScript()">
+            <button class="btn btn-outline-primary fw-bold" id="btnQuickCopy" onclick="copyQuickScript()">
                 <i class="bi bi-clipboard me-1"></i> نسخ الكود
             </button>
         </div>
@@ -121,7 +121,7 @@
                     </td>
                     <td><small class="text-muted">{{ if .Notes }}{{ .Notes }}{{ else }}-{{ end }}</small></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-info me-1" onclick="copyRouterScript('{{ .Username }}', '{{ .Password }}')">
+                        <button class="btn btn-sm btn-outline-info me-1 fw-bold" onclick="showRouterScript('{{ .Name }}', '{{ .Username }}', '{{ .Password }}')">
                             <i class="bi bi-code-slash"></i> كود المايكروتك
                         </button>
                         <a href="/sstp/clients/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف هذا الراوتر من SSTP؟');">
@@ -276,6 +276,55 @@
         </div>
     </div>
 </div>
+<!-- Modal for MikroTik Terminal Script -->
+<div class="modal fade" id="routerScriptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-terminal-fill me-2 text-info"></i> كود ربط المايكروتك (MikroTik RouterOS Script)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                    <div>
+                        <span class="text-muted small d-block">اسم الراوتر / الفرع:</span>
+                        <strong class="text-dark fs-5" id="modalRouterName">-</strong>
+                    </div>
+                    <div>
+                        <span class="badge bg-light text-dark border font-monospace px-3 py-2">
+                            User: <span id="modalRouterUser" class="text-primary fw-bold">-</span>
+                        </span>
+                    </div>
+                </div>
+
+                <label class="form-label fw-bold">أمر التيرمينال (Terminal Command):</label>
+                <div class="position-relative mb-3">
+                    <textarea id="modalScriptContent" class="form-control font-monospace bg-dark text-light p-3" rows="4" readonly style="resize: none; font-size: 0.95rem; line-height: 1.5;"></textarea>
+                </div>
+
+                <div class="alert alert-info small mb-0 d-flex align-items-start gap-2">
+                    <i class="bi bi-info-circle-fill fs-5 mt-1"></i>
+                    <div>
+                        <strong>طريقة التركيب في المايكروتك:</strong>
+                        <ol class="mb-0 ps-3 mt-1">
+                            <li>افتح برنامج <b>WinBox</b> وسجل دخول للراوتر.</li>
+                            <li>من القائمة الجانبية اضغط على <b>New Terminal</b>.</li>
+                            <li>الصق الكود واضغط <b>Enter</b> على الكيبورد لإنشاء اتصال SSTP فوراً.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-success fw-bold px-4" id="btnModalCopy" onclick="copyModalScript()">
+                    <i class="bi bi-clipboard-check me-1"></i> نسخ الكود للحافظة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
@@ -284,15 +333,57 @@
 <script>
 function copyQuickScript() {
     const input = document.getElementById('quickScript');
+    if (!input) return;
+    const text = input.value;
     input.select();
-    navigator.clipboard.writeText(input.value);
-    alert('تم نسخ كود المايكروتك بنجاح!');
+    window.copyToClipboard(text, function() {
+        const btn = document.getElementById('btnQuickCopy');
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ!';
+            btn.classList.replace('btn-outline-primary', 'btn-success');
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.classList.replace('btn-success', 'btn-outline-primary');
+            }, 2000);
+        }
+        window.showCopyToast('تم نسخ كود الربط السريع بنجاح!');
+    }, function() {
+        alert('يرجى تحديد النص والنسخ يدوياً عبر لوحة المفاتيح: Ctrl + C');
+    });
 }
 
-function copyRouterScript(user, pass) {
+function showRouterScript(name, user, pass) {
     const script = `/interface sstp-client add name=sstp-radius connect-to={{ .ServerHost }}:{{ .Settings.Port }} user=${user} password=${pass} profile=default authentication=mschap2,chap,pap verify-server-certificate=no disabled=no`;
-    navigator.clipboard.writeText(script);
-    alert('تم نسخ كود الراوتر بنجاح:\n\n' + script);
+    
+    // 1. Fill modal info
+    document.getElementById('modalRouterName').textContent = name || user;
+    document.getElementById('modalRouterUser').textContent = user;
+    document.getElementById('modalScriptContent').value = script;
+
+    // 2. Automatically copy it immediately to clipboard
+    window.copyToClipboard(script, function() {
+        window.showCopyToast('تم نسخ كود المايكروتك للحافظة بنجاح!');
+    });
+
+    // 3. Open modal so user can view/copy easily
+    const modal = new bootstrap.Modal(document.getElementById('routerScriptModal'));
+    modal.show();
+}
+
+function copyModalScript() {
+    const ta = document.getElementById('modalScriptContent');
+    if (!ta) return;
+    ta.select();
+    window.copyToClipboard(ta.value, function() {
+        const btn = document.getElementById('btnModalCopy');
+        if (btn) {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ بنجاح!';
+            setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        }
+        window.showCopyToast('تم نسخ كود المايكروتك بنجاح!');
+    });
 }
 </script>
 {{ end }}

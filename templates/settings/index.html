@@ -67,7 +67,7 @@
 
                 <div class="position-relative">
                     <textarea class="form-control font-monospace bg-dark text-info p-3" rows="10" readonly id="scriptBox">{{ .MikrotikScript }}</textarea>
-                    <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" onclick="navigator.clipboard.writeText(document.getElementById('scriptBox').value); alert('تم نسخ كود إعداد المايكروتك بنجاح!');">
+                    <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 fw-bold" onclick="window.copyToClipboard(document.getElementById('scriptBox').value, () => window.showCopyToast('تم نسخ كود إعداد المايكروتك بنجاح!'));">
                         <i class="bi bi-clipboard"></i> نسخ الكود
                     </button>
                 </div>
