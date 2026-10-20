@@ -3966,6 +3966,323 @@ func (d *DB) DisconnectSubscriberSession(username string) error {
 	return nil
 }
 
+// --- Comprehensive Subscriber Login Sessions Reporting ---
+
+func FormatTerminateCauseArabic(cause string, isOnline bool) string {
+	if isOnline {
+		return "متصل أونلاين الآن"
+	}
+	cause = strings.TrimSpace(cause)
+	if cause == "" {
+		return "انتهت الجلسة"
+	}
+	switch strings.ToLower(cause) {
+	case "user-request":
+		return "تسجيل خروج (طلب العميل)"
+	case "lost-carrier":
+		return "انقطاع إشارة الخط / الشبكة"
+	case "lost-service":
+		return "فقدان الخدمة"
+	case "idle-timeout":
+		return "انتهاء مهلة الخمول (Idle)"
+	case "session-timeout":
+		return "انتهاء وقت الجلسة المسموح"
+	case "admin-reset":
+		return "قطع إداري من النظام (CoA Reset)"
+	case "admin-reboot":
+		return "إعادة تشغيل النظام"
+	case "port-error":
+		return "خطأ في منفذ الاتصال"
+	case "nas-error":
+		return "خطأ في راوتر المايكروتك"
+	case "nas-request":
+		return "طلب إنهاء من المايكروتك"
+	case "nas-reboot":
+		return "إعادة تشغيل راوتر المايكروتك"
+	default:
+		return cause
+	}
+}
+
+func FormatDurationArabic(sec int64) string {
+	if sec <= 0 {
+		return "أقل من دقيقة"
+	}
+	h := sec / 3600
+	m := (sec % 3600) / 60
+	s := sec % 60
+	if h > 0 {
+		if m > 0 {
+			return fmt.Sprintf("%d س و %d د", h, m)
+		}
+		return fmt.Sprintf("%d ساعة", h)
+	}
+	if m > 0 {
+		if s > 0 {
+			return fmt.Sprintf("%d د و %d ث", m, s)
+		}
+		return fmt.Sprintf("%d دقيقة", m)
+	}
+	return fmt.Sprintf("%d ثانية", s)
+}
+
+func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate string, limit, offset int) ([]models.SubscriberLoginSession, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	whereClauses := []string{"1=1"}
+	var args []interface{}
+
+	search = strings.TrimSpace(search)
+	if search != "" {
+		whereClauses = append(whereClauses, "(r.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR r.framedipaddress LIKE ? OR r.callingstationid LIKE ?)")
+		pattern := "%" + search + "%"
+		args = append(args, pattern, pattern, pattern, pattern, pattern)
+	}
+
+	status = strings.TrimSpace(status)
+	if status == "online" {
+		whereClauses = append(whereClauses, "r.acctstoptime IS NULL")
+	} else if status == "closed" {
+		whereClauses = append(whereClauses, "r.acctstoptime IS NOT NULL")
+	}
+
+	nasIP = strings.TrimSpace(nasIP)
+	if nasIP != "" && nasIP != "all" {
+		whereClauses = append(whereClauses, "r.nasipaddress = ?")
+		args = append(args, nasIP)
+	}
+
+	fromDate = strings.TrimSpace(fromDate)
+	if fromDate != "" {
+		whereClauses = append(whereClauses, "r.acctstarttime >= ?")
+		if len(fromDate) == 10 {
+			fromDate = fromDate + " 00:00:00"
+		}
+		args = append(args, fromDate)
+	}
+
+	toDate = strings.TrimSpace(toDate)
+	if toDate != "" {
+		whereClauses = append(whereClauses, "r.acctstarttime <= ?")
+		if len(toDate) == 10 {
+			toDate = toDate + " 23:59:59"
+		}
+		args = append(args, toDate)
+	}
+
+	whereSQL := strings.Join(whereClauses, " AND ")
+
+	// 1. Total Count
+	var total int
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM radacct r LEFT JOIN subscribers s ON r.username = s.username WHERE %s", whereSQL)
+	_ = d.QueryRow(countQuery, args...).Scan(&total)
+
+	// 2. Data Query
+	dataQuery := fmt.Sprintf(`SELECT 
+		r.radacctid,
+		r.acctsessionid,
+		r.username,
+		COALESCE(s.full_name, r.username),
+		COALESCE(s.contract_no, '-'),
+		COALESCE(s.phone, '-'),
+		COALESCE(s.profile_name, ''),
+		r.nasipaddress,
+		COALESCE(n.shortname, r.nasipaddress),
+		COALESCE(r.framedipaddress, ''),
+		COALESCE(r.callingstationid, ''),
+		r.acctstarttime,
+		r.acctstoptime,
+		COALESCE(r.acctsessiontime, 0),
+		COALESCE(r.acctinputoctets, 0),
+		COALESCE(r.acctoutputoctets, 0),
+		COALESCE(r.acctterminatecause, '')
+	FROM radacct r
+	LEFT JOIN subscribers s ON r.username = s.username
+	LEFT JOIN nas n ON r.nasipaddress = n.nasname
+	WHERE %s
+	ORDER BY r.radacctid DESC
+	LIMIT ? OFFSET ?`, whereSQL)
+
+	queryArgs := append(args, limit, offset)
+	rows, err := d.Query(dataQuery, queryArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var sessions []models.SubscriberLoginSession
+	for rows.Next() {
+		var s models.SubscriberLoginSession
+		var (
+			fullName, contractNo, phone, profileName sql.NullString
+			nasName, framedIP, callingStation        sql.NullString
+			termCause                                sql.NullString
+			stopTime                                 sql.NullTime
+		)
+
+		if err := rows.Scan(
+			&s.RadAcctID,
+			&s.AcctSessionID,
+			&s.UserName,
+			&fullName,
+			&contractNo,
+			&phone,
+			&profileName,
+			&s.NASIPAddress,
+			&nasName,
+			&framedIP,
+			&callingStation,
+			&s.AcctStartTime,
+			&stopTime,
+			&s.AcctSessionTime,
+			&s.AcctInputOctets,
+			&s.AcctOutputOctets,
+			&termCause,
+		); err == nil {
+			if fullName.Valid {
+				s.FullName = fullName.String
+			}
+			if contractNo.Valid {
+				s.ContractNo = contractNo.String
+			}
+			if phone.Valid {
+				s.Phone = phone.String
+			}
+			if profileName.Valid {
+				s.ProfileName = profileName.String
+			}
+			if nasName.Valid {
+				s.NASName = nasName.String
+			}
+			if framedIP.Valid {
+				s.FramedIPAddress = framedIP.String
+			}
+			if callingStation.Valid {
+				s.CallingStationID = callingStation.String
+			}
+			if termCause.Valid {
+				s.AcctTerminateCause = termCause.String
+			}
+
+			s.StartTimeFormatted = s.AcctStartTime.Format("2006-01-02 15:04:05")
+
+			if stopTime.Valid {
+				s.AcctStopTime = &stopTime.Time
+				s.StopTimeFormatted = stopTime.Time.Format("2006-01-02 15:04:05")
+				s.IsOnline = false
+				s.StatusBadgeClass = "bg-secondary text-white"
+				s.StatusText = "منتهية"
+			} else {
+				s.IsOnline = true
+				s.StatusBadgeClass = "bg-success text-white"
+				s.StatusText = "متصل الآن (Online)"
+				s.StopTimeFormatted = "قيد الاتصال"
+			}
+
+			s.DurationFormatted = FormatDurationArabic(s.AcctSessionTime)
+			s.TerminateCauseText = FormatTerminateCauseArabic(s.AcctTerminateCause, s.IsOnline)
+
+			s.TotalBytes = s.AcctInputOctets + s.AcctOutputOctets
+			s.UploadFormatted = FormatBytesHuman(s.AcctInputOctets)
+			s.DownloadFormatted = FormatBytesHuman(s.AcctOutputOctets)
+			s.TotalBytesFormatted = FormatBytesHuman(s.TotalBytes)
+
+			sessions = append(sessions, s)
+		}
+	}
+
+	return sessions, total, nil
+}
+
+func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate string) (*models.SubscriberLoginSummary, error) {
+	whereClauses := []string{"1=1"}
+	var args []interface{}
+
+	search = strings.TrimSpace(search)
+	if search != "" {
+		whereClauses = append(whereClauses, "(r.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR r.framedipaddress LIKE ? OR r.callingstationid LIKE ?)")
+		pattern := "%" + search + "%"
+		args = append(args, pattern, pattern, pattern, pattern, pattern)
+	}
+
+	status = strings.TrimSpace(status)
+	if status == "online" {
+		whereClauses = append(whereClauses, "r.acctstoptime IS NULL")
+	} else if status == "closed" {
+		whereClauses = append(whereClauses, "r.acctstoptime IS NOT NULL")
+	}
+
+	nasIP = strings.TrimSpace(nasIP)
+	if nasIP != "" && nasIP != "all" {
+		whereClauses = append(whereClauses, "r.nasipaddress = ?")
+		args = append(args, nasIP)
+	}
+
+	fromDate = strings.TrimSpace(fromDate)
+	if fromDate != "" {
+		whereClauses = append(whereClauses, "r.acctstarttime >= ?")
+		if len(fromDate) == 10 {
+			fromDate = fromDate + " 00:00:00"
+		}
+		args = append(args, fromDate)
+	}
+
+	toDate = strings.TrimSpace(toDate)
+	if toDate != "" {
+		whereClauses = append(whereClauses, "r.acctstarttime <= ?")
+		if len(toDate) == 10 {
+			toDate = toDate + " 23:59:59"
+		}
+		args = append(args, toDate)
+	}
+
+	whereSQL := strings.Join(whereClauses, " AND ")
+
+	query := fmt.Sprintf(`SELECT 
+		COUNT(*),
+		COUNT(DISTINCT r.username),
+		COALESCE(SUM(CASE WHEN r.acctstoptime IS NULL THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN r.acctstoptime IS NOT NULL THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(r.acctoutputoctets), 0),
+		COALESCE(SUM(r.acctinputoctets), 0),
+		COALESCE(AVG(r.acctsessiontime), 0)
+	FROM radacct r
+	LEFT JOIN subscribers s ON r.username = s.username
+	WHERE %s`, whereSQL)
+
+	var (
+		totalSessions, uniqueUsers, onlineCount, closedCount int64
+		totalDown, totalUp                                   int64
+		avgSec                                               float64
+	)
+
+	_ = d.QueryRow(query, args...).Scan(&totalSessions, &uniqueUsers, &onlineCount, &closedCount, &totalDown, &totalUp, &avgSec)
+
+	totalTraffic := totalDown + totalUp
+
+	summary := &models.SubscriberLoginSummary{
+		TotalSessions:        totalSessions,
+		OnlineSessions:       onlineCount,
+		ClosedSessions:       closedCount,
+		UniqueUsersCount:     uniqueUsers,
+		TotalDownloadBytes:   totalDown,
+		TotalUploadBytes:     totalUp,
+		TotalTrafficBytes:    totalTraffic,
+		TotalDownloadDisplay: FormatBytesHuman(totalDown),
+		TotalUploadDisplay:   FormatBytesHuman(totalUp),
+		TotalTrafficDisplay:  FormatBytesHuman(totalTraffic),
+		AvgDurationSeconds:   int64(avgSec),
+		AvgDurationDisplay:   FormatDurationArabic(int64(avgSec)),
+	}
+
+	return summary, nil
+}
+
 
 
 

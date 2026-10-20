@@ -171,6 +171,7 @@ func main() {
 	// Reports Blueprint
 	repBP := reports.New(db, renderer)
 	mux.HandleFunc("/reports", middleware.RequireAuth(repBP.IndexHandler))
+	mux.HandleFunc("/reports/logins", middleware.RequireAuth(repBP.LoginsRedirectHandler))
 
 	// Settings Blueprint
 	settBP := settings.New(db, renderer)

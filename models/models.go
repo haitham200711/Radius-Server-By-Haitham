@@ -554,5 +554,53 @@ type SubscriberTrafficOption struct {
 	LiveIP     string `json:"live_ip"`
 }
 
+// SubscriberLoginSession represents detailed login/session records for reporting
+type SubscriberLoginSession struct {
+	RadAcctID          int64      `json:"radacctid"`
+	AcctSessionID      string     `json:"acctsessionid"`
+	UserName           string     `json:"username"`
+	FullName           string     `json:"full_name"`
+	ContractNo         string     `json:"contract_no"`
+	Phone              string     `json:"phone"`
+	ProfileName        string     `json:"profile_name"`
+	NASIPAddress       string     `json:"nasipaddress"`
+	NASName            string     `json:"nas_name"`
+	FramedIPAddress    string     `json:"framedipaddress"`
+	CallingStationID   string     `json:"callingstationid"` // Client MAC address
+	AcctStartTime      time.Time  `json:"acctstarttime"`
+	StartTimeFormatted string     `json:"start_time_formatted"`
+	AcctStopTime       *time.Time `json:"acctstoptime"`
+	StopTimeFormatted  string     `json:"stop_time_formatted"`
+	AcctSessionTime    int64      `json:"acctsessiontime"` // duration in seconds
+	DurationFormatted  string     `json:"duration_formatted"`
+	AcctInputOctets    int64      `json:"acctinputoctets"`  // Upload bytes
+	AcctOutputOctets   int64      `json:"acctoutputoctets"` // Download bytes
+	TotalBytes         int64      `json:"total_bytes"`
+	UploadFormatted    string     `json:"upload_formatted"`
+	DownloadFormatted  string     `json:"download_formatted"`
+	TotalBytesFormatted string    `json:"total_bytes_formatted"`
+	IsOnline           bool       `json:"is_online"`
+	StatusBadgeClass   string     `json:"status_badge_class"`
+	StatusText         string     `json:"status_text"`
+	AcctTerminateCause string     `json:"acctterminatecause"`
+	TerminateCauseText string     `json:"terminate_cause_text"`
+}
+
+// SubscriberLoginSummary aggregates statistics for login session reports
+type SubscriberLoginSummary struct {
+	TotalSessions        int64  `json:"total_sessions"`
+	OnlineSessions       int64  `json:"online_sessions"`
+	ClosedSessions       int64  `json:"closed_sessions"`
+	UniqueUsersCount     int64  `json:"unique_users_count"`
+	TotalDownloadBytes   int64  `json:"total_download_bytes"`
+	TotalUploadBytes     int64  `json:"total_upload_bytes"`
+	TotalTrafficBytes    int64  `json:"total_traffic_bytes"`
+	TotalDownloadDisplay string `json:"total_download_display"`
+	TotalUploadDisplay   string `json:"total_upload_display"`
+	TotalTrafficDisplay  string `json:"total_traffic_display"`
+	AvgDurationSeconds   int64  `json:"avg_duration_seconds"`
+	AvgDurationDisplay   string `json:"avg_duration_display"`
+}
+
 
 
