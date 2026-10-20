@@ -1,0 +1,555 @@
+{{ define "content" }}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">
+            <i class="bi bi-cloud-arrow-down-fill text-primary me-2"></i> النسخ الاحتياطي للنظام
+        </h3>
+        <p class="text-muted small mb-0">نسخ احتياطي تلقائي مجدول، سياسة حذف القديم، والإرسال التلقائي عبر الواتساب</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#uploadRestoreModal">
+            <i class="bi bi-upload"></i> رفع واستعادة نسخة
+        </button>
+        <button type="button" id="btnCreateBackupNow" class="btn btn-primary d-flex align-items-center gap-2 shadow-sm">
+            <i class="bi bi-database-fill-add"></i>
+            <span>إنشاء نسخة احتياطية الآن</span>
+        </button>
+    </div>
+</div>
+
+<!-- Stats Overview Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 bg-primary-subtle text-primary rounded-3">
+                    <i class="bi bi-archive-fill fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">إجمالي النسخ المحفوظة</span>
+                    <h4 class="fw-bold mb-0 text-dark">{{ .TotalCount }} <small class="text-muted fs-6">نسخة</small></h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 bg-info-subtle text-info rounded-3">
+                    <i class="bi bi-hdd-stack-fill fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">حجم التخزين المستهلك</span>
+                    <h4 class="fw-bold mb-0 text-dark">{{ .TotalStorage }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 bg-warning-subtle text-warning rounded-3">
+                    <i class="bi bi-clock-history fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">جدول النسخ الآلي</span>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        {{ if .Settings.Enabled }}
+                        كل {{ .Settings.IntervalHours }} ساعة
+                        {{ else }}
+                        <span class="badge bg-secondary">معطل حالياً</span>
+                        {{ end }}
+                    </h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="p-3 {{ if .WhatsAppStatus.IsLoggedIn }}bg-success-subtle text-success{{ else }}bg-danger-subtle text-danger{{ end }} rounded-3">
+                    <i class="bi bi-whatsapp fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">إرسال الواتساب</span>
+                    <div class="d-flex align-items-center gap-1">
+                        {{ if .Settings.SendWhatsApp }}
+                            {{ if .WhatsAppStatus.IsLoggedIn }}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">مفعل ومتصل</span>
+                            {{ else }}
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">مفعل (الواتس غير مقترن)</span>
+                            {{ end }}
+                        {{ else }}
+                            <span class="badge bg-secondary-subtle text-secondary">معطل</span>
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Settings Column -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <div class="p-2 bg-primary-subtle rounded-3 text-primary">
+                    <i class="bi bi-sliders2 fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">إعدادات النسخ التلقائي</h6>
+                    <small class="text-muted">الجدول الزمني وسياسة الاحتفاظ</small>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div id="settingsAlertBox" style="display: none;" class="mb-3"></div>
+
+                <form id="backupSettingsForm">
+                    <!-- Enable Automatic Backup Switch -->
+                    <div class="form-check form-switch p-0 d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+                        <label class="form-check-label fw-bold text-dark" for="enabledSwitch">
+                            تفعيل النسخ الاحتياطي التلقائي
+                            <span class="d-block text-muted small fw-normal">أخذ نسخ احتياطية دورية بالخلفية تلقائياً</span>
+                        </label>
+                        <input class="form-check-input ms-0 fs-4" type="checkbox" role="switch" id="enabledSwitch" name="enabled" {{ if .Settings.Enabled }}checked{{ end }}>
+                    </div>
+
+                    <!-- Interval in Hours -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-dark">
+                            <i class="bi bi-hourglass-split text-primary me-1"></i> تكرار النسخ (كل كم ساعة؟):
+                        </label>
+                        <select class="form-select" name="interval_hours" id="interval_hours">
+                            <option value="1" {{ if eq .Settings.IntervalHours 1 }}selected{{ end }}>كل 1 ساعة (ساعة بساعة)</option>
+                            <option value="2" {{ if eq .Settings.IntervalHours 2 }}selected{{ end }}>كل ساعتين (2 ساعات)</option>
+                            <option value="3" {{ if eq .Settings.IntervalHours 3 }}selected{{ end }}>كل 3 ساعات</option>
+                            <option value="4" {{ if eq .Settings.IntervalHours 4 }}selected{{ end }}>كل 4 ساعات</option>
+                            <option value="5" {{ if eq .Settings.IntervalHours 5 }}selected{{ end }}>كل 5 ساعات</option>
+                            <option value="6" {{ if eq .Settings.IntervalHours 6 }}selected{{ end }}>كل 6 ساعات (الموصى به)</option>
+                            <option value="8" {{ if eq .Settings.IntervalHours 8 }}selected{{ end }}>كل 8 ساعات</option>
+                            <option value="10" {{ if eq .Settings.IntervalHours 10 }}selected{{ end }}>كل 10 ساعات</option>
+                            <option value="12" {{ if eq .Settings.IntervalHours 12 }}selected{{ end }}>كل 12 ساعة (مرتين يومياً)</option>
+                            <option value="24" {{ if eq .Settings.IntervalHours 24 }}selected{{ end }}>كل 24 ساعة (مرة يومياً)</option>
+                        </select>
+                        <div class="form-text small">سيقوم النظام ببدء عملية النسخ وضغط قاعدة البيانات فور انقضاء المدة.</div>
+                    </div>
+
+                    <!-- Retention Count -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-dark">
+                            <i class="bi bi-trash3 text-danger me-1"></i> سياسة الاحتفاظ (عدد النسخ):
+                        </label>
+                        <div class="input-group">
+                            <input type="number" min="1" max="100" class="form-control" name="retention_count" id="retention_count" value="{{ .Settings.RetentionCount }}" required>
+                            <span class="input-group-text bg-light">نسخة حديثة</span>
+                        </div>
+                        <div class="form-text small">سيحتفظ النظام بآخر <b>{{ .Settings.RetentionCount }}</b> نسخ فقط، ويحذف النسخ الأقدم تلقائياً لتوفير مساحة القرص.</div>
+                    </div>
+
+                    <!-- WhatsApp Section -->
+                    <div class="p-3 rounded-3 bg-light border mb-4">
+                        <div class="form-check form-switch p-0 d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-check-label fw-bold text-dark" for="waSwitch">
+                                <i class="bi bi-whatsapp text-success me-1"></i> إرسال النسخة عبر الواتساب
+                            </label>
+                            <input class="form-check-input ms-0 fs-5" type="checkbox" role="switch" id="waSwitch" name="send_whatsapp" {{ if .Settings.SendWhatsApp }}checked{{ end }}>
+                        </div>
+
+                        <div id="waPhoneContainer" style="{{ if not .Settings.SendWhatsApp }}display: none;{{ end }}">
+                            <label class="form-label small fw-bold text-muted">رقم هاتف الواتساب المستلم:</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-telephone text-success"></i></span>
+                                <input type="text" class="form-control" name="whatsapp_phone" id="whatsapp_phone" value="{{ .Settings.WhatsAppPhone }}" placeholder="مثال: 0106923040">
+                            </div>
+                            <div class="form-text small text-muted mt-1">
+                                سيتم إرسال ملف النسخة المضغوط فور اكتماله إلى هذا الرقم مباشرة.
+                            </div>
+                            {{ if not .WhatsAppStatus.IsLoggedIn }}
+                            <div class="alert alert-warning py-1 px-2 mt-2 small d-flex align-items-center gap-1">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <span>تنبيه: الواتساب غير مقترن حالياً. <a href="/whatsapp" class="fw-bold">اربط الحساب من هنا</a>.</span>
+                            </div>
+                            {{ end }}
+                        </div>
+                    </div>
+
+                    <!-- Last Run Info -->
+                    <div class="p-3 rounded-3 border bg-light-subtle mb-4 small">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">آخر نسخة تم تنفيذها:</span>
+                            <span class="fw-bold text-dark">{{ if .Settings.LastBackupAt }}{{ .Settings.LastBackupAt.Format "2006-01-02 15:04" }}{{ else }}لم تنفذ بعد{{ end }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">حالة العملية الأخيرة:</span>
+                            {{ if eq .Settings.LastStatus "success" }}
+                            <span class="badge bg-success">ناجحة</span>
+                            {{ else if eq .Settings.LastStatus "failed" }}
+                            <span class="badge bg-danger">فشلت</span>
+                            {{ else }}
+                            <span class="badge bg-secondary">{{ .Settings.LastStatus }}</span>
+                            {{ end }}
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSaveSettings" class="btn btn-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-check2-circle fs-5"></i> حفظ الإعدادات
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backups Table Column -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 bg-success-subtle rounded-3 text-success">
+                        <i class="bi bi-folder-check fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">النسخ الاحتياطية المتوفرة</h6>
+                        <small class="text-muted">قائمة بالملفات المضغوطة المتاحة للتحميل أو الاستعادة</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" id="searchBackupsInput" class="form-control form-control-sm" placeholder="بحث بالاسم أو التاريخ..." style="max-width: 200px;">
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="backupsTable">
+                        <thead class="table-light text-muted small">
+                            <tr>
+                                <th class="ps-3">اسم الملف</th>
+                                <th>تاريخ ووقت الإنشاء</th>
+                                <th>الحجم</th>
+                                <th>إرسال واتساب</th>
+                                <th class="text-end pe-3">العمليات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="backupsTableBody">
+                            {{ if not .Backups }}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary opacity-50"></i>
+                                    <div class="fw-bold">لا توجد نسخ احتياطية محفوظة حتى الآن</div>
+                                    <small>اضغط على زر "إنشاء نسخة احتياطية الآن" بالأعلى لبدء أول نسخة.</small>
+                                </td>
+                            </tr>
+                            {{ else }}
+                            {{ range .Backups }}
+                            <tr id="backup-row-{{ .ID }}">
+                                <td class="ps-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-file-earmark-zip-fill text-warning fs-4"></i>
+                                        <div>
+                                            <span class="fw-bold text-dark font-monospace small d-block">{{ .Filename }}</span>
+                                            <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.7rem;">GZIP SQL</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="small text-dark d-block fw-bold">{{ .CreatedAtFormatted }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">{{ .SizeFormatted }}</span>
+                                </td>
+                                <td>
+                                    {{ if .WhatsAppSent }}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center gap-1">
+                                        <i class="bi bi-check-circle-fill"></i> تم الإرسال
+                                    </span>
+                                    {{ else }}
+                                    <button class="btn btn-sm btn-outline-success py-1 px-2 d-inline-flex align-items-center gap-1" onclick="sendViaWhatsAppNow({{ .ID }})" title="إرسال الآن للواتساب">
+                                        <i class="bi bi-whatsapp"></i> إرسال الآن
+                                    </button>
+                                    {{ end }}
+                                </td>
+                                <td class="text-end pe-3">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/backups/download?id={{ .ID }}" class="btn btn-outline-primary" title="تحميل النسخة على جهازك">
+                                            <i class="bi bi-download"></i> تحميل
+                                        </a>
+                                        <button type="button" class="btn btn-outline-warning" onclick="confirmRestore({{ .ID }}, '{{ .Filename }}')" title="استعادة هذه النسخة">
+                                            <i class="bi bi-arrow-counterclockwise"></i> استعادة
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" onclick="deleteBackup({{ .ID }}, '{{ .Filename }}')" title="حذف النسخة">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {{ end }}
+                            {{ end }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Upload & Restore Backup -->
+<div class="modal fade" id="uploadRestoreModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <i class="bi bi-upload text-primary"></i> رفع واستعادة نسخة احتياطية
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="uploadRestoreForm" enctype="multipart/form-data">
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning small d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                        <div><b>تحذير هام:</b> استعادة نسخة ستقوم باستبدال كافة جداول وبيانات النظام الحالية بما يحتويه ملف النسخة!</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">اختر ملف النسخة الاحتياطية (.sql أو .sql.gz):</label>
+                        <input type="file" name="backup_file" id="backup_file_input" class="form-control" accept=".sql,.gz" required>
+                    </div>
+
+                    <div id="uploadAlert" style="display: none;" class="alert alert-danger small"></div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" id="btnSubmitUploadRestore" class="btn btn-danger fw-bold">
+                        <i class="bi bi-arrow-counterclockwise"></i> تأكيد الاستعادة الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+// Toggle phone container on WhatsApp switch
+document.getElementById('waSwitch').addEventListener('change', function() {
+    const container = document.getElementById('waPhoneContainer');
+    container.style.display = this.checked ? 'block' : 'none';
+});
+
+// Save Settings AJAX
+document.getElementById('backupSettingsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveSettings');
+    const alertBox = document.getElementById('settingsAlertBox');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري الحفظ...';
+
+    const formData = new FormData(this);
+
+    fetch('/backups/settings', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams(formData).toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle fs-5"></i> حفظ الإعدادات';
+
+        if (data.status === 'success') {
+            alertBox.className = 'alert alert-success d-flex align-items-center gap-2 mb-3';
+            alertBox.innerHTML = '<i class="bi bi-check-circle-fill fs-5"></i><div>' + data.message + '</div>';
+            alertBox.style.display = 'flex';
+            if (window.showCopyToast) {
+                window.showCopyToast('تم حفظ إعدادات النسخ الاحتياطي بنجاح!');
+            }
+        } else {
+            alertBox.className = 'alert alert-danger d-flex align-items-center gap-2 mb-3';
+            alertBox.innerHTML = '<i class="bi bi-exclamation-triangle-fill fs-5"></i><div>' + (data.message || 'حدث خطأ') + '</div>';
+            alertBox.style.display = 'flex';
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle fs-5"></i> حفظ الإعدادات';
+        alertBox.className = 'alert alert-danger d-flex align-items-center gap-2 mb-3';
+        alertBox.innerHTML = '<i class="bi bi-exclamation-triangle-fill fs-5"></i><div>تعذر الحفظ: ' + err.message + '</div>';
+        alertBox.style.display = 'flex';
+    });
+});
+
+// Create Backup Now AJAX
+document.getElementById('btnCreateBackupNow').addEventListener('click', function() {
+    const btn = this;
+    if (!confirm('هل ترغب في إنشاء نسخة احتياطية كاملة الآن؟')) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري إنشاء النسخة الاحتياطية...';
+
+    fetch('/backups/create-now', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-database-fill-add"></i><span>إنشاء نسخة احتياطية الآن</span>';
+
+        if (data.status === 'success') {
+            alert('✅ ' + data.message + '\nاسم الملف: ' + data.filename + '\nالحجم: ' + data.size);
+            location.reload();
+        } else {
+            alert('❌ فشل إنشاء النسخة: ' + (data.message || 'خطأ غير معروف'));
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-database-fill-add"></i><span>إنشاء نسخة احتياطية الآن</span>';
+        alert('❌ خطأ في الاتصال: ' + err.message);
+    });
+});
+
+// Delete Backup AJAX
+function deleteBackup(id, filename) {
+    if (!confirm(`هل أنت متأكد من حذف النسخة الاحتياطية (${filename}) نهائياً؟`)) return;
+
+    fetch('/backups/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: 'id=' + encodeURIComponent(id)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const row = document.getElementById('backup-row-' + id);
+            if (row) row.remove();
+            if (window.showCopyToast) window.showCopyToast('تم حذف النسخة بنجاح');
+        } else {
+            alert('❌ فشل الحذف: ' + data.message);
+        }
+    })
+    .catch(err => alert('❌ خطأ: ' + err.message));
+}
+
+// Send WhatsApp Now AJAX
+function sendViaWhatsAppNow(id) {
+    let phone = prompt('أدخل رقم الواتساب المراد إرسال النسخة إليه (أو اتركه فارغاً لاستخدام الرقم المحفوظ):');
+    if (phone === null) return; // user cancelled
+
+    const params = new URLSearchParams();
+    params.append('id', id);
+    if (phone.trim()) params.append('phone', phone.trim());
+
+    if (window.showCopyToast) window.showCopyToast('جاري رفع وإرسال الملف عبر الواتساب...');
+
+    fetch('/backups/send-whatsapp', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: params.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ ' + data.message);
+            location.reload();
+        } else {
+            alert('❌ ' + data.message);
+        }
+    })
+    .catch(err => alert('❌ خطأ: ' + err.message));
+}
+
+// Confirm and Restore Backup
+function confirmRestore(id, filename) {
+    if (!confirm(`⚠️ تحذير شديد الأهمية!\n\nأنت على وشك استعادة النسخة الاحتياطية:\n(${filename})\n\nسيتم استبدال قاعدة بيانات النظام الحالية بالكامل بمحتوى هذه النسخة.\n\nهل أنت متأكد تماماً وتريد المتابعة؟`)) {
+        return;
+    }
+
+    if (window.showCopyToast) window.showCopyToast('جاري استعادة النسخة الاحتياطية، يرجى الانتظار...');
+
+    fetch('/backups/restore', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: 'id=' + encodeURIComponent(id)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('🎉 ' + data.message);
+            location.reload();
+        } else {
+            alert('❌ فشلت الاستعادة: ' + data.message);
+        }
+    })
+    .catch(err => alert('❌ خطأ أثناء الاستعادة: ' + err.message));
+}
+
+// Upload & Restore Form
+document.getElementById('uploadRestoreForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!confirm('⚠️ تحذير: استعادة الملف المرفوع ستقوم بالكتابة فوق قاعدة البيانات الحالية بالكامل!\n\nهل ترغب في المتابعة؟')) return;
+
+    const btn = document.getElementById('btnSubmitUploadRestore');
+    const alertBox = document.getElementById('uploadAlert');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري الرفع والاستعادة...';
+
+    const formData = new FormData(this);
+
+    fetch('/backups/restore', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> تأكيد الاستعادة الآن';
+
+        if (data.status === 'success') {
+            alert('🎉 ' + data.message);
+            location.reload();
+        } else {
+            alertBox.innerText = data.message || 'فشلت الاستعادة';
+            alertBox.style.display = 'block';
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> تأكيد الاستعادة الآن';
+        alertBox.innerText = 'خطأ في الاتصال: ' + err.message;
+        alertBox.style.display = 'block';
+    });
+});
+
+// Search filter in table
+document.getElementById('searchBackupsInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#backupsTableBody tr');
+    rows.forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+    });
+});
+</script>
+{{ end }}

@@ -699,5 +699,33 @@ type SubscriberLoginSummary struct {
 	AvgDurationDisplay   string `json:"avg_duration_display"`
 }
 
+// BackupSettings represents automatic backup configuration
+type BackupSettings struct {
+	ID             int        `json:"id"`
+	Enabled        bool       `json:"enabled"`
+	IntervalHours  int        `json:"interval_hours"`
+	RetentionCount int        `json:"retention_count"`
+	SendWhatsApp   bool       `json:"send_whatsapp"`
+	WhatsAppPhone  string     `json:"whatsapp_phone"`
+	LastBackupAt   *time.Time `json:"last_backup_at"`
+	LastStatus     string     `json:"last_status"`
+	LastError      string     `json:"last_error"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// BackupRecord represents an individual backup file record
+type BackupRecord struct {
+	ID                 int64      `json:"id"`
+	Filename           string     `json:"filename"`
+	FilePath           string     `json:"filepath"`
+	SizeBytes          int64      `json:"size_bytes"`
+	SizeFormatted      string     `json:"size_formatted"`
+	CreatedAt          time.Time  `json:"created_at"`
+	CreatedAtFormatted string     `json:"created_at_formatted"`
+	Status             string     `json:"status"`
+	WhatsAppSent       bool       `json:"whatsapp_sent"`
+	ErrorMessage       string     `json:"error_message"`
+}
+
 
 

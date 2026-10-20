@@ -417,9 +417,9 @@ else
     fi
 fi
 
-mkdir -p "$INSTALL_DIR/uploads" "$INSTALL_DIR/static" "$INSTALL_DIR/templates"
+mkdir -p "$INSTALL_DIR/uploads" "$INSTALL_DIR/static" "$INSTALL_DIR/templates" "$INSTALL_DIR/backups"
 chmod -R 755 "$INSTALL_DIR"
-chmod 777 "$INSTALL_DIR/uploads" 2>/dev/null || true
+chmod 777 "$INSTALL_DIR/uploads" "$INSTALL_DIR/backups" 2>/dev/null || true
 
 echo -e "${GREEN}[OK] Binary compiled successfully: $INSTALL_DIR/radius-platform${NC}"
 echo ""

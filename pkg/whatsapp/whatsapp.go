@@ -440,11 +440,25 @@ func SendWhatsAppDocument(phone string, fileBytes []byte, filename string, capti
 
 	jid := types.NewJID(cleanPhone, types.DefaultUserServer)
 	fileLen := uint64(len(fileBytes))
+
+	mimeType := "application/octet-stream"
+	lowerName := strings.ToLower(filename)
+	switch {
+	case strings.HasSuffix(lowerName, ".pdf"):
+		mimeType = "application/pdf"
+	case strings.HasSuffix(lowerName, ".zip"):
+		mimeType = "application/zip"
+	case strings.HasSuffix(lowerName, ".gz"), strings.HasSuffix(lowerName, ".tar.gz"):
+		mimeType = "application/gzip"
+	case strings.HasSuffix(lowerName, ".sql"):
+		mimeType = "application/sql"
+	}
+
 	docMsg := &waProto.DocumentMessage{
 		URL:           proto.String(uploaded.URL),
 		DirectPath:    proto.String(uploaded.DirectPath),
 		MediaKey:      uploaded.MediaKey,
-		Mimetype:      proto.String("application/pdf"),
+		Mimetype:      proto.String(mimeType),
 		FileEncSHA256: uploaded.FileEncSHA256,
 		FileSHA256:    uploaded.FileSHA256,
 		FileLength:    proto.Uint64(fileLen),

@@ -421,6 +421,33 @@ func (d *DB) InitSchema() error {
 			INDEX idx_res_tx_type (type),
 			INDEX idx_res_tx_date (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 20. Backup Settings (إعدادات النسخ الاحتياطي التلقائي)
+		`CREATE TABLE IF NOT EXISTS backup_settings (
+			id INT PRIMARY KEY DEFAULT 1,
+			enabled TINYINT(1) DEFAULT 1,
+			interval_hours INT DEFAULT 6,
+			retention_count INT DEFAULT 10,
+			send_whatsapp TINYINT(1) DEFAULT 0,
+			whatsapp_phone VARCHAR(50) DEFAULT '',
+			last_backup_at DATETIME NULL,
+			last_status VARCHAR(50) DEFAULT 'ready',
+			last_error TEXT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 21. Backups (سجل ملفات النسخ الاحتياطي)
+		`CREATE TABLE IF NOT EXISTS backups (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			filename VARCHAR(255) NOT NULL,
+			filepath VARCHAR(500) NOT NULL,
+			size_bytes BIGINT DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			status VARCHAR(50) DEFAULT 'success',
+			whatsapp_sent TINYINT(1) DEFAULT 0,
+			error_message TEXT NULL,
+			INDEX idx_backups_created (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -571,6 +598,10 @@ func (d *DB) InitSchema() error {
 	_, _ = d.Exec(`INSERT IGNORE INTO speed_control_config (id, mode, boost_type, boost_value, temp_hours, recurring_enabled, recurring_start_time, recurring_end_time, disconnect_users, is_currently_boosted)
 		VALUES (1, 'off', 'multiply', 2.00, 2, 0, '02:00', '08:00', 0, 0)`)
 	_ = d.SyncProfileBaseSpeeds()
+
+	// Seed default Backup Settings
+	_, _ = d.Exec(`INSERT IGNORE INTO backup_settings (id, enabled, interval_hours, retention_count, send_whatsapp, whatsapp_phone, last_status)
+		VALUES (1, 1, 6, 10, 0, '', 'ready')`)
 
 	// Seed default Admin if not present
 	var adminCount int
@@ -4819,6 +4850,109 @@ func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate s
 	}
 
 	return summary, nil
+}
+
+// -----------------------------------------------------------------------------
+// Backup System Helpers
+// -----------------------------------------------------------------------------
+
+func (d *DB) GetBackupSettings() (*models.BackupSettings, error) {
+	var s models.BackupSettings
+	var lastBackup sql.NullTime
+	err := d.QueryRow(`SELECT id, enabled, interval_hours, retention_count, send_whatsapp, whatsapp_phone, last_backup_at, last_status, COALESCE(last_error, ''), updated_at 
+		FROM backup_settings WHERE id = 1`).Scan(
+		&s.ID, &s.Enabled, &s.IntervalHours, &s.RetentionCount, &s.SendWhatsApp, &s.WhatsAppPhone, &lastBackup, &s.LastStatus, &s.LastError, &s.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			_, _ = d.Exec(`INSERT INTO backup_settings (id, enabled, interval_hours, retention_count, send_whatsapp, whatsapp_phone, last_status)
+				VALUES (1, 1, 6, 10, 0, '', 'ready')`)
+			return &models.BackupSettings{
+				ID:             1,
+				Enabled:        true,
+				IntervalHours:  6,
+				RetentionCount: 10,
+				SendWhatsApp:   false,
+				WhatsAppPhone:  "",
+				LastStatus:     "ready",
+			}, nil
+		}
+		return nil, err
+	}
+	if lastBackup.Valid {
+		s.LastBackupAt = &lastBackup.Time
+	}
+	return &s, nil
+}
+
+func (d *DB) UpdateBackupSettings(s *models.BackupSettings) error {
+	_, err := d.Exec(`UPDATE backup_settings SET 
+		enabled = ?, interval_hours = ?, retention_count = ?, send_whatsapp = ?, whatsapp_phone = ? 
+		WHERE id = 1`,
+		s.Enabled, s.IntervalHours, s.RetentionCount, s.SendWhatsApp, s.WhatsAppPhone)
+	return err
+}
+
+func (d *DB) UpdateBackupRunStatus(lastStatus string, lastError string) error {
+	now := time.Now()
+	_, err := d.Exec(`UPDATE backup_settings SET 
+		last_backup_at = ?, last_status = ?, last_error = ? 
+		WHERE id = 1`,
+		now, lastStatus, lastError)
+	return err
+}
+
+func (d *DB) ListBackups() ([]models.BackupRecord, error) {
+	rows, err := d.Query(`SELECT id, filename, filepath, size_bytes, created_at, status, whatsapp_sent, COALESCE(error_message, '') 
+		FROM backups ORDER BY created_at DESC, id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.BackupRecord
+	for rows.Next() {
+		var b models.BackupRecord
+		if err := rows.Scan(&b.ID, &b.Filename, &b.FilePath, &b.SizeBytes, &b.CreatedAt, &b.Status, &b.WhatsAppSent, &b.ErrorMessage); err != nil {
+			continue
+		}
+		b.SizeFormatted = FormatBytesHuman(b.SizeBytes)
+		b.CreatedAtFormatted = b.CreatedAt.Format("2006-01-02 15:04:05")
+		list = append(list, b)
+	}
+	return list, nil
+}
+
+func (d *DB) CreateBackupRecord(b *models.BackupRecord) (int64, error) {
+	res, err := d.Exec(`INSERT INTO backups (filename, filepath, size_bytes, created_at, status, whatsapp_sent, error_message)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		b.Filename, b.FilePath, b.SizeBytes, b.CreatedAt, b.Status, b.WhatsAppSent, b.ErrorMessage)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (d *DB) DeleteBackupRecord(id int64) error {
+	_, err := d.Exec(`DELETE FROM backups WHERE id = ?`, id)
+	return err
+}
+
+func (d *DB) GetBackupRecord(id int64) (*models.BackupRecord, error) {
+	var b models.BackupRecord
+	err := d.QueryRow(`SELECT id, filename, filepath, size_bytes, created_at, status, whatsapp_sent, COALESCE(error_message, '') 
+		FROM backups WHERE id = ?`, id).Scan(
+		&b.ID, &b.Filename, &b.FilePath, &b.SizeBytes, &b.CreatedAt, &b.Status, &b.WhatsAppSent, &b.ErrorMessage)
+	if err != nil {
+		return nil, err
+	}
+	b.SizeFormatted = FormatBytesHuman(b.SizeBytes)
+	b.CreatedAtFormatted = b.CreatedAt.Format("2006-01-02 15:04:05")
+	return &b, nil
+}
+
+func (d *DB) MarkBackupWhatsAppSent(id int64, sent bool) error {
+	_, err := d.Exec(`UPDATE backups SET whatsapp_sent = ? WHERE id = ?`, sent, id)
+	return err
 }
 
 

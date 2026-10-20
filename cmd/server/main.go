@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/auth"
+	backupsBP "github.com/haitham200711/Radius-Server-By-Haitham/blueprints/backups"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/card_templates"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/cards"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/dashboard"
@@ -28,6 +29,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	backupPkg "github.com/haitham200711/Radius-Server-By-Haitham/pkg/backup"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/cert"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
@@ -246,6 +248,17 @@ func main() {
 	mux.HandleFunc("/whatsapp/settings", middleware.RequireAuth(waBP.SaveSettingsHandler))
 	mux.HandleFunc("/whatsapp/templates/save", middleware.RequireAuth(waBP.SaveTemplateHandler))
 	mux.HandleFunc("/whatsapp/debt-reminders/run-now", middleware.RequireAuth(waBP.RunDebtRemindersHandler))
+
+	// Backups Blueprint (Admin Only)
+	bakBP := backupsBP.New(db, renderer, cfg)
+	backupPkg.StartBackupScheduler(db, cfg)
+	mux.HandleFunc("/backups", middleware.RequireAdmin(bakBP.IndexHandler))
+	mux.HandleFunc("/backups/settings", middleware.RequireAdmin(bakBP.SaveSettingsHandler))
+	mux.HandleFunc("/backups/create-now", middleware.RequireAdmin(bakBP.CreateNowHandler))
+	mux.HandleFunc("/backups/download", middleware.RequireAdmin(bakBP.DownloadHandler))
+	mux.HandleFunc("/backups/delete", middleware.RequireAdmin(bakBP.DeleteHandler))
+	mux.HandleFunc("/backups/send-whatsapp", middleware.RequireAdmin(bakBP.SendWhatsAppHandler))
+	mux.HandleFunc("/backups/restore", middleware.RequireAdmin(bakBP.RestoreHandler))
 
 	// Wrap mux with Session Authentication middleware
 	handler := middleware.AuthMiddleware(cfg.SessionSecret)(mux)
