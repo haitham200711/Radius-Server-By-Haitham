@@ -116,6 +116,7 @@ func parseGenerateOptions(r *http.Request) models.GenerateBatchOptions {
 
 	bindMAC := r.FormValue("bind_mac") == "1" || r.FormValue("bind_mac") == "on"
 	lockMAC := r.FormValue("lock_mac") == "1" || r.FormValue("lock_mac") == "on"
+	convertMACAfterSession := r.FormValue("convert_to_mac_after_session") == "1" || r.FormValue("convert_to_mac_after_session") == "on"
 
 	serviceName := strings.TrimSpace(r.FormValue("service_name"))
 	batchName := strings.TrimSpace(r.FormValue("batch_name"))
@@ -178,10 +179,11 @@ func parseGenerateOptions(r *http.Request) models.GenerateBatchOptions {
 		TimeLimitSeconds:     timeLimitSeconds,
 		TimeCalcMode:         timeCalcMode,
 		SimultaneousSessions: simultaneous,
-		StopOnQuota:          stopOnQuota,
-		BindMAC:              bindMAC,
-		LockMAC:              lockMAC,
-		ServiceName:          serviceName,
+		StopOnQuota:            stopOnQuota,
+		BindMAC:                 bindMAC,
+		LockMAC:                 lockMAC,
+		ConvertMACAfterSession:  convertMACAfterSession,
+		ServiceName:             serviceName,
 	}
 }
 

@@ -441,6 +441,7 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS service_name VARCHAR(100) DEFAULT '';`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS affix_type VARCHAR(10) DEFAULT 'prefix';`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS affix_value VARCHAR(50) DEFAULT '';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS convert_mac_after_session TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
@@ -451,8 +452,12 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS stop_on_quota TINYINT(1) DEFAULT 1;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS bind_mac TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS lock_mac TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS convert_mac_after_session TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS original_code VARCHAR(64) DEFAULT '';`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS is_mac_converted TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS service_name VARCHAR(100) DEFAULT '';`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS calling_mac VARCHAR(32) DEFAULT '';`,
+		`UPDATE cards SET original_code = username WHERE original_code = '' OR original_code IS NULL;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -809,11 +814,11 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 	res, err := tx.Exec(`INSERT INTO batches (
 		batch_code, batch_name, profile_id, reseller_id, count, cost_price_per_card, price_per_card,
 		total_cost_price, total_price, card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode,
-		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, service_name, affix_type, affix_value, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, convert_mac_after_session, service_name, affix_type, affix_value, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 		batchCode, opts.BatchName, opts.ProfileID, opts.ResellerID, opts.Count, opts.CostPricePerCard, opts.PricePerCard,
 		totalCostPrice, totalPrice, opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode,
-		opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName, opts.AffixType, opts.AffixValue)
+		opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ConvertMACAfterSession, opts.ServiceName, opts.AffixType, opts.AffixValue)
 	if err != nil {
 		return "", 0, err
 	}
@@ -823,8 +828,8 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 	stmtCard, err := tx.Prepare(`INSERT INTO cards (
 		batch_id, username, password, profile_id, reseller_id, status, cost_price, price,
 		card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode,
-		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, service_name, created_at
-	) VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
+		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, convert_mac_after_session, original_code, is_mac_converted, service_name, created_at
+	) VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
 	if err != nil {
 		return "", 0, err
 	}
@@ -870,7 +875,7 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 
 		if _, err := stmtCard.Exec(batchID, u, p, opts.ProfileID, opts.ResellerID, opts.CostPricePerCard, opts.PricePerCard,
 			opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode,
-			opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName); err == nil {
+			opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ConvertMACAfterSession, u, 0, opts.ServiceName); err == nil {
 
 			// radcheck: Cleartext-Password
 			_, _ = stmtRadCheck.Exec(u, "Cleartext-Password", ":=", p)
@@ -2863,7 +2868,7 @@ func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 
 	_ = d.QueryRow(`SELECT COUNT(DISTINCT r.username)
 		FROM radacct r
-		JOIN cards c ON r.username = c.username
+		JOIN cards c ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
 		WHERE c.batch_id = ? AND r.acctstoptime IS NULL`, b.ID).Scan(&b.OnlineCount)
 
 	return &b, nil
@@ -2937,23 +2942,28 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 
 	query := `SELECT c.id, c.username, c.password, c.price, c.status, c.first_login_at, c.expired_at,
 		c.batch_id, COALESCE(b.batch_code, ''), COALESCE(c.nas_id, 0), COALESCE(n.shortname, 'عام / غير مقيد'),
-		p.name, p.display_name, p.rate_limit, p.quota_bytes
+		p.name, p.display_name, p.rate_limit, p.quota_bytes,
+		COALESCE(c.original_code, ''), c.is_mac_converted, COALESCE(c.calling_mac, '')
 		FROM cards c
 		LEFT JOIN batches b ON c.batch_id = b.id
 		LEFT JOIN nas n ON c.nas_id = n.id
 		LEFT JOIN profiles p ON c.profile_id = p.id
-		WHERE c.username = ? LIMIT 1`
+		WHERE c.username = ? OR (c.original_code != '' AND c.original_code = ?) LIMIT 1`
 
-	row := d.QueryRow(query, code)
+	row := d.QueryRow(query, code, code)
 	err := row.Scan(&c.ID, &c.Username, &c.Password, &c.Price, &c.Status, &c.FirstLoginAt, &c.ExpiredAt,
 		&batchID, &batchCode, &nasID, &nasName,
-		&profileName, &profileDisp, &rateLimit, &quotaBytes)
+		&profileName, &profileDisp, &rateLimit, &quotaBytes,
+		&c.OriginalCode, &c.IsMACConverted, &c.CallingMAC)
 	if err != nil {
 		return nil, fmt.Errorf("الكارت '%s' غير مسجل في النظام", code)
 	}
 
 	tracker := &models.CafeCardTracker{
 		CardCode:       c.Username,
+		OriginalCode:   c.OriginalCode,
+		IsMACConverted: c.IsMACConverted,
+		CallingMAC:     c.CallingMAC,
 		Password:       c.Password,
 		BatchID:        batchID,
 		BatchCode:      batchCode,
@@ -2979,7 +2989,8 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 
 	_ = d.QueryRow(`SELECT SUM(acctinputoctets), SUM(acctoutputoctets), SUM(acctsessiontime),
 		MIN(acctstarttime), MAX(callingstationid), MAX(framedipaddress)
-		FROM radacct WHERE username = ?`, code).Scan(&sumIn, &sumOut, &sumTime, &minStart, &lastMAC, &lastIP)
+		FROM radacct 
+		WHERE username = ? OR (username != '' AND username = ?)`, c.Username, c.OriginalCode).Scan(&sumIn, &sumOut, &sumTime, &minStart, &lastMAC, &lastIP)
 
 	if sumIn.Valid {
 		tracker.BytesIn = sumIn.Int64
@@ -3102,7 +3113,7 @@ func (d *DB) DisconnectCard(code string) (bool, error) {
 // and cards table: tracking first logins, binding & locking to client MAC address, and auto-disabling expired cards.
 func (d *DB) StartCardSyncDaemon() {
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -3112,10 +3123,71 @@ func (d *DB) StartCardSyncDaemon() {
 }
 
 func (d *DB) syncActiveCards() {
-	// 1. MAC Binding & Locking: For cards with bind_mac=1 or lock_mac=1 that have not captured calling_mac yet
+	// 1. MAC Conversion After First Session (التحويل لماك أدرس بعد انتهاء أول جلسة عند تسجيل الخروج):
+	// For cards with convert_mac_after_session=1 and is_mac_converted=0,
+	// when the customer finished at least one session in radacct (acctstoptime IS NOT NULL)
+	// and currently has NO active session running (acctstoptime IS NULL).
+	rowsConvert, err := d.Query(`SELECT c.id, c.username,
+		(SELECT r.callingstationid 
+		 FROM radacct r 
+		 WHERE (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
+		   AND r.callingstationid != '' AND r.acctstoptime IS NOT NULL
+		 ORDER BY r.radacctid DESC LIMIT 1) AS last_mac
+		FROM cards c
+		WHERE c.convert_mac_after_session = 1 
+		  AND c.is_mac_converted = 0
+		  AND EXISTS (
+		      SELECT 1 FROM radacct r1 
+		      WHERE (r1.username = c.username OR (c.original_code != '' AND r1.username = c.original_code))
+		        AND r1.acctstoptime IS NOT NULL
+		  )
+		  AND NOT EXISTS (
+		      SELECT 1 FROM radacct r2 
+		      WHERE (r2.username = c.username OR (c.original_code != '' AND r2.username = c.original_code))
+		        AND r2.acctstoptime IS NULL
+		  )`)
+	if err == nil {
+		type convertEntry struct {
+			cardID   int64
+			username string
+			mac      string
+		}
+		var toConvert []convertEntry
+		for rowsConvert.Next() {
+			var ce convertEntry
+			var sqlMac sql.NullString
+			if err := rowsConvert.Scan(&ce.cardID, &ce.username, &sqlMac); err == nil && sqlMac.Valid && sqlMac.String != "" {
+				ce.mac = strings.TrimSpace(sqlMac.String)
+				toConvert = append(toConvert, ce)
+			}
+		}
+		rowsConvert.Close()
+
+		for _, item := range toConvert {
+			mac := item.mac
+			oldUser := item.username
+
+			// Update cards table: set username to mac, update password and calling_mac, mark converted
+			_, _ = d.Exec(`UPDATE cards SET username = ?, password = ?, calling_mac = ?, is_mac_converted = 1 WHERE id = ?`, mac, mac, mac, item.cardID)
+
+			// Recreate FreeRADIUS radcheck authentication for the MAC
+			_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", oldUser)
+			_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", mac)
+			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", mac, mac)
+			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", mac, mac)
+			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Accept')", mac)
+
+			// Migrate radreply and radusergroup to the MAC username
+			_, _ = d.Exec("UPDATE radreply SET username = ? WHERE username = ?", mac, oldUser)
+			_, _ = d.Exec("DELETE FROM radusergroup WHERE username = ?", mac)
+			_, _ = d.Exec("UPDATE radusergroup SET username = ? WHERE username = ?", mac, oldUser)
+		}
+	}
+
+	// 2. MAC Binding & Locking: For cards with bind_mac=1 or lock_mac=1 that have not captured calling_mac yet
 	rowsMAC, err := d.Query(`SELECT c.id, c.username, c.lock_mac, r.callingstationid
 		FROM cards c
-		JOIN radacct r ON c.username = r.username
+		JOIN radacct r ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
 		WHERE (c.bind_mac = 1 OR c.lock_mac = 1) AND (c.calling_mac = '' OR c.calling_mac IS NULL)
 		  AND r.callingstationid != ''
 		GROUP BY c.id, c.username, c.lock_mac, r.callingstationid`)
@@ -3145,10 +3217,10 @@ func (d *DB) syncActiveCards() {
 		}
 	}
 
-	// 2. First Login Tracking for Calendar/First-Login time calculation mode
+	// 3. First Login Tracking for Calendar/First-Login time calculation mode
 	rowsLogin, err := d.Query(`SELECT c.id, c.username, c.time_limit_seconds, c.time_calc_mode, MIN(r.acctstarttime)
 		FROM cards c
-		JOIN radacct r ON c.username = r.username
+		JOIN radacct r ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
 		WHERE c.first_login_at IS NULL
 		GROUP BY c.id, c.username, c.time_limit_seconds, c.time_calc_mode`)
 	if err == nil {
@@ -3182,7 +3254,7 @@ func (d *DB) syncActiveCards() {
 		}
 	}
 
-	// 3. Auto-Expiry Enforcement for Quota & Time Limits
+	// 4. Auto-Expiry Enforcement for Quota & Time Limits
 	// Check calendar-expired cards
 	rowsExp, err := d.Query(`SELECT c.id, c.username FROM cards c
 		WHERE c.status = 'available' AND c.expired_at IS NOT NULL AND c.expired_at < CURRENT_TIMESTAMP`)
@@ -3210,7 +3282,7 @@ func (d *DB) syncActiveCards() {
 	// Check quota-exhausted cards
 	rowsQuota, err := d.Query(`SELECT c.id, c.username, c.quota_bytes, COALESCE(SUM(r.acctinputoctets + r.acctoutputoctets), 0)
 		FROM cards c
-		JOIN radacct r ON c.username = r.username
+		JOIN radacct r ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
 		WHERE c.status = 'available' AND c.stop_on_quota = 1 AND c.quota_bytes > 0
 		GROUP BY c.id, c.username, c.quota_bytes
 		HAVING SUM(r.acctinputoctets + r.acctoutputoctets) >= c.quota_bytes`)

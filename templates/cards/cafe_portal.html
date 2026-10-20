@@ -240,6 +240,11 @@
                     <h4 class="mb-0 fw-bold text-dark font-monospace">
                         <i class="bi bi-ticket-detailed text-primary me-1"></i> {{ .TrackedCard.CardCode }}
                     </h4>
+                    {{ if .TrackedCard.IsMACConverted }}
+                    <span class="badge bg-info text-white rounded-pill px-2 py-1 small">
+                        <i class="bi bi-cpu me-1"></i> تحول لماك أدرس (الأصل: {{ .TrackedCard.OriginalCode }})
+                    </span>
+                    {{ end }}
                     <span class="badge {{ .TrackedCard.StatusBadgeClass }} px-3 py-2 rounded-pill fs-6">
                         {{ if .TrackedCard.IsOnline }}
                         <span class="pulse-dot-green me-1"></span>
@@ -640,6 +645,15 @@
                             <label class="form-check-label small fw-bold text-dark cursor-pointer" for="modal_bind_mac">
                                 التحويل لوضع الماك أدرس عند أول اتصال (Bind to MAC)
                             </label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="convert_to_mac_after_session" id="modal_convert_mac_session" value="1" checked>
+                            <label class="form-check-label small fw-bold text-dark cursor-pointer" for="modal_convert_mac_session">
+                                التحويل لماك أدرس بعد أول جلسة (عند تسجيل الخروج)
+                            </label>
+                            <div class="form-text small text-muted" style="font-size: 0.78rem;">
+                                يسجل العميل دخوله برقم الكارت ويظل عليه طوال جلسته الأولى، وفور انتهاء الجلسة أو خروجه يتحول الحساب تلقائياً إلى عنوان الماك (MAC).
+                            </div>
                         </div>
                         <div class="form-check form-switch mb-0">
                             <input class="form-check-input" type="checkbox" name="lock_mac" id="modal_lock_mac" value="1">
