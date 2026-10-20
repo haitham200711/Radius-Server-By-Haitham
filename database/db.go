@@ -1582,10 +1582,85 @@ func (d *DB) GetSSTPClients() ([]models.SSTPClient, error) {
 	return list, nil
 }
 
+// GetNextSequentialSSTPIP calculates the next available static IP in sequence for SSTP clients.
+func (d *DB) GetNextSequentialSSTPIP() string {
+	settings, err := d.GetSSTPSettings()
+	gw := "10.171.171.1"
+	if err == nil && strings.TrimSpace(settings.GatewayIP) != "" {
+		gw = strings.TrimSpace(settings.GatewayIP)
+	}
+
+	parts := strings.Split(gw, ".")
+	if len(parts) != 4 {
+		return "10.171.171.2"
+	}
+	prefix := fmt.Sprintf("%s.%s.%s.", parts[0], parts[1], parts[2])
+	gwOctet, _ := strconv.Atoi(parts[3])
+
+	// Collect all currently assigned IPs
+	used := make(map[string]bool)
+	used[gw] = true // Gateway itself is occupied
+
+	rows, qErr := d.Query("SELECT assigned_ip FROM sstp_clients WHERE assigned_ip != '' AND assigned_ip IS NOT NULL")
+	if qErr == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var ip sql.NullString
+			if err := rows.Scan(&ip); err == nil && ip.Valid && ip.String != "" {
+				used[strings.TrimSpace(ip.String)] = true
+			}
+		}
+	}
+
+	// Search sequentially from 2 up to 254 (skipping the gateway)
+	for i := 2; i <= 254; i++ {
+		if i == gwOctet {
+			continue
+		}
+		candidate := fmt.Sprintf("%s%d", prefix, i)
+		if !used[candidate] {
+			return candidate
+		}
+	}
+
+	return fmt.Sprintf("%s250", prefix)
+}
+
+func (d *DB) EnsureAllSSTPClientsHaveSequentialIP() {
+	rows, err := d.Query("SELECT id, username, assigned_ip FROM sstp_clients ORDER BY id ASC")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	var toUpdate []int64
+	for rows.Next() {
+		var id int64
+		var u, ip sql.NullString
+		if err := rows.Scan(&id, &u, &ip); err == nil {
+			if !ip.Valid || strings.TrimSpace(ip.String) == "" {
+				toUpdate = append(toUpdate, id)
+			}
+		}
+	}
+
+	if len(toUpdate) > 0 {
+		for _, id := range toUpdate {
+			nextIP := d.GetNextSequentialSSTPIP()
+			_, _ = d.Exec("UPDATE sstp_clients SET assigned_ip = ? WHERE id = ?", nextIP, id)
+		}
+		_ = d.SyncSSTPFiles()
+	}
+}
+
 func (d *DB) SaveSSTPClient(c *models.SSTPClient) error {
 	en := 0
 	if c.Enabled {
 		en = 1
+	}
+	c.AssignedIP = strings.TrimSpace(c.AssignedIP)
+	if c.AssignedIP == "" {
+		c.AssignedIP = d.GetNextSequentialSSTPIP()
 	}
 	if c.ID == 0 {
 		_, err := d.Exec(`INSERT INTO sstp_clients (name, username, password, assigned_ip, notes, enabled)
@@ -1606,6 +1681,10 @@ func (d *DB) UpdateSSTPClient(id int64, name, assignedIP, notes string, enabled 
 	en := 0
 	if enabled {
 		en = 1
+	}
+	assignedIP = strings.TrimSpace(assignedIP)
+	if assignedIP == "" {
+		assignedIP = d.GetNextSequentialSSTPIP()
 	}
 	_, err := d.Exec(`UPDATE sstp_clients SET name = ?, assigned_ip = ?, notes = ?, enabled = ? WHERE id = ?`,
 		name, assignedIP, notes, en, id)

@@ -171,6 +171,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	// Suggested random client credentials
 	randUser := fmt.Sprintf("mk-%s", randomAlpha(6))
 	randPass := randomAlpha(8)
+	nextIP := bp.db.GetNextSequentialSSTPIP()
 
 	_ = bp.renderer.Render(w, "sstp/index", map[string]interface{}{
 		"Title":          "إدارة سيرفر SSTP VPN للمايكروتك",
@@ -184,6 +185,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"ServerHost":     serverHost,
 		"RandUser":       randUser,
 		"RandPass":       randPass,
+		"NextIP":         nextIP,
 		"Message":        r.URL.Query().Get("msg"),
 		"Error":          r.URL.Query().Get("err"),
 	})
@@ -232,6 +234,9 @@ func (bp *Blueprint) AddClientHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := strings.TrimSpace(r.FormValue("password"))
 	assignedIP := strings.TrimSpace(r.FormValue("assigned_ip"))
+	if assignedIP == "" {
+		assignedIP = bp.db.GetNextSequentialSSTPIP()
+	}
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
 	if name == "" {
@@ -242,6 +247,9 @@ func (bp *Blueprint) AddClientHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if password == "" {
 		password = randomAlpha(8)
+	}
+	if assignedIP == "" {
+		assignedIP = bp.db.GetNextSequentialSSTPIP()
 	}
 
 	client := &models.SSTPClient{
@@ -290,6 +298,9 @@ func (bp *Blueprint) EditClientHandler(w http.ResponseWriter, r *http.Request) {
 		name = "راوتر مايكروتك"
 	}
 	assignedIP := strings.TrimSpace(r.FormValue("assigned_ip"))
+	if assignedIP == "" {
+		assignedIP = bp.db.GetNextSequentialSSTPIP()
+	}
 	notes := strings.TrimSpace(r.FormValue("notes"))
 	enabled := r.FormValue("enabled") == "1" || r.FormValue("enabled") == "on"
 

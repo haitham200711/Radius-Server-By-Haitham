@@ -44,6 +44,7 @@ func main() {
 	}
 	defer db.Close()
 	log.Println("[INIT] Database connected and schema synchronized successfully.")
+	db.EnsureAllSSTPClientsHaveSequentialIP()
 
 	// 2. Initialize HTML/CSS Renderer
 	renderer, err := web.NewRenderer(".")

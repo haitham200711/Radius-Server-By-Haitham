@@ -105,8 +105,9 @@
                     <td>
                         {{ if .AssignedIP }}
                         <code class="text-primary fw-bold">{{ .AssignedIP }}</code>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1" style="font-size: 0.68rem;">ثابت Static</span>
                         {{ else }}
-                        <span class="text-muted">تلقائي من Pool</span>
+                        <span class="badge bg-warning-subtle text-warning-emphasis border" style="font-size: 0.68rem;">تلقائي Dynamic</span>
                         {{ end }}
                     </td>
                     <td>
@@ -315,9 +316,14 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold small">آي بي الـ VPN الثابت (اختياري):</label>
-                        <input type="text" name="assigned_ip" class="form-control form-control-sm font-monospace" placeholder="مثال: 10.10.10.25 (اتركه فارغاً للتلقائي)">
-                        <small class="text-muted" style="font-size: 0.75rem;">الآي بي الذي سيحصل عليه المايكروتك داخل نفق الـ VPN.</small>
+                        <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                            <span>آي بي الـ VPN الثابت (Static IP): <span class="text-danger">*</span></span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                <i class="bi bi-shield-check me-1"></i>متتالي تلقائي
+                            </span>
+                        </label>
+                        <input type="text" name="assigned_ip" class="form-control form-control-sm font-monospace fw-bold text-primary" value="{{ .NextIP }}" placeholder="مثال: 10.171.171.2" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">تم تخصيص هذا الآي بي تلقائياً وبشكل متتالي ومقفل لهذا الراوتر لضمان ثباته داخل نفق الـ VPN.</small>
                     </div>
 
                     <div class="mb-2">
@@ -374,8 +380,9 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold small">آي بي الـ VPN المخصص (Assigned IP):</label>
-                        <input type="text" name="assigned_ip" id="editClientAssignedIP" class="form-control form-control-sm font-monospace" placeholder="اتركه فارغاً للتلقائي من الـ Pool">
+                        <label class="form-label fw-bold small">آي بي الـ VPN الثابت (Static IP):</label>
+                        <input type="text" name="assigned_ip" id="editClientAssignedIP" class="form-control form-control-sm font-monospace fw-bold text-primary" placeholder="اتركه فارغاً للتوليد المتتالي التلقائي">
+                        <small class="text-muted" style="font-size: 0.75rem;">آي بي ثابت ومحجوز لهذا الراوتر حصراً داخل نفق الـ VPN.</small>
                     </div>
 
                     <div class="mb-3">
