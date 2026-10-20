@@ -413,6 +413,18 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_pool VARCHAR(64) DEFAULT '';`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS is_default TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS background_color VARCHAR(30) DEFAULT '#0d6efd';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS header_title VARCHAR(150) DEFAULT 'كارت إنترنت';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS footer_text VARCHAR(255) DEFAULT 'نتمنى لكم وقتاً ممتعاً';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS theme_color VARCHAR(30) DEFAULT '#0d6efd';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS html_content MEDIUMTEXT;`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS css_content TEXT;`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS bg_image TEXT;`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS card_width VARCHAR(20) DEFAULT '240px';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS card_height VARCHAR(20) DEFAULT '140px';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS cols INT DEFAULT 3;`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS ` + "`rows`" + ` INT DEFAULT 7;`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS card_gap VARCHAR(20) DEFAULT '2mm';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS overlay_config LONGTEXT;`,
 		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_enabled TINYINT(1) DEFAULT 1;`,
 		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_days INT DEFAULT 3;`,
 		`ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS debt_reminder_min_debt DECIMAL(10,2) DEFAULT 1.00;`,
@@ -555,11 +567,66 @@ func (d *DB) InitSchema() error {
 
 	// Seed default Card Template
 	var tmplCount int
-	_ = d.QueryRow("SELECT COUNT(*) FROM card_templates").Scan(&tmplCount)
+	_ = d.QueryRow("SELECT COUNT(*) FROM card_templates WHERE html_content IS NOT NULL AND html_content != ''").Scan(&tmplCount)
 	if tmplCount == 0 {
-		_, _ = d.Exec(`INSERT INTO card_templates (name, background_color, width_mm, height_mm, show_qr, show_barcode, show_price, show_profile, show_expiry, is_default)
-			VALUES ('القالب الافتراضي الأزرق', '#0d6efd', 85.60, 54.00, 1, 0, 1, 1, 1, 1),
-			       ('قالب الكروت المدمجة', '#198754', 70.00, 45.00, 1, 1, 1, 1, 1, 0);`)
+		defaultHtml := `<div class="card-voucher voucher-modern" style="border: 2px dashed #0d6efd; border-radius: 10px; padding: 12px; background: #fff; text-align: center; position: relative;">
+    <div style="font-weight: 700; font-size: 0.95rem; color: #1e3c72; border-bottom: 1px solid #e9ecef; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <span><i class="bi bi-wifi text-primary"></i> {{.HeaderTitle}}</span>
+        <span class="badge bg-light text-secondary border font-monospace">{{.Profile}}</span>
+    </div>
+    <div style="font-size: 0.8rem; color: #6c757d; margin-bottom: 2px;">كود تسجيل الدخول:</div>
+    <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: #212529; background: #f8f9fa; padding: 6px; border-radius: 6px; margin: 6px 0; font-family: monospace; border: 1px solid #dee2e6;">{{.Code}}</div>
+    <div style="font-size: 0.75rem; color: #6c757d; display: flex; justify-content: space-between; margin-top: 6px;">
+        <span>الفرع: {{.RouterName}}</span>
+        <span class="font-monospace text-primary">#{{.BatchID}}</span>
+    </div>
+    <div style="font-size: 0.7rem; color: #adb5bd; margin-top: 4px;">{{.FooterText}}</div>
+</div>`
+
+		luxuryHtml := `<div class="card-voucher voucher-luxury" style="border: 2px solid #d4af37; border-radius: 12px; padding: 12px; background: linear-gradient(135deg, #1c1c1c 0%, #2c2518 100%); color: #fff; text-align: center; position: relative;">
+    <div style="font-weight: 700; font-size: 0.95rem; color: #ffd700; border-bottom: 1px solid #4a3e20; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <span>☕ {{.HeaderTitle}}</span>
+        <span style="background: #d4af37; color: #000; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem;">{{.Profile}}</span>
+    </div>
+    <div style="font-size: 0.8rem; color: #cccccc; margin-bottom: 2px;">رمز الدخول السريع:</div>
+    <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: #ffd700; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 6px; margin: 6px 0; font-family: monospace; border: 1px solid #d4af37;">{{.Code}}</div>
+    <div style="font-size: 0.75rem; color: #aaa; display: flex; justify-content: space-between; margin-top: 6px;">
+        <span>{{.RouterName}}</span>
+        <span style="color: #ffd700;">#{{.BatchID}}</span>
+    </div>
+    <div style="font-size: 0.7rem; color: #888; margin-top: 4px;">{{.FooterText}}</div>
+</div>`
+
+		thermalHtml := `<div class="card-voucher voucher-thermal" style="border: 1px dashed #000; border-radius: 4px; padding: 10px; background: #fff; color: #000; text-align: center; font-family: monospace;">
+    <div style="font-weight: 900; font-size: 1rem; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
+        *** {{.HeaderTitle}} ***
+    </div>
+    <div style="font-size: 0.85rem; margin: 3px 0;">السرعة: <strong>{{.Profile}}</strong></div>
+    <div style="font-size: 1.35rem; font-weight: 900; letter-spacing: 3px; border: 2px solid #000; padding: 6px; margin: 6px 0; background: #fafafa;">{{.Code}}</div>
+    <div style="font-size: 0.75rem; border-top: 1px dashed #000; padding-top: 4px; margin-top: 6px;">
+        فرع: {{.RouterName}} | دفعة #{{.BatchID}}
+    </div>
+    <div style="font-size: 0.7rem; margin-top: 2px;">{{.FooterText}}</div>
+</div>`
+
+		miniHtml := `<div class="card-voucher voucher-mini" style="border: 1px solid #198754; border-radius: 8px; padding: 8px; background: #f0fff4; text-align: center;">
+    <div style="font-weight: 700; font-size: 0.85rem; color: #198754; display: flex; justify-content: space-between;">
+        <span>📶 {{.HeaderTitle}}</span>
+        <span style="background: #198754; color: #fff; border-radius: 4px; padding: 1px 4px; font-size: 0.7rem;">{{.Profile}}</span>
+    </div>
+    <div style="font-size: 1.15rem; font-weight: 800; letter-spacing: 1.5px; color: #145a32; background: #fff; padding: 4px; border-radius: 4px; margin: 4px 0; font-family: monospace; border: 1px solid #a3e4d7;">{{.Code}}</div>
+    <div style="font-size: 0.7rem; color: #555; display: flex; justify-content: space-between;">
+        <span>{{.RouterName}}</span>
+        <span class="text-success fw-bold">#{{.BatchID}}</span>
+    </div>
+</div>`
+
+		_, _ = d.Exec(`INSERT INTO card_templates (name, is_default, header_title, footer_text, theme_color, html_content, card_width, card_height, cols, ` + "`rows`" + `, card_gap) VALUES
+			('القالب الأزرق الحديث (افتراضي)', 1, 'كارت إنترنت', 'أهلاً بكم - نتمنى لكم وقتاً ممتعاً', '#0d6efd', ?, '240px', '140px', 3, 7, '2mm'),
+			('قالب كافيه فخم (ذهبي داكن)', 0, 'VIP Wi-Fi Voucher', 'Welcome to our cafe - Enjoy high speed internet', '#d4af37', ?, '240px', '140px', 3, 7, '2mm'),
+			('قالب رول كاشير (حراري POS)', 0, 'إيصال شبكة واي فاي', 'يرجى الاحتفاظ بالكود لحين انتهاء الجلسة', '#212529', ?, '240px', '140px', 3, 7, '2mm'),
+			('قالب ميني اقتصادي (أخضر خفيف)', 0, 'كارت إنترنت سريع', 'شكراً لزيارتكم', '#198754', ?, '240px', '140px', 3, 7, '2mm')
+			ON DUPLICATE KEY UPDATE html_content = VALUES(html_content)`, defaultHtml, luxuryHtml, thermalHtml, miniHtml)
 	}
 
 	// Seed default SSTP Settings
@@ -1280,8 +1347,20 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 // --- Card Template Methods ---
 
 func (d *DB) GetCardTemplates() ([]models.CardTemplate, error) {
-	rows, err := d.Query(`SELECT id, name, background_image, background_color, width_mm, height_mm,
-		show_qr, show_barcode, show_price, show_profile, show_expiry, is_default, created_at
+	rows, err := d.Query(`SELECT id, name, is_default, 
+		COALESCE(header_title, 'كارت إنترنت'), 
+		COALESCE(footer_text, 'نتمنى لكم وقتاً ممتعاً'), 
+		COALESCE(theme_color, '#0d6efd'), 
+		COALESCE(html_content, ''), 
+		COALESCE(css_content, ''), 
+		COALESCE(bg_image, ''), 
+		COALESCE(card_width, '240px'), 
+		COALESCE(card_height, '140px'), 
+		COALESCE(cols, 3), 
+		COALESCE(` + "`rows`" + `, 7), 
+		COALESCE(card_gap, '2mm'), 
+		COALESCE(overlay_config, ''), 
+		created_at
 		FROM card_templates ORDER BY is_default DESC, id ASC`)
 	if err != nil {
 		return nil, err
@@ -1291,18 +1370,15 @@ func (d *DB) GetCardTemplates() ([]models.CardTemplate, error) {
 	var list []models.CardTemplate
 	for rows.Next() {
 		var t models.CardTemplate
-		var qr, bar, pri, prof, exp, isDef int
+		var isDef int
 		err := rows.Scan(
-			&t.ID, &t.Name, &t.BackgroundImage, &t.BackgroundColor, &t.WidthMM, &t.HeightMM,
-			&qr, &bar, &pri, &prof, &exp, &isDef, &t.CreatedAt,
+			&t.ID, &t.Name, &isDef, &t.HeaderTitle, &t.FooterText, &t.ThemeColor,
+			&t.HTMLContent, &t.CSSContent, &t.BgImage, &t.CardWidth, &t.CardHeight,
+			&t.Cols, &t.Rows, &t.CardGap, &t.OverlayConfig, &t.CreatedAt,
 		)
 		if err == nil {
-			t.ShowQR = (qr == 1)
-			t.ShowBarcode = (bar == 1)
-			t.ShowPrice = (pri == 1)
-			t.ShowProfile = (prof == 1)
-			t.ShowExpiry = (exp == 1)
 			t.IsDefault = (isDef == 1)
+			t.CreatedAtStr = t.CreatedAt.Format("2006-01-02 15:04")
 			list = append(list, t)
 		}
 	}
@@ -1311,22 +1387,31 @@ func (d *DB) GetCardTemplates() ([]models.CardTemplate, error) {
 
 func (d *DB) GetCardTemplate(id int64) (*models.CardTemplate, error) {
 	var t models.CardTemplate
-	var qr, bar, pri, prof, exp, isDef int
-	err := d.QueryRow(`SELECT id, name, background_image, background_color, width_mm, height_mm,
-		show_qr, show_barcode, show_price, show_profile, show_expiry, is_default, created_at
+	var isDef int
+	err := d.QueryRow(`SELECT id, name, is_default, 
+		COALESCE(header_title, 'كارت إنترنت'), 
+		COALESCE(footer_text, 'نتمنى لكم وقتاً ممتعاً'), 
+		COALESCE(theme_color, '#0d6efd'), 
+		COALESCE(html_content, ''), 
+		COALESCE(css_content, ''), 
+		COALESCE(bg_image, ''), 
+		COALESCE(card_width, '240px'), 
+		COALESCE(card_height, '140px'), 
+		COALESCE(cols, 3), 
+		COALESCE(` + "`rows`" + `, 7), 
+		COALESCE(card_gap, '2mm'), 
+		COALESCE(overlay_config, ''), 
+		created_at
 		FROM card_templates WHERE id = ?`, id).Scan(
-		&t.ID, &t.Name, &t.BackgroundImage, &t.BackgroundColor, &t.WidthMM, &t.HeightMM,
-		&qr, &bar, &pri, &prof, &exp, &isDef, &t.CreatedAt,
+		&t.ID, &t.Name, &isDef, &t.HeaderTitle, &t.FooterText, &t.ThemeColor,
+		&t.HTMLContent, &t.CSSContent, &t.BgImage, &t.CardWidth, &t.CardHeight,
+		&t.Cols, &t.Rows, &t.CardGap, &t.OverlayConfig, &t.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
-	t.ShowQR = (qr == 1)
-	t.ShowBarcode = (bar == 1)
-	t.ShowPrice = (pri == 1)
-	t.ShowProfile = (prof == 1)
-	t.ShowExpiry = (exp == 1)
 	t.IsDefault = (isDef == 1)
+	t.CreatedAtStr = t.CreatedAt.Format("2006-01-02 15:04")
 	return &t, nil
 }
 
@@ -1343,43 +1428,50 @@ func (d *DB) SaveCardTemplate(t *models.CardTemplate) error {
 		_, _ = tx.Exec("UPDATE card_templates SET is_default = 0")
 	}
 
-	qr := 0
-	if t.ShowQR {
-		qr = 1
+	if t.Cols <= 0 {
+		t.Cols = 3
 	}
-	bar := 0
-	if t.ShowBarcode {
-		bar = 1
+	if t.Rows <= 0 {
+		t.Rows = 7
 	}
-	pri := 0
-	if t.ShowPrice {
-		pri = 1
+	if t.CardGap == "" {
+		t.CardGap = "2mm"
 	}
-	prof := 0
-	if t.ShowProfile {
-		prof = 1
+	if t.CardWidth == "" {
+		t.CardWidth = "240px"
 	}
-	exp := 0
-	if t.ShowExpiry {
-		exp = 1
+	if t.CardHeight == "" {
+		t.CardHeight = "140px"
+	}
+	if t.ThemeColor == "" {
+		t.ThemeColor = "#0d6efd"
+	}
+	if t.HeaderTitle == "" {
+		t.HeaderTitle = "كارت إنترنت"
 	}
 
 	if t.ID == 0 {
-		_, err = tx.Exec(`INSERT INTO card_templates (name, background_image, background_color, width_mm, height_mm,
-			show_qr, show_barcode, show_price, show_profile, show_expiry, is_default)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			t.Name, t.BackgroundImage, t.BackgroundColor, t.WidthMM, t.HeightMM,
-			qr, bar, pri, prof, exp, isDef)
+		res, err := tx.Exec(`INSERT INTO card_templates (
+			name, is_default, header_title, footer_text, theme_color,
+			html_content, css_content, bg_image, card_width, card_height,
+			cols, ` + "`rows`" + `, card_gap, overlay_config, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+			t.Name, isDef, t.HeaderTitle, t.FooterText, t.ThemeColor,
+			t.HTMLContent, t.CSSContent, t.BgImage, t.CardWidth, t.CardHeight,
+			t.Cols, t.Rows, t.CardGap, t.OverlayConfig)
 		if err != nil {
 			return err
 		}
+		t.ID, _ = res.LastInsertId()
 	} else {
 		_, err = tx.Exec(`UPDATE card_templates SET
-			name = ?, background_image = ?, background_color = ?, width_mm = ?, height_mm = ?,
-			show_qr = ?, show_barcode = ?, show_price = ?, show_profile = ?, show_expiry = ?, is_default = ?
+			name = ?, is_default = ?, header_title = ?, footer_text = ?, theme_color = ?,
+			html_content = ?, css_content = ?, bg_image = ?, card_width = ?, card_height = ?,
+			cols = ?, ` + "`rows`" + ` = ?, card_gap = ?, overlay_config = ?
 			WHERE id = ?`,
-			t.Name, t.BackgroundImage, t.BackgroundColor, t.WidthMM, t.HeightMM,
-			qr, bar, pri, prof, exp, isDef, t.ID)
+			t.Name, isDef, t.HeaderTitle, t.FooterText, t.ThemeColor,
+			t.HTMLContent, t.CSSContent, t.BgImage, t.CardWidth, t.CardHeight,
+			t.Cols, t.Rows, t.CardGap, t.OverlayConfig, t.ID)
 		if err != nil {
 			return err
 		}
@@ -1387,9 +1479,40 @@ func (d *DB) SaveCardTemplate(t *models.CardTemplate) error {
 	return tx.Commit()
 }
 
+func (d *DB) SetDefaultCardTemplate(id int64) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, _ = tx.Exec("UPDATE card_templates SET is_default = 0")
+	_, err = tx.Exec("UPDATE card_templates SET is_default = 1 WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (d *DB) DeleteCardTemplate(id int64) error {
+	var total int
+	_ = d.QueryRow("SELECT COUNT(*) FROM card_templates").Scan(&total)
+	if total <= 1 {
+		return fmt.Errorf("لا يمكن حذف القالب الوحيد المتبقي في النظام")
+	}
+
+	var isDef int
+	_ = d.QueryRow("SELECT is_default FROM card_templates WHERE id = ?", id).Scan(&isDef)
+
 	_, err := d.Exec("DELETE FROM card_templates WHERE id = ?", id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if isDef == 1 {
+		_, _ = d.Exec("UPDATE card_templates SET is_default = 1 WHERE id = (SELECT id FROM (SELECT id FROM card_templates LIMIT 1) as t)")
+	}
+	return nil
 }
 
 // --- SSTP Server Methods ---

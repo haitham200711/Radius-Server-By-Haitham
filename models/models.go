@@ -255,19 +255,34 @@ type Card struct {
 
 // CardTemplate represents card print design templates
 type CardTemplate struct {
-	ID              int64     `json:"id"`
-	Name            string    `json:"name"`
-	BackgroundImage string    `json:"background_image"`
-	BackgroundColor string    `json:"background_color"`
-	WidthMM         float64   `json:"width_mm"`
-	HeightMM        float64   `json:"height_mm"`
-	ShowQR          bool      `json:"show_qr"`
-	ShowBarcode     bool      `json:"show_barcode"`
-	ShowPrice       bool      `json:"show_price"`
-	ShowProfile     bool      `json:"show_profile"`
-	ShowExpiry      bool      `json:"show_expiry"`
-	IsDefault       bool      `json:"is_default"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	IsDefault     bool      `json:"is_default"`
+	HeaderTitle   string    `json:"header_title"`
+	FooterText    string    `json:"footer_text"`
+	ThemeColor    string    `json:"theme_color"`
+	HTMLContent   string    `json:"html_content"`
+	CSSContent    string    `json:"css_content"`
+	BgImage       string    `json:"bg_image"`
+	CardWidth     string    `json:"card_width"`
+	CardHeight    string    `json:"card_height"`
+	Cols          int       `json:"cols"`
+	Rows          int       `json:"rows"`
+	CardGap       string    `json:"card_gap"`
+	OverlayConfig string    `json:"overlay_config"`
+	CreatedAt     time.Time `json:"created_at"`
+	CreatedAtStr  string    `json:"created_at_str"`
+
+	// Legacy fields for backward compatibility
+	BackgroundImage string  `json:"background_image,omitempty"`
+	BackgroundColor string  `json:"background_color,omitempty"`
+	WidthMM         float64 `json:"width_mm,omitempty"`
+	HeightMM        float64 `json:"height_mm,omitempty"`
+	ShowQR          bool    `json:"show_qr,omitempty"`
+	ShowBarcode     bool    `json:"show_barcode,omitempty"`
+	ShowPrice       bool    `json:"show_price,omitempty"`
+	ShowProfile     bool    `json:"show_profile,omitempty"`
+	ShowExpiry      bool    `json:"show_expiry,omitempty"`
 }
 
 // SSTPSettings represents the Accel-PPP SSTP VPN Server configuration

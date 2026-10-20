@@ -59,6 +59,8 @@ func main() {
 
 	// Static assets
 	mux.Handle("/static/", http.StripPrefix("/static/", web.StaticHandler("./static")))
+	_ = os.MkdirAll("./uploads", 0755)
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
 	// Root redirect
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +108,17 @@ func main() {
 	mux.HandleFunc("/card-templates", middleware.RequireAuth(tmplBP.ListHandler))
 	mux.HandleFunc("/card-templates/add", middleware.RequireAuth(tmplBP.AddHandler))
 	mux.HandleFunc("/card-templates/edit", middleware.RequireAuth(tmplBP.EditHandler))
+	mux.HandleFunc("/card-templates/update", middleware.RequireAuth(tmplBP.UpdateHandler))
 	mux.HandleFunc("/card-templates/delete", middleware.RequireAuth(tmplBP.DeleteHandler))
+	mux.HandleFunc("/card-templates/set-default", middleware.RequireAuth(tmplBP.SetDefaultHandler))
+	mux.HandleFunc("/card-templates/set_default", middleware.RequireAuth(tmplBP.SetDefaultHandler))
+
+	// Aliases for /templates
+	mux.HandleFunc("/templates", middleware.RequireAuth(tmplBP.ListHandler))
+	mux.HandleFunc("/templates/add", middleware.RequireAuth(tmplBP.AddHandler))
+	mux.HandleFunc("/templates/update", middleware.RequireAuth(tmplBP.UpdateHandler))
+	mux.HandleFunc("/templates/delete", middleware.RequireAuth(tmplBP.DeleteHandler))
+	mux.HandleFunc("/templates/set_default", middleware.RequireAuth(tmplBP.SetDefaultHandler))
 
 	// Profiles Blueprint
 	profBP := profiles.New(db, renderer)

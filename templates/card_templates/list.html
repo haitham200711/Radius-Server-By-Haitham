@@ -1,169 +1,726 @@
-{{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
+{{define "title"}}قوالب كروت الهوتسبوت{{end}}
+
+{{define "content"}}
+<style>
+    .draggable-overlay-item {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        cursor: grab;
+        white-space: nowrap;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        padding: 2px 6px;
+        border: 1.5px dashed rgba(13, 110, 253, 0.4);
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 4px;
+        transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+    }
+    .draggable-overlay-item:hover {
+        border-color: #0d6efd;
+        background-color: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 0 8px rgba(13, 110, 253, 0.5);
+    }
+    .draggable-overlay-item.is-dragging {
+        cursor: grabbing !important;
+        border-color: #ffc107 !important;
+        border-style: solid !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+        z-index: 100 !important;
+    }
+    .print-page-sheet {
+        width: 202mm;
+        min-height: 289mm;
+        margin: 0 auto;
+        background: #fff;
+        padding: 4mm;
+        box-sizing: border-box;
+        border-radius: 4px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+        display: grid;
+        transition: all 0.2s ease;
+    }
+    .print-page-sheet.landscape-sheet {
+        width: 289mm !important;
+        min-height: 202mm !important;
+        max-width: 289mm !important;
+    }
+    .card-item-container {
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+    }
+    .card-item-container .card-voucher {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        margin: 0;
+    }
+    .voucher-image-bg {
+        background-color: #f8f9fa;
+        border: 1px dashed rgba(0, 0, 0, 0.2);
+    }
+    #a4SheetPreviewModal {
+        z-index: 1070 !important;
+    }
+    @media print {
+        @page {
+            size: A4 portrait;
+            margin: 4mm !important;
+        }
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+        .app-header, .app-sidebar, .page-header-banner, header, #sidebarMenu, .no-print, .modal-header, .modal-footer, .alert, .btn, .modal-backdrop {
+            display: none !important;
+        }
+        body, html {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body.print-landscape, html.print-landscape {
+            width: 297mm !important;
+            height: 210mm !important;
+        }
+        body.print-landscape #modalA4Sheet {
+            width: 289mm !important;
+            height: 198mm !important;
+            max-height: 198mm !important;
+        }
+        .modal {
+            position: static !important;
+            overflow: visible !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .modal-dialog {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .modal-content {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .modal-body {
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+        }
+        #modalA4Sheet {
+            width: 202mm !important;
+            height: 284mm !important;
+            max-height: 284mm !important;
+            margin: 0 auto !important;
+            padding: 2mm !important;
+            box-shadow: none !important;
+            border: none !important;
+            display: grid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .card-item-container {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: flex !important;
+            align-items: stretch !important;
+            justify-content: stretch !important;
+            overflow: hidden !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+        }
+        .card-voucher {
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-shadow: none !important;
+            aspect-ratio: unset !important;
+            min-height: 0 !important;
+            position: relative !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .voucher-image-bg {
+            position: relative !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .voucher-bg-img {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: fill !important;
+            z-index: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
+</style>
+<style id="dynamicA4PrintStyle"></style>
+
+<!-- تنبيهات الرسائل -->
+{{if .Message}}
+<div class="alert alert-success alert-dismissible fade show d-flex align-items-center shadow-sm border-0 mb-4" role="alert">
+    <i class="bi bi-check-circle-fill fs-4 me-2 text-success"></i>
     <div>
-        <h3 class="fw-bold mb-1">أشكال وتصاميم كروت الواي فاي (Card Templates)</h3>
-        <p class="text-muted small mb-0">تخصيص أبعاد الكروت، الألوان، الباركود، والـ QR Code للطباعة</p>
+        <strong class="d-block">تم بنجاح!</strong>
+        <span>{{.Message}}</span>
     </div>
-    <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
-        <i class="bi bi-plus-circle me-1"></i> إضافة تصميم كارت جديد
-    </button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
+{{end}}
 
-<div class="row g-4">
-    {{ range .Templates }}
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body p-4 text-center">
-                <!-- Visual Card Mockup -->
-                <div class="rounded p-3 mb-3 d-flex flex-column justify-content-between text-white shadow-sm" 
-                     style="height: 155px; background: linear-gradient(135deg, {{ if .BackgroundColor }}{{ .BackgroundColor }}{{ else }}#0d6efd{{ end }}, #212529); position: relative; overflow: hidden;">
-                    
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small class="fw-bold"><i class="bi bi-wifi me-1"></i>كارت شبكة بريميوم</small>
-                        {{ if .ShowPrice }}
-                        <span class="badge bg-light text-dark fw-bold">10.00 ج.م</span>
-                        {{ end }}
-                    </div>
+{{if .Error}}
+<div class="alert alert-danger alert-dismissible fade show d-flex align-items-center shadow-sm border-0 mb-4" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-4 me-2 text-danger"></i>
+    <div>
+        <strong class="d-block">خطأ:</strong>
+        <span>{{.Error}}</span>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{{end}}
 
-                    <div class="my-auto">
-                        <div class="fs-5 fw-bold font-monospace bg-dark bg-opacity-50 rounded py-1 px-2 d-inline-block">
-                            USER: CARD-8849
-                        </div>
-                        <div class="small font-monospace opacity-75 mt-1">PASS: 928312</div>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-end" style="font-size: 0.75rem; opacity: 0.9;">
-                        <div>
-                            {{ if .ShowProfile }}<span class="me-2"><i class="bi bi-speedometer2"></i> 10 Mega</span>{{ end }}
-                            {{ if .ShowExpiry }}<span><i class="bi bi-clock"></i> 30 يوم</span>{{ end }}
-                        </div>
-                        <div class="d-flex gap-1">
-                            {{ if .ShowQR }}<i class="bi bi-qr-code fs-6"></i>{{ end }}
-                            {{ if .ShowBarcode }}<i class="bi bi-upc-scan fs-6"></i>{{ end }}
-                        </div>
-                    </div>
+<!-- كروت الإحصائيات السريعة للقوالب -->
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6 col-sm-6">
+        <div class="card bg-white shadow-sm border-0 border-start border-primary border-4 h-100">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1 small fw-bold">إجمالي القوالب المتاحة</h6>
+                    <h3 class="mb-0 fw-bold text-dark">{{len .Templates}} <small class="fs-6 text-muted">قالب</small></h3>
                 </div>
-
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="fw-bold mb-0 text-dark">{{ .Name }}</h5>
-                    {{ if .IsDefault }}
-                    <span class="badge bg-success"><i class="bi bi-check2-circle me-1"></i>الافتراضي للطباعة</span>
-                    {{ end }}
-                </div>
-
-                <p class="text-muted small mb-3">
-                    الأبعاد: <strong>{{ printf "%.1f" .WidthMM }} × {{ printf "%.1f" .HeightMM }} مم</strong>
-                </p>
-
-                <div class="d-flex flex-wrap justify-content-center gap-1 mb-3">
-                    {{ if .ShowQR }}<span class="badge bg-light text-dark border">QR Code</span>{{ end }}
-                    {{ if .ShowBarcode }}<span class="badge bg-light text-dark border">Barcode</span>{{ end }}
-                    {{ if .ShowPrice }}<span class="badge bg-light text-dark border">السعر</span>{{ end }}
-                    {{ if .ShowProfile }}<span class="badge bg-light text-dark border">الباقة</span>{{ end }}
-                    {{ if .ShowExpiry }}<span class="badge bg-light text-dark border">الانتهاء</span>{{ end }}
-                </div>
-
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-primary flex-grow-1 btn-edit-template"
-                        data-id="{{ .ID }}"
-                        data-name="{{ .Name }}"
-                        data-bgcolor="{{ .BackgroundColor }}"
-                        data-width="{{ .WidthMM }}"
-                        data-height="{{ .HeightMM }}"
-                        data-qr="{{ .ShowQR }}"
-                        data-barcode="{{ .ShowBarcode }}"
-                        data-price="{{ .ShowPrice }}"
-                        data-profile="{{ .ShowProfile }}"
-                        data-expiry="{{ .ShowExpiry }}"
-                        data-default="{{ .IsDefault }}">
-                        <i class="bi bi-pencil-square me-1"></i> تعديل التصميم
-                    </button>
-                    <a href="/card-templates/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا التصميم؟');">
-                        <i class="bi bi-trash"></i>
-                    </a>
+                <div class="rounded-circle p-3 bg-light text-primary">
+                    <i class="bi bi-palette-fill fs-3"></i>
                 </div>
             </div>
         </div>
     </div>
-    {{ else }}
-    <div class="col-12 text-center py-5 text-muted">
-        <i class="bi bi-credit-card-2-front fs-1 d-block mb-2"></i>
-        لا توجد تصاميم كروت مضافة حتى الآن
+    <div class="col-xl-3 col-md-6 col-sm-6">
+        <div class="card bg-white shadow-sm border-0 border-start border-success border-4 h-100">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1 small fw-bold">القالب الافتراضي المعتمد</h6>
+                    <h4 class="mb-0 fw-bold text-success text-truncate" style="max-width: 170px;">
+                        {{$hasDef := false}}
+                        {{range .Templates}}
+                            {{if .IsDefault}}{{$hasDef = true}}{{.Name}}{{end}}
+                        {{end}}
+                        {{if not $hasDef}}الافتراضي المدمج{{end}}
+                    </h4>
+                </div>
+                <div class="rounded-circle p-3 bg-light text-success">
+                    <i class="bi bi-star-fill fs-3"></i>
+                </div>
+            </div>
+        </div>
     </div>
-    {{ end }}
+    <div class="col-xl-3 col-md-6 col-sm-6">
+        <div class="card bg-white shadow-sm border-0 border-start border-info border-4 h-100">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1 small fw-bold">مقاس ورقة الطباعة</h6>
+                    <h4 class="mb-0 fw-bold text-dark">A4 القياسي</h4>
+                </div>
+                <div class="rounded-circle p-3 bg-light text-info">
+                    <i class="bi bi-file-earmark-pdf-fill fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 col-sm-6">
+        <div class="card bg-white shadow-sm border-0 border-start border-warning border-4 h-100">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1 small fw-bold">المحرر المرئي</h6>
+                    <h4 class="mb-0 fw-bold text-dark">سحب وإفلات حر</h4>
+                </div>
+                <div class="rounded-circle p-3 bg-light text-warning">
+                    <i class="bi bi-magic fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Modal Add Template -->
-<div class="modal fade" id="addTemplateModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title fw-bold text-primary">
-                    <i class="bi bi-plus-circle me-1"></i> إضافة تصميم كارت جديد
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="/card-templates/add">
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">اسم التصميم: <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: كروت مقاس قياسي أزرق" required>
-                    </div>
+<!-- شريط الأدوات العلوي -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <p class="text-muted mb-0 small">إدارة وتخصيص تصاميم كروت الهوتسبوت للطباعة على ورق A4، مع إمكانية رفع خلفيات جاهزة أو تحرير الكود برمجياً.</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary shadow-sm rounded-3 px-3 py-2 fw-bold" data-bs-toggle="modal" data-bs-target="#templateModal" onclick="openAddModal()">
+            <i class="bi bi-plus-circle me-1"></i> إضافة قالب كروت جديد
+        </button>
+    </div>
+</div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">لون خلفية الكارت الرئيسية:</label>
-                        <div class="input-group">
-                            <input type="color" name="background_color" class="form-control form-control-color" value="#0d6efd" title="اختر اللون">
-                            <input type="text" class="form-control font-monospace" value="#0d6efd" placeholder="#0d6efd" readonly>
+<!-- معرض قوالب الكروت بتصميم أفقي متناسق وأنيق -->
+<div class="d-flex flex-column gap-3 mb-4">
+    {{range .Templates}}
+    <div class="card bg-white shadow-sm border-0 rounded-4 overflow-hidden {{if .IsDefault}}border-start border-4 border-primary{{end}}">
+        <div class="card-body p-3 p-lg-4">
+            <div class="row align-items-center g-3">
+                <!-- مساحة المعاينة المصغرة للكارت -->
+                <div class="col-lg-3 col-md-4 col-12">
+                    <div class="p-2 rounded-3 border d-flex align-items-center justify-content-center mx-auto" style="min-height: 140px; max-width: 260px; background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                        <div class="w-100 shadow-sm rounded-2 overflow-hidden d-flex align-items-center justify-content-center" id="preview-box-{{.ID}}" style="max-width: 240px; transform: scale(0.92); transform-origin: center;">
+                            <!-- يتم رسم محتوى الكارت المباشر بواسطة جافاسكريبت renderTemplateContent -->
                         </div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold">العرض (مم):</label>
-                            <input type="number" step="0.5" name="width_mm" class="form-control" value="85.60" required>
-                            <small class="text-muted">القياسي: 85.6 مم</small>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold">الارتفاع (مم):</label>
-                            <input type="number" step="0.5" name="height_mm" class="form-control" value="54.00" required>
-                            <small class="text-muted">القياسي: 54.0 مم</small>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold d-block">عناصر الكارت المطبوعة:</label>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_qr" id="add_show_qr" value="1" checked>
-                            <label class="form-check-label" for="add_show_qr">QR Code تسجيل الدخول</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_barcode" id="add_show_barcode" value="1">
-                            <label class="form-check-label" for="add_show_barcode">Barcode</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_price" id="add_show_price" value="1" checked>
-                            <label class="form-check-label" for="add_show_price">السعر</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_profile" id="add_show_profile" value="1" checked>
-                            <label class="form-check-label" for="add_show_profile">اسم الباقة</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_expiry" id="add_show_expiry" value="1" checked>
-                            <label class="form-check-label" for="add_show_expiry">مدة الصلاحية</label>
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mt-3 pt-2 border-top">
-                        <input class="form-check-input" type="checkbox" name="is_default" id="add_is_default" value="1">
-                        <label class="form-check-label fw-bold" for="add_is_default">تعيين هذا التصميم كقالب افتراضي لطباعة الكروت</label>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">
-                        <i class="bi bi-check-circle me-1"></i> حفظ القالب
+
+                <!-- تفاصيل ومواصفات القالب -->
+                <div class="col-lg-6 col-md-5 col-12">
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        <span class="rounded-circle d-inline-block shadow-sm flex-shrink-0" style="width: 14px; height: 14px; background-color: {{.ThemeColor}};" title="لون القالب"></span>
+                        <h5 class="mb-0 fw-bold text-dark">{{.Name}}</h5>
+                        {{if .IsDefault}}
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 py-1 px-2.5 rounded-pill">
+                            <i class="bi bi-star-fill text-warning me-1"></i> القالب الافتراضي المعتمد
+                        </span>
+                        {{end}}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 my-2">
+                        <span class="badge bg-light text-dark border px-2.5 py-1.5 font-monospace">
+                            <i class="bi bi-grid-3x3 text-primary me-1"></i> مقاس A4: {{.Cols}} بالعرض × {{.Rows}} بالطول
+                        </span>
+                        <span class="badge bg-light text-dark border px-2.5 py-1.5 font-monospace">
+                            <i class="bi bi-arrows-angle-expand text-info me-1"></i> الفاصل: {{.CardGap}}
+                        </span>
+                        <span class="badge bg-light text-muted border px-2.5 py-1.5">
+                            <i class="bi bi-calendar3 me-1"></i> أُضيف: {{.CreatedAt}}
+                        </span>
+                    </div>
+
+                    <div class="small text-muted mt-2 d-flex flex-wrap gap-3">
+                        <span><i class="bi bi-fonts me-1 text-secondary"></i> الترويسة: <strong>{{if .HeaderTitle}}{{.HeaderTitle}}{{else}}كارت إنترنت{{end}}</strong></span>
+                        <span><i class="bi bi-chat-left-quote me-1 text-secondary"></i> التذييل: <strong>{{if .FooterText}}{{.FooterText}}{{else}}نتمنى لكم وقتاً ممتعاً{{end}}</strong></span>
+                    </div>
+                </div>
+
+                <!-- أزرار الإجراءات والتحكم -->
+                <div class="col-lg-3 col-md-3 col-12 d-flex flex-column gap-2 justify-content-center align-items-stretch">
+                    <button type="button" class="btn btn-sm btn-outline-info fw-bold rounded-3 py-2" onclick="openA4FullPreviewFromCard({{.ID}})" title="معاينة ورقة A4 كاملة بكروت عشوائية">
+                        <i class="bi bi-file-earmark-ruled me-1"></i> معاينة ورقة A4
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold rounded-3 py-2 shadow-sm" onclick="openEditModal({{.ID}})" title="تعديل تصميم ومقاسات القالب">
+                        <i class="bi bi-pencil-square me-1"></i> تعديل القالب
+                    </button>
+                    <div class="d-flex gap-2">
+                        {{if not .IsDefault}}
+                        <form action="/templates/set_default" method="POST" class="flex-grow-1 m-0">
+                            <input type="hidden" name="id" value="{{.ID}}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary w-100 rounded-3 fw-semibold py-1.5" title="تعيين هذا القالب كافتراضي للنظام">
+                                <i class="bi bi-star me-1 text-warning"></i> تعيين كافتراضي
+                            </button>
+                        </form>
+                        <form action="/templates/delete" method="POST" class="d-inline m-0" onsubmit="return confirm('هل أنت متأكد من حذف هذا القالب؟');">
+                            <input type="hidden" name="id" value="{{.ID}}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 py-1.5 px-3" title="حذف هذا القالب">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{end}}
+    {{if not .Templates}}
+    <div class="card bg-white shadow-sm border-0 rounded-4 text-center py-5">
+        <div class="card-body">
+            <i class="bi bi-palette fs-1 d-block mb-3 text-secondary"></i>
+            <h5 class="fw-bold text-dark">لا توجد قوالب مضافة حتى الآن</h5>
+            <p class="text-muted small mb-3">يمكنك البدء بإضافة أول قالب كروت هوتسبوت بالنقر على الزر أعلاه.</p>
+            <button type="button" class="btn btn-primary rounded-3 px-3 py-2 fw-bold" data-bs-toggle="modal" data-bs-target="#templateModal" onclick="openAddModal()">
+                <i class="bi bi-plus-circle me-1"></i> إضافة قالب كروت جديد
+            </button>
+        </div>
+    </div>
+    {{end}}
+</div>
+
+<!-- نافذة مودال: إضافة / تعديل قالب الكروت -->
+<div class="modal fade" id="templateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="modalTitle">
+                    <i class="bi bi-layout-text-window-reverse me-2"></i> إضافة قالب كروت جديد
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="templateForm" method="POST" action="/templates/add" enctype="multipart/form-data" onsubmit="prepareFormSubmission()">
+                <input type="hidden" name="id" id="tmplId" value="">
+                <input type="hidden" name="overlay_config" id="tmplOverlayConfig" value="">
+                <input type="hidden" name="bg_image_existing" id="tmplBgImageExisting" value="">
+                <input type="hidden" name="active_mode" id="tmplActiveMode" value="image">
+
+                <div class="modal-body p-4">
+                    <!-- الحقول الأساسية -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold">اسم القالب <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" id="tmplName" required placeholder="مثال: كارت كافيه مخصص">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">لون السمة</label>
+                            <input type="color" class="form-control form-control-color w-100" name="theme_color" id="tmplThemeColor" value="#0d6efd" title="اختر اللون">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="is_default" id="tmplIsDefault">
+                                <label class="form-check-label fw-bold" for="tmplIsDefault">قالب افتراضي</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- إعدادات تخطيط وتوزيع الكروت على صفحة A4 (بالطول والعرض) -->
+                    <div class="card border-primary border-opacity-25 bg-light mb-3 shadow-none">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-primary mb-0">
+                                    <i class="bi bi-file-earmark-text-fill me-1"></i> تخطيط وتوزيع الكروت لورقة الطباعة (A4):
+                                </h6>
+                                <span class="badge bg-primary">A4 Portrait (210×297mm)</span>
+                            </div>
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold mb-1"><i class="bi bi-layout-three-columns text-success me-1"></i> الكروت بعرض الصفحة (الأعمدة):</label>
+                                    <select class="form-select form-select-sm fw-bold border-success" name="cols" id="tmplCols" onchange="updateA4CalcBadge()">
+                                        <option value="1">1 كارت بالعرض</option>
+                                        <option value="2">2 كارت بالعرض</option>
+                                        <option value="3" selected>3 كروت بالعرض (A4 قياسي)</option>
+                                        <option value="4">4 كروت بالعرض</option>
+                                        <option value="5">5 كروت بالعرض</option>
+                                        <option value="6">6 كروت بالعرض</option>
+                                        <option value="7">7 كروت بالعرض</option>
+                                        <option value="8">8 كروت بالعرض</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold mb-1"><i class="bi bi-distribute-vertical text-danger me-1"></i> الكروت بطول الصفحة (الصفوف):</label>
+                                    <select class="form-select form-select-sm fw-bold border-danger" name="rows" id="tmplRows" onchange="updateA4CalcBadge()">
+                                        <option value="1">1 كارت بالطول</option>
+                                        <option value="2">2 كروت بالطول</option>
+                                        <option value="3">3 كروت بالطول</option>
+                                        <option value="4">4 كروت بالطول</option>
+                                        <option value="5">5 كروت بالطول</option>
+                                        <option value="6">6 كروت بالطول</option>
+                                        <option value="7" selected>7 كروت بالطول (A4 قياسي)</option>
+                                        <option value="8">8 كروت بالطول</option>
+                                        <option value="9">9 كروت بالطول</option>
+                                        <option value="10">10 كروت بالطول</option>
+                                        <option value="11">11 كارت بالطول</option>
+                                        <option value="12">12 كارت بالطول</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold mb-1"><i class="bi bi-arrows-angle-expand text-info me-1"></i> الفراغ بين الكروت (Card Gap):</label>
+                                    <select class="form-select form-select-sm" name="card_gap" id="tmplCardGap">
+                                        <option value="0mm">0mm (ملاصقة للقص السريع)</option>
+                                        <option value="1.5mm">1.5mm (فاصل دقيق)</option>
+                                        <option value="2mm" selected>2mm (قياسي متناسق)</option>
+                                        <option value="3mm">3mm (مناسب)</option>
+                                        <option value="5mm">5mm (تباعد واسع)</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <div class="alert alert-info py-2 px-3 mb-0 small d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-info-circle-fill me-1 text-primary"></i> ستحتوي كل صفحة A4 مطبوعة على: <strong id="tmplA4CalcSummary" class="text-dark font-monospace">21 كارت (3 بالعرض × 7 بالطول)</strong></span>
+                                        <span class="text-muted" style="font-size:11px;">يتم التطبيق تلقائياً عند اختيار هذا القالب لطباعة أي باتش</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- تبويبات اختيار نوع التصميم -->
+                    <ul class="nav nav-pills nav-fill mb-3 bg-light p-1 rounded-3 border" id="designModeTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-bold" id="tab-image-btn" data-bs-toggle="pill" data-bs-target="#tab-image-pane" type="button" role="tab" onclick="setMode('image')">
+                                <i class="bi bi-image-fill me-1 text-primary"></i> 1) رفع صورة كارت مخصصة (خلفية)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold" id="tab-html-btn" data-bs-toggle="pill" data-bs-target="#tab-html-pane" type="button" role="tab" onclick="setMode('html')">
+                                <i class="bi bi-code-slash me-1 text-warning"></i> 2) محرر كود HTML وقوالب جاهزة
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content border rounded-3 p-3 bg-white" id="designModeContent">
+                        <!-- تبويب 1: تصميم بصورة كارت جاهزة -->
+                        <div class="tab-pane fade show active" id="tab-image-pane" role="tabpanel">
+                            <div class="row g-3">
+                                <!-- إعدادات الصورة والمواضع -->
+                                <div class="col-lg-6">
+                                    <div class="p-3 bg-light rounded-3 border">
+                                        <h6 class="fw-bold text-primary mb-3">
+                                            <i class="bi bi-cloud-arrow-up-fill me-1"></i> اختر صورة الكارت من جهازك:
+                                        </h6>
+                                        <div class="mb-3">
+                                            <input type="file" class="form-control" name="bg_image_file" id="bgImageFile" accept="image/png, image/jpeg, image/webp" onchange="handleImageFileSelected(event)">
+                                            <div class="form-text small">يدعم صور PNG أو JPG أو WebP. اختر تصميم الكارت بدون نصوص الدخول.</div>
+                                        </div>
+
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-6">
+                                                <label class="form-label small fw-bold mb-1">عرض الكارت (Width):</label>
+                                                <input type="text" class="form-control form-control-sm" name="card_width" id="tmplCardWidth" value="260px" placeholder="مثال: 260px أو 85mm" oninput="updateImageLiveOverlay()">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small fw-bold mb-1">ارتفاع الكارت (Height):</label>
+                                                <input type="text" class="form-control form-control-sm" name="card_height" id="tmplCardHeight" value="150px" placeholder="مثال: 150px أو 54mm" oninput="updateImageLiveOverlay()">
+                                            </div>
+                                        </div>
+
+                                        <hr class="my-2">
+                                        <h6 class="fw-bold text-dark mb-2 small"><i class="bi bi-arrows-move me-1"></i> تحريك مواضع النصوص فوق الصورة:</h6>
+
+                                        <!-- كود الدخول -->
+                                        <div class="mb-2 p-2 bg-white rounded border">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="fw-bold small text-primary"><i class="bi bi-key-fill me-1"></i> كود المستخدم (Username/Code)</span>
+                                                <input type="color" class="form-control form-control-color p-0 border-0" id="cfgCodeColor" value="#000000" style="width:24px; height:24px;" oninput="updateImageLiveOverlay()" title="لون الخط">
+                                            </div>
+                                            <div class="row g-2 align-items-center">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الأفقي X%</small>
+                                                    <input type="range" class="form-range" id="cfgCodeX" min="5" max="95" value="50" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الرأسي Y%</small>
+                                                    <input type="range" class="form-range" id="cfgCodeY" min="5" max="95" value="45" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">حجم الخط px</small>
+                                                    <input type="number" class="form-control form-control-sm" id="cfgCodeSize" value="18" min="10" max="36" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- كلمة المرور -->
+                                        <div class="mb-2 p-2 bg-white rounded border">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <div class="form-check form-switch mb-0">
+                                                    <input class="form-check-input" type="checkbox" id="cfgPassEnabled" onchange="updateImageLiveOverlay()">
+                                                    <label class="form-check-label small fw-bold" for="cfgPassEnabled">كلمة المرور (إذا كانت منفصلة)</label>
+                                                </div>
+                                                <input type="color" class="form-control form-control-color p-0 border-0" id="cfgPassColor" value="#333333" style="width:24px; height:24px;" oninput="updateImageLiveOverlay()">
+                                            </div>
+                                            <div class="row g-2 align-items-center" id="passControlsRow">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الأفقي X%</small>
+                                                    <input type="range" class="form-range" id="cfgPassX" min="5" max="95" value="50" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الرأسي Y%</small>
+                                                    <input type="range" class="form-range" id="cfgPassY" min="5" max="95" value="65" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">حجم الخط px</small>
+                                                    <input type="number" class="form-control form-control-sm" id="cfgPassSize" value="15" min="10" max="32" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- البروفايل / السرعة -->
+                                        <div class="mb-2 p-2 bg-white rounded border">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <div class="form-check form-switch mb-0">
+                                                    <input class="form-check-input" type="checkbox" id="cfgProfEnabled" checked onchange="updateImageLiveOverlay()">
+                                                    <label class="form-check-label small fw-bold" for="cfgProfEnabled">البروفايل / السرعة</label>
+                                                </div>
+                                                <input type="color" class="form-control form-control-color p-0 border-0" id="cfgProfColor" value="#1e3c72" style="width:24px; height:24px;" oninput="updateImageLiveOverlay()">
+                                            </div>
+                                            <div class="row g-2 align-items-center" id="profControlsRow">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الأفقي X%</small>
+                                                    <input type="range" class="form-range" id="cfgProfX" min="5" max="95" value="80" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الرأسي Y%</small>
+                                                    <input type="range" class="form-range" id="cfgProfY" min="5" max="95" value="18" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">حجم الخط px</small>
+                                                    <input type="number" class="form-control form-control-sm" id="cfgProfSize" value="13" min="10" max="24" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- رقم الباتش / الفرع -->
+                                        <div class="mb-0 p-2 bg-white rounded border">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <div class="form-check form-switch mb-0">
+                                                    <input class="form-check-input" type="checkbox" id="cfgBatchEnabled" checked onchange="updateImageLiveOverlay()">
+                                                    <label class="form-check-label small fw-bold" for="cfgBatchEnabled">رقم الباتش / الفرع</label>
+                                                </div>
+                                                <input type="color" class="form-control form-control-color p-0 border-0" id="cfgBatchColor" value="#666666" style="width:24px; height:24px;" oninput="updateImageLiveOverlay()">
+                                            </div>
+                                            <div class="row g-2 align-items-center" id="batchControlsRow">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الأفقي X%</small>
+                                                    <input type="range" class="form-range" id="cfgBatchX" min="5" max="95" value="20" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">الموضع الرأسي Y%</small>
+                                                    <input type="range" class="form-range" id="cfgBatchY" min="5" max="95" value="88" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block" style="font-size:11px;">حجم الخط px</small>
+                                                    <input type="number" class="form-control form-control-sm" id="cfgBatchSize" value="11" min="9" max="20" oninput="updateImageLiveOverlay()">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- المعاينة الفورية للكارت فوق الصورة -->
+                                <div class="col-lg-6 d-flex flex-column align-items-center justify-content-center p-3 bg-light rounded-3 border">
+                                    <div class="text-center mb-2 w-100">
+                                        <span class="badge bg-secondary mb-1">معاينة تفاعلية لشكل الكارت الحقيقي</span>
+                                        <div class="badge bg-primary-subtle text-primary border border-primary-subtle d-block py-1 px-2 mt-1">
+                                            <i class="bi bi-arrows-move me-1"></i> <strong>اسحب الكود أو أي نص بالماوس بحرية</strong> لوضعه في أي مكان تريده
+                                        </div>
+                                    </div>
+
+                                    <!-- صندوق المعاينة الحية -->
+                                    <div id="liveImageCardWrapper" class="shadow rounded overflow-hidden position-relative border" style="width: 320px; height: 185px; max-width: 100%; background: #e9ecef; background-size: 100% 100%; background-position: center; background-repeat: no-repeat;">
+                                        <!-- عنصر كود المستخدم -->
+                                        <div id="ovCode" class="draggable-overlay-item font-monospace fw-bold" title="اسحب بالماوس لتحريك الكود">
+                                            784920
+                                        </div>
+                                        <!-- عنصر الباسورد -->
+                                        <div id="ovPass" class="draggable-overlay-item font-monospace" title="اسحب بالماوس لتحريك الباسورد">
+                                            pass: 784920
+                                        </div>
+                                        <!-- عنصر البروفايل -->
+                                        <div id="ovProf" class="draggable-overlay-item fw-bold" title="اسحب بالماوس لتحريك البروفايل">
+                                            2Mega
+                                        </div>
+                                        <!-- عنصر الباتش -->
+                                        <div id="ovBatch" class="draggable-overlay-item" title="اسحب بالماوس لتحريك رقم الباتش">
+                                            #50
+                                        </div>
+                                    </div>
+
+                                    <!-- أزرار المحاذاة السريعة للكود في منتصف الكارت -->
+                                    <div class="d-flex flex-wrap justify-content-center gap-1 mt-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11px;" onclick="setQuickPosition('code', 50, 50)" title="توسيط الكود في منتصف الكارت تماماً">
+                                            <i class="bi bi-arrows-collapse me-1"></i> توسيط الكود (نصف الكارت)
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11px;" onclick="setQuickPosition('code', 50, null)" title="توسيط الكود أفقياً فقط">
+                                            ↔️ في النص أفقياً
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:11px;" onclick="setQuickPosition('code', null, 50)" title="توسيط الكود رأسياً فقط">
+                                            ↕️ في النص رأسياً
+                                        </button>
+                                    </div>
+
+                                    <!-- زر معاينة ورقة A4 كاملة بكروت عشوائية -->
+                                    <div class="w-100 mt-2 pt-2 border-top">
+                                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-bold w-100 shadow-sm" onclick="openA4FullPreviewFromEditor()">
+                                            <i class="bi bi-file-earmark-medical-fill me-1 text-white"></i> معاينة ورقة A4 كاملة (كروت عشوائية) 👁️
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-2 text-center text-muted small" id="imagePlaceholderHint">
+                                        <i class="bi bi-info-circle me-1"></i> ارفع صورة كارت من اليسار لتظهر هنا فوراً.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- تبويب 2: محرر HTML المتقدم -->
+                        <div class="tab-pane fade" id="tab-html-pane" role="tabpanel">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">عنوان الكارت (Header)</label>
+                                    <input type="text" class="form-control" name="header_title" id="tmplHeaderTitle" value="كارت إنترنت" placeholder="مثال: كارت إنترنت / Welcome">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">نص التذييل (Footer Text)</label>
+                                    <input type="text" class="form-control" name="footer_text" id="tmplFooterText" value="أهلاً بكم - نتمنى لكم وقتاً ممتعاً" placeholder="ملاحظات أو هاتف الدعم">
+                                </div>
+
+                                <!-- أزرار استيراد تصاميم جاهزة سريعة -->
+                                <div class="col-12">
+                                    <div class="d-flex flex-wrap align-items-center gap-2 p-2 bg-light rounded-3 border">
+                                        <span class="small fw-bold text-muted"><i class="bi bi-magic me-1"></i> استيراد تصميم جاهز كبداية:</span>
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0" onclick="loadPreset('modern')">الحديث (Modern)</button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-pill py-0" onclick="loadPreset('luxury')">كافيه ذهبي (Luxury)</button>
+                                        <button type="button" class="btn btn-sm btn-outline-dark rounded-pill py-0" onclick="loadPreset('thermal')">رول حراري (POS)</button>
+                                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill py-0" onclick="loadPreset('mini')">ميني اقتصادي (Mini)</button>
+                                    </div>
+                                </div>
+
+                                <!-- دليل المتغيرات المتاحة -->
+                                <div class="col-12">
+                                    <label class="form-label fw-bold small text-muted mb-1">
+                                        <i class="bi bi-code-slash me-1"></i> المتغيرات التلقائية المتاحة (انقر للنسخ والإدراج):
+                                    </label>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.Code{{"}}"}}')">{{"{{"}}.Code{{"}}"}} <small class="text-muted">(الكود)</small></button>
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.Password{{"}}"}}')">{{"{{"}}.Password{{"}}"}} <small class="text-muted">(الباسورد)</small></button>
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.Profile{{"}}"}}')">{{"{{"}}.Profile{{"}}"}} <small class="text-muted">(السرعة)</small></button>
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.RouterName{{"}}"}}')">{{"{{"}}.RouterName{{"}}"}} <small class="text-muted">(الفرع)</small></button>
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.BatchID{{"}}"}}')">{{"{{"}}.BatchID{{"}}"}} <small class="text-muted">(رقم الباتش)</small></button>
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.Email{{"}}"}}')">{{"{{"}}.Email{{"}}"}} <small class="text-muted">(الإيميل)</small></button>
+                                        <button type="button" class="btn btn-sm btn-light border font-monospace py-0 px-2" onclick="insertTag('{{"{{"}}.BgImage{{"}}"}}')">{{"{{"}}.BgImage{{"}}"}} <small class="text-muted">(الصورة)</small></button>
+                                    </div>
+                                </div>
+
+                                <!-- كود القالب HTML -->
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">كود تصميم الكارت (HTML / CSS) <span class="text-danger">*</span></label>
+                                    <textarea class="form-control font-monospace" name="html_content" id="tmplHtmlContent" rows="7" style="font-size: 0.85rem; direction: ltr; text-align: left;"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" id="saveTemplateBtn">
+                        <i class="bi bi-save me-1"></i> حفظ القالب
                     </button>
                 </div>
             </form>
@@ -171,105 +728,798 @@
     </div>
 </div>
 
-<!-- Modal Edit Template -->
-<div class="modal fade" id="editTemplateModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title fw-bold text-primary">
-                    <i class="bi bi-pencil-square me-1"></i> تعديل تصميم الكارت
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- نافذة مودال: معاينة ورقة A4 كاملة بكروت عشوائية تجريبية -->
+<div class="modal fade" id="a4SheetPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-ruled-fill fs-5 text-warning"></i>
+                    <h5 class="modal-title fw-bold mb-0">معاينة ورقة A4 كاملة بكروت عشوائية تجريبية</h5>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="a4ModalLayoutBadge" class="badge bg-warning text-dark font-monospace fs-6">3 بالعرض × 7 بالطول = 21 كارت</span>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
             </div>
-            <form method="POST" action="/card-templates/edit">
-                <input type="hidden" name="id" id="edit_tmpl_id">
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">اسم التصميم: <span class="text-danger">*</span></label>
-                        <input type="text" name="name" id="edit_tmpl_name" class="form-control" required>
+            <div class="modal-body p-3 bg-light">
+                <!-- شريط تنبيه وأدوات داخل المعاينة -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center p-2 bg-white rounded-3 shadow-sm border mb-3 gap-2">
+                    <div class="small text-muted">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        معاينة مطابقة تماماً لمقاسات الطباعة لورقة A4، يمكنك تدقيق تناسق الكروت ومواضع الأرقام والبيانات قبل الاعتماد.
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">لون خلفية الكارت الرئيسية:</label>
-                        <div class="input-group">
-                            <input type="color" name="background_color" id="edit_tmpl_color" class="form-control form-control-color">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="تنسيق الورقة">
+                            <button type="button" class="btn btn-primary fw-bold" id="btnA4Portrait" onclick="setA4Orientation('portrait')">
+                                <i class="bi bi-file-earmark me-1"></i> رأسي (Portrait)
+                            </button>
+                            <button type="button" class="btn btn-outline-primary fw-bold" id="btnA4Landscape" onclick="setA4Orientation('landscape')">
+                                <i class="bi bi-file-earmark-landscape me-1"></i> أفقي (Landscape)
+                            </button>
                         </div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold">العرض (مم):</label>
-                            <input type="number" step="0.5" name="width_mm" id="edit_tmpl_width" class="form-control" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold">الارتفاع (مم):</label>
-                            <input type="number" step="0.5" name="height_mm" id="edit_tmpl_height" class="form-control" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold d-block">عناصر الكارت المطبوعة:</label>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_qr" id="edit_tmpl_qr" value="1">
-                            <label class="form-check-label" for="edit_tmpl_qr">QR Code</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_barcode" id="edit_tmpl_barcode" value="1">
-                            <label class="form-check-label" for="edit_tmpl_barcode">Barcode</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_price" id="edit_tmpl_price" value="1">
-                            <label class="form-check-label" for="edit_tmpl_price">السعر</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_profile" id="edit_tmpl_profile" value="1">
-                            <label class="form-check-label" for="edit_tmpl_profile">اسم الباقة</label>
-                        </div>
-                        <div class="form-check form-check-inline mb-2">
-                            <input class="form-check-input" type="checkbox" name="show_expiry" id="edit_tmpl_expiry" value="1">
-                            <label class="form-check-label" for="edit_tmpl_expiry">الصلاحية</label>
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mt-3 pt-2 border-top">
-                        <input class="form-check-input" type="checkbox" name="is_default" id="edit_tmpl_default" value="1">
-                        <label class="form-check-label fw-bold" for="edit_tmpl_default">تعيين كقالب افتراضي للطباعة</label>
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold" onclick="generateNewRandomA4Cards()">
+                            <i class="bi bi-arrow-clockwise me-1"></i> توليد أرقام عشوائية
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="exportA4PreviewToPDF()">
+                            <i class="bi bi-file-earmark-pdf-fill me-1"></i> تصدير ورقة A4 كملف PDF 📄
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="printModalA4Sheet()">
+                            <i class="bi bi-printer-fill me-1"></i> تجربة طباعة الورقة
+                        </button>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">
-                        <i class="bi bi-check-circle me-1"></i> حفظ التعديلات
-                    </button>
+
+                <!-- ورقة A4 الحقيقية -->
+                <div class="d-flex justify-content-center overflow-auto p-2">
+                    <div id="modalA4Sheet" class="print-page-sheet shadow" style="width: 202mm; min-height: 289mm; max-width: 100%; background: #fff; padding: 4mm; box-sizing: border-box; display: grid;">
+                        <!-- محتوى الكروت سيتم حقنه بالجافاسكريبت -->
+                    </div>
                 </div>
-            </form>
+            </div>
+            <div class="modal-footer py-2 bg-white d-flex justify-content-between">
+                <small class="text-muted"><i class="bi bi-info-circle me-1"></i> مقاس الورقة القياسي: A4 Portrait (210×297mm)</small>
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إغلاق المعاينة</button>
+            </div>
         </div>
     </div>
 </div>
-{{ end }}
+
+<script>
+    // بيانات تجريبية للمعاينة الحية
+    const dummyData = {
+        Code: "c78291",
+        Password: "pass123",
+        Profile: "1h",
+        RouterName: "الفرع الرئيسي",
+        BatchID: "50",
+        Email: "50@system.local"
+    };
+
+    const presets = {
+        modern: `<div class="card-voucher voucher-modern" style="border: 2px dashed #0d6efd; border-radius: 10px; padding: 12px; background: #fff; text-align: center; position: relative;">
+    <div style="font-weight: 700; font-size: 0.95rem; color: #1e3c72; border-bottom: 1px solid #e9ecef; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <span><i class="bi bi-wifi text-primary"></i> {{"{{"}}.HeaderTitle{{"}}"}}</span>
+        <span class="badge bg-light text-secondary border font-monospace">{{"{{"}}.Profile{{"}}"}}</span>
+    </div>
+    <div style="font-size: 0.8rem; color: #6c757d; margin-bottom: 2px;">كود تسجيل الدخول:</div>
+    <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: #212529; background: #f8f9fa; padding: 6px; border-radius: 6px; margin: 6px 0; font-family: monospace; border: 1px solid #dee2e6;">{{"{{"}}.Code{{"}}"}}</div>
+    <div style="font-size: 0.75rem; color: #6c757d; display: flex; justify-content: space-between; margin-top: 6px;">
+        <span>الفرع: {{"{{"}}.RouterName{{"}}"}}</span>
+        <span class="font-monospace text-primary">#{{"{{"}}.BatchID{{"}}"}}</span>
+    </div>
+    <div style="font-size: 0.7rem; color: #adb5bd; margin-top: 4px;">{{"{{"}}.FooterText{{"}}"}}</div>
+</div>`,
+        luxury: `<div class="card-voucher voucher-luxury" style="border: 2px solid #d4af37; border-radius: 12px; padding: 12px; background: linear-gradient(135deg, #1c1c1c 0%, #2c2518 100%); color: #fff; text-align: center; position: relative;">
+    <div style="font-weight: 700; font-size: 0.95rem; color: #ffd700; border-bottom: 1px solid #4a3e20; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <span>☕ {{"{{"}}.HeaderTitle{{"}}"}}</span>
+        <span style="background: #d4af37; color: #000; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem;">{{"{{"}}.Profile{{"}}"}}</span>
+    </div>
+    <div style="font-size: 0.8rem; color: #cccccc; margin-bottom: 2px;">رمز الدخول السريع:</div>
+    <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: #ffd700; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 6px; margin: 6px 0; font-family: monospace; border: 1px solid #d4af37;">{{"{{"}}.Code{{"}}"}}</div>
+    <div style="font-size: 0.75rem; color: #aaa; display: flex; justify-content: space-between; margin-top: 6px;">
+        <span>{{"{{"}}.RouterName{{"}}"}}</span>
+        <span style="color: #ffd700;">#{{"{{"}}.BatchID{{"}}"}}</span>
+    </div>
+    <div style="font-size: 0.7rem; color: #888; margin-top: 4px;">{{"{{"}}.FooterText{{"}}"}}</div>
+</div>`,
+        thermal: `<div class="card-voucher voucher-thermal" style="border: 1px dashed #000; border-radius: 4px; padding: 10px; background: #fff; color: #000; text-align: center; font-family: monospace;">
+    <div style="font-weight: 900; font-size: 1rem; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
+        *** {{"{{"}}.HeaderTitle{{"}}"}} ***
+    </div>
+    <div style="font-size: 0.85rem; margin: 3px 0;">السرعة: <strong>{{"{{"}}.Profile{{"}}"}}</strong></div>
+    <div style="font-size: 1.35rem; font-weight: 900; letter-spacing: 3px; border: 2px solid #000; padding: 6px; margin: 6px 0; background: #fafafa;">{{"{{"}}.Code{{"}}"}}</div>
+    <div style="font-size: 0.75rem; border-top: 1px dashed #000; padding-top: 4px; margin-top: 6px;">
+        فرع: {{"{{"}}.RouterName{{"}}"}} | دفعة #{{"{{"}}.BatchID{{"}}"}}
+    </div>
+    <div style="font-size: 0.7rem; margin-top: 2px;">{{"{{"}}.FooterText{{"}}"}}</div>
+</div>`,
+        mini: `<div class="card-voucher voucher-mini" style="border: 1px solid #198754; border-radius: 8px; padding: 8px; background: #f0fff4; text-align: center;">
+    <div style="font-weight: 700; font-size: 0.85rem; color: #198754; display: flex; justify-content: space-between;">
+        <span>📶 {{"{{"}}.HeaderTitle{{"}}"}}</span>
+        <span style="background: #198754; color: #fff; border-radius: 4px; padding: 1px 4px; font-size: 0.7rem;">{{"{{"}}.Profile{{"}}"}}</span>
+    </div>
+    <div style="font-size: 1.15rem; font-weight: 800; letter-spacing: 1.5px; color: #145a32; background: #fff; padding: 4px; border-radius: 4px; margin: 4px 0; font-family: monospace; border: 1px solid #a3e4d7;">{{"{{"}}.Code{{"}}"}}</div>
+    <div style="font-size: 0.7rem; color: #555; display: flex; justify-content: space-between;">
+        <span>{{"{{"}}.RouterName{{"}}"}}</span>
+        <span class="text-success fw-bold">#{{"{{"}}.BatchID{{"}}"}}</span>
+    </div>
+</div>`
+    };
+
+    function renderTemplateContent(html, headerTitle, footerText, bgImage) {
+        let res = html || presets.modern;
+        if (bgImage && res.includes("voucher-image-bg")) {
+            res = res.replace(/background-image:\s*url\(['"]?.*?['"]?\)/gi, `background-image: url('${bgImage}')`);
+            if (!res.includes("voucher-bg-img")) {
+                const imgTag = `<img src="${bgImage}" class="voucher-bg-img" alt="" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none; border-radius: inherit; display: block;">`;
+                res = res.replace(/(<div[^>]*class="[^"]*voucher-image-bg[^"]*"[^>]*>)/i, `$1\n    ${imgTag}`);
+            }
+        }
+        res = res.replace(/\{\{\.HeaderTitle\}\}/g, headerTitle || "كارت إنترنت");
+        res = res.replace(/\{\{\.FooterText\}\}/g, footerText || "أهلاً وسهلاً");
+        res = res.replace(/\{\{\.Code\}\}/g, dummyData.Code);
+        res = res.replace(/\{\{\.Password\}\}/g, dummyData.Password);
+        res = res.replace(/\{\{\.Profile\}\}/g, dummyData.Profile);
+        res = res.replace(/\{\{\.RouterName\}\}/g, dummyData.RouterName);
+        res = res.replace(/\{\{\.BatchID\}\}/g, dummyData.BatchID);
+        res = res.replace(/\{\{\.Email\}\}/g, dummyData.Email);
+        res = res.replace(/\{\{\.BgImage\}\}/g, bgImage || "");
+
+        // Auto-heal if code is missing in voucher-image-bg
+        if (!res.includes(dummyData.Code) && res.includes("voucher-image-bg")) {
+            res = res.replace(/(<div\s+style="[^"]*left:\s*\d+%[^"]*top:\s*\d+%[^"]*">\s*)(<\/div>)/gi, `$1${dummyData.Code}$2`);
+        }
+
+        // Ensure all absolute overlay divs are on top of the background image (z-index: 2)
+        res = res.replace(/(<div[^>]*style="[^"]*position:\s*absolute;)([^"]*")/gi, function(match, p1, p2) {
+            if (!match.includes("z-index")) {
+                return p1 + " z-index: 2;" + p2;
+            }
+            return match;
+        });
+
+        return res;
+    }
+
+    let currentSelectedImageDataUrl = "";
+
+    function setMode(mode) {
+        document.getElementById("tmplActiveMode").value = mode;
+    }
+
+    const templatesMap = {
+        {{range .Templates}}
+        "{{.ID}}": {
+            id: {{.ID}},
+            name: {{.Name}},
+            headerTitle: {{.HeaderTitle}},
+            footerText: {{.FooterText}},
+            themeColor: {{.ThemeColor}},
+            isDefault: {{.IsDefault}},
+            htmlContent: {{.HTMLContent}},
+            bgImage: {{.BgImage}},
+            cardWidth: {{.CardWidth}},
+            cardHeight: {{.CardHeight}},
+            cols: {{.Cols}},
+            rows: {{.Rows}},
+            cardGap: "{{.CardGap}}",
+            overlayConfig: {{.OverlayConfig}}
+        },
+        {{end}}
+    };
+
+    function updateA4CalcBadge() {
+        const c = parseInt(document.getElementById("tmplCols").value) || 3;
+        const r = parseInt(document.getElementById("tmplRows").value) || 7;
+        const total = c * r;
+        const el = document.getElementById("tmplA4CalcSummary");
+        if (el) {
+            el.innerText = `${total} كارت (${c} بالعرض × ${r} بالطول)`;
+        }
+    }
+
+    // تفعيل سحب وإفلات العناصر فوق الكارت بالماوس (Drag & Drop)
+    function initOverlayDraggable(elementId, xInputId, yInputId) {
+        const el = document.getElementById(elementId);
+        const container = document.getElementById("liveImageCardWrapper");
+        if (!el || !container) return;
+
+        let isDragging = false;
+
+        el.addEventListener("pointerdown", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            isDragging = true;
+            el.classList.add("is-dragging");
+            try { el.setPointerCapture(e.pointerId); } catch(err) {}
+        });
+
+        el.addEventListener("pointermove", function(e) {
+            if (!isDragging) return;
+            const rect = container.getBoundingClientRect();
+            let x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+            let y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+
+            x = Math.max(5, Math.min(95, x));
+            y = Math.max(5, Math.min(95, y));
+
+            const xInput = document.getElementById(xInputId);
+            const yInput = document.getElementById(yInputId);
+            if (xInput) xInput.value = x;
+            if (yInput) yInput.value = y;
+
+            el.style.left = x + "%";
+            el.style.top = y + "%";
+        });
+
+        function endDrag(e) {
+            if (isDragging) {
+                isDragging = false;
+                el.classList.remove("is-dragging");
+                try { el.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+        }
+
+        el.addEventListener("pointerup", endDrag);
+        el.addEventListener("pointercancel", endDrag);
+    }
+
+    // زر المحاذاة السريعة
+    function setQuickPosition(target, x, y) {
+        if (target === 'code') {
+            const xInput = document.getElementById("cfgCodeX");
+            const yInput = document.getElementById("cfgCodeY");
+            if (x !== null && xInput) xInput.value = x;
+            if (y !== null && yInput) yInput.value = y;
+            updateImageLiveOverlay();
+        }
+    }
+
+    // منطق معاينة ورقة A4 كاملة بكروت عشوائية
+    let a4PreviewState = {
+        cols: 3,
+        rows: 7,
+        gap: "2mm",
+        htmlTemplate: "",
+        bgImage: "",
+        headerTitle: "كارت إنترنت",
+        footerText: "نتمنى لكم وقتاً ممتعاً"
+    };
+
+    function renderCardForA4(htmlTemplate, headerTitle, footerText, bgImage, card) {
+        let res = htmlTemplate || presets.modern;
+        if (bgImage && res.includes("voucher-image-bg")) {
+            res = res.replace(/background-image:\s*url\(['"]?.*?['"]?\)/gi, `background-image: url('${bgImage}')`);
+            if (!res.includes("voucher-bg-img")) {
+                const imgTag = `<img src="${bgImage}" class="voucher-bg-img" alt="" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none; border-radius: inherit; display: block;">`;
+                res = res.replace(/(<div[^>]*class="[^"]*voucher-image-bg[^"]*"[^>]*>)/i, `$1\n    ${imgTag}`);
+            }
+        }
+        res = res.replace(/\{\{\.HeaderTitle\}\}/g, headerTitle || "كارت إنترنت");
+        res = res.replace(/\{\{\.FooterText\}\}/g, footerText || "نتمنى لكم وقتاً ممتعاً");
+        res = res.replace(/\{\{\.Code\}\}/g, card.Code);
+        res = res.replace(/\{\{\.Password\}\}/g, card.Password);
+        res = res.replace(/\{\{\.Profile\}\}/g, card.Profile);
+        res = res.replace(/\{\{\.RouterName\}\}/g, card.RouterName);
+        res = res.replace(/\{\{\.BatchID\}\}/g, card.BatchID);
+        res = res.replace(/\{\{\.Email\}\}/g, card.Email);
+        res = res.replace(/\{\{\.BgImage\}\}/g, bgImage || "");
+
+        // Auto-heal if code is missing in voucher-image-bg
+        if (!res.includes(card.Code) && res.includes("voucher-image-bg")) {
+            res = res.replace(/(<div\s+style="[^"]*left:\s*\d+%[^"]*top:\s*\d+%[^"]*">\s*)(<\/div>)/gi, `$1${card.Code}$2`);
+        }
+
+        // Ensure all absolute overlay divs are on top of the background image (z-index: 2)
+        res = res.replace(/(<div[^>]*style="[^"]*position:\s*absolute;)([^"]*")/gi, function(match, p1, p2) {
+            if (!match.includes("z-index")) {
+                return p1 + " z-index: 2;" + p2;
+            }
+            return match;
+        });
+
+        return res;
+    }
+
+    function openA4FullPreviewFromEditor() {
+        const cols = parseInt(document.getElementById("tmplCols").value) || 3;
+        const rows = parseInt(document.getElementById("tmplRows").value) || 7;
+        const gap = document.getElementById("tmplCardGap").value || "2mm";
+        const mode = document.getElementById("tmplActiveMode").value;
+
+        let html = "";
+        let bg = "";
+        let header = document.getElementById("tmplHeaderTitle").value || "كارت إنترنت";
+        let footer = document.getElementById("tmplFooterText").value || "نتمنى لكم وقتاً ممتعاً";
+
+        if (mode === "image") {
+            html = buildHtmlFromImageOverlay();
+            bg = currentSelectedImageDataUrl || document.getElementById("tmplBgImageExisting").value || "";
+        } else {
+            html = document.getElementById("tmplHtmlContent").value;
+        }
+
+        a4PreviewState = {
+            cols: cols,
+            rows: rows,
+            gap: gap,
+            htmlTemplate: html,
+            bgImage: bg,
+            headerTitle: header,
+            footerText: footer
+        };
+
+        setA4Orientation(cols > rows ? 'landscape' : 'portrait');
+        renderA4PreviewSheet();
+
+        // Close editor modal temporarily to avoid stacked backdrop conflicts
+        const editorModalEl = document.getElementById("templateModal");
+        const editorModalInstance = bootstrap.Modal.getInstance(editorModalEl);
+        if (editorModalInstance) {
+            window.reopenEditorModalOnA4Close = true;
+            editorModalInstance.hide();
+        }
+
+        const previewModal = new bootstrap.Modal(document.getElementById("a4SheetPreviewModal"));
+        previewModal.show();
+    }
+
+    function openA4FullPreviewFromCard(templateId) {
+        const t = templatesMap[templateId];
+        if (!t) return;
+
+        window.reopenEditorModalOnA4Close = false;
+        const c = t.cols || 3;
+        const r = t.rows || 7;
+        a4PreviewState = {
+            cols: c,
+            rows: r,
+            gap: t.cardGap || "2mm",
+            htmlTemplate: t.htmlContent,
+            bgImage: t.bgImage || "",
+            headerTitle: t.headerTitle || "كارت إنترنت",
+            footerText: t.footerText || "نتمنى لكم وقتاً ممتعاً"
+        };
+
+        setA4Orientation(c > r ? 'landscape' : 'portrait');
+        renderA4PreviewSheet();
+        const previewModal = new bootstrap.Modal(document.getElementById("a4SheetPreviewModal"));
+        previewModal.show();
+    }
+
+    function generateNewRandomA4Cards() {
+        renderA4PreviewSheet();
+    }
+
+    function renderA4PreviewSheet() {
+        const cols = a4PreviewState.cols;
+        const rows = a4PreviewState.rows;
+        const totalCards = cols * rows;
+        const gap = a4PreviewState.gap;
+
+        // تحديث البادج
+        const badge = document.getElementById("a4ModalLayoutBadge");
+        if (badge) {
+            badge.innerText = `${cols} بالعرض × ${rows} بالطول = ${totalCards} كارت عشوائي`;
+        }
+
+        const container = document.getElementById("modalA4Sheet");
+        if (!container) return;
+
+        container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        container.style.gap = gap;
+
+        // توليد كروت عشوائية جديدة
+        let fullHtml = "";
+        for (let i = 0; i < totalCards; i++) {
+            const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+            const card = {
+                Code: randomCode,
+                Password: randomCode,
+                Profile: "2Mega",
+                RouterName: "كافيه أبو سند",
+                BatchID: "50",
+                Email: "50@system.local"
+            };
+
+            fullHtml += `
+            <div class="card-item-container">
+                ${renderCardForA4(a4PreviewState.htmlTemplate, a4PreviewState.headerTitle, a4PreviewState.footerText, a4PreviewState.bgImage, card)}
+            </div>`;
+        }
+
+        container.innerHTML = fullHtml;
+    }
+
+    let currentA4Orientation = 'portrait';
+
+    function setA4Orientation(orient) {
+        currentA4Orientation = orient;
+        const sheet = document.getElementById("modalA4Sheet");
+        const btnPort = document.getElementById("btnA4Portrait");
+        const btnLand = document.getElementById("btnA4Landscape");
+        const dynamicStyle = document.getElementById("dynamicA4PrintStyle");
+
+        if (orient === 'landscape') {
+            if (sheet) sheet.classList.add("landscape-sheet");
+            document.body.classList.add("print-landscape");
+            if (btnPort) {
+                btnPort.classList.remove("btn-primary");
+                btnPort.classList.add("btn-outline-primary");
+            }
+            if (btnLand) {
+                btnLand.classList.remove("btn-outline-primary");
+                btnLand.classList.add("btn-primary");
+            }
+            if (dynamicStyle) {
+                dynamicStyle.innerHTML = "@page { size: A4 landscape !important; margin: 4mm !important; }";
+            }
+        } else {
+            if (sheet) sheet.classList.remove("landscape-sheet");
+            document.body.classList.remove("print-landscape");
+            if (btnLand) {
+                btnLand.classList.remove("btn-primary");
+                btnLand.classList.add("btn-outline-primary");
+            }
+            if (btnPort) {
+                btnPort.classList.remove("btn-outline-primary");
+                btnPort.classList.add("btn-primary");
+            }
+            if (dynamicStyle) {
+                dynamicStyle.innerHTML = "@page { size: A4 portrait !important; margin: 4mm !important; }";
+            }
+        }
+    }
+
+    function printModalA4Sheet() {
+        window.print();
+    }
+
+    function exportA4PreviewToPDF() {
+        const sheet = document.getElementById("modalA4Sheet");
+        if (!sheet) return;
+
+        const btn = document.querySelector("#a4SheetPreviewModal .modal-footer .btn-danger") || document.querySelector("#a4SheetPreviewModal .btn-danger");
+        let origBtnHtml = "";
+        if (btn) {
+            origBtnHtml = btn.innerHTML;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> جارٍ التجهيز...`;
+            btn.disabled = true;
+        }
+
+        const isLand = (currentA4Orientation === 'landscape');
+        const exportWrapper = document.createElement("div");
+        exportWrapper.style.width = isLand ? "289mm" : "202mm";
+        exportWrapper.style.margin = "0 auto";
+        exportWrapper.style.background = "#fff";
+
+        const clone = sheet.cloneNode(true);
+        clone.style.boxShadow = "none";
+        clone.style.border = "none";
+        clone.style.margin = "0 auto";
+        clone.style.width = isLand ? "289mm" : "202mm";
+        clone.style.height = isLand ? "198mm" : "284mm";
+        clone.style.maxHeight = isLand ? "198mm" : "284mm";
+        clone.style.padding = "2mm";
+
+        clone.querySelectorAll(".card-voucher").forEach(cv => {
+            cv.style.aspectRatio = "unset";
+            cv.style.minHeight = "0";
+            cv.style.height = "100%";
+        });
+
+        exportWrapper.appendChild(clone);
+
+        const opt = {
+            margin: [4, 4, 4, 4],
+            filename: isLand ? 'ورقة_كروت_A4_افقي.pdf' : 'ورقة_كروت_A4_راسي.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: isLand ? 'landscape' : 'portrait' }
+        };
+
+        if (typeof html2pdf !== 'undefined') {
+            html2pdf().set(opt).from(exportWrapper).save().then(() => {
+                if (btn) {
+                    btn.innerHTML = origBtnHtml;
+                    btn.disabled = false;
+                }
+            }).catch(err => {
+                console.error("PDF export failed:", err);
+                if (btn) {
+                    btn.innerHTML = origBtnHtml;
+                    btn.disabled = false;
+                }
+                window.print();
+            });
+        } else {
+            if (btn) {
+                btn.innerHTML = origBtnHtml;
+                btn.disabled = false;
+            }
+            window.print();
+        }
+    }
+
+    // إعداد المعاينات وتهيئة السحب عند تحميل الصفحة
+    document.addEventListener("DOMContentLoaded", function() {
+        for (const id in templatesMap) {
+            const t = templatesMap[id];
+            const box = document.getElementById("preview-box-" + id);
+            if (box) {
+                box.innerHTML = renderTemplateContent(t.htmlContent, t.headerTitle, t.footerText, t.bgImage);
+            }
+        }
+
+        // تهيئة السحب بالماوس للعناصر الأربعة
+        initOverlayDraggable("ovCode", "cfgCodeX", "cfgCodeY");
+        initOverlayDraggable("ovPass", "cfgPassX", "cfgPassY");
+        initOverlayDraggable("ovProf", "cfgProfX", "cfgProfY");
+        initOverlayDraggable("ovBatch", "cfgBatchX", "cfgBatchY");
+
+        // استعادة نافذة المحرر تلقائياً عند إغلاق نافذة المعاينة
+        const a4ModalEl = document.getElementById("a4SheetPreviewModal");
+        if (a4ModalEl) {
+            a4ModalEl.addEventListener("hidden.bs.modal", function() {
+                if (window.reopenEditorModalOnA4Close) {
+                    window.reopenEditorModalOnA4Close = false;
+                    const editorModal = bootstrap.Modal.getOrCreateInstance(document.getElementById("templateModal"));
+                    editorModal.show();
+                }
+            });
+        }
+    });
+
+    function handleImageFileSelected(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            currentSelectedImageDataUrl = evt.target.result;
+            const cardBox = document.getElementById("liveImageCardWrapper");
+            cardBox.style.backgroundImage = "url('" + currentSelectedImageDataUrl + "')";
+            document.getElementById("imagePlaceholderHint").innerHTML = `<span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i> تم اختيار الصورة بنجاح! يمكنك الآن تحريك النصوص بالماوس بحرية فوقها.</span>`;
+            updateImageLiveOverlay();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function updateImageLiveOverlay() {
+        const codeX = document.getElementById("cfgCodeX").value;
+        const codeY = document.getElementById("cfgCodeY").value;
+        const codeSize = document.getElementById("cfgCodeSize").value;
+        const codeColor = document.getElementById("cfgCodeColor").value;
+
+        const ovCode = document.getElementById("ovCode");
+        ovCode.style.left = codeX + "%";
+        ovCode.style.top = codeY + "%";
+        ovCode.style.fontSize = codeSize + "px";
+        ovCode.style.color = codeColor;
+
+        const passEnabled = document.getElementById("cfgPassEnabled").checked;
+        const ovPass = document.getElementById("ovPass");
+        if (passEnabled) {
+            ovPass.style.display = "block";
+            ovPass.style.left = document.getElementById("cfgPassX").value + "%";
+            ovPass.style.top = document.getElementById("cfgPassY").value + "%";
+            ovPass.style.fontSize = document.getElementById("cfgPassSize").value + "px";
+            ovPass.style.color = document.getElementById("cfgPassColor").value;
+        } else {
+            ovPass.style.display = "none";
+        }
+
+        const profEnabled = document.getElementById("cfgProfEnabled").checked;
+        const ovProf = document.getElementById("ovProf");
+        if (profEnabled) {
+            ovProf.style.display = "block";
+            ovProf.style.left = document.getElementById("cfgProfX").value + "%";
+            ovProf.style.top = document.getElementById("cfgProfY").value + "%";
+            ovProf.style.fontSize = document.getElementById("cfgProfSize").value + "px";
+            ovProf.style.color = document.getElementById("cfgProfColor").value;
+        } else {
+            ovProf.style.display = "none";
+        }
+
+        const batchEnabled = document.getElementById("cfgBatchEnabled").checked;
+        const ovBatch = document.getElementById("ovBatch");
+        if (batchEnabled) {
+            ovBatch.style.display = "block";
+            ovBatch.style.left = document.getElementById("cfgBatchX").value + "%";
+            ovBatch.style.top = document.getElementById("cfgBatchY").value + "%";
+            ovBatch.style.fontSize = document.getElementById("cfgBatchSize").value + "px";
+            ovBatch.style.color = document.getElementById("cfgBatchColor").value;
+        } else {
+            ovBatch.style.display = "none";
+        }
+    }
+
+    function buildHtmlFromImageOverlay() {
+        const codeX = document.getElementById("cfgCodeX").value;
+        const codeY = document.getElementById("cfgCodeY").value;
+        const codeSize = document.getElementById("cfgCodeSize").value;
+        const codeColor = document.getElementById("cfgCodeColor").value;
+
+        const passEnabled = document.getElementById("cfgPassEnabled").checked;
+        const passX = document.getElementById("cfgPassX").value;
+        const passY = document.getElementById("cfgPassY").value;
+        const passSize = document.getElementById("cfgPassSize").value;
+        const passColor = document.getElementById("cfgPassColor").value;
+
+        const profEnabled = document.getElementById("cfgProfEnabled").checked;
+        const profX = document.getElementById("cfgProfX").value;
+        const profY = document.getElementById("cfgProfY").value;
+        const profSize = document.getElementById("cfgProfSize").value;
+        const profColor = document.getElementById("cfgProfColor").value;
+
+        const batchEnabled = document.getElementById("cfgBatchEnabled").checked;
+        const batchX = document.getElementById("cfgBatchX").value;
+        const batchY = document.getElementById("cfgBatchY").value;
+        const batchSize = document.getElementById("cfgBatchSize").value;
+        const batchColor = document.getElementById("cfgBatchColor").value;
+
+        const cWidth = document.getElementById("tmplCardWidth").value || "260px";
+        const cHeight = document.getElementById("tmplCardHeight").value || "150px";
+
+        const configObj = {
+            code: { x: codeX, y: codeY, size: codeSize, color: codeColor },
+            pass: { enabled: passEnabled, x: passX, y: passY, size: passSize, color: passColor },
+            prof: { enabled: profEnabled, x: profX, y: profY, size: profSize, color: profColor },
+            batch: { enabled: batchEnabled, x: batchX, y: batchY, size: batchSize, color: batchColor }
+        };
+        document.getElementById("tmplOverlayConfig").value = JSON.stringify(configObj);
+
+        let html = `<div class="card-voucher voucher-image-bg" style="width: 100%; aspect-ratio: 16/9.5; min-height: ${cHeight}; background-image: url('{{"{{"}}.BgImage{{"}}"}}'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.15); border: 1px dashed rgba(0,0,0,0.15);">\n`;
+        html += `    <img src="{{"{{"}}.BgImage{{"}}"}}" class="voucher-bg-img" alt="" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none; border-radius: inherit; display: block;">\n`;
+        html += `    <div style="position: absolute; z-index: 2; left: ${codeX}%; top: ${codeY}%; transform: translate(-50%, -50%); font-size: ${codeSize}px; color: ${codeColor}; font-weight: 800; font-family: monospace; white-space: nowrap; letter-spacing: 1px;">{{"{{"}}.Code{{"}}"}}</div>\n`;
+
+        if (passEnabled) {
+            html += `    <div style="position: absolute; z-index: 2; left: ${passX}%; top: ${passY}%; transform: translate(-50%, -50%); font-size: ${passSize}px; color: ${passColor}; font-family: monospace; white-space: nowrap;">{{"{{"}}.Password{{"}}"}}</div>\n`;
+        }
+        if (profEnabled) {
+            html += `    <div style="position: absolute; z-index: 2; left: ${profX}%; top: ${profY}%; transform: translate(-50%, -50%); font-size: ${profSize}px; color: ${profColor}; font-weight: 700; white-space: nowrap;">{{"{{"}}.Profile{{"}}"}}</div>\n`;
+        }
+        if (batchEnabled) {
+            html += `    <div style="position: absolute; z-index: 2; left: ${batchX}%; top: ${batchY}%; transform: translate(-50%, -50%); font-size: ${batchSize}px; color: ${batchColor}; font-weight: 600; white-space: nowrap;">#{{"{{"}}.BatchID{{"}}"}}</div>\n`;
+        }
+        html += `</div>`;
+
+        return html;
+    }
+
+    function prepareFormSubmission() {
+        const mode = document.getElementById("tmplActiveMode").value;
+        if (mode === "image") {
+            const generatedHtml = buildHtmlFromImageOverlay();
+            document.getElementById("tmplHtmlContent").value = generatedHtml;
+        }
+    }
+
+    function openAddModal() {
+        document.getElementById("modalTitle").innerHTML = '<i class="bi bi-layout-text-window-reverse me-2"></i> إضافة قالب كروت جديد';
+        document.getElementById("templateForm").action = "/templates/add";
+        document.getElementById("tmplId").value = "";
+        document.getElementById("tmplName").value = "";
+        document.getElementById("tmplHeaderTitle").value = "كارت إنترنت";
+        document.getElementById("tmplFooterText").value = "نتمنى لكم وقتاً ممتعاً";
+        document.getElementById("tmplThemeColor").value = "#0d6efd";
+        document.getElementById("tmplIsDefault").checked = false;
+        document.getElementById("tmplHtmlContent").value = presets.modern;
+        document.getElementById("tmplBgImageExisting").value = "";
+        document.getElementById("bgImageFile").value = "";
+        document.getElementById("liveImageCardWrapper").style.backgroundImage = "none";
+        document.getElementById("imagePlaceholderHint").innerHTML = '<i class="bi bi-info-circle me-1"></i> ارفع صورة كارت من اليسار لتظهر هنا فوراً.';
+        
+        // Reset overlay controls
+        document.getElementById("cfgCodeX").value = 50;
+        document.getElementById("cfgCodeY").value = 45;
+        document.getElementById("cfgCodeSize").value = 18;
+        document.getElementById("cfgCodeColor").value = "#000000";
+        document.getElementById("cfgPassEnabled").checked = false;
+        document.getElementById("cfgProfEnabled").checked = true;
+        document.getElementById("cfgBatchEnabled").checked = true;
+
+        document.getElementById("tmplCols").value = 3;
+        document.getElementById("tmplRows").value = 7;
+        document.getElementById("tmplCardGap").value = "2mm";
+        updateA4CalcBadge();
+
+        new bootstrap.Tab(document.getElementById("tab-image-btn")).show();
+        setMode("image");
+        updateImageLiveOverlay();
+    }
+
+    function openEditModal(id) {
+        const t = templatesMap[id];
+        if (!t) return;
+        document.getElementById("modalTitle").innerHTML = '<i class="bi bi-pencil-square me-2"></i> تعديل قالب الكروت: ' + t.name;
+        document.getElementById("templateForm").action = "/templates/update";
+        document.getElementById("tmplId").value = t.id;
+        document.getElementById("tmplName").value = t.name;
+        document.getElementById("tmplHeaderTitle").value = t.headerTitle;
+        document.getElementById("tmplFooterText").value = t.footerText;
+        document.getElementById("tmplThemeColor").value = t.themeColor;
+        document.getElementById("tmplIsDefault").checked = t.isDefault;
+        document.getElementById("tmplHtmlContent").value = t.htmlContent;
+        document.getElementById("tmplBgImageExisting").value = t.bgImage || "";
+        document.getElementById("tmplCardWidth").value = t.cardWidth || "260px";
+        document.getElementById("tmplCardHeight").value = t.cardHeight || "150px";
+
+        document.getElementById("tmplCols").value = t.cols || 3;
+        document.getElementById("tmplRows").value = t.rows || 7;
+        document.getElementById("tmplCardGap").value = t.cardGap || "2mm";
+        updateA4CalcBadge();
+
+        if (t.bgImage) {
+            const cleanBg = (t.bgImage || "").replace(/\/+/g, "/");
+            document.getElementById("liveImageCardWrapper").style.backgroundImage = "url('" + cleanBg + "')";
+            document.getElementById("imagePlaceholderHint").innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i> يستخدم الصورة الحالية: <code>${cleanBg}</code> (يمكنك اختيار صورة بديلة من جهازك).</span>`;
+            if (t.overlayConfig) {
+                try {
+                    const cfg = JSON.parse(t.overlayConfig);
+                    if (cfg.code) {
+                        document.getElementById("cfgCodeX").value = cfg.code.x || 50;
+                        document.getElementById("cfgCodeY").value = cfg.code.y || 45;
+                        document.getElementById("cfgCodeSize").value = cfg.code.size || 18;
+                        document.getElementById("cfgCodeColor").value = cfg.code.color || "#000000";
+                    }
+                    if (cfg.pass) {
+                        document.getElementById("cfgPassEnabled").checked = !!cfg.pass.enabled;
+                        document.getElementById("cfgPassX").value = cfg.pass.x || 50;
+                        document.getElementById("cfgPassY").value = cfg.pass.y || 65;
+                        document.getElementById("cfgPassSize").value = cfg.pass.size || 15;
+                        document.getElementById("cfgPassColor").value = cfg.pass.color || "#333333";
+                    }
+                    if (cfg.prof) {
+                        document.getElementById("cfgProfEnabled").checked = !!cfg.prof.enabled;
+                        document.getElementById("cfgProfX").value = cfg.prof.x || 80;
+                        document.getElementById("cfgProfY").value = cfg.prof.y || 18;
+                        document.getElementById("cfgProfSize").value = cfg.prof.size || 13;
+                        document.getElementById("cfgProfColor").value = cfg.prof.color || "#1e3c72";
+                    }
+                    if (cfg.batch) {
+                        document.getElementById("cfgBatchEnabled").checked = !!cfg.batch.enabled;
+                        document.getElementById("cfgBatchX").value = cfg.batch.x || 20;
+                        document.getElementById("cfgBatchY").value = cfg.batch.y || 88;
+                        document.getElementById("cfgBatchSize").value = cfg.batch.size || 11;
+                        document.getElementById("cfgBatchColor").value = cfg.batch.color || "#666666";
+                    }
+                } catch(e) {}
+            }
+            new bootstrap.Tab(document.getElementById("tab-image-btn")).show();
+            setMode("image");
+        } else {
+            document.getElementById("liveImageCardWrapper").style.backgroundImage = "none";
+            new bootstrap.Tab(document.getElementById("tab-html-btn")).show();
+            setMode("html");
+        }
+
+        updateImageLiveOverlay();
+        new bootstrap.Modal(document.getElementById("templateModal")).show();
+    }
+
+    function loadPreset(key) {
+        if (presets[key]) {
+            document.getElementById("tmplHtmlContent").value = presets[key];
+            if (key === 'luxury') document.getElementById("tmplThemeColor").value = '#d4af37';
+            if (key === 'thermal') document.getElementById("tmplThemeColor").value = '#212529';
+            if (key === 'mini') document.getElementById("tmplThemeColor").value = '#198754';
+            if (key === 'modern') document.getElementById("tmplThemeColor").value = '#0d6efd';
+        }
+    }
+
+    function insertTag(tag) {
+        const textarea = document.getElementById("tmplHtmlContent");
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        textarea.value = text.substring(0, start) + tag + text.substring(end);
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+    }
+</script>
+{{end}}
 
 {{ define "auth_content" }}{{ end }}
-
-{{ define "scripts" }}
-<script>
-document.querySelectorAll('.btn-edit-template').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const d = this.dataset;
-        document.getElementById('edit_tmpl_id').value = d.id;
-        document.getElementById('edit_tmpl_name').value = d.name;
-        document.getElementById('edit_tmpl_color').value = d.bgcolor || '#0d6efd';
-        document.getElementById('edit_tmpl_width').value = d.width;
-        document.getElementById('edit_tmpl_height').value = d.height;
-        document.getElementById('edit_tmpl_qr').checked = (d.qr === 'true');
-        document.getElementById('edit_tmpl_barcode').checked = (d.barcode === 'true');
-        document.getElementById('edit_tmpl_price').checked = (d.price === 'true');
-        document.getElementById('edit_tmpl_profile').checked = (d.profile === 'true');
-        document.getElementById('edit_tmpl_expiry').checked = (d.expiry === 'true');
-        document.getElementById('edit_tmpl_default').checked = (d.default === 'true');
-
-        const modal = new bootstrap.Modal(document.getElementById('editTemplateModal'));
-        modal.show();
-    });
-});
-</script>
-{{ end }}
+{{ define "scripts" }}{{ end }}
