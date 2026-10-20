@@ -1,13 +1,53 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<style>
+.subscriber-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+}
+.subscriber-row:hover {
+    background-color: rgba(13, 110, 253, 0.05) !important;
+}
+.subscriber-row.active-selected {
+    background-color: rgba(13, 110, 253, 0.12) !important;
+    border-right: 4px solid #0d6efd !important;
+}
+</style>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
         <h3 class="fw-bold mb-1">إدارة المشتركين والعقود (PPPoE / Hotspot)</h3>
         <p class="text-muted small mb-0">سجل المشتركين المتكامل مع النظام وقاعدة بيانات المشتركين</p>
     </div>
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-primary fw-bold shadow-sm" onclick="openLiveTrafficModal('', '')">
-            <i class="bi bi-activity text-danger me-1"></i> مراقبة السحب لايف
-        </button>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <!-- Active Subscriber Selection Badge -->
+        <div id="activeSubBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 d-none align-items-center gap-2 shadow-sm" style="font-size: 0.85rem;">
+            <i class="bi bi-person-check-fill fs-6"></i>
+            <span>المحدد: <strong id="activeSubName"></strong></span>
+            <button type="button" class="btn-close btn-close-sm ms-1" style="font-size: 0.6rem;" onclick="clearActiveSubscriber(event)" title="إلغاء التحديد"></button>
+        </div>
+
+        <!-- Unified Action Buttons Toolbar -->
+        <div class="btn-group shadow-sm bg-white" role="group" aria-label="أدوات المشترك">
+            <button type="button" class="btn btn-outline-primary fw-bold" onclick="toolbarAction('traffic')" title="مراقبة سحب العميل المحدد لايف">
+                <i class="bi bi-activity text-danger me-1"></i> سحب لايف
+            </button>
+            <button type="button" class="btn btn-outline-success fw-bold" onclick="toolbarAction('renew')" title="تجديد اشتراك العميل المحدد">
+                <i class="bi bi-arrow-repeat me-1"></i> تجديد
+            </button>
+            <button type="button" class="btn btn-outline-primary fw-bold" onclick="toolbarAction('edit')" title="تعديل بيانات المشترك المحدد">
+                <i class="bi bi-pencil-square me-1"></i> تعديل
+            </button>
+            <button type="button" class="btn btn-outline-info text-dark fw-bold" onclick="toolbarAction('quota')" title="إضافة كوتة رصيد إضافية">
+                <i class="bi bi-database-add me-1"></i> +كوتة
+            </button>
+            <button type="button" class="btn btn-outline-warning text-dark fw-bold" onclick="toolbarAction('debt')" title="سداد مديونية المشترك المحدد">
+                <i class="bi bi-cash-stack me-1"></i> سداد
+            </button>
+            <button type="button" class="btn btn-outline-danger fw-bold" onclick="toolbarAction('delete')" title="حذف المشترك المحدد">
+                <i class="bi bi-trash me-1"></i> حذف
+            </button>
+        </div>
+
         <a href="/subscribers/add" class="btn btn-primary fw-bold shadow-sm">
             <i class="bi bi-person-plus-fill me-1"></i> إضافة مشترك جديد
         </a>
@@ -176,13 +216,19 @@
                     <th class="col-quota">الكوتة</th>
                     <th class="col-expiry">تاريخ الانتهاء</th>
                     <th class="col-status">الحالة</th>
-                    <th class="text-end">خيارات</th>
                 </tr>
             </thead>
             <tbody>
                 {{ range .Subscribers }}
-                <tr id="row-{{ .Username }}">
-                    <td class="text-center">
+                <tr id="row-{{ .Username }}"
+                    class="subscriber-row"
+                    onclick="handleRowClick('{{ .Username }}', '{{ .FullName }}', '{{ .Profile }}', '{{ printf "%.2f" .Debt }}', '{{ printf "%.1f" .QuotaGB }}', event)"
+                    data-username="{{ .Username }}"
+                    data-fullname="{{ .FullName }}"
+                    data-profile="{{ .Profile }}"
+                    data-debt="{{ printf "%.2f" .Debt }}"
+                    data-quota="{{ printf "%.1f" .QuotaGB }}">
+                    <td class="text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="form-check-input sub-checkbox" value="{{ .Username }}" onchange="updateSelectionState()">
                     </td>
                     <td class="col-online">
@@ -218,7 +264,7 @@
                     </td>
                     <td class="col-phone">
                         {{ if .Phone }}
-                        <a href="tel:{{ .Phone }}" class="text-decoration-none text-dark">
+                        <a href="tel:{{ .Phone }}" class="text-decoration-none text-dark" onclick="event.stopPropagation()">
                             <i class="bi bi-telephone text-muted me-1"></i>{{ .Phone }}
                         </a>
                         {{ else }}
@@ -252,32 +298,10 @@
                         <span class="badge bg-secondary">{{ .Status }}</span>
                         {{ end }}
                     </td>
-                    <td class="text-end text-nowrap">
-                        <button type="button" class="btn btn-sm btn-outline-primary me-1 fw-bold" onclick="openLiveTrafficModal('{{ .Username }}', '{{ .FullName }}')" title="مراقبة سحب العميل لايف">
-                            <i class="bi bi-activity text-danger me-1"></i> سحب لايف
-                        </button>
-                        {{ if gt .Debt 0.0 }}
-                        <button type="button" class="btn btn-sm btn-outline-warning text-dark me-1" onclick="openPayDebtModal('{{ .Username }}', '{{ .FullName }}', '{{ printf "%.2f" .Debt }}')" title="سداد مديونية المشترك">
-                            <i class="bi bi-cash-stack"></i> سداد
-                        </button>
-                        {{ end }}
-                        <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="openAddQuotaModal('{{ .Username }}', '{{ .FullName }}', '{{ printf "%.1f" .QuotaGB }}')" title="إضافة كوتة رصيد إضافية">
-                            <i class="bi bi-database-add"></i> +كوتة
-                        </button>
-                        <a href="/subscribers/edit?username={{ .Username }}" class="btn btn-sm btn-outline-primary me-1" title="تعديل بيانات المشترك">
-                            <i class="bi bi-pencil-square"></i> تعديل
-                        </a>
-                        <button type="button" class="btn btn-sm btn-outline-success me-1" onclick="openRenewModal('{{ .Username }}', '{{ .FullName }}', '{{ .Profile }}')" title="تجديد الاشتراك">
-                            <i class="bi bi-arrow-repeat"></i> تجديد
-                        </button>
-                        <a href="/subscribers/delete?username={{ .Username }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من النظام والقاعدة؟');" title="حذف المشترك">
-                            <i class="bi bi-trash"></i> حذف
-                        </a>
-                    </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="12" class="text-center py-5 text-muted">
+                    <td colspan="11" class="text-center py-5 text-muted">
                         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
                         لا توجد بيانات مشتركين مطابقة
                     </td>
@@ -1087,6 +1111,114 @@ const selectedCountBadge = document.getElementById('selectedCount');
 const bulkUsernamesFields = document.querySelectorAll('.bulk-usernames-field');
 const bulkCountTexts = document.querySelectorAll('.bulk-count-text');
 
+let activeSubscriber = null;
+
+function setActiveSubscriber(sub) {
+    activeSubscriber = sub;
+    const badge = document.getElementById('activeSubBadge');
+    const nameEl = document.getElementById('activeSubName');
+
+    document.querySelectorAll('.subscriber-row').forEach(r => r.classList.remove('active-selected'));
+
+    if (sub && sub.username) {
+        if (badge) {
+            badge.classList.remove('d-none');
+            badge.classList.add('d-flex');
+        }
+        if (nameEl) {
+            nameEl.textContent = sub.username + (sub.fullName ? ' (' + sub.fullName + ')' : '');
+        }
+        const row = document.getElementById('row-' + sub.username);
+        if (row) row.classList.add('active-selected');
+    } else {
+        if (badge) {
+            badge.classList.remove('d-flex');
+            badge.classList.add('d-none');
+        }
+        if (nameEl) nameEl.textContent = '';
+    }
+}
+
+function clearActiveSubscriber(e) {
+    if (e) e.stopPropagation();
+    setActiveSubscriber(null);
+    deselectAll();
+}
+
+function handleRowClick(username, fullName, profile, debt, quota, event) {
+    // If clicked on input, link, or button, let their default handlers run
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'A' || event.target.tagName === 'BUTTON' || event.target.closest('a') || event.target.closest('button')) {
+        return;
+    }
+
+    // Set this row as active subscriber and check only this row
+    rowCheckboxes.forEach(cb => {
+        cb.checked = (cb.value === username);
+    });
+
+    setActiveSubscriber({
+        username: username,
+        fullName: fullName,
+        profile: profile,
+        debt: debt,
+        quota: quota
+    });
+
+    updateSelectionState();
+}
+
+function toolbarAction(action) {
+    // If no activeSubscriber is set, check if exactly one checkbox is checked
+    if (!activeSubscriber) {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length === 1) {
+            const row = document.getElementById('row-' + checked[0].value);
+            if (row) {
+                activeSubscriber = {
+                    username: row.dataset.username,
+                    fullName: row.dataset.fullname,
+                    profile: row.dataset.profile,
+                    debt: row.dataset.debt,
+                    quota: row.dataset.quota
+                };
+            }
+        }
+    }
+
+    if (action === 'traffic') {
+        if (activeSubscriber) {
+            openLiveTrafficModal(activeSubscriber.username, activeSubscriber.fullName);
+        } else {
+            openLiveTrafficModal('', '');
+        }
+        return;
+    }
+
+    if (!activeSubscriber) {
+        alert('يرجى تحديد مشترك من الجدول أولاً بالنقر على الصف الخاص به.');
+        return;
+    }
+
+    if (action === 'renew') {
+        openRenewModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.profile);
+    } else if (action === 'edit') {
+        window.location.href = '/subscribers/edit?username=' + encodeURIComponent(activeSubscriber.username);
+    } else if (action === 'quota') {
+        openAddQuotaModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.quota);
+    } else if (action === 'debt') {
+        const debtVal = parseFloat(activeSubscriber.debt) || 0;
+        if (debtVal <= 0) {
+            alert('المشترك (' + activeSubscriber.username + ') ليس لديه أي مديونية مستحقة.');
+            return;
+        }
+        openPayDebtModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.debt);
+    } else if (action === 'delete') {
+        if (confirm('هل أنت متأكد من حذف المشترك (' + activeSubscriber.username + ') نهائياً من النظام والقاعدة؟')) {
+            window.location.href = '/subscribers/delete?username=' + encodeURIComponent(activeSubscriber.username);
+        }
+    }
+}
+
 if (selectAllCheckbox) {
     selectAllCheckbox.addEventListener('change', function() {
         const checked = this.checked;
@@ -1110,7 +1242,10 @@ function updateSelectionState() {
             selected.push(cb.value);
             if (row) row.classList.add('table-primary');
         } else {
-            if (row) row.classList.remove('table-primary');
+            if (row) {
+                row.classList.remove('table-primary');
+                row.classList.remove('active-selected');
+            }
         }
     });
 
@@ -1121,11 +1256,26 @@ function updateSelectionState() {
     const csv = selected.join(',');
     bulkUsernamesFields.forEach(el => el.value = csv);
 
-    if (count > 0) {
+    if (count === 1) {
+        const row = document.getElementById('row-' + selected[0]);
+        if (row) {
+            setActiveSubscriber({
+                username: row.dataset.username,
+                fullName: row.dataset.fullname,
+                profile: row.dataset.profile,
+                debt: row.dataset.debt,
+                quota: row.dataset.quota
+            });
+        }
+    } else {
+        setActiveSubscriber(null);
+    }
+
+    if (count > 1) {
         bulkActionBar.classList.remove('d-none');
     } else {
         bulkActionBar.classList.add('d-none');
-        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        if (selectAllCheckbox && count === 0) selectAllCheckbox.checked = false;
     }
 
     if (selectAllCheckbox && rowCheckboxes.length > 0) {
@@ -1138,8 +1288,12 @@ function deselectAll() {
     rowCheckboxes.forEach(cb => {
         cb.checked = false;
         const row = document.getElementById('row-' + cb.value);
-        if (row) row.classList.remove('table-primary');
+        if (row) {
+            row.classList.remove('table-primary');
+            row.classList.remove('active-selected');
+        }
     });
+    setActiveSubscriber(null);
     updateSelectionState();
 }
 
