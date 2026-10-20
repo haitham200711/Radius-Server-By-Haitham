@@ -1,33 +1,116 @@
 {{ define "content" }}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
-        <h3 class="fw-bold mb-1">
-            <i class="bi bi-whatsapp text-success me-2"></i> ربط وإشعارات الواتساب (WhatsApp Automation)
+        <h3 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <span class="p-1.5 bg-success-subtle text-success rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                <i class="bi bi-whatsapp"></i>
+            </span>
+            <span>ربط وإشعارات الواتساب (WhatsApp Automation)</span>
         </h3>
-        <p class="text-muted small mb-0">إدارة ربط واتساب ويب، وقوالب الرسائل التلقائية لانتهاء الوقت، واستهلاك الكوتة (50%, 75%, 100%)، والتجديد، والديون</p>
+        <p class="text-muted small mb-0">إدارة ربط واتساب ويب، وقوالب الرسائل التلقائية لانتهاء الوقت واستهلاك الكوتة والتجديد والديون</p>
     </div>
-    <div>
+
+    <!-- Top Action Buttons Toolbar -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
         {{ if .Status.IsLoggedIn }}
-        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6">
-            <i class="bi bi-check-circle-fill me-1"></i> متصل ومقترن: <b dir="ltr" class="font-monospace ms-1">+{{ .Status.PhoneNumber }}</b>
-        </span>
+        <button type="button" class="btn btn-sm btn-outline-danger fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#logoutModal">
+            <i class="bi bi-box-arrow-right me-1"></i> قطع الاتصال (+{{ .Status.PhoneNumber }})
+        </button>
         {{ else }}
-        <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2 fs-6">
-            <i class="bi bi-exclamation-triangle-fill me-1"></i> بانتظار مسح كود QR أو الاقتران
-        </span>
+        <button type="button" class="btn btn-sm btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#pairingModal">
+            <i class="bi bi-qr-code-scan me-1"></i> اقتران واتساب (QR / هاتف)
+        </button>
         {{ end }}
+
+        <button type="button" class="btn btn-sm btn-outline-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#testMsgModal">
+            <i class="bi bi-send-fill text-primary me-1"></i> تجربة إرسال
+        </button>
+
+        <button type="button" class="btn btn-sm btn-outline-danger fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#instantDebtModal">
+            <i class="bi bi-bell-fill text-danger me-1"></i> إرسال تذكير الديون
+        </button>
+
+        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#waSettingsModal">
+            <i class="bi bi-gear-fill me-1"></i> إعدادات الخدمة
+        </button>
+    </div>
+</div>
+
+<!-- Compact Stats Ribbon -->
+<div class="row g-2 mb-4">
+    <!-- Card 1: Pairing & Connection -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center {{ if .Status.IsLoggedIn }}bg-success-subtle text-success{{ else }}bg-warning-subtle text-warning{{ end }} flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-whatsapp"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">حالة اتصال الهاتف</span>
+                    {{ if .Status.IsLoggedIn }}
+                    <span class="fw-bold text-success small font-monospace" dir="ltr">+{{ .Status.PhoneNumber }}</span>
+                    {{ else }}
+                    <span class="fw-bold text-warning small">بانتظار الاقتران</span>
+                    {{ end }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Notifications Service State -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center {{ if .Settings.Enabled }}bg-primary-subtle text-primary{{ else }}bg-light text-secondary border{{ end }} flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-broadcast-pin"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">خدمة الإشعارات العامة</span>
+                    <span class="fw-bold {{ if .Settings.Enabled }}text-primary{{ else }}text-muted{{ end }} small">
+                        {{ if .Settings.Enabled }}مفعلة (نشطة){{ else }}معطلة مؤقتاً{{ end }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Debt Reminder Automation -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center {{ if .Settings.DebtReminderEnabled }}bg-danger-subtle text-danger{{ else }}bg-light text-secondary border{{ end }} flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-alarm-fill"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">التذكير التلقائي بالديون</span>
+                    <span class="fw-bold {{ if .Settings.DebtReminderEnabled }}text-danger{{ else }}text-muted{{ end }} small">
+                        {{ if .Settings.DebtReminderEnabled }}مفعل (كل {{ .Settings.DebtReminderDays }} أيام){{ else }}معطل{{ end }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Sent Messages Count -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center bg-info-subtle text-info flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-clock-history"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">سجل الإرسال الحديث</span>
+                    <span class="fw-bold text-dark small">{{ len .Logs }} رسالة مسجلة</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Main Tabs Navigation -->
 <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-3 shadow-sm border" id="mainWaTab" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active px-3 py-2 fw-bold d-flex align-items-center gap-2" id="conn-tab" data-bs-toggle="pill" data-bs-target="#conn-pane" type="button" role="tab">
-            <i class="bi bi-qr-code-scan text-primary"></i> الربط والاتصال بالهاتف
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link px-3 py-2 fw-bold d-flex align-items-center gap-2" id="templates-tab" data-bs-toggle="pill" data-bs-target="#templates-pane" type="button" role="tab">
+        <button class="nav-link active px-3 py-2 fw-bold d-flex align-items-center gap-2" id="templates-tab" data-bs-toggle="pill" data-bs-target="#templates-pane" type="button" role="tab">
             <i class="bi bi-chat-text-fill text-success"></i> قوالب رسائل العملاء (الكوتة والوقت والتجديد)
         </button>
     </li>
@@ -41,259 +124,28 @@
             <i class="bi bi-clock-history text-secondary"></i> سجل الرسائل المرسلة
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link px-3 py-2 fw-bold d-flex align-items-center gap-2" id="conn-tab" data-bs-toggle="pill" data-bs-target="#conn-pane" type="button" role="tab">
+            <i class="bi bi-qr-code-scan text-primary"></i> حالة الاتصال والاقتران المباشر
+        </button>
+    </li>
 </ul>
 
 <div class="tab-content" id="mainWaTabContent">
-    <!-- TAB 1: CONNECTION & PAIRING -->
-    <div class="tab-pane fade show active" id="conn-pane" role="tabpanel">
-        <div class="row g-4">
-            <!-- Left: Device Pairing -->
-            <div class="col-lg-7">
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                        <span class="fw-bold text-dark">
-                            <i class="bi bi-phone me-1 text-primary"></i> حالة الاتصال والاقتران (Device Pairing)
-                        </span>
-                        {{ if .Status.IsLoggedIn }}
-                        <span class="badge bg-success">متصل بنجاح</span>
-                        {{ else }}
-                        <span class="badge bg-secondary">غير مقترن</span>
-                        {{ end }}
-                    </div>
-                    <div class="card-body p-4">
-                        {{ if .Status.IsLoggedIn }}
-                        <!-- Logged In State -->
-                        <div class="text-center py-4">
-                            <div class="display-4 text-success mb-3">
-                                <i class="bi bi-patch-check-fill"></i>
-                            </div>
-                            <h4 class="fw-bold text-dark mb-1">حساب الواتساب متصل بنجاح!</h4>
-                            <p class="text-muted mb-3">
-                                تم اقتران السيرفر برقم الهاتف: <b class="text-primary font-monospace fs-5" dir="ltr">+{{ .Status.PhoneNumber }}</b>
-                            </p>
-                            <div class="alert alert-success d-inline-block px-4 py-2 small mb-4">
-                                <i class="bi bi-shield-check me-1"></i> الجلسة محفوظة وتتصل تلقائياً مع السيرفر حتى بعد إعادة التشغيل
-                            </div>
-                            <div>
-                                <form method="POST" action="/whatsapp/logout" onsubmit="return confirm('هل أنت متأكد من رغبتك في قطع الاتصال وتسجيل الخروج من واتساب؟ سيتم إلغاء اقتران الهاتف.');">
-                                    <button type="submit" class="btn btn-outline-danger fw-bold px-4">
-                                        <i class="bi bi-box-arrow-right me-1"></i> تسجيل الخروج وإلغاء الاقتران
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                        {{ else }}
-                        <!-- Not Logged In: Pairing Options -->
-                        <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3" id="pairingTab" role="tablist">
-                            <li class="nav-item flex-grow-1" role="presentation">
-                                <button class="nav-link active w-100 fw-bold d-flex justify-content-center align-items-center gap-2" id="qr-tab" data-bs-toggle="pill" data-bs-target="#qr-pane" type="button" role="tab">
-                                    <i class="bi bi-qr-code-scan"></i> الطريقة الأولى: مسح كود QR
-                                </button>
-                            </li>
-                            <li class="nav-item flex-grow-1" role="presentation">
-                                <button class="nav-link w-100 fw-bold d-flex justify-content-center align-items-center gap-2" id="phone-tab" data-bs-toggle="pill" data-bs-target="#phone-pane" type="button" role="tab">
-                                    <i class="bi bi-123"></i> الطريقة الثانية: كود الهاتف
-                                </button>
-                            </li>
-                        </ul>
-
-                        <div class="tab-content" id="pairingTabContent">
-                            <!-- Tab 1.1: QR Code -->
-                            <div class="tab-pane fade show active" id="qr-pane" role="tabpanel">
-                                <div class="row align-items-center">
-                                    <div class="col-md-6 text-center mb-3 mb-md-0">
-                                        <div id="qrLoading" class="p-4 border rounded-3 bg-light d-none">
-                                            <div class="spinner-border text-primary mb-2" role="status"></div>
-                                            <p class="text-muted small mb-0">جاري الاتصال بخوادم واتساب وتوليد الكود...</p>
-                                        </div>
-
-                                        <div id="qrDisplay" class="border rounded-3 p-3 bg-white shadow-sm d-inline-block {{ if not .Status.HasQR }}d-none{{ end }}">
-                                            <img id="qrImage" src="{{ if .Status.HasQR }}{{ .Status.QRCodeImage }}{{ end }}" alt="QR Code" class="img-fluid" style="width: 230px; height: 230px;">
-                                            <div class="small text-muted mt-2">
-                                                <i class="bi bi-arrow-repeat spin"></i> يتجدد الكود تلقائياً
-                                            </div>
-                                        </div>
-
-                                        <div id="qrPlaceholder" class="p-4 border rounded-3 bg-light {{ if .Status.HasQR }}d-none{{ end }}">
-                                            <i class="bi bi-qr-code text-muted display-4 d-block mb-2"></i>
-                                            <span class="text-muted small d-block mb-3">اضغط على الزر أدناه لتوليد كود QR ومسحه بكاميرا الهاتف</span>
-                                        </div>
-
-                                        <div class="mt-3">
-                                            <button type="button" class="btn btn-primary fw-bold px-4" id="btnStartQR" onclick="startQRPairing()">
-                                                <i class="bi bi-qr-code me-1"></i> توليد كود QR الآن
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <h6 class="fw-bold mb-3 text-dark">
-                                            <i class="bi bi-info-circle text-primary me-1"></i> خطوات مسح الكود:
-                                        </h6>
-                                        <ol class="small text-muted ps-3 mb-0" style="line-height: 1.8;">
-                                            <li>افتح تطبيق <b>واتساب</b> على هاتفك المحمول.</li>
-                                            <li>اضغط على القائمة (ثلاث نقاط) أو <b>الإعدادات</b>.</li>
-                                            <li>اختر <b>الأجهزة المرتبطة (Linked Devices)</b>.</li>
-                                            <li>اضغط على زر <b>ربط جهاز (Link a Device)</b>.</li>
-                                            <li>وجّه كاميرا هاتفك نحو المربع الظاهر هنا للمسح.</li>
-                                        </ol>
-                                        <div class="alert alert-info py-2 px-3 small mt-3 mb-0">
-                                            <i class="bi bi-magic me-1"></i> بمجرد المسح، سيكتشف النظام تسجيل الدخول فوراً ويتم الاتصال تلقائياً!
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Tab 1.2: Phone Linking Code -->
-                            <div class="tab-pane fade" id="phone-pane" role="tabpanel">
-                                <div class="p-3 bg-light rounded-3 border">
-                                    <h6 class="fw-bold text-dark mb-2">
-                                        <i class="bi bi-key-fill text-warning me-1"></i> ربط الحساب عبر إدخال كود في الهاتف
-                                    </h6>
-                                    <p class="text-muted small mb-3">
-                                        إذا كنت لا تريد استخدام الكاميرا، يمكنك كتابة رقم هاتفك واستخراج كود مكون من 8 خانات لإدخاله في تطبيق واتساب بهاتفك.
-                                    </p>
-
-                                    <div class="input-group mb-3">
-                                        <span class="input-group-text font-monospace bg-white"><i class="bi bi-telephone"></i></span>
-                                        <input type="text" id="phonePairInput" class="form-control font-monospace" placeholder="مثال: 201012345678" dir="ltr">
-                                        <button type="button" class="btn btn-warning fw-bold text-dark px-3" id="btnPairPhone" onclick="pairByPhone()">
-                                            <i class="bi bi-key me-1"></i> استخراج كود الربط
-                                        </button>
-                                    </div>
-
-                                    <div id="phoneCodeResult" class="d-none text-center p-3 bg-white border border-warning rounded-3">
-                                        <span class="text-muted small d-block mb-1">أدخل الكود التالي في هاتفك (الأجهزة المرتبطة -> ربط باستخدام رقم الهاتف):</span>
-                                        <div class="display-6 font-monospace fw-bold text-dark my-2 tracking-wide" id="phoneCodeDisplay">--------</div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyPhoneCode()">
-                                            <i class="bi bi-clipboard me-1"></i> نسخ الكود
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {{ end }}
-                    </div>
-                </div>
-
-                <!-- Live Test Message Card -->
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white py-3 border-bottom">
-                        <span class="fw-bold text-dark">
-                            <i class="bi bi-send-check text-success me-1"></i> تجربة إرسال رسالة واتساب حية
-                        </span>
-                    </div>
-                    <div class="card-body p-4">
-                        <form method="POST" action="/whatsapp/test">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">رقم هاتف المستلم (مع كود الدولة):</label>
-                                <input type="text" name="test_phone" class="form-control font-monospace" placeholder="مثال: 201012345678" value="{{ .Settings.AdminPhone }}" required dir="ltr">
-                                <small class="text-muted">أدخل الرقم بالصيغة الدولية مثل: <code>201012345678</code> لمصر أو <code>9665xxxxxxxx</code> للسعودية.</small>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">نص الرسالة التجريبية:</label>
-                                <textarea name="test_message" class="form-control" rows="2" placeholder="أدخل رسالتك التجريبية هنا...">🔔 تجربة ربط واتساب ناجحة من نظام راديوس مايكروتك الاحترافي!</textarea>
-                            </div>
-
-                            <button type="submit" class="btn btn-success fw-bold px-4" {{ if and (not .Status.IsLoggedIn) (eq .Settings.APIEndpoint "") }}disabled title="يرجى ربط واتساب أولاً"{{ end }}>
-                                <i class="bi bi-send-fill me-1"></i> إرسال الرسالة الآن
-                            </button>
-                            {{ if and (not .Status.IsLoggedIn) (eq .Settings.APIEndpoint "") }}
-                            <small class="text-danger ms-2 fw-bold">
-                                <i class="bi bi-exclamation-circle"></i> يرجى مسح كود QR أو إدخال بوابة خارجية أولاً لتفعيل الإرسال.
-                            </small>
-                            {{ end }}
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: General Settings -->
-            <div class="col-lg-5">
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white py-3 border-bottom">
-                        <span class="fw-bold text-dark">
-                            <i class="bi bi-sliders me-1 text-primary"></i> إعدادات الخدمة العامة
-                        </span>
-                    </div>
-                    <form method="POST" action="/whatsapp/settings">
-                        <div class="card-body p-4">
-                            <div class="form-check form-switch mb-3 pb-2 border-bottom">
-                                <input class="form-check-input" type="checkbox" name="enabled" id="waEnabled" value="1" {{ if .Settings.Enabled }}checked{{ end }}>
-                                <label class="form-check-label fw-bold" for="waEnabled">تفعيل خدمة الواتساب العامة في النظام</label>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">رقم هاتف المدير / المسؤول:</label>
-                                <input type="text" name="admin_phone" class="form-control font-monospace" placeholder="مثال: 201012345678" value="{{ .Settings.AdminPhone }}" dir="ltr">
-                                <small class="text-muted">الرقم الذي سيتلقى التنبيهات الإدارية والتقارير.</small>
-                            </div>
-
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" name="notify_on_new_subscriber" id="notifNew" value="1" {{ if .Settings.NotifyOnNewSubscriber }}checked{{ end }}>
-                                <label class="form-check-label small fw-bold" for="notifNew">إرسال رسالة ترحيب وبيانات الاشتراك للعميل الجديد</label>
-                            </div>
-
-                            <!-- Preserve Debt Reminder inputs inside settings form -->
-                            <input type="hidden" name="debt_reminder_enabled" value="{{ if .Settings.DebtReminderEnabled }}1{{ else }}0{{ end }}">
-                            <input type="hidden" name="debt_reminder_days" value="{{ .Settings.DebtReminderDays }}">
-                            <input type="hidden" name="debt_reminder_min_debt" value="{{ printf "%.2f" .Settings.DebtReminderMinDebt }}">
-
-                            <div class="accordion mt-3" id="gatewayAccordion">
-                                <div class="accordion-item border-0">
-                                    <h2 class="accordion-header">
-                                        <button class="accordion-button collapsed px-0 py-2 small fw-bold text-muted bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGateway">
-                                            <i class="bi bi-cloud-arrow-up me-2 text-primary"></i> إعدادات بوابة خارجية احتياطية (Optional Gateway API)
-                                        </button>
-                                    </h2>
-                                    <div id="collapseGateway" class="accordion-collapse collapse" data-bs-parent="#gatewayAccordion">
-                                        <div class="p-3 bg-light rounded-3 mt-2">
-                                            <small class="text-muted d-block mb-2">إذا أردت استخدام بوابة إرسال سحابية خارجية (مثل Green API، UltraMsg، WAHA) كبديل احتياطي:</small>
-                                            <div class="mb-2">
-                                                <label class="form-label small fw-bold">رابط البوابة (API Endpoint):</label>
-                                                <input type="text" name="api_endpoint" class="form-control form-control-sm font-monospace" placeholder="https://api.green-api.com/waInstance..." value="{{ .Settings.APIEndpoint }}" dir="ltr">
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small fw-bold">رمز المصادقة (API Token):</label>
-                                                <input type="password" name="api_token" class="form-control form-control-sm font-monospace" value="{{ .Settings.APIToken }}">
-                                            </div>
-                                            <div>
-                                                <label class="form-label small fw-bold">معرف الجلسة (Instance ID):</label>
-                                                <input type="text" name="instance_id" class="form-control form-control-sm font-monospace" value="{{ .Settings.InstanceID }}">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-light p-3 text-end">
-                            <button type="submit" class="btn btn-primary fw-bold px-4">
-                                <i class="bi bi-check-circle me-1"></i> حفظ الإعدادات
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- TAB 2: CLIENT MESSAGE TEMPLATES & AUTOMATIONS -->
-    <div class="tab-pane fade" id="templates-pane" role="tabpanel">
+    <!-- TAB 1: NOTIFICATION TEMPLATES -->
+    <div class="tab-pane fade show active" id="templates-pane" role="tabpanel">
         <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <div>
-                    <h5 class="fw-bold mb-0 text-dark">
-                        <i class="bi bi-chat-quote-fill text-success me-2"></i> قوالب رسائل العملاء التلقائية والتحكم في محتواها
-                    </h5>
-                    <small class="text-muted">يمكنك تفعيل أو تعطيل أي رسالة، وتعديل نصها وإدراج المتغيرات الديناميكية بسهولة</small>
-                </div>
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark">
+                    <i class="bi bi-chat-square-text text-success me-1"></i> قوالب رسائل الواتساب التلقائية للأحداث
+                </span>
+                <span class="badge bg-light text-muted border">انقر على المتغير لإدراجه في نص الرسالة</span>
             </div>
             <div class="card-body p-4">
-                <!-- Variables Legend Bar -->
-                <div class="p-3 bg-light rounded-3 border mb-4">
-                    <span class="small fw-bold text-dark d-block mb-2">
-                        <i class="bi bi-tags-fill text-primary me-1"></i> المتغيرات الديناميكية المتاحة (اضغط على أي زر لإدراجه مباشرة في خانة الرسالة):
+                <!-- Variables Tags Helper -->
+                <div class="mb-4 p-3 bg-light rounded-3 border">
+                    <span class="fw-bold small text-dark d-block mb-2">
+                        <i class="bi bi-code-slash text-primary me-1"></i> المتغيرات التلقائية المتاحة (انقر على أي متغير لإدراجه فوراً في الرسالة النشطة):
                     </span>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-sm btn-white border shadow-sm font-monospace" onclick="insertTag('{name}')" title="اسم العميل الكامل">{name} (الاسم)</button>
@@ -310,8 +162,8 @@
                     </div>
                 </div>
 
-                <!-- Template Forms Grid -->
-                <div class="row g-4">
+                <!-- Template Cards Grid -->
+                <div class="row g-3">
                     {{ range .Templates }}
                     {{ if ne .EventKey "debt_reminder" }}
                     <div class="col-lg-6">
@@ -352,7 +204,7 @@
                                 </div>
                                 <div class="card-footer bg-light p-2 px-3 d-flex justify-content-between align-items-center">
                                     <span class="small text-muted font-monospace" style="font-size: 0.75rem;">الكود: <code>{{ .EventKey }}</code></span>
-                                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
+                                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3 shadow-sm">
                                         <i class="bi bi-check-lg me-1"></i> حفظ القالب
                                     </button>
                                 </div>
@@ -366,7 +218,7 @@
         </div>
     </div>
 
-    <!-- TAB 3: RECURRING DEBT REMINDERS -->
+    <!-- TAB 2: RECURRING DEBT REMINDERS -->
     <div class="tab-pane fade" id="debt-reminder-pane" role="tabpanel">
         <div class="row g-4">
             <div class="col-lg-7">
@@ -417,40 +269,39 @@
                                     </select>
                                     <small class="text-muted">المدة الفاصلة بين كل رسالة تذكير وأخرى لنفس العميل.</small>
                                 </div>
-
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">الحد الأدنى لقيمة الدين للتذكير:</label>
+                                    <label class="form-label fw-bold">الحد الأدنى للمديونية للتذكير (ج.م):</label>
                                     <div class="input-group">
-                                        <input type="number" step="0.5" name="debt_reminder_min_debt" class="form-control font-monospace fw-bold" value="{{ printf "%.2f" .Settings.DebtReminderMinDebt }}" required>
-                                        <span class="input-group-text bg-light">ج.م</span>
+                                        <input type="number" step="0.5" name="debt_reminder_min_debt" class="form-control fw-bold" value="{{ printf "%.2f" .Settings.DebtReminderMinDebt }}">
+                                        <span class="input-group-text">ج.م</span>
                                     </div>
-                                    <small class="text-muted">تجاهل العملاء إذا كان الدين أقل من هذا المبلغ.</small>
+                                    <small class="text-muted">لن يتم إرسال تذكير إذا كان الدين أقل من هذا المبلغ.</small>
                                 </div>
                             </div>
 
-                            {{ if not .Settings.DebtReminderLastRun.IsZero }}
-                            <div class="small text-muted mb-3">
-                                <i class="bi bi-clock me-1"></i> آخر فحص وإرسال تلقائي للتذكيرات: <b>{{ .Settings.DebtReminderLastRun.Format "2006-01-02 15:04:05" }}</b>
+                            <div class="p-3 bg-light rounded-3 border">
+                                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-clock-history me-1"></i> وقت الفحص اليومي</h6>
+                                <p class="text-muted small mb-0">يتم تشغيل الفحص يومياً الساعة <strong>12:00 ظهراً</strong> وتوزيع الرسائل تلقائياً بفواصل زمنية لحماية الرقم من الحظر.</p>
                             </div>
-                            {{ end }}
-
-                            <button type="submit" class="btn btn-primary fw-bold px-4">
-                                <i class="bi bi-check-circle me-1"></i> حفظ إعدادات دورة التذكير
+                        </div>
+                        <div class="card-footer bg-light p-3 text-end">
+                            <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm">
+                                <i class="bi bi-save me-1"></i> حفظ إعدادات التذكير بالديون
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <!-- Right: Debt Reminder Template & Instant Trigger -->
+            <!-- Right Column: Template & Manual Trigger -->
             <div class="col-lg-5">
-                <!-- Template for Debt Reminder -->
                 {{ range .Templates }}
                 {{ if eq .EventKey "debt_reminder" }}
                 <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                        <strong class="text-dark"><i class="bi bi-pencil-square text-primary me-1"></i> نص رسالة التذكير بالدين</strong>
-                        <span class="badge bg-warning text-dark font-monospace">debt_reminder</span>
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <span class="fw-bold text-dark">
+                            <i class="bi bi-chat-quote-fill text-primary me-1"></i> قالب رسالة التذكير بالديون
+                        </span>
                     </div>
                     <form method="POST" action="/whatsapp/templates/save">
                         <input type="hidden" name="event_key" value="debt_reminder">
@@ -465,7 +316,7 @@
                             </div>
                         </div>
                         <div class="card-footer bg-light p-3 text-end">
-                            <button type="submit" class="btn btn-primary fw-bold px-3">
+                            <button type="submit" class="btn btn-primary fw-bold px-3 shadow-sm">
                                 <i class="bi bi-check-lg me-1"></i> حفظ نص رسالة التذكير
                             </button>
                         </div>
@@ -484,7 +335,7 @@
                             إذا كنت ترغب في بدء حملة تذكير فورية لجميع العملاء الذين عليهم ديون دون انتظار الدورة المجدولة:
                         </p>
                         <form method="POST" action="/whatsapp/debt-reminders/run-now" onsubmit="return confirm('هل أنت متأكد من رغبتك في إرسال رسائل تذكير بالديون لجميع العملاء المدينين الآن عبر الواتساب؟');">
-                            <button type="submit" class="btn btn-danger fw-bold w-100 py-2">
+                            <button type="submit" class="btn btn-danger fw-bold w-100 py-2 shadow-sm">
                                 <i class="bi bi-send-exclamation me-1"></i> إرسال تذكير فوري لجميع العملاء المدينين الآن
                             </button>
                         </form>
@@ -494,7 +345,7 @@
         </div>
     </div>
 
-    <!-- TAB 4: MESSAGE LOGS -->
+    <!-- TAB 3: MESSAGE LOGS -->
     <div class="tab-pane fade" id="logs-pane" role="tabpanel">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
@@ -543,6 +394,400 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: CONNECTION & PAIRING DETAILS -->
+    <div class="tab-pane fade" id="conn-pane" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-dark">
+                            <i class="bi bi-phone me-1 text-primary"></i> تفاصيل حالة الاقتران والاتصال المباشر
+                        </span>
+                        {{ if .Status.IsLoggedIn }}
+                        <span class="badge bg-success">متصل بنجاح</span>
+                        {{ else }}
+                        <span class="badge bg-secondary">غير مقترن</span>
+                        {{ end }}
+                    </div>
+                    <div class="card-body p-4">
+                        {{ if .Status.IsLoggedIn }}
+                        <div class="text-center py-4">
+                            <div class="display-4 text-success mb-3">
+                                <i class="bi bi-patch-check-fill"></i>
+                            </div>
+                            <h4 class="fw-bold text-dark mb-1">حساب الواتساب متصل بنجاح!</h4>
+                            <p class="text-muted mb-3">
+                                تم اقتران السيرفر برقم الهاتف: <b class="text-primary font-monospace fs-5" dir="ltr">+{{ .Status.PhoneNumber }}</b>
+                            </p>
+                            <div class="alert alert-success d-inline-block px-4 py-2 small mb-4">
+                                <i class="bi bi-shield-check me-1"></i> الجلسة محفوظة وتتصل تلقائياً مع السيرفر حتى بعد إعادة التشغيل
+                            </div>
+                            <div>
+                                <form method="POST" action="/whatsapp/logout" onsubmit="return confirm('هل أنت متأكد من رغبتك في قطع الاتصال وتسجيل الخروج من واتساب؟ سيتم إلغاء اقتران الهاتف.');">
+                                    <button type="submit" class="btn btn-outline-danger fw-bold px-4 shadow-sm">
+                                        <i class="bi bi-box-arrow-right me-1"></i> تسجيل الخروج وإلغاء الاقتران
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {{ else }}
+                        <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3" id="pairingTab" role="tablist">
+                            <li class="nav-item flex-grow-1" role="presentation">
+                                <button class="nav-link active w-100 fw-bold d-flex justify-content-center align-items-center gap-2" id="qr-tab" data-bs-toggle="pill" data-bs-target="#qr-pane" type="button" role="tab">
+                                    <i class="bi bi-qr-code-scan"></i> مسح كود QR
+                                </button>
+                            </li>
+                            <li class="nav-item flex-grow-1" role="presentation">
+                                <button class="nav-link w-100 fw-bold d-flex justify-content-center align-items-center gap-2" id="phone-tab" data-bs-toggle="pill" data-bs-target="#phone-pane" type="button" role="tab">
+                                    <i class="bi bi-123"></i> كود الهاتف (8 خانات)
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="pairingTabContent">
+                            <div class="tab-pane fade show active text-center py-3" id="qr-pane" role="tabpanel">
+                                <div id="qrContainer" class="d-inline-block p-3 bg-white rounded-3 shadow-sm border mb-3 position-relative" style="min-width: 260px; min-height: 260px;">
+                                    <div id="qrLoading" class="position-absolute top-50 start-50 translate-middle d-none text-center">
+                                        <div class="spinner-border text-success" role="status"></div>
+                                        <div class="small text-muted mt-2 fw-bold">جاري طلب كود QR من واتساب...</div>
+                                    </div>
+                                    <div id="qrDisplay" class="{{ if not .Status.HasQR }}d-none{{ end }}">
+                                        <img id="qrImage" src="{{ if .Status.HasQR }}{{ .Status.QRCodeImage }}{{ end }}" alt="WhatsApp QR Code" class="img-fluid rounded" style="max-width: 250px;">
+                                    </div>
+                                    <div id="qrPlaceholder" class="{{ if .Status.HasQR }}d-none{{ end }} py-5 text-muted">
+                                        <i class="bi bi-qr-code fs-1 d-block mb-2 text-secondary"></i>
+                                        <span>اضغط على الزر أدناه لبدء الاتصال وعرض الكود</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" id="btnStartQR" onclick="startQRPairing()">
+                                        <i class="bi bi-qr-code me-1"></i> توليد كود QR الآن
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade py-3" id="phone-pane" role="tabpanel">
+                                <div class="row justify-content-center">
+                                    <div class="col-md-9">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">رقم هاتف الواتساب (مع كود الدولة):</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control font-monospace" id="phonePairInput" placeholder="201012345678" dir="ltr">
+                                                <button type="button" class="btn btn-warning fw-bold text-dark px-3" id="btnPairPhone" onclick="pairByPhone()">
+                                                    <i class="bi bi-key me-1"></i> استخراج كود الربط
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="phoneCodeResult" class="d-none alert alert-light border text-center py-3">
+                                            <div class="small text-muted mb-1">أدخل هذا الكود في هاتفك:</div>
+                                            <div class="display-6 font-monospace fw-bold text-primary my-2 letter-spacing" id="phoneCodeDisplay"></div>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyPhoneCode()">
+                                                <i class="bi bi-clipboard me-1"></i> نسخ الكود
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <span class="fw-bold text-dark">
+                            <i class="bi bi-info-circle text-primary me-1"></i> خطوات ربط واتساب السريعة
+                        </span>
+                    </div>
+                    <div class="card-body p-4 small">
+                        <ol class="pe-3 mb-0" style="line-height: 1.8;">
+                            <li>افتح تطبيق <strong>WhatsApp</strong> على هاتفك المحمول.</li>
+                            <li>اضغط على <strong>القائمة (⋮)</strong> أو <strong>الإعدادات (Settings)</strong>.</li>
+                            <li>اختر <strong>الأجهزة المرتبطة (Linked Devices)</strong>.</li>
+                            <li>اضغط على <strong>ربط جهاز (Link a Device)</strong>.</li>
+                            <li>امسح كود <strong>QR</strong> الظاهر على الشاشة أو أدخل كود الهاتف المكون من 8 خانات.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODALS SECTION (Matching Top Button System)               -->
+<!-- ======================================================== -->
+
+<!-- 1. Pairing Modal (QR / Phone) -->
+<div class="modal fade" id="pairingModal" tabindex="-1" aria-labelledby="pairingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold" id="pairingModalLabel">
+                    <i class="bi bi-qr-code-scan me-2"></i> اقتران وربط حساب الواتساب بالسيرفر
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3" id="modalPairingTab" role="tablist">
+                    <li class="nav-item flex-grow-1" role="presentation">
+                        <button class="nav-link active w-100 fw-bold d-flex justify-content-center align-items-center gap-2" id="modal-qr-tab" data-bs-toggle="pill" data-bs-target="#modal-qr-pane" type="button" role="tab">
+                            <i class="bi bi-qr-code-scan"></i> الطريقة الأولى: مسح كود QR
+                        </button>
+                    </li>
+                    <li class="nav-item flex-grow-1" role="presentation">
+                        <button class="nav-link w-100 fw-bold d-flex justify-content-center align-items-center gap-2" id="modal-phone-tab" data-bs-toggle="pill" data-bs-target="#modal-phone-pane" type="button" role="tab">
+                            <i class="bi bi-123"></i> الطريقة الثانية: كود الهاتف المكون من 8 خانات
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="modalPairingTabContent">
+                    <!-- QR Pane in Modal -->
+                    <div class="tab-pane fade show active text-center py-3" id="modal-qr-pane" role="tabpanel">
+                        <p class="text-muted small mb-3">افتح واتساب على هاتفك > الأجهزة المرتبطة > ربط جهاز > وجه الكاميرا نحو الكود:</p>
+                        <div id="modalQrContainer" class="d-inline-block p-3 bg-white rounded-3 shadow-sm border mb-3 position-relative" style="min-width: 260px; min-height: 260px;">
+                            <div id="modalQrLoading" class="position-absolute top-50 start-50 translate-middle d-none text-center">
+                                <div class="spinner-border text-success" role="status"></div>
+                                <div class="small text-muted mt-2 fw-bold">جاري طلب كود QR من واتساب...</div>
+                            </div>
+                            <div id="modalQrDisplay" class="{{ if not .Status.HasQR }}d-none{{ end }}">
+                                <img id="modalQrImage" src="{{ if .Status.HasQR }}{{ .Status.QRCodeImage }}{{ end }}" alt="WhatsApp QR Code" class="img-fluid rounded" style="max-width: 250px;">
+                            </div>
+                            <div id="modalQrPlaceholder" class="{{ if .Status.HasQR }}d-none{{ end }} py-5 text-muted">
+                                <i class="bi bi-qr-code fs-1 d-block mb-2 text-secondary"></i>
+                                <span>اضغط على الزر أدناه لبدء الاتصال وعرض كود QR</span>
+                            </div>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" id="btnStartQRModal" onclick="startQRPairingModal()">
+                                <i class="bi bi-qr-code me-1"></i> توليد كود QR الآن
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Phone Code Pane in Modal -->
+                    <div class="tab-pane fade py-3" id="modal-phone-pane" role="tabpanel">
+                        <div class="row justify-content-center">
+                            <div class="col-md-10">
+                                <div class="alert alert-info py-2 px-3 small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i> أدخل رقم هاتفك مع كود الدولة ثم افتح إشعار واتساب واكتب الكود المكون من 8 خانات.
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">رقم هاتف الواتساب (مثال: 201012345678):</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control font-monospace" id="modalPhonePairInput" placeholder="201012345678" dir="ltr">
+                                        <button type="button" class="btn btn-warning fw-bold text-dark px-3" id="btnPairPhoneModal" onclick="pairByPhoneModal()">
+                                            <i class="bi bi-key me-1"></i> استخراج الكود
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="modalPhoneCodeResult" class="d-none alert alert-light border text-center py-3">
+                                    <div class="small text-muted mb-1">أدخل هذا الكود في هاتفك:</div>
+                                    <div class="display-6 font-monospace fw-bold text-primary my-2 letter-spacing" id="modalPhoneCodeDisplay"></div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyModalPhoneCode()">
+                                        <i class="bi bi-clipboard me-1"></i> نسخ الكود
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2 px-3 border-top">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Logout Modal -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-box-arrow-right me-2"></i> قطع الاتصال بحساب الواتساب
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/whatsapp/logout">
+                <div class="modal-body p-4 text-center">
+                    <div class="text-danger mb-3">
+                        <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">هل أنت متأكد من قطع اتصال الهاتف؟</h5>
+                    <p class="text-muted small mb-0">
+                        سيتم إلغاء اقتران رقم الهاتف <b class="font-monospace text-primary" dir="ltr">+{{ .Status.PhoneNumber }}</b> وتتوقف الإشعارات حتى إعادة المسح.
+                    </p>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 shadow-sm">
+                        <i class="bi bi-box-arrow-right me-1"></i> تأكيد قطع الاتصال
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Test Message Modal -->
+<div class="modal fade" id="testMsgModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-send-fill me-2"></i> إرسال رسالة واتساب تجريبية سريعة
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/whatsapp/test">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">رقم المستلم (مع كود الدولة):</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-telephone text-muted"></i></span>
+                            <input type="text" name="test_phone" class="form-control font-monospace" placeholder="201012345678" value="{{ .Settings.AdminPhone }}" required dir="ltr">
+                        </div>
+                        <small class="text-muted">مثال لمصر: 201012345678 (بدون علامة + أو أصفار إضافية)</small>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-bold">نص الرسالة:</label>
+                        <textarea name="test_message" class="form-control" rows="3" required placeholder="اكتب نص الرسالة هنا...">🔔 تجربة ربط واتساب ناجحة من نظام راديوس مايكروتك الاحترافي!</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-success fw-bold px-3 shadow-sm" {{ if and (not .Status.IsLoggedIn) (eq .Settings.APIEndpoint "") }}disabled title="يرجى ربط واتساب أولاً"{{ end }}>
+                        <i class="bi bi-send me-1"></i> إرسال الرسالة الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Instant Debt Reminder Trigger Modal -->
+<div class="modal fade" id="instantDebtModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-bell-fill me-2"></i> إرسال تذكير الديون الآن فوراً لكافة المدينين
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/whatsapp/debt-reminders/run-now">
+                <div class="modal-body p-4 text-center">
+                    <div class="text-danger mb-3">
+                        <i class="bi bi-broadcast fs-1"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">بدء حملة تذكير فوري بالديون؟</h5>
+                    <p class="text-muted small mb-0">
+                        يقوم النظام بفحص جدول العملاء وإرسال رسائل تذكير عبر الواتساب فوراً لكافة المشتركين الذين عليهم مديونية مستحقة وفق القالب المخصص.
+                    </p>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 shadow-sm">
+                        <i class="bi bi-send-exclamation me-1"></i> نعم، إرسال التذكير الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 5. Settings Modal -->
+<div class="modal fade" id="waSettingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-gear-fill me-2"></i> إعدادات خدمة الواتساب وبوابة الإرسال
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/whatsapp/settings">
+                <input type="hidden" name="debt_reminder_enabled" value="{{ if .Settings.DebtReminderEnabled }}1{{ else }}0{{ end }}">
+                <input type="hidden" name="debt_reminder_days" value="{{ .Settings.DebtReminderDays }}">
+                <input type="hidden" name="debt_reminder_min_debt" value="{{ printf "%.2f" .Settings.DebtReminderMinDebt }}">
+
+                <div class="modal-body p-4">
+                    <!-- General Enable Switch -->
+                    <div class="form-check form-switch mb-3 pb-2 border-bottom">
+                        <input class="form-check-input" type="checkbox" name="enabled" id="modalWaEnabled" value="1" {{ if .Settings.Enabled }}checked{{ end }}>
+                        <label class="form-check-label fw-bold" for="modalWaEnabled">تفعيل خدمة إرسال رسائل الواتساب العامة في النظام</label>
+                    </div>
+
+                    <!-- Admin Phone -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">رقم هاتف الأدمن / المسؤول للتنبيهات:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-person-badge text-muted"></i></span>
+                            <input type="text" name="admin_phone" class="form-control font-monospace" placeholder="201012345678" value="{{ .Settings.AdminPhone }}" dir="ltr">
+                        </div>
+                        <small class="text-muted">يتلقى تنبيهات النظام الحرجة والتقارير اليومية.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">أحداث الإشعارات التلقائية:</label>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="notify_on_new_subscriber" id="modalNotifNew" value="1" {{ if .Settings.NotifyOnNewSubscriber }}checked{{ end }}>
+                            <label class="form-check-label small" for="modalNotifNew">إرسال رسالة ترحيب وبيانات الاشتراك للعميل الجديد فور إضافته</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="notify_on_expiry" id="modalNotifExp" value="1" {{ if .Settings.NotifyOnExpiry }}checked{{ end }}>
+                            <label class="form-check-label small" for="modalNotifExp">إرسال تنبيه قبل انتهاء الاشتراك</label>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="notify_on_payment" id="modalNotifPay" value="1" {{ if .Settings.NotifyOnPayment }}checked{{ end }}>
+                            <label class="form-check-label small" for="modalNotifPay">إرسال إيصال سداد فوري عند دفع مديونية المشترك</label>
+                        </div>
+                    </div>
+
+                    <!-- External Gateway Accordion -->
+                    <div class="accordion mt-3" id="modalAccordionGateway">
+                        <div class="accordion-item border rounded-3 overflow-hidden">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed px-3 py-2 small fw-bold text-muted bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#modalCollapseGateway">
+                                    <i class="bi bi-hdd-network me-2"></i> بوابة واتساب خارجية بديلة (External API Gateway - اختياري)
+                                </button>
+                            </h2>
+                            <div id="modalCollapseGateway" class="accordion-collapse collapse">
+                                <div class="accordion-body bg-light p-3 small">
+                                    <p class="text-muted mb-2">يمكنك استخدام بوابة خارجية (مثل Wassenger, UltraMsg, WPPConnect) كاحتياطي:</p>
+                                    <div class="mb-2">
+                                        <label class="form-label mb-1">رابط الـ API Endpoint:</label>
+                                        <input type="text" name="api_endpoint" class="form-control form-control-sm font-monospace" placeholder="https://api.ultramsg.com/instance..." value="{{ .Settings.APIEndpoint }}" dir="ltr">
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label mb-1">API Token / Secret:</label>
+                                            <input type="password" name="api_token" class="form-control form-control-sm font-monospace" placeholder="Token" value="{{ .Settings.APIToken }}">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label mb-1">معرف الجلسة (Instance ID):</label>
+                                            <input type="text" name="instance_id" class="form-control form-control-sm font-monospace" placeholder="instance1234" value="{{ .Settings.InstanceID }}" dir="ltr">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4 shadow-sm">
+                        <i class="bi bi-save me-1"></i> حفظ كافة الإعدادات
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -615,6 +860,50 @@ function startQRPairing() {
         });
 }
 
+function startQRPairingModal() {
+    const btn = document.getElementById('btnStartQRModal');
+    const loading = document.getElementById('modalQrLoading');
+    const display = document.getElementById('modalQrDisplay');
+    const placeholder = document.getElementById('modalQrPlaceholder');
+    const qrImg = document.getElementById('modalQrImage');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري الاتصال...';
+    }
+    if (placeholder) placeholder.classList.add('d-none');
+    if (loading) loading.classList.remove('d-none');
+    if (display) display.classList.add('d-none');
+
+    fetch('/whatsapp/start-pairing', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (loading) loading.classList.add('d-none');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i> إعادة توليد كود QR';
+            }
+            if (data.ok && data.qr) {
+                if (qrImg) qrImg.src = data.qr;
+                if (display) display.classList.remove('d-none');
+                startStatusPolling();
+            } else {
+                if (placeholder) placeholder.classList.remove('d-none');
+                alert('حدث خطأ أثناء توليد كود QR: ' + (data.error || 'غير معروف'));
+            }
+        })
+        .catch(err => {
+            console.error('Modal QR start err:', err);
+            if (loading) loading.classList.add('d-none');
+            if (placeholder) placeholder.classList.remove('d-none');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-qr-code me-1"></i> توليد كود QR الآن';
+            }
+            alert('تعذر الاتصال بالسيرفر لبدء الاقتران.');
+        });
+}
+
 function startStatusPolling() {
     if (qrPollInterval) clearInterval(qrPollInterval);
 
@@ -629,6 +918,10 @@ function startStatusPolling() {
                     const qrImg = document.getElementById('qrImage');
                     if (qrImg && qrImg.src !== status.qr_code_image) {
                         qrImg.src = status.qr_code_image;
+                    }
+                    const modalQrImg = document.getElementById('modalQrImage');
+                    if (modalQrImg && modalQrImg.src !== status.qr_code_image) {
+                        modalQrImg.src = status.qr_code_image;
                     }
                 }
             })
@@ -685,8 +978,65 @@ function pairByPhone() {
     });
 }
 
+function pairByPhoneModal() {
+    const input = document.getElementById('modalPhonePairInput');
+    const btn = document.getElementById('btnPairPhoneModal');
+    const resultBox = document.getElementById('modalPhoneCodeResult');
+    const display = document.getElementById('modalPhoneCodeDisplay');
+
+    const phone = input ? input.value.trim() : '';
+    if (!phone) {
+        alert('يرجى كتابة رقم الهاتف مع كود الدولة أولاً.');
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري التوليد...';
+    }
+
+    const params = new URLSearchParams();
+    params.append('phone', phone);
+
+    fetch('/whatsapp/pair-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-key me-1"></i> استخراج الكود';
+        }
+        if (data.ok && data.code) {
+            if (display) display.textContent = data.code;
+            if (resultBox) resultBox.classList.remove('d-none');
+            startStatusPolling();
+        } else {
+            alert('فشل استخراج الكود: ' + (data.error || 'غير معروف'));
+        }
+    })
+    .catch(err => {
+        console.error('Modal Pair phone error:', err);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-key me-1"></i> استخراج الكود';
+        }
+        alert('تعذر استخراج كود الربط من السيرفر.');
+    });
+}
+
 function copyPhoneCode() {
     const display = document.getElementById('phoneCodeDisplay');
+    if (!display) return;
+    window.copyToClipboard(display.textContent.trim(), function() {
+        window.showCopyToast('تم نسخ كود الربط للحافظة!');
+    });
+}
+
+function copyModalPhoneCode() {
+    const display = document.getElementById('modalPhoneCodeDisplay');
     if (!display) return;
     window.copyToClipboard(display.textContent.trim(), function() {
         window.showCopyToast('تم نسخ كود الربط للحافظة!');
