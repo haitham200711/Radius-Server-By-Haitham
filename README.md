@@ -10,36 +10,39 @@
 
 ---
 
-## 🏛️ المعمارية التقنية (Architecture)
+## ⚡ التثبيت بضغطة زر واحدة (One-Click Automated Install)
 
-1. **FreeRADIUS v3 Server:**
-   * استقبال ومعالجة حزم الـ UDP على البورتات القياسية:
-     * `1812 UDP`: مصادقة المشتركين (Authentication)
-     * `1813 UDP`: سجلات المحاسبة وتتبع الاستهلاك (Accounting)
-     * `3799 UDP`: استقبال وإرسال أوامر الفصل وتعديل السرعة (CoA / PoD)
-   * قواميس المايكروتك الرسمية (`Mikrotik-Rate-Limit`, `Framed-IP-Address`, وغيرها).
-   * دعم جميع بروتوكولات التشفير: **PAP**, **CHAP**, **MS-CHAPv2**.
+يدعم النظام التثبيت التلقائي بالكامل على أنظمة **Ubuntu 20.04 / 22.04 / 24.04 LTS** و **Debian 11 / 12** عبر سكريبت واحد يقوم بتثبيت وضبط جميع المكونات (MariaDB, FreeRADIUS, Accel-PPP SSTP, Go Platform):
 
-2. **MariaDB Database (FreeRADIUS Schema):**
-   * جداول الراديوس القياسية: `radcheck`, `radreply`, `radusergroup`, `radgroupcheck`, `radgroupreply`, `radacct`, `nas`.
-   * جداول المنصة المؤسسية: `admins`, `resellers`, `profiles`, `batches`, `cards`, `card_templates`.
+### الطريقة الأولى: أمر مباشر من GitHub
+قم بفتح الطرفية (Terminal) على سيرفر اللينكس كـ `root` ونفّذ الأمر التالي:
 
-3. **Go Control-Plane Platform (Blueprints):**
-   * `auth`: تسجيل الدخول والخروج والتحقق من الصلاحيات (Admin / Reseller).
-   * `dashboard`: لوحة الإحصائيات العامة ومراقبة حركة البيانات.
-   * `subscribers`: إدارة مشتركي البرودباند والهوتسبوت في FreeRADIUS.
-   * `cards`: توليد الكروت بكميات ضخمة وتجهيزها للطباعة.
-   * `card_templates`: تصاميم وأشكال الكروت والباركود.
-   * `profiles`: باقات السرعات والكوتة وربطها التلقائي مع `Mikrotik-Rate-Limit`.
-   * `routers`: إدارة راوترات المايكروتك NAS.
-   * `resellers`: إدارة حسابات الموزعين وأرصدتهم وحدودهم الائتمانية.
-   * `sessions`: متابعة الجلسات الحية وفصل العملاء فورياً عبر الـ CoA.
-   * `reports`: سجلات المحاسبة التاريخية.
-   * `settings`: كود ربط المايكروتك السريع وحالة السيرفر.
+```bash
+curl -fsSL https://raw.githubusercontent.com/haitham200711/Radius-Server-By-Haitham/master/install.sh | sudo bash
+```
+
+### الطريقة الثانية: عبر استنساخ المستودع (Git Clone)
+```bash
+git clone https://github.com/haitham200711/Radius-Server-By-Haitham.git /opt/radius-server
+cd /opt/radius-server
+sudo bash install.sh
+```
 
 ---
 
 ## 🚀 بيانات الدخول الافتراضية
-* **الرابط:** `http://192.168.2.90:5000`
-* **المستخدم الافتراضي:** `admin`
+* **رابط لوحة التحكم:** `http://<SERVER_IP>:5000`
+* **اسم المستخدم:** `admin`
 * **كلمة المرور:** `admin123`
+
+---
+
+## 🔌 البورتات والخدمات المستخدمة (Default Ports)
+| الخدمة | البورت / البروتوكول | الوصف |
+| :--- | :--- | :--- |
+| **لوحة التحكم السحابية** | `5000 TCP` | Web Control-Plane UI |
+| **مصادقة الراديوس (Auth)** | `1812 UDP` | FreeRADIUS Authentication |
+| **محاسبة الراديوس (Acct)** | `1813 UDP` | FreeRADIUS Accounting |
+| **أوامر الفصل والتعديل (CoA)**| `3799 UDP` | Disconnect / Change of Auth |
+| **سيرفر VPN SSTP** | `4444 TCP` | Accel-PPP SSTP Server |
+| **قاعدة البيانات** | `3306 TCP (Local)` | MariaDB (radius:radiuspass@radiusdb) |
