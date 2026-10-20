@@ -124,22 +124,56 @@ func (p *Profile) CalculateExpiration(from time.Time) time.Time {
 
 // Batch represents a generated batch of voucher cards
 type Batch struct {
-	ID             int64     `json:"id"`
-	BatchCode      string    `json:"batch_code"`
-	ProfileID      int64     `json:"profile_id"`
-	ProfileName    string    `json:"profile_name"`
-	ResellerID     int64     `json:"reseller_id"` // 0 = admin
-	ResellerName   string    `json:"reseller_name"`
-	Count          int       `json:"count"`
-	AvailableCount int       `json:"available_count"`
-	UsedCount      int       `json:"used_count"`
-	OnlineCount    int       `json:"online_count"`
-	PricePerCard   float64   `json:"price_per_card"`
-	TotalPrice     float64   `json:"total_price"`
-	CardType       string    `json:"card_type"` // "charge" or "cafe"
-	NASID          int64     `json:"nas_id"`
-	NASName        string    `json:"nas_name"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID                   int64     `json:"id"`
+	BatchCode            string    `json:"batch_code"`
+	BatchName            string    `json:"batch_name"`
+	ProfileID            int64     `json:"profile_id"`
+	ProfileName          string    `json:"profile_name"`
+	ResellerID           int64     `json:"reseller_id"` // 0 = admin
+	ResellerName         string    `json:"reseller_name"`
+	Count                int       `json:"count"`
+	AvailableCount       int       `json:"available_count"`
+	UsedCount            int       `json:"used_count"`
+	OnlineCount          int       `json:"online_count"`
+	PricePerCard         float64   `json:"price_per_card"`
+	TotalPrice           float64   `json:"total_price"`
+	CardType             string    `json:"card_type"` // "charge" or "cafe"
+	NASID                int64     `json:"nas_id"`
+	NASName              string    `json:"nas_name"`
+	QuotaBytes           int64     `json:"quota_bytes"`
+	TimeLimitSeconds     int64     `json:"time_limit_seconds"`
+	TimeCalcMode         string    `json:"time_calc_mode"` // "first_login" or "by_second"
+	SimultaneousSessions int       `json:"simultaneous_sessions"`
+	StopOnQuota          bool      `json:"stop_on_quota"`
+	BindMAC              bool      `json:"bind_mac"`
+	LockMAC              bool      `json:"lock_mac"`
+	ServiceName          string    `json:"service_name"`
+	AffixType            string    `json:"affix_type"` // "prefix" or "suffix"
+	AffixValue           string    `json:"affix_value"`
+	CreatedAt            time.Time `json:"created_at"`
+}
+
+// GenerateBatchOptions contains options for bulk card batch generation
+type GenerateBatchOptions struct {
+	BatchName            string  `json:"batch_name"`
+	Count                int     `json:"count"`
+	ProfileID            int64   `json:"profile_id"`
+	ResellerID           int64   `json:"reseller_id"`
+	NASID                int64   `json:"nas_id"`
+	CardType             string  `json:"card_type"` // "charge" or "cafe"
+	PricePerCard         float64 `json:"price_per_card"`
+	AffixType            string  `json:"affix_type"` // "prefix" or "suffix"
+	AffixValue           string  `json:"affix_value"`
+	CharLen              int     `json:"char_len"`
+	Format               string  `json:"format"` // "num", "alpha", "mixed"
+	QuotaBytes           int64   `json:"quota_bytes"`
+	TimeLimitSeconds     int64   `json:"time_limit_seconds"`
+	TimeCalcMode         string  `json:"time_calc_mode"` // "first_login" or "by_second"
+	SimultaneousSessions int     `json:"simultaneous_sessions"`
+	StopOnQuota          bool    `json:"stop_on_quota"`
+	BindMAC              bool    `json:"bind_mac"`
+	LockMAC              bool    `json:"lock_mac"`
+	ServiceName          string  `json:"service_name"`
 }
 
 // CafeCardTracker represents real-time diagnostic inspection of a cafe card
@@ -181,18 +215,29 @@ type CafeCardTracker struct {
 
 // Card represents an individual hotspot / voucher card
 type Card struct {
-	ID           int64        `json:"id"`
-	BatchID      int64        `json:"batch_id"`
-	Username     string       `json:"username"`
-	Password     string       `json:"password"`
-	ProfileID    int64        `json:"profile_id"`
-	ProfileName  string       `json:"profile_name"`
-	ResellerID   int64        `json:"reseller_id"`
-	Status       string       `json:"status"` // "available", "used", "expired", "locked"
-	Price        float64      `json:"price"`
-	FirstLoginAt sql.NullTime `json:"first_login_at"`
-	ExpiredAt    sql.NullTime `json:"expired_at"`
-	CreatedAt    time.Time    `json:"created_at"`
+	ID                   int64        `json:"id"`
+	BatchID              int64        `json:"batch_id"`
+	Username             string       `json:"username"`
+	Password             string       `json:"password"`
+	ProfileID            int64        `json:"profile_id"`
+	ProfileName          string       `json:"profile_name"`
+	ResellerID           int64        `json:"reseller_id"`
+	Status               string       `json:"status"` // "available", "used", "expired", "locked"
+	Price                float64      `json:"price"`
+	CardType             string       `json:"card_type"`
+	NASID                int64        `json:"nas_id"`
+	QuotaBytes           int64        `json:"quota_bytes"`
+	TimeLimitSeconds     int64        `json:"time_limit_seconds"`
+	TimeCalcMode         string       `json:"time_calc_mode"`
+	SimultaneousSessions int          `json:"simultaneous_sessions"`
+	StopOnQuota          bool         `json:"stop_on_quota"`
+	BindMAC              bool         `json:"bind_mac"`
+	LockMAC              bool         `json:"lock_mac"`
+	ServiceName          string       `json:"service_name"`
+	CallingMAC           string       `json:"calling_mac"`
+	FirstLoginAt         sql.NullTime `json:"first_login_at"`
+	ExpiredAt            sql.NullTime `json:"expired_at"`
+	CreatedAt            time.Time    `json:"created_at"`
 }
 
 // CardTemplate represents card print design templates

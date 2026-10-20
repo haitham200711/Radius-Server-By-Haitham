@@ -437,9 +437,9 @@
 
 <!-- Modal: Generate Cafe Batch Modal -->
 <div class="modal fade" id="generateCafeBatchModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-white py-3 border-bottom">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+            <div class="modal-header bg-white py-3 border-bottom" style="border-radius: 14px 14px 0 0;">
                 <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
                     <span class="p-2 bg-primary-subtle text-primary rounded-2 d-inline-flex">
                         <i class="bi bi-cup-hot-fill"></i>
@@ -448,76 +448,211 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" action="/cards/cafe/generate">
+            <form method="POST" action="/cards/cafe/generate" id="cafeModalForm">
+                <input type="hidden" name="card_type" value="cafe">
+                <input type="hidden" name="stop_on_quota_submitted" value="1">
+
                 <div class="modal-body p-4">
-                    <!-- 1. Cafe Router Selection -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">فرع الكافيه (MikroTik Router NAS):</label>
-                        <select name="nas_id" class="form-select" required>
-                            {{ range .Routers }}
-                            <option value="{{ .ID }}" {{ if eq .ID $.SelectedRouterID }}selected{{ end }}>
-                                {{ .ShortName }} ({{ .NASName }})
-                            </option>
-                            {{ end }}
-                        </select>
-                    </div>
-
-                    <!-- 2. Profile Selection -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">الباقة والسرعة والكوتة:</label>
-                        <select name="profile_id" class="form-select" required>
-                            {{ range .Profiles }}
-                            <option value="{{ .ID }}">
-                                {{ .DisplayName }} ({{ .RateLimit }}) - {{ .Price }} ج.م
-                            </option>
-                            {{ end }}
-                        </select>
-                    </div>
-
-                    <!-- 3. Count & Prefix -->
+                    <!-- 1. Cafe Router Selection & Batch Name -->
                     <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-secondary">عدد الكروت:</label>
-                            <input type="number" name="count" class="form-control" value="100" min="1" max="10000" required>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">فرع الكافيه المستهدف (MikroTik Router NAS) <span class="text-danger">*</span></label>
+                            <select name="nas_id" class="form-select" required>
+                                {{ range .Routers }}
+                                <option value="{{ .ID }}" {{ if eq .ID $.SelectedRouterID }}selected{{ end }}>
+                                    {{ .ShortName }} ({{ .NASName }})
+                                </option>
+                                {{ end }}
+                            </select>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-secondary">بادئة الكود (Prefix):</label>
-                            <input type="text" name="prefix" class="form-control font-monospace" value="CF-">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">اسم الحزمة (Batch Name) <span class="text-danger">*</span></label>
+                            <input type="text" name="batch_name" id="modal_batch_name" class="form-control" placeholder="مثال: باقة عطلة الأسبوع - كافيه النيل" required>
                         </div>
                     </div>
 
-                    <!-- 4. Price & Code Length -->
+                    <!-- 2. Quantity & Profile Selection -->
                     <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-secondary">سعر الكارت (ج.م):</label>
-                            <input type="number" step="0.5" name="price_per_card" class="form-control" placeholder="اتركه لاعتماد الباقة">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">اختر الباقة والسرعة (Profile) <span class="text-danger">*</span></label>
+                            <select name="profile_id" id="modal_profile_select" class="form-select" required>
+                                <option value="" disabled selected>-- اختر الباقة --</option>
+                                {{ range .Profiles }}
+                                <option value="{{ .ID }}"
+                                        data-quota-bytes="{{ .QuotaBytes }}"
+                                        data-quota-gb="{{ .QuotaGB }}"
+                                        data-validity-value="{{ .ValidityValue }}"
+                                        data-validity-unit="{{ .ValidityUnit }}"
+                                        data-uptime="{{ .UptimeSeconds }}"
+                                        data-price="{{ .Price }}"
+                                        data-disp="{{ .DisplayName }}">
+                                    {{ .DisplayName }} ({{ .RateLimit }}) - {{ .Price }} ج.م
+                                </option>
+                                {{ end }}
+                            </select>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-secondary">طول الكود العشوائي:</label>
-                            <input type="number" name="char_len" class="form-control" value="6" min="4" max="12">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">عدد الكروت المطلوبة <span class="text-danger">*</span></label>
+                            <input type="number" name="count" id="modal_count" class="form-control fw-bold font-monospace" value="100" min="1" max="50000" required>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size:0.75rem;" onclick="document.getElementById('modal_count').value=50">50</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size:0.75rem;" onclick="document.getElementById('modal_count').value=100">100</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size:0.75rem;" onclick="document.getElementById('modal_count').value=500">500</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" style="font-size:0.75rem;" onclick="document.getElementById('modal_count').value=1000">1,000</button>
+                                <button type="button" class="btn btn-sm btn-primary rounded-pill py-0 px-2 fw-bold" style="font-size:0.75rem;" onclick="document.getElementById('modal_count').value=5000">5,000 🔥</button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- 5. WhatsApp Cafe Phone -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">رقم واتساب صاحب الكافيه (اختياري):</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light text-success"><i class="bi bi-whatsapp"></i></span>
-                            <input type="text" name="cafe_phone" class="form-control font-monospace" placeholder="مثال: 201012345678" value="{{ if .SelectedRouter }}{{ .SelectedRouter.Phone }}{{ end }}">
+                    <!-- 3. Quota & Time Limits per Card -->
+                    <div class="row g-3 mb-3 p-3 bg-light rounded-3 border">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small mb-1">
+                                <i class="bi bi-hdd-network text-primary me-1"></i> كوتة الكارت الواحد:
+                            </label>
+                            <div class="input-group">
+                                <input type="number" step="any" min="0" name="quota_val" id="modal_quota_val" class="form-control fw-bold" placeholder="فارغ لغير محدود">
+                                <select name="quota_unit" id="modal_quota_unit" class="form-select fw-bold bg-white" style="max-width: 105px;">
+                                    <option value="GB" selected>جيجا GB</option>
+                                    <option value="MB">ميجا MB</option>
+                                </select>
+                            </div>
+                            <div class="form-text small text-muted">اتركه فارغاً أو 0 إذا كان غير محدود.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small mb-1">
+                                <i class="bi bi-clock-history text-success me-1"></i> وقت الكارت الواحد:
+                            </label>
+                            <div class="input-group">
+                                <input type="number" min="0" name="time_val" id="modal_time_val" class="form-control fw-bold" placeholder="المدة">
+                                <select name="time_unit" id="modal_time_unit" class="form-select fw-bold bg-white" style="max-width: 115px;">
+                                    <option value="hours" selected>ساعات</option>
+                                    <option value="days">أيام</option>
+                                    <option value="minutes">دقائق</option>
+                                </select>
+                            </div>
+                            <div class="form-text small text-muted">المدة الزمنية المسموح بها للكارت.</div>
                         </div>
                     </div>
 
-                    <!-- 6. Send WhatsApp Checkbox -->
-                    <div class="form-check form-switch p-3 bg-light rounded-3 border">
-                        <input class="form-check-input ms-0 me-2" type="checkbox" name="send_whatsapp" value="1" id="sendWaCheck" checked>
-                        <label class="form-check-label small fw-bold text-dark" for="sendWaCheck">
-                            إرسال إشعار فوري بكود الدفعة وتفاصيلها إلى واتساب الكافيه
-                        </label>
+                    <!-- 4. Affix Selection (بادئة أو خاتمة) -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-secondary">نوع المقطع المضاف</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="affix_type" id="modal_affix_prefix" value="prefix" checked onchange="updateModalPreview()">
+                                <label class="btn btn-outline-primary btn-sm fw-bold" for="modal_affix_prefix">بادئة Prefix</label>
+
+                                <input type="radio" class="btn-check" name="affix_type" id="modal_affix_suffix" value="suffix" onchange="updateModalPreview()">
+                                <label class="btn btn-outline-primary btn-sm fw-bold" for="modal_affix_suffix">خاتمة Suffix</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-secondary" id="modal_affix_label">نص البادئة</label>
+                            <input type="text" name="affix_value" id="modal_affix_value" class="form-control font-monospace" value="CF-" dir="ltr" oninput="updateModalPreview()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-secondary">طول الرمز ونوعه</label>
+                            <div class="input-group">
+                                <input type="number" name="char_len" id="modal_char_len" class="form-control font-monospace" value="6" min="4" max="12" oninput="updateModalPreview()">
+                                <select name="format" id="modal_format" class="form-select font-monospace" onchange="updateModalPreview()">
+                                    <option value="num" selected>أرقام</option>
+                                    <option value="mixed">أرقام وحروف</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- معاينة الكارت -->
+                    <div class="p-2 mb-3 bg-light rounded text-center border">
+                        <span class="small text-muted me-2">معاينة كود الكارت:</span>
+                        <code class="fw-bold fs-6 text-primary font-monospace bg-white px-2 py-1 rounded border" id="modal_preview_box" dir="ltr">CF-849201</code>
+                    </div>
+
+                    <!-- 5. Simultaneous, Time Calculation & Security -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">عدد الأجهزة المتزامنة (Simultaneous-Use):</label>
+                            <input type="number" name="simultaneous_sessions" class="form-control fw-bold" value="1" min="1" max="10" required>
+                            <div class="form-text small">عدد الأجهزة المسموح باتصالها بنفس الكارت في وقت واحد.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">معرف الخدمة في المايكروتك (Hotspot Server):</label>
+                            <input type="text" name="service_name" class="form-control font-monospace" placeholder="مثل: hotspot1 أو all" value="all" dir="ltr">
+                            <div class="form-text small">اتركه <code>all</code> للعمل على كافة السيرفرات.</div>
+                        </div>
+                    </div>
+
+                    <!-- طريقة احتساب الوقت -->
+                    <div class="mb-3 p-3 bg-light rounded-3 border">
+                        <label class="form-label fw-bold small text-dark d-block mb-2">طريقة احتساب الوقت:</label>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="time_calc_mode" id="modal_calc_first_login" value="first_login" checked>
+                                    <label class="form-check-label fw-bold small text-dark cursor-pointer" for="modal_calc_first_login">
+                                        <i class="bi bi-play-circle-fill text-success me-1"></i> من أول اتصال (First Login)
+                                    </label>
+                                    <div class="form-text small text-muted">يبدأ العد من لحظة الدخول الأولى.</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="time_calc_mode" id="modal_calc_by_second" value="by_second">
+                                    <label class="form-check-label fw-bold small text-dark cursor-pointer" for="modal_calc_by_second">
+                                        <i class="bi bi-stopwatch-fill text-primary me-1"></i> بالثانية (By Second - تراكمي)
+                                    </label>
+                                    <div class="form-text small text-muted">يخصم فقط أثناء الاتصال الفعلي.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- مفاتيح التحكم والأمان والماك أدرس -->
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="stop_on_quota" id="modal_stop_quota" value="1" checked>
+                            <label class="form-check-label small fw-bold text-dark cursor-pointer" for="modal_stop_quota">
+                                عند انتهاء الكوتة: إيقاف الكارت وقطع الاتصال فوراً
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="bind_mac" id="modal_bind_mac" value="1">
+                            <label class="form-check-label small fw-bold text-dark cursor-pointer" for="modal_bind_mac">
+                                التحويل لوضع الماك أدرس عند أول اتصال (Bind to MAC)
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="lock_mac" id="modal_lock_mac" value="1">
+                            <label class="form-check-label small fw-bold text-dark cursor-pointer" for="modal_lock_mac">
+                                إغلاق بالماك أدرس (قفل الكارت على أول جهاز يتصل به)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 6. WhatsApp Cafe Phone & Notification -->
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-secondary">رقم واتساب صاحب الكافيه:</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-success"><i class="bi bi-whatsapp"></i></span>
+                                <input type="text" name="cafe_phone" class="form-control font-monospace" placeholder="مثال: 201012345678" value="{{ if .SelectedRouter }}{{ .SelectedRouter.Phone }}{{ end }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" name="send_whatsapp" value="1" id="sendWaCheck" checked>
+                                <label class="form-check-label small fw-bold text-dark cursor-pointer" for="sendWaCheck">
+                                    إرسال إشعار فوري بكود الدفعة إلى واتساب الكافيه
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light py-2 px-4 border-top">
+                <div class="modal-footer bg-light py-3 px-4 border-top" style="border-radius: 0 0 14px 14px;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">
+                    <button type="submit" id="btnSubmitModal" class="btn btn-primary fw-bold shadow-sm px-4">
                         <i class="bi bi-lightning-charge me-1"></i> توليد الكروت وحفظها في الراديوس
                     </button>
                 </div>
@@ -525,6 +660,84 @@
         </div>
     </div>
 </div>
+
+<script>
+// Modal Profile listener
+document.getElementById('modal_profile_select')?.addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    if (!opt) return;
+
+    var batchInput = document.getElementById('modal_batch_name');
+    var dispName = opt.getAttribute('data-disp') || opt.text;
+    if (batchInput && (!batchInput.value || batchInput.value.startsWith('دفعة'))) {
+        var today = new Date().toISOString().slice(0, 10);
+        batchInput.value = 'دفعة ' + dispName + ' (' + today + ')';
+    }
+
+    var quotaBytes = parseInt(opt.getAttribute('data-quota-bytes') || '0', 10);
+    var quotaGb = parseFloat(opt.getAttribute('data-quota-gb') || '0');
+    var quotaVal = document.getElementById('modal_quota_val');
+    var quotaUnit = document.getElementById('modal_quota_unit');
+
+    if (quotaBytes > 0) {
+        if (quotaBytes >= 1073741824) {
+            if (quotaVal) quotaVal.value = (quotaGb > 0) ? quotaGb : (quotaBytes / 1073741824).toFixed(1);
+            if (quotaUnit) quotaUnit.value = 'GB';
+        } else {
+            if (quotaVal) quotaVal.value = Math.round(quotaBytes / 1048576);
+            if (quotaUnit) quotaUnit.value = 'MB';
+        }
+    } else {
+        if (quotaVal) quotaVal.value = '';
+    }
+
+    var valVal = opt.getAttribute('data-validity-value');
+    var valUnit = opt.getAttribute('data-validity-unit') || 'hours';
+    var timeVal = document.getElementById('modal_time_val');
+    var timeUnit = document.getElementById('modal_time_unit');
+
+    if (valVal && parseInt(valVal, 10) > 0) {
+        if (timeVal) timeVal.value = valVal;
+        if (timeUnit) {
+            if (valUnit === 'days' || valUnit === 'hours' || valUnit === 'minutes') {
+                timeUnit.value = valUnit;
+            } else {
+                timeUnit.value = 'hours';
+            }
+        }
+    } else {
+        if (timeVal) timeVal.value = '';
+    }
+});
+
+function updateModalPreview() {
+    var isSuffix = document.getElementById('modal_affix_suffix')?.checked;
+    var affixVal = document.getElementById('modal_affix_value')?.value || '';
+    var charLen = parseInt(document.getElementById('modal_char_len')?.value || '6', 10);
+    var format = document.getElementById('modal_format')?.value || 'num';
+    var label = document.getElementById('modal_affix_label');
+
+    if (label) {
+        label.innerText = isSuffix ? 'نص الخاتمة' : 'نص البادئة';
+    }
+
+    var dummyCode = (format === 'num') ? '849201537264'.slice(0, charLen) : 'A8K92F1X9M24'.slice(0, charLen);
+    var result = isSuffix ? (dummyCode + affixVal) : (affixVal + dummyCode);
+    var previewEl = document.getElementById('modal_preview_box');
+    if (previewEl) {
+        previewEl.innerText = result || '---';
+    }
+}
+updateModalPreview();
+
+document.getElementById('cafeModalForm')?.addEventListener('submit', function() {
+    var btn = document.getElementById('btnSubmitModal');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> جارٍ التوليد...';
+    }
+});
+</script>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}

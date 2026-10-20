@@ -27,7 +27,14 @@
             <tbody>
                 {{ range .Batches }}
                 <tr>
-                    <td><strong>{{ .BatchCode }}</strong></td>
+                    <td>
+                        {{ if .BatchName }}
+                        <span class="fw-bold text-dark d-block">{{ .BatchName }}</span>
+                        <code class="small text-muted font-monospace">#{{ .BatchCode }}</code>
+                        {{ else }}
+                        <strong class="font-monospace">{{ .BatchCode }}</strong>
+                        {{ end }}
+                    </td>
                     <td><span class="badge bg-primary">{{ .ProfileName }}</span></td>
                     <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
                     <td><span class="fw-bold">{{ .Count }}</span></td>

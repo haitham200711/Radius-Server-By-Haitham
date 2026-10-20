@@ -427,8 +427,28 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS is_cafe TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS batch_name VARCHAR(100) DEFAULT '';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS quota_bytes BIGINT DEFAULT 0;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS time_limit_seconds BIGINT DEFAULT 0;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS time_calc_mode VARCHAR(20) DEFAULT 'first_login';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS simultaneous_sessions INT DEFAULT 1;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS stop_on_quota TINYINT(1) DEFAULT 1;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS bind_mac TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS lock_mac TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS service_name VARCHAR(100) DEFAULT '';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS affix_type VARCHAR(10) DEFAULT 'prefix';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS affix_value VARCHAR(50) DEFAULT '';`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS quota_bytes BIGINT DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS time_limit_seconds BIGINT DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS time_calc_mode VARCHAR(20) DEFAULT 'first_login';`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS simultaneous_sessions INT DEFAULT 1;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS stop_on_quota TINYINT(1) DEFAULT 1;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS bind_mac TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS lock_mac TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS service_name VARCHAR(100) DEFAULT '';`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS calling_mac VARCHAR(32) DEFAULT '';`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -705,27 +725,71 @@ func (d *DB) DeleteSubscriber(username string) error {
 
 // --- Batch Generator (Ultra Fast Bulk Cards into FreeRADIUS) ---
 
-func (d *DB) GenerateBatch(count int, prefix string, charLen int, profileID int64, resellerID int64, pricePerCard float64) (string, int, error) {
-	if count <= 0 || count > 50000 {
-		count = 100
+func randomNumeric(n int) string {
+	const digits = "0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = digits[rand.Intn(len(digits))]
 	}
-	if charLen < 4 {
-		charLen = 6
+	return string(b)
+}
+
+func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, int, error) {
+	if opts.Count <= 0 || opts.Count > 50000 {
+		opts.Count = 100
+	}
+	if opts.CharLen < 4 {
+		opts.CharLen = 6
+	}
+	if opts.SimultaneousSessions <= 0 {
+		opts.SimultaneousSessions = 1
+	}
+	if opts.TimeCalcMode == "" {
+		opts.TimeCalcMode = "first_login"
+	}
+	if opts.AffixType == "" {
+		opts.AffixType = "prefix"
 	}
 
 	var prof models.Profile
-	err := d.QueryRow("SELECT id, name, display_name, price FROM profiles WHERE id = ?", profileID).Scan(
-		&prof.ID, &prof.Name, &prof.DisplayName, &prof.Price)
+	err := d.QueryRow("SELECT id, name, display_name, price, quota_bytes, uptime_seconds, validity_value, validity_unit FROM profiles WHERE id = ?", opts.ProfileID).Scan(
+		&prof.ID, &prof.Name, &prof.DisplayName, &prof.Price, &prof.QuotaBytes, &prof.UptimeSeconds, &prof.ValidityValue, &prof.ValidityUnit)
 	if err != nil {
 		return "", 0, fmt.Errorf("profile not found: %w", err)
 	}
 
-	if pricePerCard <= 0 {
-		pricePerCard = prof.Price
+	if opts.PricePerCard <= 0 {
+		opts.PricePerCard = prof.Price
+	}
+	if opts.QuotaBytes == 0 && prof.QuotaBytes > 0 {
+		opts.QuotaBytes = prof.QuotaBytes
+	}
+	if opts.TimeLimitSeconds == 0 {
+		if prof.UptimeSeconds > 0 {
+			opts.TimeLimitSeconds = prof.UptimeSeconds
+		} else if prof.ValidityValue > 0 {
+			switch prof.ValidityUnit {
+			case "minutes":
+				opts.TimeLimitSeconds = int64(prof.ValidityValue * 60)
+			case "hours":
+				opts.TimeLimitSeconds = int64(prof.ValidityValue * 3600)
+			case "days":
+				opts.TimeLimitSeconds = int64(prof.ValidityValue * 86400)
+			case "months":
+				opts.TimeLimitSeconds = int64(prof.ValidityValue * 86400 * 30)
+			}
+		}
 	}
 
-	batchCode := fmt.Sprintf("B%d-%s", time.Now().Unix(), randomLetters(4))
-	totalPrice := float64(count) * pricePerCard
+	prefixLetter := "B"
+	if opts.CardType == "cafe" {
+		prefixLetter = "CF"
+	}
+	batchCode := fmt.Sprintf("%s%d-%s", prefixLetter, time.Now().Unix(), randomLetters(4))
+	if opts.BatchName == "" {
+		opts.BatchName = fmt.Sprintf("دفعة %s", batchCode)
+	}
+	totalPrice := float64(opts.Count) * opts.PricePerCard
 
 	tx, err := d.Begin()
 	if err != nil {
@@ -734,26 +798,41 @@ func (d *DB) GenerateBatch(count int, prefix string, charLen int, profileID int6
 	defer tx.Rollback()
 
 	// 1. Insert Batch record
-	res, err := tx.Exec(`INSERT INTO batches (batch_code, profile_id, reseller_id, count, price_per_card, total_price, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, batchCode, profileID, resellerID, count, pricePerCard, totalPrice)
+	res, err := tx.Exec(`INSERT INTO batches (
+		batch_code, batch_name, profile_id, reseller_id, count, price_per_card, total_price,
+		card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode, simultaneous_sessions,
+		stop_on_quota, bind_mac, lock_mac, service_name, affix_type, affix_value, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		batchCode, opts.BatchName, opts.ProfileID, opts.ResellerID, opts.Count, opts.PricePerCard, totalPrice,
+		opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode, opts.SimultaneousSessions,
+		opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName, opts.AffixType, opts.AffixValue)
 	if err != nil {
 		return "", 0, err
 	}
 	batchID, _ := res.LastInsertId()
 
 	// 2. Prepare bulk insert statements
-	stmtCard, err := tx.Prepare(`INSERT INTO cards (batch_id, username, password, profile_id, reseller_id, status, price, created_at)
-		VALUES (?, ?, ?, ?, ?, 'available', ?, CURRENT_TIMESTAMP)`)
+	stmtCard, err := tx.Prepare(`INSERT INTO cards (
+		batch_id, username, password, profile_id, reseller_id, status, price,
+		card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode,
+		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, service_name, created_at
+	) VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
 	if err != nil {
 		return "", 0, err
 	}
 	defer stmtCard.Close()
 
-	stmtRadCheck, err := tx.Prepare(`INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)`)
+	stmtRadCheck, err := tx.Prepare(`INSERT INTO radcheck (username, attribute, op, value) VALUES (?, ?, ?, ?)`)
 	if err != nil {
 		return "", 0, err
 	}
 	defer stmtRadCheck.Close()
+
+	stmtRadReply, err := tx.Prepare(`INSERT INTO radreply (username, attribute, op, value) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return "", 0, err
+	}
+	defer stmtRadReply.Close()
 
 	stmtRadGroup, err := tx.Prepare(`INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)`)
 	if err != nil {
@@ -762,20 +841,66 @@ func (d *DB) GenerateBatch(count int, prefix string, charLen int, profileID int6
 	defer stmtRadGroup.Close()
 
 	created := 0
-	for i := 0; i < count; i++ {
-		u := fmt.Sprintf("%s%s", prefix, randomAlphanumeric(charLen))
-		p := randomAlphanumeric(6)
+	for i := 0; i < opts.Count; i++ {
+		var randPart string
+		if opts.Format == "num" {
+			randPart = randomNumeric(opts.CharLen)
+		} else if opts.Format == "alpha" {
+			randPart = randomLetters(opts.CharLen)
+		} else {
+			randPart = randomAlphanumeric(opts.CharLen)
+		}
 
-		if _, err := stmtCard.Exec(batchID, u, p, profileID, resellerID, pricePerCard); err == nil {
-			_, _ = stmtRadCheck.Exec(u, p)
+		var u string
+		if opts.AffixType == "suffix" {
+			u = randPart + opts.AffixValue
+		} else {
+			u = opts.AffixValue + randPart
+		}
+
+		p := u // Standard hotspot login: username == password
+
+		if _, err := stmtCard.Exec(batchID, u, p, opts.ProfileID, opts.ResellerID, opts.PricePerCard,
+			opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode,
+			opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName); err == nil {
+
+			// radcheck: Cleartext-Password
+			_, _ = stmtRadCheck.Exec(u, "Cleartext-Password", ":=", p)
+
+			// radcheck: Simultaneous-Use
+			if opts.SimultaneousSessions > 0 {
+				_, _ = stmtRadCheck.Exec(u, "Simultaneous-Use", ":=", strconv.Itoa(opts.SimultaneousSessions))
+			}
+
+			// radcheck: Called-Station-Id (Service Name / Hotspot Server check)
+			if opts.ServiceName != "" && opts.ServiceName != "all" {
+				_, _ = stmtRadCheck.Exec(u, "Called-Station-Id", "=~", opts.ServiceName)
+			}
+
+			// radcheck: Max-All-Session (if time calc mode is by_second)
+			if opts.TimeCalcMode == "by_second" && opts.TimeLimitSeconds > 0 {
+				_, _ = stmtRadCheck.Exec(u, "Max-All-Session", ":=", strconv.FormatInt(opts.TimeLimitSeconds, 10))
+			}
+
+			// radreply: Mikrotik-Total-Limit (Total data limit in bytes)
+			if opts.QuotaBytes > 0 && opts.StopOnQuota {
+				_, _ = stmtRadReply.Exec(u, "Mikrotik-Total-Limit", ":=", strconv.FormatInt(opts.QuotaBytes, 10))
+			}
+
+			// radreply: Session-Timeout
+			if opts.TimeLimitSeconds > 0 {
+				_, _ = stmtRadReply.Exec(u, "Session-Timeout", ":=", strconv.FormatInt(opts.TimeLimitSeconds, 10))
+			}
+
+			// radusergroup: link to profile
 			_, _ = stmtRadGroup.Exec(u, prof.Name)
+
 			created++
 		}
 	}
 
-	// If assigned to a reseller with balance deduction
-	if resellerID > 0 {
-		_, _ = tx.Exec("UPDATE resellers SET balance = balance - ? WHERE id = ?", totalPrice, resellerID)
+	if opts.ResellerID > 0 {
+		_, _ = tx.Exec("UPDATE resellers SET balance = balance - ? WHERE id = ?", totalPrice, opts.ResellerID)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -783,6 +908,21 @@ func (d *DB) GenerateBatch(count int, prefix string, charLen int, profileID int6
 	}
 
 	return batchCode, created, nil
+}
+
+func (d *DB) GenerateBatch(count int, prefix string, charLen int, profileID int64, resellerID int64, pricePerCard float64) (string, int, error) {
+	return d.GenerateAdvancedBatch(models.GenerateBatchOptions{
+		Count:                count,
+		AffixType:            "prefix",
+		AffixValue:           prefix,
+		CharLen:              charLen,
+		ProfileID:            profileID,
+		ResellerID:           resellerID,
+		PricePerCard:         pricePerCard,
+		CardType:             "charge",
+		StopOnQuota:          true,
+		SimultaneousSessions: 1,
+	})
 }
 
 func randomAlphanumeric(n int) string {
@@ -2752,78 +2892,18 @@ func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 }
 
 func (d *DB) GenerateCafeBatch(count int, prefix string, charLen int, profileID int64, nasID int64, pricePerCard float64) (string, int, error) {
-	if count <= 0 || count > 50000 {
-		count = 100
-	}
-	if charLen < 4 {
-		charLen = 6
-	}
-
-	var prof models.Profile
-	err := d.QueryRow("SELECT id, name, display_name, price FROM profiles WHERE id = ?", profileID).Scan(
-		&prof.ID, &prof.Name, &prof.DisplayName, &prof.Price)
-	if err != nil {
-		return "", 0, fmt.Errorf("profile not found: %w", err)
-	}
-
-	if pricePerCard <= 0 {
-		pricePerCard = prof.Price
-	}
-
-	batchCode := fmt.Sprintf("CF%d-%s", time.Now().Unix(), randomLetters(4))
-	totalPrice := float64(count) * pricePerCard
-
-	tx, err := d.Begin()
-	if err != nil {
-		return "", 0, err
-	}
-	defer tx.Rollback()
-
-	// 1. Insert Batch record with card_type = 'cafe' and nas_id
-	res, err := tx.Exec(`INSERT INTO batches (batch_code, profile_id, reseller_id, count, price_per_card, total_price, card_type, nas_id, created_at)
-		VALUES (?, ?, 0, ?, ?, ?, 'cafe', ?, CURRENT_TIMESTAMP)`, batchCode, profileID, count, pricePerCard, totalPrice, nasID)
-	if err != nil {
-		return "", 0, err
-	}
-	batchID, _ := res.LastInsertId()
-
-	// 2. Prepare bulk insert statements
-	stmtCard, err := tx.Prepare(`INSERT INTO cards (batch_id, username, password, profile_id, reseller_id, status, price, card_type, nas_id, created_at)
-		VALUES (?, ?, ?, ?, 0, 'available', ?, 'cafe', ?, CURRENT_TIMESTAMP)`)
-	if err != nil {
-		return "", 0, err
-	}
-	defer stmtCard.Close()
-
-	stmtRadCheck, err := tx.Prepare(`INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)`)
-	if err != nil {
-		return "", 0, err
-	}
-	defer stmtRadCheck.Close()
-
-	stmtRadGroup, err := tx.Prepare(`INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)`)
-	if err != nil {
-		return "", 0, err
-	}
-	defer stmtRadGroup.Close()
-
-	created := 0
-	for i := 0; i < count; i++ {
-		u := fmt.Sprintf("%s%s", prefix, randomAlphanumeric(charLen))
-		p := randomAlphanumeric(6)
-
-		if _, err := stmtCard.Exec(batchID, u, p, profileID, pricePerCard, nasID); err == nil {
-			_, _ = stmtRadCheck.Exec(u, p)
-			_, _ = stmtRadGroup.Exec(u, prof.Name)
-			created++
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return "", 0, err
-	}
-
-	return batchCode, created, nil
+	return d.GenerateAdvancedBatch(models.GenerateBatchOptions{
+		Count:                count,
+		AffixType:            "prefix",
+		AffixValue:           prefix,
+		CharLen:              charLen,
+		ProfileID:            profileID,
+		NASID:                nasID,
+		PricePerCard:         pricePerCard,
+		CardType:             "cafe",
+		StopOnQuota:          true,
+		SimultaneousSessions: 1,
+	})
 }
 
 func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
@@ -3002,6 +3082,145 @@ func (d *DB) DisconnectCard(code string) (bool, error) {
 		WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, sessionID.String, nasIP.String)
 
 	return true, nil
+}
+
+// StartCardSyncDaemon handles real-time synchronization between active accounting sessions (radacct)
+// and cards table: tracking first logins, binding & locking to client MAC address, and auto-disabling expired cards.
+func (d *DB) StartCardSyncDaemon() {
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			d.syncActiveCards()
+		}
+	}()
+}
+
+func (d *DB) syncActiveCards() {
+	// 1. MAC Binding & Locking: For cards with bind_mac=1 or lock_mac=1 that have not captured calling_mac yet
+	rowsMAC, err := d.Query(`SELECT c.id, c.username, c.lock_mac, r.callingstationid
+		FROM cards c
+		JOIN radacct r ON c.username = r.username
+		WHERE (c.bind_mac = 1 OR c.lock_mac = 1) AND (c.calling_mac = '' OR c.calling_mac IS NULL)
+		  AND r.callingstationid != ''
+		GROUP BY c.id, c.username, c.lock_mac, r.callingstationid`)
+	if err == nil {
+		type macEntry struct {
+			cardID   int64
+			username string
+			lockMAC  bool
+			mac      string
+		}
+		var list []macEntry
+		for rowsMAC.Next() {
+			var me macEntry
+			if err := rowsMAC.Scan(&me.cardID, &me.username, &me.lockMAC, &me.mac); err == nil {
+				list = append(list, me)
+			}
+		}
+		rowsMAC.Close()
+
+		for _, item := range list {
+			_, _ = d.Exec("UPDATE cards SET calling_mac = ? WHERE id = ?", item.mac, item.cardID)
+			if item.lockMAC {
+				// Lock FreeRADIUS strictly to this MAC address
+				_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", item.username)
+				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", item.username, item.mac)
+			}
+		}
+	}
+
+	// 2. First Login Tracking for Calendar/First-Login time calculation mode
+	rowsLogin, err := d.Query(`SELECT c.id, c.username, c.time_limit_seconds, c.time_calc_mode, MIN(r.acctstarttime)
+		FROM cards c
+		JOIN radacct r ON c.username = r.username
+		WHERE c.first_login_at IS NULL
+		GROUP BY c.id, c.username, c.time_limit_seconds, c.time_calc_mode`)
+	if err == nil {
+		type loginEntry struct {
+			cardID     int64
+			username   string
+			timeLimit  int64
+			calcMode   string
+			firstLogin time.Time
+		}
+		var logins []loginEntry
+		for rowsLogin.Next() {
+			var le loginEntry
+			if err := rowsLogin.Scan(&le.cardID, &le.username, &le.timeLimit, &le.calcMode, &le.firstLogin); err == nil {
+				logins = append(logins, le)
+			}
+		}
+		rowsLogin.Close()
+
+		for _, le := range logins {
+			if le.calcMode == "first_login" && le.timeLimit > 0 {
+				expDate := le.firstLogin.Add(time.Duration(le.timeLimit) * time.Second)
+				_, _ = d.Exec("UPDATE cards SET first_login_at = ?, expired_at = ? WHERE id = ?", le.firstLogin, expDate, le.cardID)
+				// Set Expiration attribute in FreeRADIUS radcheck
+				expStr := expDate.Format("02 Jan 2006 15:04:05")
+				_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", le.username)
+				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", le.username, expStr)
+			} else {
+				_, _ = d.Exec("UPDATE cards SET first_login_at = ? WHERE id = ?", le.firstLogin, le.cardID)
+			}
+		}
+	}
+
+	// 3. Auto-Expiry Enforcement for Quota & Time Limits
+	// Check calendar-expired cards
+	rowsExp, err := d.Query(`SELECT c.id, c.username FROM cards c
+		WHERE c.status = 'available' AND c.expired_at IS NOT NULL AND c.expired_at < CURRENT_TIMESTAMP`)
+	if err == nil {
+		var expCards []string
+		var expIDs []int64
+		for rowsExp.Next() {
+			var id int64
+			var u string
+			if err := rowsExp.Scan(&id, &u); err == nil {
+				expCards = append(expCards, u)
+				expIDs = append(expIDs, id)
+			}
+		}
+		rowsExp.Close()
+
+		for i, u := range expCards {
+			_, _ = d.Exec("UPDATE cards SET status = 'expired' WHERE id = ?", expIDs[i])
+			_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", u)
+			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Reject')", u)
+			_, _ = d.DisconnectCard(u)
+		}
+	}
+
+	// Check quota-exhausted cards
+	rowsQuota, err := d.Query(`SELECT c.id, c.username, c.quota_bytes, COALESCE(SUM(r.acctinputoctets + r.acctoutputoctets), 0)
+		FROM cards c
+		JOIN radacct r ON c.username = r.username
+		WHERE c.status = 'available' AND c.stop_on_quota = 1 AND c.quota_bytes > 0
+		GROUP BY c.id, c.username, c.quota_bytes
+		HAVING SUM(r.acctinputoctets + r.acctoutputoctets) >= c.quota_bytes`)
+	if err == nil {
+		var quotaCards []string
+		var quotaIDs []int64
+		for rowsQuota.Next() {
+			var id int64
+			var u string
+			var limit, used int64
+			if err := rowsQuota.Scan(&id, &u, &limit, &used); err == nil {
+				quotaCards = append(quotaCards, u)
+				quotaIDs = append(quotaIDs, id)
+			}
+		}
+		rowsQuota.Close()
+
+		for i, u := range quotaCards {
+			_, _ = d.Exec("UPDATE cards SET status = 'expired' WHERE id = ?", quotaIDs[i])
+			_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", u)
+			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Reject')", u)
+			_, _ = d.DisconnectCard(u)
+		}
+	}
 }
 
 

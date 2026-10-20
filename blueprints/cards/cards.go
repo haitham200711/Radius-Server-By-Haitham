@@ -36,7 +36,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	activeMenu := "cards"
 	pageTitle := "كروت الشحن"
 
-	query := `SELECT b.id, b.batch_code, b.profile_id, COALESCE(p.display_name, ''),
+	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
 		b.reseller_id, COALESCE(res.name, 'المدير العام'), b.count, b.price_per_card, b.total_price, b.created_at
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
@@ -56,7 +56,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var b models.Batch
-			if err := rows.Scan(&b.ID, &b.BatchCode, &b.ProfileID, &b.ProfileName,
+			if err := rows.Scan(&b.ID, &b.BatchCode, &b.BatchName, &b.ProfileID, &b.ProfileName,
 				&b.ResellerID, &b.ResellerName, &b.Count, &b.PricePerCard, &b.TotalPrice, &b.CreatedAt); err == nil {
 				batches = append(batches, b)
 			}
@@ -70,6 +70,111 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"CurrentUser": u,
 		"Batches":     batches,
 	})
+}
+
+func parseGenerateOptions(r *http.Request) models.GenerateBatchOptions {
+	count, _ := strconv.Atoi(r.FormValue("count"))
+	profileID, _ := strconv.ParseInt(r.FormValue("profile_id"), 10, 64)
+	resellerID, _ := strconv.ParseInt(r.FormValue("reseller_id"), 10, 64)
+	nasID, _ := strconv.ParseInt(r.FormValue("nas_id"), 10, 64)
+	pricePerCard, _ := strconv.ParseFloat(r.FormValue("price_per_card"), 64)
+	charLen, _ := strconv.Atoi(r.FormValue("char_len"))
+	simultaneous, _ := strconv.Atoi(r.FormValue("simultaneous_sessions"))
+
+	affixType := r.FormValue("affix_type")
+	if affixType != "suffix" {
+		affixType = "prefix"
+	}
+	affixVal := strings.TrimSpace(r.FormValue("affix_value"))
+	if affixVal == "" {
+		affixVal = strings.TrimSpace(r.FormValue("prefix"))
+	}
+
+	format := r.FormValue("format")
+	if format == "" {
+		format = "num"
+	}
+
+	timeCalcMode := r.FormValue("time_calc_mode")
+	if timeCalcMode != "by_second" {
+		timeCalcMode = "first_login"
+	}
+
+	stopOnQuota := r.FormValue("stop_on_quota") == "1" || r.FormValue("stop_on_quota") == "on"
+	if r.FormValue("stop_on_quota_submitted") == "1" && !stopOnQuota {
+		stopOnQuota = false
+	} else if r.FormValue("stop_on_quota_submitted") == "" {
+		stopOnQuota = true
+	}
+
+	bindMAC := r.FormValue("bind_mac") == "1" || r.FormValue("bind_mac") == "on"
+	lockMAC := r.FormValue("lock_mac") == "1" || r.FormValue("lock_mac") == "on"
+
+	serviceName := strings.TrimSpace(r.FormValue("service_name"))
+	batchName := strings.TrimSpace(r.FormValue("batch_name"))
+	cardType := r.FormValue("card_type")
+	if cardType == "" {
+		cardType = "charge"
+	}
+
+	// Calculate quota bytes
+	quotaValStr := strings.TrimSpace(r.FormValue("quota_val"))
+	quotaUnit := strings.TrimSpace(r.FormValue("quota_unit"))
+	var quotaBytes int64
+	if quotaValStr != "" {
+		qv, err := strconv.ParseFloat(quotaValStr, 64)
+		if err == nil && qv > 0 {
+			if strings.ToUpper(quotaUnit) == "GB" {
+				quotaBytes = int64(qv * 1024 * 1024 * 1024)
+			} else {
+				quotaBytes = int64(qv * 1024 * 1024)
+			}
+		}
+	}
+
+	// Calculate time limit seconds
+	timeValStr := strings.TrimSpace(r.FormValue("time_val"))
+	timeUnit := strings.TrimSpace(r.FormValue("time_unit"))
+	var timeLimitSeconds int64
+	if timeValStr != "" {
+		tv, err := strconv.ParseInt(timeValStr, 10, 64)
+		if err == nil && tv > 0 {
+			switch strings.ToLower(timeUnit) {
+			case "minutes", "min":
+				timeLimitSeconds = tv * 60
+			case "hours", "hour":
+				timeLimitSeconds = tv * 3600
+			case "days", "day":
+				timeLimitSeconds = tv * 86400
+			case "months", "month":
+				timeLimitSeconds = tv * 86400 * 30
+			default:
+				timeLimitSeconds = tv
+			}
+		}
+	}
+
+	return models.GenerateBatchOptions{
+		BatchName:            batchName,
+		Count:                count,
+		ProfileID:            profileID,
+		ResellerID:           resellerID,
+		NASID:                nasID,
+		CardType:             cardType,
+		PricePerCard:         pricePerCard,
+		AffixType:            affixType,
+		AffixValue:           affixVal,
+		CharLen:              charLen,
+		Format:               format,
+		QuotaBytes:           quotaBytes,
+		TimeLimitSeconds:     timeLimitSeconds,
+		TimeCalcMode:         timeCalcMode,
+		SimultaneousSessions: simultaneous,
+		StopOnQuota:          stopOnQuota,
+		BindMAC:              bindMAC,
+		LockMAC:              lockMAC,
+		ServiceName:          serviceName,
+	}
 }
 
 func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,16 +192,8 @@ func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodGet {
-		pRows, _ := bp.db.Query("SELECT id, name, display_name, price FROM profiles ORDER BY id ASC")
-		var profiles []models.Profile
-		if pRows != nil {
-			defer pRows.Close()
-			for pRows.Next() {
-				var p models.Profile
-				_ = pRows.Scan(&p.ID, &p.Name, &p.DisplayName, &p.Price)
-				profiles = append(profiles, p)
-			}
-		}
+		profiles, _ := bp.db.GetProfiles()
+		routers, _ := bp.db.GetCafeRouters()
 
 		var resellers []models.Reseller
 		if u.Role == "admin" {
@@ -117,30 +214,28 @@ func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 			"CardType":    cardType,
 			"CurrentUser": u,
 			"Profiles":    profiles,
+			"Routers":     routers,
 			"Resellers":   resellers,
 		})
 		return
 	}
 
-	count, _ := strconv.Atoi(r.FormValue("count"))
-	prefix := r.FormValue("prefix")
-	charLen, _ := strconv.Atoi(r.FormValue("char_len"))
-	profileID, _ := strconv.ParseInt(r.FormValue("profile_id"), 10, 64)
-	resellerID, _ := strconv.ParseInt(r.FormValue("reseller_id"), 10, 64)
-	pricePerCard, _ := strconv.ParseFloat(r.FormValue("price_per_card"), 64)
-
+	opts := parseGenerateOptions(r)
+	if cardType != "" {
+		opts.CardType = cardType
+	}
 	if u.Role == "reseller" {
-		resellerID = u.ID
+		opts.ResellerID = u.ID
 	}
 
-	batchCode, _, err := bp.db.GenerateBatch(count, prefix, charLen, profileID, resellerID, pricePerCard)
+	batchCode, _, err := bp.db.GenerateAdvancedBatch(opts)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error generating batch: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	redir := "/cards/print?batch=" + batchCode
-	if cardType == "cafe" {
+	if opts.CardType == "cafe" {
 		redir += "&type=cafe"
 	}
 	http.Redirect(w, r, redir, http.StatusFound)
@@ -232,16 +327,7 @@ func (bp *Blueprint) CafePortalHandler(w http.ResponseWriter, r *http.Request) {
 	batches, _ := bp.db.GetCafeBatches(selectedRouterID)
 
 	// 6. Profiles list for modal generator
-	pRows, _ := bp.db.Query("SELECT id, name, display_name, price FROM profiles ORDER BY id ASC")
-	var profilesList []models.Profile
-	if pRows != nil {
-		defer pRows.Close()
-		for pRows.Next() {
-			var p models.Profile
-			_ = pRows.Scan(&p.ID, &p.Name, &p.DisplayName, &p.Price)
-			profilesList = append(profilesList, p)
-		}
-	}
+	profilesList, _ := bp.db.GetProfiles()
 
 	_ = bp.renderer.Render(w, "cards/cafe_portal", map[string]interface{}{
 		"Title":            "منظومة كروت الكافيهات على الراديوس",
@@ -270,36 +356,30 @@ func (bp *Blueprint) CafeGenerateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	count, _ := strconv.Atoi(r.FormValue("count"))
-	prefix := strings.TrimSpace(r.FormValue("prefix"))
-	if prefix == "" {
-		prefix = "CF-"
-	}
-	charLen, _ := strconv.Atoi(r.FormValue("char_len"))
-	profileID, _ := strconv.ParseInt(r.FormValue("profile_id"), 10, 64)
-	nasID, _ := strconv.ParseInt(r.FormValue("nas_id"), 10, 64)
-	pricePerCard, _ := strconv.ParseFloat(r.FormValue("price_per_card"), 64)
+	opts := parseGenerateOptions(r)
+	opts.CardType = "cafe"
+
 	sendWhatsApp := r.FormValue("send_whatsapp") == "1"
 	cafePhone := strings.TrimSpace(r.FormValue("cafe_phone"))
 
-	batchCode, created, err := bp.db.GenerateCafeBatch(count, prefix, charLen, profileID, nasID, pricePerCard)
+	batchCode, created, err := bp.db.GenerateAdvancedBatch(opts)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/cards/cafe?router_id=%d&err=%s", nasID, url.QueryEscape(err.Error())), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/cards/cafe?router_id=%d&err=%s", opts.NASID, url.QueryEscape(err.Error())), http.StatusFound)
 		return
 	}
 
 	// If phone was provided, save to NAS
-	if cafePhone != "" && nasID > 0 {
-		_, _ = bp.db.Exec("UPDATE nas SET phone = ?, is_cafe = 1 WHERE id = ?", cafePhone, nasID)
+	if cafePhone != "" && opts.NASID > 0 {
+		_, _ = bp.db.Exec("UPDATE nas SET phone = ?, is_cafe = 1 WHERE id = ?", cafePhone, opts.NASID)
 	}
 
 	// Send WhatsApp notification if requested
 	if sendWhatsApp && cafePhone != "" {
 		go func() {
 			var nasName string
-			_ = bp.db.QueryRow("SELECT shortname FROM nas WHERE id = ?", nasID).Scan(&nasName)
+			_ = bp.db.QueryRow("SELECT shortname FROM nas WHERE id = ?", opts.NASID).Scan(&nasName)
 			var profName string
-			_ = bp.db.QueryRow("SELECT display_name FROM profiles WHERE id = ?", profileID).Scan(&profName)
+			_ = bp.db.QueryRow("SELECT display_name FROM profiles WHERE id = ?", opts.ProfileID).Scan(&profName)
 
 			msg := fmt.Sprintf("☕ *كروت شبكة الواي فاي - كافيه %s*\n"+
 				"━━━━━━━━━━━━━━━━━\n"+
@@ -333,7 +413,7 @@ func (bp *Blueprint) CafeGenerateHandler(w http.ResponseWriter, r *http.Request)
 		}()
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/cards/cafe?router_id=%d&msg=batch_created&batch=%s", nasID, batchCode), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/cards/cafe?router_id=%d&msg=batch_created&batch=%s", opts.NASID, batchCode), http.StatusFound)
 }
 
 // CafeDisconnectHandler terminates the active live session for an inspected card

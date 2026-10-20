@@ -93,6 +93,7 @@ func main() {
 
 	// Cards Blueprint
 	cardsBP := cards.New(db, renderer)
+	db.StartCardSyncDaemon()
 	mux.HandleFunc("/cards", middleware.RequireAuth(cardsBP.ListHandler))
 	mux.HandleFunc("/cards/generate", middleware.RequireAuth(cardsBP.GenerateHandler))
 	mux.HandleFunc("/cards/print", middleware.RequireAuth(cardsBP.PrintHandler))

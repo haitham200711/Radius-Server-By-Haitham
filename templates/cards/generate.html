@@ -1,67 +1,429 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">{{ if eq .CardType "cafe" }}توليد كروت كافيهات جديدة (Hotspot){{ else }}توليد كروت شحن جديدة (Recharge){{ end }}</h3>
-        <p class="text-muted small mb-0">إنشاء وتخزين الكروت في نظام الراديوس وتجهيزها للطباعة الفورية</p>
+        <h3 class="fw-bold mb-1">{{ if eq .CardType "cafe" }}توليد دفعة كروت كافيهات جديدة (Hotspot){{ else }}توليد دفعة كروت جديدة (Cards Generator){{ end }}</h3>
+        <p class="text-muted small mb-0">توليد دفعات الكروت بدقة عالية وربطها الكامل بالراديوس والمايكروتك</p>
     </div>
     <a href="/cards{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-right me-1"></i> رجوع للدفعات
     </a>
 </div>
 
-<div class="card max-w-700 mx-auto" style="max-width: 650px;">
-    <div class="card-body p-4">
-        <form method="POST" action="/cards/generate">
-            <input type="hidden" name="card_type" value="{{ .CardType }}">
-            <div class="mb-3">
-                <label class="form-label fw-bold">عدد الكروت المطلوبة:</label>
-                <input type="number" name="count" class="form-control" value="100" min="1" max="50000" required>
-                <small class="text-muted">يدعم حتى 50,000 كارت دفعة واحدة بسرعة فائقة</small>
-            </div>
+<form method="POST" action="/cards/generate" id="advancedCardGenForm">
+    <input type="hidden" name="card_type" value="{{ if .CardType }}{{ .CardType }}{{ else }}charge{{ end }}">
+    <input type="hidden" name="stop_on_quota_submitted" value="1">
 
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">بادئة اسم المستخدم (Prefix):</label>
-                    <input type="text" name="prefix" class="form-control" placeholder="مثال: CARD-">
+    <div class="row g-4">
+        <!-- العمود الأيمن: البيانات الأساسية والباقة والوقت -->
+        <div class="col-lg-7">
+            <!-- كارت 1: بيانات الحزمة والكمية -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="bi bi-collection-fill text-primary me-2"></i> بيانات الحزمة والكمية
+                    </h5>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">طول الاسم العشوائي:</label>
-                    <input type="number" name="char_len" class="form-control" value="6" min="4" max="16" required>
+                <div class="card-body p-4">
+                    <!-- اسم الحزمة -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم الحزمة (Batch Name) <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-bookmark-star"></i></span>
+                            <input type="text" name="batch_name" id="batch_name" class="form-control" placeholder="مثال: دفعة كروت عطلة الأسبوع - كافيه النيل" required>
+                        </div>
+                        <div class="form-text small">اسم وصفي مميز للدفعة يسهل التعرف عليها في السجلات والطباعة.</div>
+                    </div>
+
+                    <!-- الكمية -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-bold mb-0">الكمية المطلوبة (Cards Count) <span class="text-danger">*</span></label>
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">حتى 50,000 كارت دفعة واحدة</span>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-123"></i></span>
+                            <input type="number" name="count" id="card_count" class="form-control fw-bold fs-6 font-monospace" value="100" min="1" max="50000" required>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" onclick="setCount(50)">50</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" onclick="setCount(100)">100</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" onclick="setCount(250)">250</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" onclick="setCount(500)">500</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1" onclick="setCount(1000)">1,000</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1" onclick="setCount(5000)">5,000</button>
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 fw-bold shadow-sm" onclick="setCount(10000)">10,000 🔥</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- الراوتر / الكافيه -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الراوتر أو الفرع المستهدف (اختياري)</label>
+                            <select name="nas_id" class="form-select">
+                                <option value="0">عام (متاح على جميع الراوترات)</option>
+                                {{ range .Routers }}
+                                <option value="{{ .ID }}">{{ .ShortName }} ({{ .NasName }})</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <!-- تخصيص لموزع -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الموزع (اختياري)</label>
+                            <select name="reseller_id" class="form-select">
+                                <option value="0">المدير العام (بدون موزع)</option>
+                                {{ range .Resellers }}
+                                <option value="{{ .ID }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-bold">الباقة والسرعة المحددة:</label>
-                <select name="profile_id" class="form-select" required>
-                    {{ range .Profiles }}
-                    <option value="{{ .ID }}">{{ .DisplayName }} ({{ .Price }} ج.م)</option>
-                    {{ end }}
-                </select>
+            <!-- كارت 2: الباقة والكوتة والوقت لكل كارت -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="bi bi-speedometer2 text-success me-2"></i> الباقة والكوتة والوقت للكارت الواحد
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- اختيار الباقة -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">اختر الباقة (Profile) <span class="text-danger">*</span></label>
+                        <select name="profile_id" id="profile_select" class="form-select form-select-lg fs-6" required>
+                            <option value="" disabled selected>-- اضغط لاختيار الباقة والسرعة --</option>
+                            {{ range .Profiles }}
+                            <option value="{{ .ID }}"
+                                    data-quota-bytes="{{ .QuotaBytes }}"
+                                    data-quota-gb="{{ .QuotaGB }}"
+                                    data-validity-value="{{ .ValidityValue }}"
+                                    data-validity-unit="{{ .ValidityUnit }}"
+                                    data-uptime="{{ .UptimeSeconds }}"
+                                    data-price="{{ .Price }}"
+                                    data-name="{{ .Name }}"
+                                    data-disp="{{ .DisplayName }}">
+                                {{ .DisplayName }} ({{ .RateLimit }} - {{ .Price }} ج.م)
+                            </option>
+                            {{ end }}
+                        </select>
+                        <div class="form-text small">عند اختيار الباقة سيتم تلقائياً ملء خانة الكوتة وخانة الوقت بالقيم الافتراضية للباقة.</div>
+                    </div>
+
+                    <!-- خانة الكوتة والوقت للكارت الواحد جنباً إلى جنب -->
+                    <div class="row g-3 mb-3 p-3 bg-light rounded-3 border">
+                        <!-- خانة الكوتة -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-hdd-network text-primary me-1"></i> كوتة الكارت الواحد:</span>
+                                <span class="badge bg-secondary" id="badge_quota_unlimited" style="display: none;">غير محدود</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" step="any" min="0" name="quota_val" id="quota_val" class="form-control fw-bold" placeholder="مثال: 1 أو 500">
+                                <select name="quota_unit" id="quota_unit" class="form-select fw-bold bg-white" style="max-width: 105px;">
+                                    <option value="GB" selected>جيجا GB</option>
+                                    <option value="MB">ميجا MB</option>
+                                </select>
+                            </div>
+                            <div class="form-text small text-muted">اتركه فارغاً أو 0 إذا كان غير محدود.</div>
+                        </div>
+
+                        <!-- خانة الوقت -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-clock-history text-success me-1"></i> وقت الكارت الواحد:</span>
+                                <span class="badge bg-secondary" id="badge_time_unlimited" style="display: none;">مفتوح</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" min="0" name="time_val" id="time_val" class="form-control fw-bold" placeholder="مثال: 2 أو 24">
+                                <select name="time_unit" id="time_unit" class="form-select fw-bold bg-white" style="max-width: 115px;">
+                                    <option value="hours" selected>ساعات</option>
+                                    <option value="days">أيام</option>
+                                    <option value="minutes">دقائق</option>
+                                </select>
+                            </div>
+                            <div class="form-text small text-muted">المدة الزمنية المسموح بها للكارت.</div>
+                        </div>
+                    </div>
+
+                    <!-- سعر البيع للكارت الواحد -->
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">سعر البيع للكارت الواحد (ج.م)</label>
+                        <div class="input-group" style="max-width: 250px;">
+                            <input type="number" step="0.5" min="0" name="price_per_card" id="price_per_card" class="form-control fw-bold" placeholder="0.00">
+                            <span class="input-group-text bg-light">ج.م</span>
+                        </div>
+                        <div class="form-text small">اتركه فارغاً لاعتماد السعر المحدد في الباقة.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- العمود الأيسر: خيارات التنسيق، القيود، والأمان -->
+        <div class="col-lg-5">
+            <!-- كارت 3: بادئة أو خاتمة وتنسيق الكود -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="bi bi-tag-fill text-warning me-2"></i> بادئة أو خاتمة الكود
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- خيار بادئة أو خاتمة -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold d-block small text-secondary">نوع المقطع المضاف للكارت</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="affix_type" id="affix_prefix" value="prefix" checked onchange="updatePreview()">
+                            <label class="btn btn-outline-primary fw-bold" for="affix_prefix">
+                                <i class="bi bi-arrow-bar-left me-1"></i> بادئة (Prefix)
+                            </label>
+
+                            <input type="radio" class="btn-check" name="affix_type" id="affix_suffix" value="suffix" onchange="updatePreview()">
+                            <label class="btn btn-outline-primary fw-bold" for="affix_suffix">
+                                <i class="bi bi-arrow-bar-right me-1"></i> خاتمة (Suffix)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- نص البادئة / الخاتمة -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" id="affix_label">نص البادئة (اختياري)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-hash"></i></span>
+                            <input type="text" name="affix_value" id="affix_value" class="form-control font-monospace" placeholder="مثال: CF- أو -VIP" dir="ltr" oninput="updatePreview()">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">طول الرمز العشوائي</label>
+                            <input type="number" name="char_len" id="char_len" class="form-control font-monospace" value="6" min="4" max="16" required oninput="updatePreview()">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">نوع الرموز</label>
+                            <select name="format" id="format_select" class="form-select font-monospace" onchange="updatePreview()">
+                                <option value="num" selected>أرقام فقط (0-9)</option>
+                                <option value="mixed">أرقام وحروف</option>
+                                <option value="alpha">حروف إنجليزية</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- صندوق المعاينة الحية للكارت -->
+                    <div class="p-3 bg-light rounded-3 border text-center">
+                        <span class="text-muted small d-block mb-1">معاينة شكل كود الكارت الناتج:</span>
+                        <code class="fs-5 fw-bold text-primary font-monospace bg-white px-3 py-1 rounded border d-inline-block" id="card_code_preview" dir="ltr">CF-849201</code>
+                    </div>
+                </div>
             </div>
 
-            {{ if eq .CurrentUser.Role "admin" }}
-            <div class="mb-3">
-                <label class="form-label fw-bold">تخصيص لموزع (اختياري):</label>
-                <select name="reseller_id" class="form-select">
-                    <option value="0">المدير العام (بدون موزع)</option>
-                    {{ range .Resellers }}
-                    <option value="{{ .ID }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
-                    {{ end }}
-                </select>
-            </div>
-            {{ end }}
+            <!-- كارت 4: التحكم، عدد الأجهزة، الماك أدرس، والخدمة -->
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="bi bi-shield-check text-info me-2"></i> قيود الأمان، الماك أدرس، والخدمة
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- عدد الأجهزة -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                            <span>عدد الأجهزة المتزامنة (Simultaneous-Use):</span>
+                            <span class="badge bg-light text-dark border font-monospace" id="devices_badge">1 جهاز</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-phone"></i></span>
+                            <input type="number" name="simultaneous_sessions" id="simultaneous_sessions" class="form-control fw-bold" value="1" min="1" max="10" required oninput="document.getElementById('devices_badge').innerText = this.value + ' جهاز'">
+                        </div>
+                        <div class="form-text small">عدد الأجهزة المسموح باتصالها بنفس الكارت في نفس اللحظة (الافتراضي: 1 جهاز).</div>
+                    </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-bold">سعر البيع للكارت (ج.م - اختياري):</label>
-                <input type="number" step="0.5" name="price_per_card" class="form-control" placeholder="اتركه فارغاً لاعتماد سعر الباقة">
+                    <!-- احتساب الوقت: من أول اتصال أو بالثانية -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold d-block small text-secondary mb-2">طريقة احتساب الوقت (Time Calculation Mode)</label>
+                        <div class="form-check p-3 bg-light rounded-3 border mb-2">
+                            <input class="form-check-input" type="radio" name="time_calc_mode" id="calc_first_login" value="first_login" checked>
+                            <label class="form-check-label fw-bold text-dark cursor-pointer" for="calc_first_login">
+                                <i class="bi bi-play-circle-fill text-success me-1"></i> من أول اتصال (First Login)
+                            </label>
+                            <div class="form-text small text-muted ps-4">
+                                يبدأ العد التنازلي للوقت فور أول تسجيل دخول للكارت حتى انتهاء المدة (مستمر سواء العميل متصل أو مفصول).
+                            </div>
+                        </div>
+
+                        <div class="form-check p-3 bg-light rounded-3 border">
+                            <input class="form-check-input" type="radio" name="time_calc_mode" id="calc_by_second" value="by_second">
+                            <label class="form-check-label fw-bold text-dark cursor-pointer" for="calc_by_second">
+                                <i class="bi bi-stopwatch-fill text-primary me-1"></i> بالثانية (By Second - تراكمي)
+                            </label>
+                            <div class="form-text small text-muted ps-4">
+                                يخصم الوقت فقط أثناء اتصال الزبون بالشبكة (العداد يتوقف عند قطع الاتصال).
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- مفاتيح التحكم والأمان والماك أدرس -->
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <!-- عند انتهاء الكوتة ايقاف الكارت -->
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="stop_on_quota" id="switch_stop_quota" value="1" checked>
+                            <label class="form-check-label fw-bold text-dark cursor-pointer" for="switch_stop_quota">
+                                عند انتهاء الكوتة: إيقاف الكارت وقطع الاتصال فوراً
+                            </label>
+                        </div>
+
+                        <!-- التحويل لوضع الماك ادرس عند الإتصال -->
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="bind_mac" id="switch_bind_mac" value="1">
+                            <label class="form-check-label fw-bold text-dark cursor-pointer" for="switch_bind_mac">
+                                التحويل لوضع الماك أدرس عند أول اتصال (Bind to MAC)
+                            </label>
+                            <div class="form-text small text-muted ps-4">حفظ ماك جهاز العميل تلقائياً عند دخوله لتسريع الدخول القادم.</div>
+                        </div>
+
+                        <!-- إغلاق بالماك ادرس -->
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" name="lock_mac" id="switch_lock_mac" value="1">
+                            <label class="form-check-label fw-bold text-dark cursor-pointer" for="switch_lock_mac">
+                                إغلاق بالماك أدرس (قفل الكارت على جهاز واحد فقط)
+                            </label>
+                            <div class="form-text small text-muted ps-4">منع تشغيل الكارت على أي جهاز ثانٍ نهائياً بعد أول اتصال.</div>
+                        </div>
+                    </div>
+
+                    <!-- ربط الحزمة بمعرف الخدمة في المايكروتك -->
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">معرف الخدمة في المايكروتك (Hotspot Server / Service)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-hdd-rack"></i></span>
+                            <input type="text" name="service_name" class="form-control font-monospace" placeholder="مثال: hotspot1 أو all" value="all" dir="ltr">
+                        </div>
+                        <div class="form-text small text-muted">
+                            يمكنك حصر هذه الحزمة لتعمل فقط على سيرفر هوتسبوت محدد داخل المايكروتك (اتركه <code>all</code> للعمل على كل السيرفرات).
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
-                <i class="bi bi-lightning-charge me-1"></i> توليد الكروت وحفظها في النظام فوراً
-            </button>
-        </form>
+            <!-- زر التوليد والحفظ -->
+            <div class="card shadow-sm border-0 bg-primary text-white p-4 text-center">
+                <button type="submit" id="btnSubmitGenerate" class="btn btn-light btn-lg fw-bold w-100 shadow py-3 text-primary fs-5">
+                    <i class="bi bi-lightning-charge-fill me-2"></i> توليد الكروت وتجهيزها للطباعة الآن
+                </button>
+                <span class="small text-white-50 mt-2 d-block">يتم إنشاء الكروت وتخزينها بأعلى سرعة داخل قواعد بيانات الراديوس.</span>
+            </div>
+        </div>
     </div>
-</div>
+</form>
+
+<script>
+function setCount(n) {
+    document.getElementById('card_count').value = n;
+}
+
+// Profile selector listener
+document.getElementById('profile_select')?.addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    if (!opt) return;
+
+    // Set Default Batch Name if empty
+    var batchInput = document.getElementById('batch_name');
+    var dispName = opt.getAttribute('data-disp') || opt.text;
+    if (batchInput && (!batchInput.value || batchInput.value.startsWith('دفعة'))) {
+        var today = new Date().toISOString().slice(0, 10);
+        batchInput.value = 'دفعة ' + dispName + ' (' + today + ')';
+    }
+
+    // Populate Price
+    var price = opt.getAttribute('data-price');
+    var priceInput = document.getElementById('price_per_card');
+    if (price && priceInput) {
+        priceInput.value = price;
+    }
+
+    // Populate Quota
+    var quotaBytes = parseInt(opt.getAttribute('data-quota-bytes') || '0', 10);
+    var quotaGb = parseFloat(opt.getAttribute('data-quota-gb') || '0');
+    var quotaVal = document.getElementById('quota_val');
+    var quotaUnit = document.getElementById('quota_unit');
+    var badgeQuotaUn = document.getElementById('badge_quota_unlimited');
+
+    if (quotaBytes > 0) {
+        if (badgeQuotaUn) badgeQuotaUn.style.display = 'none';
+        if (quotaBytes >= 1073741824) {
+            if (quotaVal) quotaVal.value = (quotaGb > 0) ? quotaGb : (quotaBytes / 1073741824).toFixed(1);
+            if (quotaUnit) quotaUnit.value = 'GB';
+        } else {
+            if (quotaVal) quotaVal.value = Math.round(quotaBytes / 1048576);
+            if (quotaUnit) quotaUnit.value = 'MB';
+        }
+    } else {
+        if (quotaVal) quotaVal.value = '';
+        if (badgeQuotaUn) badgeQuotaUn.style.display = 'inline-block';
+    }
+
+    // Populate Time
+    var valVal = opt.getAttribute('data-validity-value');
+    var valUnit = opt.getAttribute('data-validity-unit') || 'hours';
+    var timeVal = document.getElementById('time_val');
+    var timeUnit = document.getElementById('time_unit');
+    var badgeTimeUn = document.getElementById('badge_time_unlimited');
+
+    if (valVal && parseInt(valVal, 10) > 0) {
+        if (badgeTimeUn) badgeTimeUn.style.display = 'none';
+        if (timeVal) timeVal.value = valVal;
+        if (timeUnit) {
+            if (valUnit === 'days' || valUnit === 'hours' || valUnit === 'minutes') {
+                timeUnit.value = valUnit;
+            } else {
+                timeUnit.value = 'hours';
+            }
+        }
+    } else {
+        if (timeVal) timeVal.value = '';
+        if (badgeTimeUn) badgeTimeUn.style.display = 'inline-block';
+    }
+});
+
+// Affix toggle and preview
+function updatePreview() {
+    var isSuffix = document.getElementById('affix_suffix')?.checked;
+    var affixVal = document.getElementById('affix_value')?.value || '';
+    var charLen = parseInt(document.getElementById('char_len')?.value || '6', 10);
+    var format = document.getElementById('format_select')?.value || 'num';
+    var label = document.getElementById('affix_label');
+
+    if (label) {
+        label.innerText = isSuffix ? 'نص الخاتمة (Suffix - اختياري)' : 'نص البادئة (Prefix - اختياري)';
+    }
+
+    var dummyCode = '';
+    if (format === 'num') {
+        dummyCode = '8492015372648192'.slice(0, charLen);
+    } else if (format === 'alpha') {
+        dummyCode = 'AKWXYZBCDEFGHJKL'.slice(0, charLen);
+    } else {
+        dummyCode = 'A8K92F1X9M24'.slice(0, charLen);
+    }
+
+    var result = isSuffix ? (dummyCode + affixVal) : (affixVal + dummyCode);
+    var previewEl = document.getElementById('card_code_preview');
+    if (previewEl) {
+        previewEl.innerText = result || '---';
+    }
+}
+
+// Trigger initial preview
+updatePreview();
+
+document.getElementById('advancedCardGenForm')?.addEventListener('submit', function() {
+    var btn = document.getElementById('btnSubmitGenerate');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> جارٍ التوليد والحفظ في الراديوس...';
+    }
+});
+</script>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
