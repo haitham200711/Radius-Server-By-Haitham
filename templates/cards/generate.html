@@ -55,28 +55,20 @@
                         </div>
                     </div>
 
-                    <div class="row g-3">
-                        <!-- الراوتر / الكافيه -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">الراوتر أو الفرع المستهدف (اختياري)</label>
-                            <select name="nas_id" class="form-select">
-                                <option value="0">عام (متاح على جميع الراوترات)</option>
-                                {{ range .Routers }}
-                                <option value="{{ .ID }}">{{ .ShortName }} ({{ .NasName }})</option>
-                                {{ end }}
-                            </select>
-                        </div>
-                        <!-- تخصيص لموزع -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">الموزع (اختياري)</label>
-                            <select name="reseller_id" class="form-select">
-                                <option value="0">المدير العام (بدون موزع)</option>
-                                {{ range .Resellers }}
-                                <option value="{{ .ID }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
-                                {{ end }}
-                            </select>
-                        </div>
+                    <input type="hidden" name="nas_id" value="0">
+                    {{ if .Resellers }}
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">تخصيص لموزع (اختياري)</label>
+                        <select name="reseller_id" class="form-select">
+                            <option value="0">المدير العام (بدون موزع)</option>
+                            {{ range .Resellers }}
+                            <option value="{{ .ID }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
+                            {{ end }}
+                        </select>
                     </div>
+                    {{ else }}
+                    <input type="hidden" name="reseller_id" value="0">
+                    {{ end }}
                 </div>
             </div>
 

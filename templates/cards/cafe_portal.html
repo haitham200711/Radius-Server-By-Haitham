@@ -454,25 +454,14 @@
             </div>
             <form method="POST" action="/cards/cafe/generate" id="cafeModalForm">
                 <input type="hidden" name="card_type" value="cafe">
+                <input type="hidden" name="nas_id" value="{{ .SelectedRouterID }}">
                 <input type="hidden" name="stop_on_quota_submitted" value="1">
 
                 <div class="modal-body p-4">
-                    <!-- 1. Cafe Router Selection & Batch Name -->
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-secondary">فرع الكافيه المستهدف (MikroTik Router NAS) <span class="text-danger">*</span></label>
-                            <select name="nas_id" class="form-select" required>
-                                {{ range .Routers }}
-                                <option value="{{ .ID }}" {{ if eq .ID $.SelectedRouterID }}selected{{ end }}>
-                                    {{ .ShortName }} ({{ .NASName }})
-                                </option>
-                                {{ end }}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-secondary">اسم الحزمة (Batch Name) <span class="text-danger">*</span></label>
-                            <input type="text" name="batch_name" id="modal_batch_name" class="form-control" placeholder="مثال: باقة عطلة الأسبوع - كافيه النيل" required>
-                        </div>
+                    <!-- Batch Name -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">اسم الحزمة (Batch Name) <span class="text-danger">*</span></label>
+                        <input type="text" name="batch_name" id="modal_batch_name" class="form-control" placeholder="مثال: باقة عطلة الأسبوع - كافيه النيل" required>
                     </div>
 
                     <!-- 2. Quantity & Profile Selection -->
