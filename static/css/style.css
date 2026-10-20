@@ -331,50 +331,62 @@ body {
 }
 
 .sidebar-submenu {
-    padding-right: 18px;
-    margin-top: 3px;
+    margin-right: 20px;
+    padding-right: 12px;
+    margin-top: 4px;
     margin-bottom: 6px;
-    width: 100% !important;
+    border-right: 2px solid #e2e8f0;
     flex-shrink: 0 !important;
 }
 
-.sidebar-submenu.show,
 .sidebar-submenu.collapsing {
+    transition: height 0.15s cubic-bezier(0, 0, 0.2, 1) !important;
+}
+
+.sidebar-submenu.show {
     display: flex !important;
     flex-direction: column !important;
-    width: 100% !important;
     flex-shrink: 0 !important;
 }
 
 .sidebar-sub-link {
     display: flex !important;
     flex-direction: row !important;
-    width: 100% !important;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 7px 12px;
     color: #64748b;
     text-decoration: none;
-    font-size: 0.84rem;
+    font-size: 0.85rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
-    transition: all 0.15s ease;
-    margin-bottom: 3px;
+    transition: all 0.12s ease-in-out;
+    margin-bottom: 2px;
     box-sizing: border-box;
     white-space: nowrap !important;
-    overflow: hidden;
+    position: relative;
 }
 
 .sidebar-sub-link:hover {
-    color: var(--primary);
+    color: #0d6efd;
     background-color: #f1f5f9;
+    padding-right: 15px;
 }
 
 .sidebar-sub-link.active {
-    color: var(--primary) !important;
-    background-color: var(--primary-subtle) !important;
+    color: #0d6efd !important;
+    background-color: rgba(13, 110, 253, 0.08) !important;
     font-weight: 700;
-    border-right: 2px solid var(--primary);
+    border-right: 3px solid #0d6efd;
+    margin-right: -14px;
+    padding-right: 11px;
+}
+
+.sidebar-sub-link i {
+    font-size: 0.95rem;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
 }
 
 .dot-icon {
@@ -383,10 +395,15 @@ body {
 }
 
 .submenu-arrow {
-    transition: transform 0.2s ease;
+    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     font-size: 0.72rem;
     color: #94a3b8;
     flex-shrink: 0;
+}
+
+.sidebar-nav-link[aria-expanded="true"] {
+    background-color: #f8fafc;
+    color: #0f172a;
 }
 
 .sidebar-nav-link[aria-expanded="true"] .submenu-arrow {

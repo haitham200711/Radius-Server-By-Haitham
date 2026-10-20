@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- Unified Modern SaaS Theme -->
-    <link rel="stylesheet" href="/static/css/style.css?v=20261020_sidebar_fix">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261020_sidebar_fast">
 </head>
 <body>
 {{ if .CurrentUser }}
@@ -125,15 +125,15 @@
                         </a>
                         <div class="collapse {{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}show{{ end }} sidebar-submenu flex-column" id="subscribersSubmenu">
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "subscribers" }}active{{ end }}" href="/subscribers">
-                                <i class="bi bi-circle-fill dot-icon"></i>
+                                <i class="bi bi-person-lines-fill text-primary"></i>
                                 <span>قائمة المشتركين</span>
                             </a>
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "sessions" }}active{{ end }}" href="/sessions">
-                                <i class="bi bi-circle-fill dot-icon text-danger"></i>
+                                <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
                                 <span>المشتركين المتصلين</span>
                             </a>
                             <a class="sidebar-sub-link {{ if and (eq .ActiveMenu "reports") (eq .ActiveTab "logins") }}active{{ end }}" href="/reports?tab=logins">
-                                <i class="bi bi-circle-fill dot-icon text-info"></i>
+                                <i class="bi bi-journal-text text-info"></i>
                                 <span>سجل تسجيل الدخول</span>
                             </a>
                         </div>
@@ -152,11 +152,11 @@
                         </a>
                         <div class="collapse {{ if or (eq .ActiveMenu "profiles") (eq .ActiveMenu "speed_control") }}show{{ end }} sidebar-submenu flex-column" id="offersSubmenu">
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "profiles" }}active{{ end }}" href="/profiles">
-                                <i class="bi bi-circle-fill dot-icon text-warning"></i>
+                                <i class="bi bi-sliders text-warning"></i>
                                 <span>البروفايلات</span>
                             </a>
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "speed_control" }}active{{ end }}" href="/profiles/speed-control">
-                                <i class="bi bi-circle-fill dot-icon text-primary"></i>
+                                <i class="bi bi-speedometer2 text-primary"></i>
                                 <span>التحكم بالسرعات</span>
                             </a>
                         </div>
@@ -175,11 +175,11 @@
                         </a>
                         <div class="collapse {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}show{{ end }} sidebar-submenu flex-column" id="cardsSubmenu">
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "cards" }}active{{ end }}" href="/cards">
-                                <i class="bi bi-circle-fill dot-icon"></i>
+                                <i class="bi bi-wallet2 text-primary"></i>
                                 <span>كروت الشحن</span>
                             </a>
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "cafe_cards" }}active{{ end }}" href="/cards/cafe">
-                                <i class="bi bi-circle-fill dot-icon text-warning"></i>
+                                <i class="bi bi-cup-hot text-warning"></i>
                                 <span>كروت الكافيهات</span>
                             </a>
                         </div>
