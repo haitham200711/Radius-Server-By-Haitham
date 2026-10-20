@@ -132,6 +132,7 @@ func main() {
 	mux.HandleFunc("/profiles/speed-control/apply-temporary", middleware.RequireAuth(profBP.ApplyTemporaryHandler))
 	mux.HandleFunc("/profiles/speed-control/save-recurring", middleware.RequireAuth(profBP.SaveRecurringHandler))
 	mux.HandleFunc("/profiles/speed-control/restore", middleware.RequireAuth(profBP.RestoreHandler))
+	mux.HandleFunc("/profiles/speed-control/restore-profile", middleware.RequireAuth(profBP.RestoreProfileHandler))
 
 	// Routers (NAS) Blueprint
 	routBP := routers.New(db, renderer)

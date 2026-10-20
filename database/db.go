@@ -66,7 +66,7 @@ func (d *DB) InitSchema() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 2. Resellers (الموزعين)
+		// 2. Resellers (ط§ظ„ظ…ظˆط²ط¹ظٹظ†)
 		`CREATE TABLE IF NOT EXISTS resellers (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(100) NOT NULL,
@@ -80,7 +80,7 @@ func (d *DB) InitSchema() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 3. Profiles (باقات الخدمات)
+		// 3. Profiles (ط¨ط§ظ‚ط§طھ ط§ظ„ط®ط¯ظ…ط§طھ)
 		`CREATE TABLE IF NOT EXISTS profiles (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(64) UNIQUE NOT NULL,
@@ -103,7 +103,7 @@ func (d *DB) InitSchema() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 4. Batches (دفعات الكروت)
+		// 4. Batches (ط¯ظپط¹ط§طھ ط§ظ„ظƒط±ظˆطھ)
 		`CREATE TABLE IF NOT EXISTS batches (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			batch_code VARCHAR(32) UNIQUE NOT NULL,
@@ -115,7 +115,7 @@ func (d *DB) InitSchema() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 5. Cards (كروت الشحن)
+		// 5. Cards (ظƒط±ظˆطھ ط§ظ„ط´ط­ظ†)
 		`CREATE TABLE IF NOT EXISTS cards (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
 			batch_id INT NOT NULL,
@@ -133,7 +133,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_cards_batch (batch_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 6. Card Templates (تصاميم الطباعة)
+		// 6. Card Templates (طھطµط§ظ…ظٹظ… ط§ظ„ط·ط¨ط§ط¹ط©)
 		`CREATE TABLE IF NOT EXISTS card_templates (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(100) NOT NULL,
@@ -236,7 +236,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_radacct_session (acctsessionid),
 			INDEX idx_radacct_user (username)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		// 8. Subscribers CRM Table (العملاء والعقود)
+		// 8. Subscribers CRM Table (ط§ظ„ط¹ظ…ظ„ط§ط، ظˆط§ظ„ط¹ظ‚ظˆط¯)
 		`CREATE TABLE IF NOT EXISTS subscribers (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			username VARCHAR(64) UNIQUE NOT NULL,
@@ -283,7 +283,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_sstp_user (username)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 11. Billing Transactions & Debt Logs (سجل العمليات المالية والديون)
+		// 11. Billing Transactions & Debt Logs (ط³ط¬ظ„ ط§ظ„ط¹ظ…ظ„ظٹط§طھ ط§ظ„ظ…ط§ظ„ظٹط© ظˆط§ظ„ط¯ظٹظˆظ†)
 		`CREATE TABLE IF NOT EXISTS billing_transactions (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
 			username VARCHAR(64) NOT NULL,
@@ -303,7 +303,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_billing_date (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 12. SSTP One-Time Script Tokens (روابط تثبيت المايكروتك لمرة واحدة)
+		// 12. SSTP One-Time Script Tokens (ط±ظˆط§ط¨ط· طھط«ط¨ظٹطھ ط§ظ„ظ…ط§ظٹظƒط±ظˆطھظƒ ظ„ظ…ط±ط© ظˆط§ط­ط¯ط©)
 		`CREATE TABLE IF NOT EXISTS sstp_tokens (
 			token VARCHAR(64) PRIMARY KEY,
 			client_id BIGINT DEFAULT 0,
@@ -315,7 +315,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_token_used (token, used)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 13. SSTP Static Routes (توجيه الشبكات الثابت للفروع)
+		// 13. SSTP Static Routes (طھظˆط¬ظٹظ‡ ط§ظ„ط´ط¨ظƒط§طھ ط§ظ„ط«ط§ط¨طھ ظ„ظ„ظپط±ظˆط¹)
 		`CREATE TABLE IF NOT EXISTS sstp_static_routes (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			destination_cidr VARCHAR(64) NOT NULL,
@@ -329,7 +329,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_route_gw (gateway_ip)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 14. WhatsApp Settings (إعدادات وإشعارات الواتساب)
+		// 14. WhatsApp Settings (ط¥ط¹ط¯ط§ط¯ط§طھ ظˆط¥ط´ط¹ط§ط±ط§طھ ط§ظ„ظˆط§طھط³ط§ط¨)
 		`CREATE TABLE IF NOT EXISTS whatsapp_settings (
 			id INT PRIMARY KEY,
 			enabled TINYINT(1) DEFAULT 1,
@@ -343,7 +343,7 @@ func (d *DB) InitSchema() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 15. WhatsApp Logs (سجل رسائل الواتساب المرسلة)
+		// 15. WhatsApp Logs (ط³ط¬ظ„ ط±ط³ط§ط¦ظ„ ط§ظ„ظˆط§طھط³ط§ط¨ ط§ظ„ظ…ط±ط³ظ„ط©)
 		`CREATE TABLE IF NOT EXISTS whatsapp_logs (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
 			phone VARCHAR(32) NOT NULL,
@@ -358,7 +358,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_wa_date (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 16. WhatsApp Message Templates (قوالب رسائل وإشعارات الواتساب)
+		// 16. WhatsApp Message Templates (ظ‚ظˆط§ظ„ط¨ ط±ط³ط§ط¦ظ„ ظˆط¥ط´ط¹ط§ط±ط§طھ ط§ظ„ظˆط§طھط³ط§ط¨)
 		`CREATE TABLE IF NOT EXISTS whatsapp_templates (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			event_key VARCHAR(64) UNIQUE NOT NULL,
@@ -369,7 +369,7 @@ func (d *DB) InitSchema() error {
 			INDEX idx_wa_tmpl_key (event_key)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 17. Speed Control Configuration (التحكم بالسرعات ومضاعفة الباقات)
+		// 17. Speed Control Configuration (ط§ظ„طھط­ظƒظ… ط¨ط§ظ„ط³ط±ط¹ط§طھ ظˆظ…ط¶ط§ط¹ظپط© ط§ظ„ط¨ط§ظ‚ط§طھ)
 		`CREATE TABLE IF NOT EXISTS speed_control_config (
 			id INT PRIMARY KEY,
 			mode VARCHAR(20) DEFAULT 'off',
@@ -385,7 +385,7 @@ func (d *DB) InitSchema() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 18. Profile Base Speeds (سجل السرعات الأساسية للبروفايلات)
+		// 18. Profile Base Speeds (ط³ط¬ظ„ ط§ظ„ط³ط±ط¹ط§طھ ط§ظ„ط£ط³ط§ط³ظٹط© ظ„ظ„ط¨ط±ظˆظپط§ظٹظ„ط§طھ)
 		`CREATE TABLE IF NOT EXISTS profile_base_speeds (
 			profile_id INT PRIMARY KEY,
 			profile_name VARCHAR(64) NOT NULL,
@@ -413,8 +413,8 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS on_time_pool VARCHAR(64) DEFAULT '';`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS is_default TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS background_color VARCHAR(30) DEFAULT '#0d6efd';`,
-		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS header_title VARCHAR(150) DEFAULT 'كارت إنترنت';`,
-		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS footer_text VARCHAR(255) DEFAULT 'نتمنى لكم وقتاً ممتعاً';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS header_title VARCHAR(150) DEFAULT 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ';`,
+		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS footer_text VARCHAR(255) DEFAULT 'ظ†طھظ…ظ†ظ‰ ظ„ظƒظ… ظˆظ‚طھط§ظ‹ ظ…ظ…طھط¹ط§ظ‹';`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS theme_color VARCHAR(30) DEFAULT '#0d6efd';`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS html_content MEDIUMTEXT;`,
 		`ALTER TABLE card_templates ADD COLUMN IF NOT EXISTS css_content TEXT;`,
@@ -486,43 +486,43 @@ func (d *DB) InitSchema() error {
 	}{
 		{
 			key:  "time_expired",
-			name: "انتهاء وقت واشتراك العميل",
-			text: "عزيزي المشترك {name}، نود إعلامكم بأن اشتراككم رقم ({contract_no}) قد انتهى بتاريخ {expiry_date}. يرجى سرعة التجديد لضمان استمرار الخدمة.",
+			name: "ط§ظ†طھظ‡ط§ط، ظˆظ‚طھ ظˆط§ط´طھط±ط§ظƒ ط§ظ„ط¹ظ…ظٹظ„",
+			text: "ط¹ط²ظٹط²ظٹ ط§ظ„ظ…ط´طھط±ظƒ {name}طŒ ظ†ظˆط¯ ط¥ط¹ظ„ط§ظ…ظƒظ… ط¨ط£ظ† ط§ط´طھط±ط§ظƒظƒظ… ط±ظ‚ظ… ({contract_no}) ظ‚ط¯ ط§ظ†طھظ‡ظ‰ ط¨طھط§ط±ظٹط® {expiry_date}. ظٹط±ط¬ظ‰ ط³ط±ط¹ط© ط§ظ„طھط¬ط¯ظٹط¯ ظ„ط¶ظ…ط§ظ† ط§ط³طھظ…ط±ط§ط± ط§ظ„ط®ط¯ظ…ط©.",
 		},
 		{
 			key:  "quota_50",
-			name: "استهلاك 50% من كوتة العميل",
-			text: "مرحباً {name}، لقد تم استهلاك 50% من كوتة الإنترنت الخاصة بك ({quota_used} جيجا من إجمالي {quota_total} جيجا). المتبقي: {quota_remaining} جيجا.",
+			name: "ط§ط³طھظ‡ظ„ط§ظƒ 50% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¹ظ…ظٹظ„",
+			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ ظ„ظ‚ط¯ طھظ… ط§ط³طھظ‡ظ„ط§ظƒ 50% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¥ظ†طھط±ظ†طھ ط§ظ„ط®ط§طµط© ط¨ظƒ ({quota_used} ط¬ظٹط¬ط§ ظ…ظ† ط¥ط¬ظ…ط§ظ„ظٹ {quota_total} ط¬ظٹط¬ط§). ط§ظ„ظ…طھط¨ظ‚ظٹ: {quota_remaining} ط¬ظٹط¬ط§.",
 		},
 		{
 			key:  "quota_75",
-			name: "استهلاك 75% من كوتة العميل",
-			text: "تنبيه: مرحباً {name}، لقد استهلكت 75% من كوتة الإنترنت. المتبقي لديك: {quota_remaining} جيجا. تاريخ الانتهاء: {expiry_date}.",
+			name: "ط§ط³طھظ‡ظ„ط§ظƒ 75% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¹ظ…ظٹظ„",
+			text: "طھظ†ط¨ظٹظ‡: ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ ظ„ظ‚ط¯ ط§ط³طھظ‡ظ„ظƒطھ 75% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¥ظ†طھط±ظ†طھ. ط§ظ„ظ…طھط¨ظ‚ظٹ ظ„ط¯ظٹظƒ: {quota_remaining} ط¬ظٹط¬ط§. طھط§ط±ظٹط® ط§ظ„ط§ظ†طھظ‡ط§ط،: {expiry_date}.",
 		},
 		{
 			key:  "quota_100",
-			name: "استهلاك 100% من كوتة العميل",
-			text: "تنبيه هام: مرحباً {name}، لقد تم استهلاك 100% من كوتة الإنترنت بالكامل. يرجى شحن كوتة إضافية أو تجديد الباقة لاستعادة السرعة الكاملة.",
+			name: "ط§ط³طھظ‡ظ„ط§ظƒ 100% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¹ظ…ظٹظ„",
+			text: "طھظ†ط¨ظٹظ‡ ظ‡ط§ظ…: ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ ظ„ظ‚ط¯ طھظ… ط§ط³طھظ‡ظ„ط§ظƒ 100% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¥ظ†طھط±ظ†طھ ط¨ط§ظ„ظƒط§ظ…ظ„. ظٹط±ط¬ظ‰ ط´ط­ظ† ظƒظˆطھط© ط¥ط¶ط§ظپظٹط© ط£ظˆ طھط¬ط¯ظٹط¯ ط§ظ„ط¨ط§ظ‚ط© ظ„ط§ط³طھط¹ط§ط¯ط© ط§ظ„ط³ط±ط¹ط© ط§ظ„ظƒط§ظ…ظ„ط©.",
 		},
 		{
 			key:  "renew",
-			name: "تجديد اشتراك العميل",
-			text: "مرحباً {name}، تم تجديد اشتراككم بنجاح على باقة ({profile}). تاريخ الانتهاء الجديد: {expiry_date}. شكراً لثقتكم بنا.",
+			name: "طھط¬ط¯ظٹط¯ ط§ط´طھط±ط§ظƒ ط§ظ„ط¹ظ…ظٹظ„",
+			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ طھظ… طھط¬ط¯ظٹط¯ ط§ط´طھط±ط§ظƒظƒظ… ط¨ظ†ط¬ط§ط­ ط¹ظ„ظ‰ ط¨ط§ظ‚ط© ({profile}). طھط§ط±ظٹط® ط§ظ„ط§ظ†طھظ‡ط§ط، ط§ظ„ط¬ط¯ظٹط¯: {expiry_date}. ط´ظƒط±ط§ظ‹ ظ„ط«ظ‚طھظƒظ… ط¨ظ†ط§.",
 		},
 		{
 			key:  "debt_added",
-			name: "تسجيل أو إضافة مديونية جديدة",
-			text: "مرحباً {name}، تم تسجيل مديونية على حسابكم بمبلغ {amount} ج.م. إجمالي الدين المستحق الحالي: {debt} ج.م.",
+			name: "طھط³ط¬ظٹظ„ ط£ظˆ ط¥ط¶ط§ظپط© ظ…ط¯ظٹظˆظ†ظٹط© ط¬ط¯ظٹط¯ط©",
+			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ طھظ… طھط³ط¬ظٹظ„ ظ…ط¯ظٹظˆظ†ظٹط© ط¹ظ„ظ‰ ط­ط³ط§ط¨ظƒظ… ط¨ظ…ط¨ظ„ط؛ {amount} ط¬.ظ…. ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط¯ظٹظ† ط§ظ„ظ…ط³طھط­ظ‚ ط§ظ„ط­ط§ظ„ظٹ: {debt} ط¬.ظ….",
 		},
 		{
 			key:  "debt_paid",
-			name: "سداد دفعة من الدين",
-			text: "مرحباً {name}، تم استلام سداد بمبلغ {amount} ج.م بنجاح. المتبقي من الدين: {debt} ج.م. شكراً لتعاملكم الراقي معنا.",
+			name: "ط³ط¯ط§ط¯ ط¯ظپط¹ط© ظ…ظ† ط§ظ„ط¯ظٹظ†",
+			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ طھظ… ط§ط³طھظ„ط§ظ… ط³ط¯ط§ط¯ ط¨ظ…ط¨ظ„ط؛ {amount} ط¬.ظ… ط¨ظ†ط¬ط§ط­. ط§ظ„ظ…طھط¨ظ‚ظٹ ظ…ظ† ط§ظ„ط¯ظٹظ†: {debt} ط¬.ظ…. ط´ظƒط±ط§ظ‹ ظ„طھط¹ط§ظ…ظ„ظƒظ… ط§ظ„ط±ط§ظ‚ظٹ ظ…ط¹ظ†ط§.",
 		},
 		{
 			key:  "debt_reminder",
-			name: "التذكير الدوري بالديون المستحقة",
-			text: "عزيزي المشترك {name}، نود تذكيركم بوجود مديونية مستحقة بقيمة {debt} ج.م على اشتراككم رقم ({contract_no}). يرجى سرعة السداد لتفادي توقف الخدمة.",
+			name: "ط§ظ„طھط°ظƒظٹط± ط§ظ„ط¯ظˆط±ظٹ ط¨ط§ظ„ط¯ظٹظˆظ† ط§ظ„ظ…ط³طھط­ظ‚ط©",
+			text: "ط¹ط²ظٹط²ظٹ ط§ظ„ظ…ط´طھط±ظƒ {name}طŒ ظ†ظˆط¯ طھط°ظƒظٹط±ظƒظ… ط¨ظˆط¬ظˆط¯ ظ…ط¯ظٹظˆظ†ظٹط© ظ…ط³طھط­ظ‚ط© ط¨ظ‚ظٹظ…ط© {debt} ط¬.ظ… ط¹ظ„ظ‰ ط§ط´طھط±ط§ظƒظƒظ… ط±ظ‚ظ… ({contract_no}). ظٹط±ط¬ظ‰ ط³ط±ط¹ط© ط§ظ„ط³ط¯ط§ط¯ ظ„طھظپط§ط¯ظٹ طھظˆظ‚ظپ ط§ظ„ط®ط¯ظ…ط©.",
 		},
 	}
 	for _, dt := range defaultTemplates {
@@ -556,7 +556,7 @@ func (d *DB) InitSchema() error {
 		_, _ = d.Exec(`INSERT INTO profiles (name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds, price)
 			VALUES ('5M_UNLIMITED', '5 Mega Unlimited', '2560k/5120k', 'pppoe-pool', 0, 2592000, 150.00),
 			       ('10M_UNLIMITED', '10 Mega Unlimited', '5120k/10240k', 'pppoe-pool', 0, 2592000, 250.00),
-			       ('HS_1GB_1D', 'Hotspot 1GB / يومي', '2M/4M', 'hs-pool', 1073741824, 86400, 5.00);`)
+			       ('HS_1GB_1D', 'Hotspot 1GB / ظٹظˆظ…ظٹ', '2M/4M', 'hs-pool', 1073741824, 86400, 5.00);`)
 
 		// Also populate FreeRADIUS radgroupreply for these profiles
 		_, _ = d.Exec(`INSERT INTO radgroupreply (groupname, attribute, op, value)
@@ -574,10 +574,10 @@ func (d *DB) InitSchema() error {
         <span><i class="bi bi-wifi text-primary"></i> {{.HeaderTitle}}</span>
         <span class="badge bg-light text-secondary border font-monospace">{{.Profile}}</span>
     </div>
-    <div style="font-size: 0.8rem; color: #6c757d; margin-bottom: 2px;">كود تسجيل الدخول:</div>
+    <div style="font-size: 0.8rem; color: #6c757d; margin-bottom: 2px;">ظƒظˆط¯ طھط³ط¬ظٹظ„ ط§ظ„ط¯ط®ظˆظ„:</div>
     <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: #212529; background: #f8f9fa; padding: 6px; border-radius: 6px; margin: 6px 0; font-family: monospace; border: 1px solid #dee2e6;">{{.Code}}</div>
     <div style="font-size: 0.75rem; color: #6c757d; display: flex; justify-content: space-between; margin-top: 6px;">
-        <span>الفرع: {{.RouterName}}</span>
+        <span>ط§ظ„ظپط±ط¹: {{.RouterName}}</span>
         <span class="font-monospace text-primary">#{{.BatchID}}</span>
     </div>
     <div style="font-size: 0.7rem; color: #adb5bd; margin-top: 4px;">{{.FooterText}}</div>
@@ -585,10 +585,10 @@ func (d *DB) InitSchema() error {
 
 		luxuryHtml := `<div class="card-voucher voucher-luxury" style="border: 2px solid #d4af37; border-radius: 12px; padding: 12px; background: linear-gradient(135deg, #1c1c1c 0%, #2c2518 100%); color: #fff; text-align: center; position: relative;">
     <div style="font-weight: 700; font-size: 0.95rem; color: #ffd700; border-bottom: 1px solid #4a3e20; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-        <span>☕ {{.HeaderTitle}}</span>
+        <span>âک• {{.HeaderTitle}}</span>
         <span style="background: #d4af37; color: #000; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem;">{{.Profile}}</span>
     </div>
-    <div style="font-size: 0.8rem; color: #cccccc; margin-bottom: 2px;">رمز الدخول السريع:</div>
+    <div style="font-size: 0.8rem; color: #cccccc; margin-bottom: 2px;">ط±ظ…ط² ط§ظ„ط¯ط®ظˆظ„ ط§ظ„ط³ط±ظٹط¹:</div>
     <div style="font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: #ffd700; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 6px; margin: 6px 0; font-family: monospace; border: 1px solid #d4af37;">{{.Code}}</div>
     <div style="font-size: 0.75rem; color: #aaa; display: flex; justify-content: space-between; margin-top: 6px;">
         <span>{{.RouterName}}</span>
@@ -601,17 +601,17 @@ func (d *DB) InitSchema() error {
     <div style="font-weight: 900; font-size: 1rem; border-bottom: 1px dashed #000; padding-bottom: 4px; margin-bottom: 6px;">
         *** {{.HeaderTitle}} ***
     </div>
-    <div style="font-size: 0.85rem; margin: 3px 0;">السرعة: <strong>{{.Profile}}</strong></div>
+    <div style="font-size: 0.85rem; margin: 3px 0;">ط§ظ„ط³ط±ط¹ط©: <strong>{{.Profile}}</strong></div>
     <div style="font-size: 1.35rem; font-weight: 900; letter-spacing: 3px; border: 2px solid #000; padding: 6px; margin: 6px 0; background: #fafafa;">{{.Code}}</div>
     <div style="font-size: 0.75rem; border-top: 1px dashed #000; padding-top: 4px; margin-top: 6px;">
-        فرع: {{.RouterName}} | دفعة #{{.BatchID}}
+        ظپط±ط¹: {{.RouterName}} | ط¯ظپط¹ط© #{{.BatchID}}
     </div>
     <div style="font-size: 0.7rem; margin-top: 2px;">{{.FooterText}}</div>
 </div>`
 
 		miniHtml := `<div class="card-voucher voucher-mini" style="border: 1px solid #198754; border-radius: 8px; padding: 8px; background: #f0fff4; text-align: center;">
     <div style="font-weight: 700; font-size: 0.85rem; color: #198754; display: flex; justify-content: space-between;">
-        <span>📶 {{.HeaderTitle}}</span>
+        <span>ًں“¶ {{.HeaderTitle}}</span>
         <span style="background: #198754; color: #fff; border-radius: 4px; padding: 1px 4px; font-size: 0.7rem;">{{.Profile}}</span>
     </div>
     <div style="font-size: 1.15rem; font-weight: 800; letter-spacing: 1.5px; color: #145a32; background: #fff; padding: 4px; border-radius: 4px; margin: 4px 0; font-family: monospace; border: 1px solid #a3e4d7;">{{.Code}}</div>
@@ -622,10 +622,10 @@ func (d *DB) InitSchema() error {
 </div>`
 
 		_, _ = d.Exec(`INSERT INTO card_templates (name, is_default, header_title, footer_text, theme_color, html_content, card_width, card_height, cols, ` + "`rows`" + `, card_gap) VALUES
-			('القالب الأزرق الحديث (افتراضي)', 1, 'كارت إنترنت', 'أهلاً بكم - نتمنى لكم وقتاً ممتعاً', '#0d6efd', ?, '240px', '140px', 3, 7, '2mm'),
-			('قالب كافيه فخم (ذهبي داكن)', 0, 'VIP Wi-Fi Voucher', 'Welcome to our cafe - Enjoy high speed internet', '#d4af37', ?, '240px', '140px', 3, 7, '2mm'),
-			('قالب رول كاشير (حراري POS)', 0, 'إيصال شبكة واي فاي', 'يرجى الاحتفاظ بالكود لحين انتهاء الجلسة', '#212529', ?, '240px', '140px', 3, 7, '2mm'),
-			('قالب ميني اقتصادي (أخضر خفيف)', 0, 'كارت إنترنت سريع', 'شكراً لزيارتكم', '#198754', ?, '240px', '140px', 3, 7, '2mm')
+			('ط§ظ„ظ‚ط§ظ„ط¨ ط§ظ„ط£ط²ط±ظ‚ ط§ظ„ط­ط¯ظٹط« (ط§ظپطھط±ط§ط¶ظٹ)', 1, 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ', 'ط£ظ‡ظ„ط§ظ‹ ط¨ظƒظ… - ظ†طھظ…ظ†ظ‰ ظ„ظƒظ… ظˆظ‚طھط§ظ‹ ظ…ظ…طھط¹ط§ظ‹', '#0d6efd', ?, '240px', '140px', 3, 7, '2mm'),
+			('ظ‚ط§ظ„ط¨ ظƒط§ظپظٹظ‡ ظپط®ظ… (ط°ظ‡ط¨ظٹ ط¯ط§ظƒظ†)', 0, 'VIP Wi-Fi Voucher', 'Welcome to our cafe - Enjoy high speed internet', '#d4af37', ?, '240px', '140px', 3, 7, '2mm'),
+			('ظ‚ط§ظ„ط¨ ط±ظˆظ„ ظƒط§ط´ظٹط± (ط­ط±ط§ط±ظٹ POS)', 0, 'ط¥ظٹطµط§ظ„ ط´ط¨ظƒط© ظˆط§ظٹ ظپط§ظٹ', 'ظٹط±ط¬ظ‰ ط§ظ„ط§ط­طھظپط§ط¸ ط¨ط§ظ„ظƒظˆط¯ ظ„ط­ظٹظ† ط§ظ†طھظ‡ط§ط، ط§ظ„ط¬ظ„ط³ط©', '#212529', ?, '240px', '140px', 3, 7, '2mm'),
+			('ظ‚ط§ظ„ط¨ ظ…ظٹظ†ظٹ ط§ظ‚طھطµط§ط¯ظٹ (ط£ط®ط¶ط± ط®ظپظٹظپ)', 0, 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ ط³ط±ظٹط¹', 'ط´ظƒط±ط§ظ‹ ظ„ط²ظٹط§ط±طھظƒظ…', '#198754', ?, '240px', '140px', 3, 7, '2mm')
 			ON DUPLICATE KEY UPDATE html_content = VALUES(html_content)`, defaultHtml, luxuryHtml, thermalHtml, miniHtml)
 	}
 
@@ -866,7 +866,7 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 	}
 	batchCode := fmt.Sprintf("%s%d-%s", prefixLetter, time.Now().Unix(), randomLetters(4))
 	if opts.BatchName == "" {
-		opts.BatchName = fmt.Sprintf("دفعة %s", batchCode)
+		opts.BatchName = fmt.Sprintf("ط¯ظپط¹ط© %s", batchCode)
 	}
 	totalPrice := float64(opts.Count) * opts.PricePerCard
 	totalCostPrice := float64(opts.Count) * opts.CostPricePerCard
@@ -1348,8 +1348,8 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 
 func (d *DB) GetCardTemplates() ([]models.CardTemplate, error) {
 	rows, err := d.Query(`SELECT id, name, is_default, 
-		COALESCE(header_title, 'كارت إنترنت'), 
-		COALESCE(footer_text, 'نتمنى لكم وقتاً ممتعاً'), 
+		COALESCE(header_title, 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ'), 
+		COALESCE(footer_text, 'ظ†طھظ…ظ†ظ‰ ظ„ظƒظ… ظˆظ‚طھط§ظ‹ ظ…ظ…طھط¹ط§ظ‹'), 
 		COALESCE(theme_color, '#0d6efd'), 
 		COALESCE(html_content, ''), 
 		COALESCE(css_content, ''), 
@@ -1389,8 +1389,8 @@ func (d *DB) GetCardTemplate(id int64) (*models.CardTemplate, error) {
 	var t models.CardTemplate
 	var isDef int
 	err := d.QueryRow(`SELECT id, name, is_default, 
-		COALESCE(header_title, 'كارت إنترنت'), 
-		COALESCE(footer_text, 'نتمنى لكم وقتاً ممتعاً'), 
+		COALESCE(header_title, 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ'), 
+		COALESCE(footer_text, 'ظ†طھظ…ظ†ظ‰ ظ„ظƒظ… ظˆظ‚طھط§ظ‹ ظ…ظ…طھط¹ط§ظ‹'), 
 		COALESCE(theme_color, '#0d6efd'), 
 		COALESCE(html_content, ''), 
 		COALESCE(css_content, ''), 
@@ -1447,7 +1447,7 @@ func (d *DB) SaveCardTemplate(t *models.CardTemplate) error {
 		t.ThemeColor = "#0d6efd"
 	}
 	if t.HeaderTitle == "" {
-		t.HeaderTitle = "كارت إنترنت"
+		t.HeaderTitle = "ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ"
 	}
 
 	if t.ID == 0 {
@@ -1498,7 +1498,7 @@ func (d *DB) DeleteCardTemplate(id int64) error {
 	var total int
 	_ = d.QueryRow("SELECT COUNT(*) FROM card_templates").Scan(&total)
 	if total <= 1 {
-		return fmt.Errorf("لا يمكن حذف القالب الوحيد المتبقي في النظام")
+		return fmt.Errorf("ظ„ط§ ظٹظ…ظƒظ† ط­ط°ظپ ط§ظ„ظ‚ط§ظ„ط¨ ط§ظ„ظˆط­ظٹط¯ ط§ظ„ظ…طھط¨ظ‚ظٹ ظپظٹ ط§ظ„ظ†ط¸ط§ظ…")
 	}
 
 	var isDef int
@@ -1974,7 +1974,7 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 		adminUser = "admin"
 	}
 
-	desc := fmt.Sprintf("تجديد باقة: %s", p.DisplayName)
+	desc := fmt.Sprintf("طھط¬ط¯ظٹط¯ ط¨ط§ظ‚ط©: %s", p.DisplayName)
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'renew', ?, ?, ?, ?, ?, ?)`,
@@ -2062,7 +2062,7 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 		adminUser = "admin"
 	}
 
-	desc := fmt.Sprintf("إضافة كوتة رصيد: %.1f GB", quotaGB)
+	desc := fmt.Sprintf("ط¥ط¶ط§ظپط© ظƒظˆطھط© ط±طµظٹط¯: %.1f GB", quotaGB)
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'quota', ?, ?, ?, ?, ?, ?)`,
@@ -2125,7 +2125,7 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 		adminUser = "admin"
 	}
 
-	desc := fmt.Sprintf("سداد نقدي من المديونية (متبقي: %.2f ج.م)", newDebt)
+	desc := fmt.Sprintf("ط³ط¯ط§ط¯ ظ†ظ‚ط¯ظٹ ظ…ظ† ط§ظ„ظ…ط¯ظٹظˆظ†ظٹط© (ظ…طھط¨ظ‚ظٹ: %.2f ط¬.ظ…)", newDebt)
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
@@ -2334,7 +2334,7 @@ func (d *DB) TriggerWhatsAppEvent(eventKey string, sub *models.Subscriber, extra
 	if sub.ExpirationDate.Valid {
 		vars["{expiry_date}"] = sub.ExpirationDate.Time.Format("2006-01-02")
 	} else {
-		vars["{expiry_date}"] = "غير محدد"
+		vars["{expiry_date}"] = "ط؛ظٹط± ظ…ط­ط¯ط¯"
 	}
 
 	for k, v := range extraVars {
@@ -2353,7 +2353,7 @@ func (d *DB) TriggerWhatsAppEvent(eventKey string, sub *models.Subscriber, extra
 	} else if waSettings.APIEndpoint != "" {
 		sendErr = whatsapp.SendWhatsAppExternalFallback(waSettings.APIEndpoint, waSettings.APIToken, waSettings.InstanceID, sub.Phone, text)
 	} else {
-		sendErr = fmt.Errorf("خدمة واتساب غير مقترنة")
+		sendErr = fmt.Errorf("ط®ط¯ظ…ط© ظˆط§طھط³ط§ط¨ ط؛ظٹط± ظ…ظ‚طھط±ظ†ط©")
 	}
 
 	logStatus := "sent"
@@ -2594,7 +2594,7 @@ func (d *DB) LogWhatsAppMessage(phone, recipient, msgType, content, status, errM
 }
 
 // ============================================================================
-// Speed Control (التحكم بالسرعات ومضاعفة الباقات)
+// Speed Control (ط§ظ„طھط­ظƒظ… ط¨ط§ظ„ط³ط±ط¹ط§طھ ظˆظ…ط¶ط§ط¹ظپط© ط§ظ„ط¨ط§ظ‚ط§طھ)
 // ============================================================================
 
 func (d *DB) GetSpeedControlConfig() (*models.SpeedControlConfig, error) {
@@ -2699,6 +2699,8 @@ func (d *DB) GetProfileBaseSpeeds() ([]models.ProfileBaseSpeed, error) {
 	for rows.Next() {
 		var item models.ProfileBaseSpeed
 		if err := rows.Scan(&item.ProfileID, &item.ProfileName, &item.DisplayName, &item.BaseRateLimit, &item.BoostedRateLimit, &item.CurrentRateLimit); err == nil {
+			item.IsBoosted = (item.BoostedRateLimit != "" && item.CurrentRateLimit == item.BoostedRateLimit) ||
+				(item.BaseRateLimit != "" && item.CurrentRateLimit != item.BaseRateLimit)
 			list = append(list, item)
 		}
 	}
@@ -2792,6 +2794,103 @@ func (d *DB) RestoreBaseSpeeds(disconnectUsers bool) error {
 	}
 
 	return nil
+}
+
+func (d *DB) RestoreSingleProfileBaseSpeed(profileID int64, disconnectUsers bool) error {
+	_ = d.SyncProfileBaseSpeeds()
+
+	var baseRate, profName string
+	err := d.QueryRow(`SELECT COALESCE(pbs.base_rate_limit, p.rate_limit), p.name 
+		FROM profiles p
+		LEFT JOIN profile_base_speeds pbs ON pbs.profile_id = p.id
+		WHERE p.id = ?`, profileID).Scan(&baseRate, &profName)
+	if err != nil {
+		return err
+	}
+
+	if baseRate == "" {
+		return fmt.Errorf("السرعة الأصلية غير متوفرة")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Restore profile rate_limit
+	_, _ = tx.Exec("UPDATE profiles SET rate_limit = ? WHERE id = ?", baseRate, profileID)
+
+	// 2. Restore radgroupreply Mikrotik-Rate-Limit
+	_, _ = tx.Exec("UPDATE radgroupreply SET value = ? WHERE groupname = ? AND attribute = 'Mikrotik-Rate-Limit'", baseRate, profName)
+
+	// 3. Clear boosted rate limit in profile_base_speeds
+	_, _ = tx.Exec("UPDATE profile_base_speeds SET boosted_rate_limit = '' WHERE profile_id = ?", profileID)
+
+	// 4. Check if any profiles are still boosted; if none, turn off boosted status in config
+	var remainingBoosted int
+	_ = tx.QueryRow(`SELECT COUNT(*) FROM profile_base_speeds WHERE boosted_rate_limit != '' AND boosted_rate_limit IS NOT NULL`).Scan(&remainingBoosted)
+	if remainingBoosted == 0 {
+		_, _ = tx.Exec("UPDATE speed_control_config SET is_currently_boosted = 0, mode = 'off', temp_expires_at = NULL WHERE id = 1")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	if disconnectUsers {
+		go func() {
+			_, _ = d.DisconnectProfileActiveSessions(profName)
+		}()
+	}
+
+	return nil
+}
+
+func (d *DB) DisconnectProfileActiveSessions(profileName string) (int, error) {
+	rows, err := d.Query(`SELECT r.acctsessionid, r.username, r.nasipaddress, r.framedipaddress
+		FROM radacct r
+		JOIN radusergroup ug ON r.username = ug.username
+		WHERE r.acctstoptime IS NULL AND ug.groupname = ?`, profileName)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type sess struct {
+		sessionID string
+		username  string
+		nasIP     string
+		framedIP  string
+	}
+	var sessions []sess
+	for rows.Next() {
+		var s sess
+		_ = rows.Scan(&s.sessionID, &s.username, &s.nasIP, &s.framedIP)
+		sessions = append(sessions, s)
+	}
+
+	count := 0
+	for _, s := range sessions {
+		var secret string
+		var coaPort int
+		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
+		if secret == "" {
+			secret = "radius123"
+		}
+		if coaPort <= 0 {
+			coaPort = 3799
+		}
+
+		var fIP net.IP
+		if s.framedIP != "" {
+			fIP = net.ParseIP(s.framedIP)
+		}
+
+		_, _ = radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, fIP)
+		count++
+	}
+	return count, nil
 }
 
 func (d *DB) DisconnectAllActiveSessions() (int, error) {
@@ -2901,7 +3000,7 @@ func (d *DB) CheckSpeedControlSchedule() error {
 }
 
 // ============================================================================
-// Cafe Hotspot Cards Management (منظومة كروت الكافيهات على الراديوس)
+// Cafe Hotspot Cards Management (ظ…ظ†ط¸ظˆظ…ط© ظƒط±ظˆطھ ط§ظ„ظƒط§ظپظٹظ‡ط§طھ ط¹ظ„ظ‰ ط§ظ„ط±ط§ط¯ظٹظˆط³)
 // ============================================================================
 
 func FormatBytesHuman(b int64) string {
@@ -2924,18 +3023,18 @@ func FormatBytesHuman(b int64) string {
 
 func FormatDurationHuman(sec int64) string {
 	if sec <= 0 {
-		return "0 دقيقة"
+		return "0 ط¯ظ‚ظٹظ‚ط©"
 	}
 	hours := sec / 3600
 	mins := (sec % 3600) / 60
 	secs := sec % 60
 	if hours > 0 {
-		return fmt.Sprintf("%d ساعة و %d دقيقة", hours, mins)
+		return fmt.Sprintf("%d ط³ط§ط¹ط© ظˆ %d ط¯ظ‚ظٹظ‚ط©", hours, mins)
 	}
 	if mins > 0 {
-		return fmt.Sprintf("%d دقيقة و %d ثانية", mins, secs)
+		return fmt.Sprintf("%d ط¯ظ‚ظٹظ‚ط© ظˆ %d ط«ط§ظ†ظٹط©", mins, secs)
 	}
-	return fmt.Sprintf("%d ثانية", secs)
+	return fmt.Sprintf("%d ط«ط§ظ†ظٹط©", secs)
 }
 
 func (d *DB) GetCafeRouters() ([]models.NAS, error) {
@@ -2963,7 +3062,7 @@ func (d *DB) GetCafeRouters() ([]models.NAS, error) {
 func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
 		b.count, COALESCE(b.cost_price_per_card, 0.0), b.price_per_card, COALESCE(b.total_cost_price, 0.0), b.total_price,
-		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
+		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'ط§ظ„ظپط±ط¹ ط§ظ„ط±ط¦ظٹط³ظٹ')
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN nas n ON b.nas_id = n.id
@@ -3000,7 +3099,7 @@ func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
 		b.count, COALESCE(b.cost_price_per_card, 0.0), b.price_per_card, COALESCE(b.total_cost_price, 0.0), b.total_price,
-		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
+		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'ط§ظ„ظپط±ط¹ ط§ظ„ط±ط¦ظٹط³ظٹ')
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN nas n ON b.nas_id = n.id
@@ -3051,7 +3150,7 @@ func (d *DB) GenerateCafeBatch(count int, prefix string, charLen int, profileID 
 func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
-		return nil, fmt.Errorf("يرجى إدخال كود الكارت")
+		return nil, fmt.Errorf("ظٹط±ط¬ظ‰ ط¥ط¯ط®ط§ظ„ ظƒظˆط¯ ط§ظ„ظƒط§ط±طھ")
 	}
 
 	// 1. Fetch card details
@@ -3064,7 +3163,7 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	var nasName string
 
 	query := `SELECT c.id, c.username, c.password, c.price, c.status, c.first_login_at, c.expired_at,
-		c.batch_id, COALESCE(b.batch_code, ''), COALESCE(c.nas_id, 0), COALESCE(n.shortname, 'عام / غير مقيد'),
+		c.batch_id, COALESCE(b.batch_code, ''), COALESCE(c.nas_id, 0), COALESCE(n.shortname, 'ط¹ط§ظ… / ط؛ظٹط± ظ…ظ‚ظٹط¯'),
 		p.name, p.display_name, p.rate_limit, p.quota_bytes,
 		COALESCE(c.original_code, ''), c.is_mac_converted, COALESCE(c.calling_mac, '')
 		FROM cards c
@@ -3079,7 +3178,7 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 		&profileName, &profileDisp, &rateLimit, &quotaBytes,
 		&c.OriginalCode, &c.IsMACConverted, &c.CallingMAC)
 	if err != nil {
-		return nil, fmt.Errorf("الكارت '%s' غير مسجل في النظام", code)
+		return nil, fmt.Errorf("ط§ظ„ظƒط§ط±طھ '%s' ط؛ظٹط± ظ…ط³ط¬ظ„ ظپظٹ ط§ظ„ظ†ط¸ط§ظ…", code)
 	}
 
 	tracker := &models.CafeCardTracker{
@@ -3102,7 +3201,7 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	if quotaBytes > 0 {
 		tracker.QuotaDisplay = FormatBytesHuman(quotaBytes)
 	} else {
-		tracker.QuotaDisplay = "غير محدود (Open ∞)"
+		tracker.QuotaDisplay = "ط؛ظٹط± ظ…ط­ط¯ظˆط¯ (Open âˆ‍)"
 	}
 
 	// 2. Query Accounting consumption from radacct
@@ -3171,31 +3270,31 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 			tracker.UsagePercent = 100.0
 		}
 	} else {
-		tracker.RemainingDisplay = "مفتوح ∞"
+		tracker.RemainingDisplay = "ظ…ظپطھظˆط­ âˆ‍"
 		tracker.UsagePercent = 0.0
 	}
 
 	// 5. Diagnostics & Status
 	if tracker.IsOnline {
 		tracker.Status = "online"
-		tracker.StatusLabel = "متصل الآن (Online)"
+		tracker.StatusLabel = "ظ…طھطµظ„ ط§ظ„ط¢ظ† (Online)"
 		tracker.StatusBadgeClass = "bg-success text-white"
-		tracker.ExpireReason = "الكارت يعمل ويتصل بالشبكة حالياً بشكل ممتاز."
+		tracker.ExpireReason = "ط§ظ„ظƒط§ط±طھ ظٹط¹ظ…ظ„ ظˆظٹطھطµظ„ ط¨ط§ظ„ط´ط¨ظƒط© ط­ط§ظ„ظٹط§ظ‹ ط¨ط´ظƒظ„ ظ…ظ…طھط§ط²."
 	} else if tracker.TotalBytes == 0 && tracker.FirstLogin == "" {
 		tracker.Status = "available"
-		tracker.StatusLabel = "متاح للبيع (لم يبدأ بعد)"
+		tracker.StatusLabel = "ظ…طھط§ط­ ظ„ظ„ط¨ظٹط¹ (ظ„ظ… ظٹط¨ط¯ط£ ط¨ط¹ط¯)"
 		tracker.StatusBadgeClass = "bg-light text-secondary border"
-		tracker.ExpireReason = "الكارت جديد وجاهز للبيع، لم يسجل العميل الدخول به حتى الآن."
+		tracker.ExpireReason = "ط§ظ„ظƒط§ط±طھ ط¬ط¯ظٹط¯ ظˆط¬ط§ظ‡ط² ظ„ظ„ط¨ظٹط¹طŒ ظ„ظ… ظٹط³ط¬ظ„ ط§ظ„ط¹ظ…ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ط¨ظ‡ ط­طھظ‰ ط§ظ„ط¢ظ†."
 	} else if quotaBytes > 0 && tracker.TotalBytes >= quotaBytes {
 		tracker.Status = "expired"
-		tracker.StatusLabel = "منتهي الكوتة (Expired Quota)"
+		tracker.StatusLabel = "ظ…ظ†طھظ‡ظٹ ط§ظ„ظƒظˆطھط© (Expired Quota)"
 		tracker.StatusBadgeClass = "bg-danger text-white"
-		tracker.ExpireReason = "انتهت كوتة التحميل المخصصة للكارت بالكامل وتم إيقاف الخدمة."
+		tracker.ExpireReason = "ط§ظ†طھظ‡طھ ظƒظˆطھط© ط§ظ„طھط­ظ…ظٹظ„ ط§ظ„ظ…ط®طµطµط© ظ„ظ„ظƒط§ط±طھ ط¨ط§ظ„ظƒط§ظ…ظ„ ظˆطھظ… ط¥ظٹظ‚ط§ظپ ط§ظ„ط®ط¯ظ…ط©."
 	} else {
 		tracker.Status = "used"
-		tracker.StatusLabel = "مستهلك / غير متصل"
+		tracker.StatusLabel = "ظ…ط³طھظ‡ظ„ظƒ / ط؛ظٹط± ظ…طھطµظ„"
 		tracker.StatusBadgeClass = "bg-secondary text-white"
-		tracker.ExpireReason = "الكارت مستخدم وغير متصل حالياً (قد تكون مدة الصلاحية أو الجلسة انتهت)."
+		tracker.ExpireReason = "ط§ظ„ظƒط§ط±طھ ظ…ط³طھط®ط¯ظ… ظˆط؛ظٹط± ظ…طھطµظ„ ط­ط§ظ„ظٹط§ظ‹ (ظ‚ط¯ طھظƒظˆظ† ظ…ط¯ط© ط§ظ„طµظ„ط§ط­ظٹط© ط£ظˆ ط§ظ„ط¬ظ„ط³ط© ط§ظ†طھظ‡طھ)."
 	}
 
 	return tracker, nil
@@ -3207,7 +3306,7 @@ func (d *DB) DisconnectCard(code string) (bool, error) {
 		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, code).Scan(
 		&sessionID, &nasIP, &framedIPStr)
 	if err != nil || !sessionID.Valid {
-		return false, fmt.Errorf("الكارت غير متصل أونلاين حالياً")
+		return false, fmt.Errorf("ط§ظ„ظƒط§ط±طھ ط؛ظٹط± ظ…طھطµظ„ ط£ظˆظ†ظ„ط§ظٹظ† ط­ط§ظ„ظٹط§ظ‹")
 	}
 
 	var secret string
@@ -3246,7 +3345,7 @@ func (d *DB) StartCardSyncDaemon() {
 }
 
 func (d *DB) syncActiveCards() {
-	// 1. MAC Conversion After First Session (التحويل لماك أدرس بعد انتهاء أول جلسة عند تسجيل الخروج):
+	// 1. MAC Conversion After First Session (ط§ظ„طھط­ظˆظٹظ„ ظ„ظ…ط§ظƒ ط£ط¯ط±ط³ ط¨ط¹ط¯ ط§ظ†طھظ‡ط§ط، ط£ظˆظ„ ط¬ظ„ط³ط© ط¹ظ†ط¯ طھط³ط¬ظٹظ„ ط§ظ„ط®ط±ظˆط¬):
 	// For cards with convert_mac_after_session=1 and is_mac_converted=0,
 	// when the customer finished at least one session in radacct (acctstoptime IS NOT NULL)
 	// and currently has NO active session running (acctstoptime IS NULL).

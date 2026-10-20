@@ -61,13 +61,14 @@ func (bp *Blueprint) SpeedControlHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	_ = bp.renderer.Render(w, "profiles/speed_control", map[string]interface{}{
-		"Title":            "التحكم بالسرعات ومضاعفة الباقات",
+		"Title":            "التحكم بالسرعات",
 		"ActiveMenu":       "speed_control",
 		"CurrentUser":      middleware.GetUser(r),
 		"Config":           cfg,
 		"Speeds":           speeds,
 		"RemainingTimeStr": remainingTimeStr,
 		"ProfilesCount":    len(speeds),
+		"Message":          r.URL.Query().Get("msg"),
 	})
 }
 
@@ -241,4 +242,22 @@ func (bp *Blueprint) RestoreHandler(w http.ResponseWriter, r *http.Request) {
 	_ = bp.db.RestoreBaseSpeeds(disconnectUsers)
 
 	http.Redirect(w, r, "/profiles/speed-control?msg=restored", http.StatusFound)
+}
+
+// RestoreProfileHandler restores a single profile's base rate limit
+func (bp *Blueprint) RestoreProfileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/profiles/speed-control", http.StatusFound)
+		return
+	}
+
+	profileID, _ := strconv.ParseInt(r.FormValue("profile_id"), 10, 64)
+	if profileID > 0 {
+		disconnectUsers := r.FormValue("disconnect_users") == "1" || true
+		if err := bp.db.RestoreSingleProfileBaseSpeed(profileID, disconnectUsers); err != nil {
+			log.Printf("[SpeedControl] Restore single profile error: %v", err)
+		}
+	}
+
+	http.Redirect(w, r, "/profiles/speed-control?msg=profile_restored", http.StatusFound)
 }

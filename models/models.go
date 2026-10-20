@@ -486,6 +486,7 @@ type ProfileBaseSpeed struct {
 	BaseRateLimit    string    `json:"base_rate_limit"`
 	BoostedRateLimit string    `json:"boosted_rate_limit"`
 	CurrentRateLimit string    `json:"current_rate_limit"`
+	IsBoosted        bool      `json:"is_boosted"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
