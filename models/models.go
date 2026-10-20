@@ -337,6 +337,9 @@ type NAS struct {
 	Community   string    `json:"community"`
 	Description string    `json:"description"`
 	CoAPort     int       `json:"coa_port"`
+	APIPort     int       `json:"api_port"`
+	APIUser     string    `json:"api_user"`
+	APIPassword string    `json:"api_password"`
 	Phone       string    `json:"phone"`   // Cafe owner WhatsApp phone
 	IsCafe      bool      `json:"is_cafe"` // true if branch is a Cafe
 	CreatedAt   time.Time `json:"created_at"`
@@ -542,6 +545,8 @@ type SubscriberLiveTraffic struct {
 	QuotaUsagePercent      float64 `json:"quota_usage_percent"`
 	ExpirationDate         string  `json:"expiration_date"`
 	LastUpdate             string  `json:"last_update"`
+	DataSource             string  `json:"data_source"`
+	IsAPI                  bool    `json:"is_api"`
 }
 
 // SubscriberTrafficOption provides lightweight subscriber list items for search/dropdown

@@ -15,6 +15,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/mikrotik"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/radius"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/speedutil"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
@@ -161,6 +162,9 @@ func (d *DB) InitSchema() error {
 			community VARCHAR(50),
 			description VARCHAR(200) DEFAULT 'RADIUS Client',
 			coa_port INT DEFAULT 3799,
+			api_port INT DEFAULT 8728,
+			api_user VARCHAR(64) DEFAULT 'admin',
+			api_password VARCHAR(128) DEFAULT '',
 			INDEX idx_nas_nasname (nasname)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
@@ -439,6 +443,9 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT '';`,
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS is_cafe TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS coa_port INT DEFAULT 3799;`,
+		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS api_port INT DEFAULT 8728;`,
+		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS api_user VARCHAR(64) DEFAULT 'admin';`,
+		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS api_password VARCHAR(128) DEFAULT '';`,
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS created_at DATETIME DEFAULT CURRENT_TIMESTAMP;`,
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
@@ -3742,61 +3749,103 @@ func (d *DB) GetSubscriberLiveTraffic(username string) (*models.SubscriberLiveTr
 			}
 		}
 
-		// Calculate Real-Time Bandwidth Speed (Bps)
-		subTrafficMu.Lock()
-		prev, exists := subTrafficHistory[username]
-		if !exists {
-			initDown := int64(0)
-			initUp := int64(0)
-			if traffic.SessionTimeSec > 5 {
-				initDown = (traffic.SessionDownloadBytes * 8) / traffic.SessionTimeSec
-				initUp = (traffic.SessionUploadBytes * 8) / traffic.SessionTimeSec
-				if downMax > 0 && initDown > downMax {
-					initDown = downMax
-				}
-				if upMax > 0 && initUp > upMax {
-					initUp = upMax
-				}
-			}
-			subTrafficHistory[username] = &subTrafficPoint{
-				timestamp: now,
-				inOctets:  traffic.SessionUploadBytes,
-				outOctets: traffic.SessionDownloadBytes,
-				downBps:   initDown,
-				upBps:     initUp,
-			}
-			traffic.CurrentDownloadBps = initDown
-			traffic.CurrentUploadBps = initUp
-		} else {
-			diffSec := now.Sub(prev.timestamp).Seconds()
-			deltaIn := traffic.SessionUploadBytes - prev.inOctets
-			deltaOut := traffic.SessionDownloadBytes - prev.outOctets
+		// 3.1 Try Live MikroTik RouterOS API measurement first
+		var (
+			apiPort          sql.NullInt64
+			apiUser, apiPass sql.NullString
+			apiSuccess       bool
+		)
+		_ = d.QueryRow("SELECT api_port, api_user, api_password FROM nas WHERE nasname = ? LIMIT 1", traffic.NASIP).Scan(&apiPort, &apiUser, &apiPass)
 
-			if diffSec >= 0.8 {
-				if deltaIn > 0 || deltaOut > 0 {
-					newUp := int64(float64(deltaIn*8) / diffSec)
-					newDown := int64(float64(deltaOut*8) / diffSec)
-					if downMax > 0 && newDown > downMax*2 {
-						newDown = downMax
-					}
-					if upMax > 0 && newUp > upMax*2 {
-						newUp = upMax
-					}
-					prev.upBps = newUp
-					prev.downBps = newDown
-				} else if diffSec > 12 {
-					// Soft decay
-					prev.downBps = prev.downBps * 85 / 100
-					prev.upBps = prev.upBps * 85 / 100
-				}
-				prev.timestamp = now
-				prev.inOctets = traffic.SessionUploadBytes
-				prev.outOctets = traffic.SessionDownloadBytes
-			}
-			traffic.CurrentDownloadBps = prev.downBps
-			traffic.CurrentUploadBps = prev.upBps
+		portNum := 8728
+		if apiPort.Valid && apiPort.Int64 > 0 {
+			portNum = int(apiPort.Int64)
 		}
-		subTrafficMu.Unlock()
+		uName := "admin"
+		if apiUser.Valid && strings.TrimSpace(apiUser.String) != "" {
+			uName = strings.TrimSpace(apiUser.String)
+		}
+		pwd := ""
+		if apiPass.Valid {
+			pwd = apiPass.String
+		}
+
+		if traffic.NASIP != "" && portNum > 0 {
+			addr := fmt.Sprintf("%s:%d", traffic.NASIP, portNum)
+			mkClient, mkErr := mikrotik.Connect(addr, uName, pwd, 800*time.Millisecond)
+			if mkErr == nil {
+				rxBps, txBps, trErr := mkClient.GetInterfaceTraffic(username)
+				_ = mkClient.Close()
+				if trErr == nil {
+					apiSuccess = true
+					traffic.IsAPI = true
+					traffic.DataSource = "MikroTik RouterOS API (لايف فوري)"
+					traffic.CurrentDownloadBps = txBps
+					traffic.CurrentUploadBps = rxBps
+				}
+			}
+		}
+
+		if !apiSuccess {
+			traffic.IsAPI = false
+			traffic.DataSource = "RADIUS Accounting"
+
+			// Calculate Real-Time Bandwidth Speed (Bps) from RADIUS Accounting
+			subTrafficMu.Lock()
+			prev, exists := subTrafficHistory[username]
+			if !exists {
+				initDown := int64(0)
+				initUp := int64(0)
+				if traffic.SessionTimeSec > 5 {
+					initDown = (traffic.SessionDownloadBytes * 8) / traffic.SessionTimeSec
+					initUp = (traffic.SessionUploadBytes * 8) / traffic.SessionTimeSec
+					if downMax > 0 && initDown > downMax {
+						initDown = downMax
+					}
+					if upMax > 0 && initUp > upMax {
+						initUp = upMax
+					}
+				}
+				subTrafficHistory[username] = &subTrafficPoint{
+					timestamp: now,
+					inOctets:  traffic.SessionUploadBytes,
+					outOctets: traffic.SessionDownloadBytes,
+					downBps:   initDown,
+					upBps:     initUp,
+				}
+				traffic.CurrentDownloadBps = initDown
+				traffic.CurrentUploadBps = initUp
+			} else {
+				diffSec := now.Sub(prev.timestamp).Seconds()
+				deltaIn := traffic.SessionUploadBytes - prev.inOctets
+				deltaOut := traffic.SessionDownloadBytes - prev.outOctets
+
+				if diffSec >= 0.8 {
+					if deltaIn > 0 || deltaOut > 0 {
+						newUp := int64(float64(deltaIn*8) / diffSec)
+						newDown := int64(float64(deltaOut*8) / diffSec)
+						if downMax > 0 && newDown > downMax*2 {
+							newDown = downMax
+						}
+						if upMax > 0 && newUp > upMax*2 {
+							newUp = upMax
+						}
+						prev.upBps = newUp
+						prev.downBps = newDown
+					} else if diffSec > 12 {
+						// Soft decay
+						prev.downBps = prev.downBps * 85 / 100
+						prev.upBps = prev.upBps * 85 / 100
+					}
+					prev.timestamp = now
+					prev.inOctets = traffic.SessionUploadBytes
+					prev.outOctets = traffic.SessionDownloadBytes
+				}
+				traffic.CurrentDownloadBps = prev.downBps
+				traffic.CurrentUploadBps = prev.upBps
+			}
+			subTrafficMu.Unlock()
+		}
 
 		traffic.DownloadSpeedDisplay = FormatSpeedBps(traffic.CurrentDownloadBps)
 		traffic.UploadSpeedDisplay = FormatSpeedBps(traffic.CurrentUploadBps)

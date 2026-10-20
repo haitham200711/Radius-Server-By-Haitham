@@ -994,6 +994,7 @@
                         <label class="form-check-label small fw-bold text-dark" for="ltAutoRefreshCheck">تحديث تلقائي (1.5 ث)</label>
                     </div>
                     <span class="text-muted small ms-2" style="font-size: 0.72rem;" id="ltLastUpdateStatus">آخر فحص: -</span>
+                    <span id="ltDataSourceBadge" class="badge bg-secondary-subtle text-secondary border ms-2 py-0.5 px-2" style="font-size: 0.72rem;">-</span>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-outline-danger fw-bold" id="btnLtDisconnect" onclick="disconnectCurrentSubSession()" title="قطع اتصال الجلسة وتجديد الآيبي">
@@ -1419,6 +1420,17 @@ function updateLiveTrafficUI(d) {
     document.getElementById('ltExpDate').textContent = d.expiration_date || 'غير محدد';
 
     document.getElementById('ltLastUpdateStatus').textContent = 'آخر تحديث: ' + (d.last_update || '-');
+
+    const srcBadge = document.getElementById('ltDataSourceBadge');
+    if (srcBadge) {
+        if (d.is_api) {
+            srcBadge.className = 'badge bg-success-subtle text-success border border-success-subtle ms-2 py-0.5 px-2';
+            srcBadge.innerHTML = '<i class="bi bi-cpu-fill me-1"></i>MikroTik API (مباشر)';
+        } else {
+            srcBadge.className = 'badge bg-info-subtle text-info-emphasis border border-info-subtle ms-2 py-0.5 px-2';
+            srcBadge.innerHTML = '<i class="bi bi-hdd-network me-1"></i>RADIUS Accounting';
+        }
+    }
 
     // Disconnect button state
     const btnDisc = document.getElementById('btnLtDisconnect');

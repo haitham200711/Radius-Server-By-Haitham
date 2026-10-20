@@ -140,7 +140,9 @@ func main() {
 	routBP := routers.New(db, renderer)
 	mux.HandleFunc("/routers", middleware.RequireAuth(routBP.ListHandler))
 	mux.HandleFunc("/routers/add", middleware.RequireAuth(routBP.AddHandler))
+	mux.HandleFunc("/routers/edit", middleware.RequireAuth(routBP.EditHandler))
 	mux.HandleFunc("/routers/delete", middleware.RequireAuth(routBP.DeleteHandler))
+	mux.HandleFunc("/routers/test-api", middleware.RequireAuth(routBP.TestAPIHandler))
 
 	// SSTP Server Blueprint
 	sstpBP := sstp.New(db, renderer)

@@ -5,13 +5,37 @@
             <span class="p-1.5 bg-primary-subtle text-primary rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
                 <i class="bi bi-router"></i>
             </span>
-            <span>راوترات وسيرفرات المايكروتك (NAS Devices)</span>
+            <span>راوترات وسيرفرات المايكروتك (NAS & RouterOS API)</span>
         </h4>
-        <p class="text-muted small mb-0">أجهزة الشبكة المسموح لها بإرسال واستقبال طلبات الراديوس والـ CoA Disconnect</p>
+        <p class="text-muted small mb-0">أجهزة الشبكة المسموح لها بإرسال طلبات الراديوس، الـ CoA Disconnect، والمراقبة الحية عبر RouterOS API</p>
     </div>
-    <button class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addRouterModal">
-        <i class="bi bi-plus-circle me-1"></i> إضافة راوتر مايكروتك
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary fw-bold" data-bs-toggle="collapse" data-bs-target="#apiHelpBox">
+            <i class="bi bi-terminal me-1"></i> سكريبت تفعيل الـ API في مايكروتك
+        </button>
+        <button class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+            <i class="bi bi-plus-circle me-1"></i> إضافة راوتر مايكروتك
+        </button>
+    </div>
+</div>
+
+<!-- MikroTik Terminal Command Helper -->
+<div class="collapse mb-3" id="apiHelpBox">
+    <div class="card border-primary-subtle shadow-sm bg-primary-subtle bg-opacity-10">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-primary d-flex align-items-center gap-2">
+                    <i class="bi bi-code-square"></i> كود تفعيل الـ API والسماح له في المايكروتك (للمراقبة الحية وسحب السرعة الفوري)
+                </span>
+                <button class="btn btn-xs btn-outline-primary py-0 px-2 fw-bold" onclick="copyApiScript()">
+                    <i class="bi bi-clipboard me-1"></i> نسخ الكود
+                </button>
+            </div>
+            <pre class="bg-dark text-success p-2.5 rounded font-monospace small mb-1" id="mikrotikApiScript">/ip service enable api
+/ip firewall filter add chain=input protocol=tcp dst-port=8728 action=accept comment="Allow Radius Live API" place-before=1</pre>
+            <small class="text-muted">انسخ الكود والصقه في تيرمينال المايكروتك (Terminal) لفتح منفذ 8728 والسماح للسيرفر بقراءة سرعة وسحب المشتركين لايف ثانية بثانية.</small>
+        </div>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-3">
@@ -33,6 +57,7 @@
                     <th>عنوان IP (NAS IP)</th>
                     <th>الباسورد المشترك (Secret)</th>
                     <th>منفذ الـ CoA</th>
+                    <th>إعدادات RouterOS API</th>
                     <th>الوصف والموقع</th>
                     <th class="text-end">الإجراءات</th>
                 </tr>
@@ -44,8 +69,21 @@
                     <td><code class="text-primary fw-bold">{{ .NASName }}</code></td>
                     <td><span class="badge bg-light text-dark border font-monospace">{{ .Secret }}</span></td>
                     <td><span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace">{{ .CoAPort }}</span></td>
+                    <td>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle font-monospace">Port: {{ .APIPort }}</span>
+                            <span class="badge bg-light text-dark border font-monospace">{{ .APIUser }}</span>
+                        </div>
+                    </td>
                     <td><span class="text-muted">{{ if .Description }}{{ .Description }}{{ else }}-{{ end }}</span></td>
                     <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-light border text-success py-1 px-2 me-1" onclick="testRouterAPI('{{ .ID }}', '{{ .ShortName }}')" title="اختبار اتصال الـ API">
+                            <i class="bi bi-lightning-charge-fill me-1"></i> فحص API
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light border text-primary py-1 px-2 me-1" 
+                            onclick="openEditRouterModal('{{ .ID }}', '{{ .ShortName }}', '{{ .NASName }}', '{{ .Secret }}', '{{ .CoAPort }}', '{{ .APIPort }}', '{{ .APIUser }}', '{{ .Description }}')" title="تعديل بيانات الراوتر">
+                            <i class="bi bi-pencil-square"></i> تعديل
+                        </button>
                         <a href="/routers/delete?id={{ .ID }}" class="btn btn-sm btn-light border text-danger py-1 px-2" onclick="return confirm('هل أنت متأكد من حذف هذا الراوتر من الراديوس؟');" title="حذف الراوتر">
                             <i class="bi bi-trash"></i> حذف
                         </a>
@@ -53,7 +91,7 @@
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">
+                    <td colspan="7" class="text-center py-5 text-muted">
                         <i class="bi bi-router fs-2 d-block mb-2 text-secondary opacity-50"></i>
                         لا يوجد راوترات NAS مسجلة حالياً
                     </td>
@@ -83,8 +121,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">عنوان IP الراوتر (NAS IP): <span class="text-danger">*</span></label>
-                        <input type="text" name="nasname" class="form-control form-control-sm font-monospace" placeholder="مثال: 192.168.2.1 أو 10.10.10.2" required>
-                        <small class="text-muted" style="font-size: 0.75rem;">عنوان الـ IP الذي يتصل منه المايكروتك بسيرفر الراديوس.</small>
+                        <input type="text" name="nasname" class="form-control form-control-sm font-monospace" placeholder="مثال: 10.171.171.15 أو 192.168.2.1" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">عنوان الـ IP الذي يتصل منه المايكروتك بسيرفر الراديوس (سواء عبر SSTP أو شبكة محلية).</small>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-7">
@@ -96,6 +134,33 @@
                             <input type="number" name="coa_port" class="form-control form-control-sm font-monospace" value="3799" required>
                         </div>
                     </div>
+
+                    <!-- RouterOS API Settings -->
+                    <div class="card border-info-subtle bg-light mb-3">
+                        <div class="card-header bg-info-subtle py-1.5 px-2.5">
+                            <span class="fw-bold small text-info-emphasis d-flex align-items-center gap-1">
+                                <i class="bi bi-cpu"></i> إعدادات MikroTik RouterOS API (للمراقبة الحية اللحظية)
+                            </span>
+                        </div>
+                        <div class="card-body p-2.5">
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="form-label fw-bold small">منفذ الـ API:</label>
+                                    <input type="number" name="api_port" class="form-control form-control-sm font-monospace" value="8728" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-bold small">مستخدم API:</label>
+                                    <input type="text" name="api_user" class="form-control form-control-sm font-monospace" value="admin" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-bold small">باسورد API:</label>
+                                    <input type="password" name="api_password" class="form-control form-control-sm font-monospace" placeholder="باسورد الروتر">
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">يستخدم لجلب سرعة وسحب العميل الحية من كيرنل المايكروتك مباشرة.</small>
+                        </div>
+                    </div>
+
                     <div class="mb-2">
                         <label class="form-label fw-bold small">الوصف / الموقع:</label>
                         <input type="text" name="description" class="form-control form-control-sm" placeholder="موقع البرج أو الفرع...">
@@ -111,7 +176,201 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Edit Router -->
+<div class="modal fade" id="editRouterModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-pencil-square text-primary fs-5"></i>
+                    <h6 class="modal-title fw-bold text-dark mb-0">تعديل بيانات راوتر المايكروتك</h6>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/routers/edit">
+                <input type="hidden" name="id" id="editRouterId">
+                <div class="modal-body p-3">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">اسم الراوتر التعريفي (Short Name): <span class="text-danger">*</span></label>
+                        <input type="text" name="shortname" id="editRouterShortName" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">عنوان IP الراوتر (NAS IP): <span class="text-danger">*</span></label>
+                        <input type="text" name="nasname" id="editRouterNasName" class="form-control form-control-sm font-monospace" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="form-label fw-bold small">كلمة السر المشتركة (RADIUS Secret): <span class="text-danger">*</span></label>
+                            <input type="text" name="secret" id="editRouterSecret" class="form-control form-control-sm font-monospace" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label fw-bold small">منفذ الـ CoA / PoD:</label>
+                            <input type="number" name="coa_port" id="editRouterCoaPort" class="form-control form-control-sm font-monospace" required>
+                        </div>
+                    </div>
+
+                    <!-- RouterOS API Settings -->
+                    <div class="card border-info-subtle bg-light mb-3">
+                        <div class="card-header bg-info-subtle py-1.5 px-2.5">
+                            <span class="fw-bold small text-info-emphasis d-flex align-items-center gap-1">
+                                <i class="bi bi-cpu"></i> إعدادات MikroTik RouterOS API
+                            </span>
+                        </div>
+                        <div class="card-body p-2.5">
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="form-label fw-bold small">منفذ الـ API:</label>
+                                    <input type="number" name="api_port" id="editRouterApiPort" class="form-control form-control-sm font-monospace" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-bold small">مستخدم API:</label>
+                                    <input type="text" name="api_user" id="editRouterApiUser" class="form-control form-control-sm font-monospace" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label fw-bold small">باسورد جديد:</label>
+                                    <input type="password" name="api_password" id="editRouterApiPassword" class="form-control form-control-sm font-monospace" placeholder="اتركه فارغاً للإبقاء">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small">الوصف / الموقع:</label>
+                        <input type="text" name="description" id="editRouterDescription" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                        <i class="bi bi-check-lg me-1"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Test API Results -->
+<div class="modal fade" id="testApiModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2 px-3">
+                <h6 class="modal-title fw-bold mb-0 d-flex align-items-center gap-2" id="testApiTitle">
+                    <i class="bi bi-lightning-charge text-warning"></i> اختبار اتصال RouterOS API
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3 text-center" id="testApiBody">
+                <div class="spinner-border text-primary my-3" role="status"></div>
+                <p class="text-muted small mb-0">جاري الاتصال براوتر المايكروتك وفحص خدمة الـ API...</p>
+            </div>
+            <div class="modal-footer bg-light py-1.5 px-3">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+{{ define "scripts" }}
+<script>
+function copyApiScript() {
+    const text = document.getElementById('mikrotikApiScript').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('تم نسخ سكريبت المايكروتك بنجاح!');
+    });
+}
+
+function openEditRouterModal(id, shortName, nasName, secret, coaPort, apiPort, apiUser, desc) {
+    document.getElementById('editRouterId').value = id;
+    document.getElementById('editRouterShortName').value = shortName;
+    document.getElementById('editRouterNasName').value = nasName;
+    document.getElementById('editRouterSecret').value = secret;
+    document.getElementById('editRouterCoaPort').value = coaPort || 3799;
+    document.getElementById('editRouterApiPort').value = apiPort || 8728;
+    document.getElementById('editRouterApiUser').value = apiUser || 'admin';
+    document.getElementById('editRouterApiPassword').value = '';
+    document.getElementById('editRouterDescription').value = desc || '';
+    
+    new bootstrap.Modal(document.getElementById('editRouterModal')).show();
+}
+
+function testRouterAPI(routerId, routerName) {
+    const modalEl = document.getElementById('testApiModal');
+    const modal = new bootstrap.Modal(modalEl);
+    const bodyEl = document.getElementById('testApiBody');
+    const titleEl = document.getElementById('testApiTitle');
+
+    titleEl.innerHTML = `<i class="bi bi-router text-primary"></i> فحص API راوتر [${routerName}]`;
+    bodyEl.innerHTML = `
+        <div class="spinner-border text-primary my-3" role="status"></div>
+        <p class="text-muted small mb-0">جاري الاتصال بالراوتر واختبار منفذ الـ API والتحقق من كلمة السر...</p>
+    `;
+    modal.show();
+
+    fetch(`/routers/test-api?id=${encodeURIComponent(routerId)}`)
+        .then(res => res.json())
+        .then(res => {
+            if (res.status === 'success' && res.data) {
+                bodyEl.innerHTML = `
+                    <div class="text-success mb-2">
+                        <i class="bi bi-check-circle-fill fs-1"></i>
+                    </div>
+                    <h6 class="fw-bold text-success mb-2">${res.message}</h6>
+                    <div class="card bg-light border-0 text-start p-2.5 small font-monospace">
+                        <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+                            <span class="text-muted">الهدف (Target):</span>
+                            <strong>${res.data.target}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+                            <span class="text-muted">إصدار النظام:</span>
+                            <span class="badge bg-success">${res.data.version}</span>
+                        </div>
+                        <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+                            <span class="text-muted">المعالج / البوردة:</span>
+                            <span>${res.data.board}</span>
+                        </div>
+                        <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
+                            <span class="text-muted">استهلاك CPU:</span>
+                            <span class="fw-bold ${res.data.cpu_load > 70 ? 'text-danger' : 'text-primary'}">${res.data.cpu_load}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">وقت التشغيل (Uptime):</span>
+                            <span>${res.data.uptime}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                bodyEl.innerHTML = `
+                    <div class="text-danger mb-2">
+                        <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+                    </div>
+                    <h6 class="fw-bold text-danger mb-2">فشل الاتصال بـ API المايكروتك</h6>
+                    <p class="text-dark small bg-danger-subtle p-2 rounded mb-3">${res.message || 'خطأ غير معروف'}</p>
+                    <div class="alert alert-warning text-start small mb-0">
+                        <strong>كيفية الحل:</strong>
+                        <ol class="mb-1 ps-3">
+                            <li>تأكد من كتابة باسورد الراوتر الصحيح من زر "تعديل".</li>
+                            <li>تأكد من تفعيل خدمة الـ API في المايكروتك:
+                                <code class="d-block mt-1 p-1 bg-dark text-warning rounded">/ip service enable api</code>
+                            </li>
+                            <li>تأكد من السماح للمنفذ 8728 في الـ Firewall.</li>
+                        </ol>
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            bodyEl.innerHTML = `
+                <div class="text-danger mb-2">
+                    <i class="bi bi-x-circle-fill fs-1"></i>
+                </div>
+                <h6 class="fw-bold text-danger mb-1">خطأ في الاتصال بالشبكة</h6>
+                <p class="text-muted small">${err.message}</p>
+            `;
+        });
+}
+</script>
+{{ end }}
