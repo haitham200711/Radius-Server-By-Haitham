@@ -106,10 +106,16 @@ func main() {
 
 	// Profiles Blueprint
 	profBP := profiles.New(db, renderer)
+	profBP.StartSpeedControlDaemon()
 	mux.HandleFunc("/profiles", middleware.RequireAuth(profBP.ListHandler))
 	mux.HandleFunc("/profiles/add", middleware.RequireAuth(profBP.AddHandler))
 	mux.HandleFunc("/profiles/edit", middleware.RequireAuth(profBP.EditHandler))
 	mux.HandleFunc("/profiles/delete", middleware.RequireAuth(profBP.DeleteHandler))
+	mux.HandleFunc("/profiles/speed-control", middleware.RequireAuth(profBP.SpeedControlHandler))
+	mux.HandleFunc("/profiles/speed-control/apply-permanent", middleware.RequireAuth(profBP.ApplyPermanentHandler))
+	mux.HandleFunc("/profiles/speed-control/apply-temporary", middleware.RequireAuth(profBP.ApplyTemporaryHandler))
+	mux.HandleFunc("/profiles/speed-control/save-recurring", middleware.RequireAuth(profBP.SaveRecurringHandler))
+	mux.HandleFunc("/profiles/speed-control/restore", middleware.RequireAuth(profBP.RestoreHandler))
 
 	// Routers (NAS) Blueprint
 	routBP := routers.New(db, renderer)

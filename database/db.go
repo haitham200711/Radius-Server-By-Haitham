@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -13,6 +14,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/radius"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/speedutil"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	_ "modernc.org/sqlite"
 )
@@ -365,6 +368,31 @@ func (d *DB) InitSchema() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			INDEX idx_wa_tmpl_key (event_key)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 17. Speed Control Configuration (التحكم بالسرعات ومضاعفة الباقات)
+		`CREATE TABLE IF NOT EXISTS speed_control_config (
+			id INT PRIMARY KEY,
+			mode VARCHAR(20) DEFAULT 'off',
+			boost_type VARCHAR(20) DEFAULT 'multiply',
+			boost_value DECIMAL(6, 2) DEFAULT 2.00,
+			temp_hours INT DEFAULT 2,
+			temp_expires_at DATETIME NULL,
+			recurring_enabled TINYINT(1) DEFAULT 0,
+			recurring_start_time VARCHAR(10) DEFAULT '02:00',
+			recurring_end_time VARCHAR(10) DEFAULT '08:00',
+			disconnect_users TINYINT(1) DEFAULT 0,
+			is_currently_boosted TINYINT(1) DEFAULT 0,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 18. Profile Base Speeds (سجل السرعات الأساسية للبروفايلات)
+		`CREATE TABLE IF NOT EXISTS profile_base_speeds (
+			profile_id INT PRIMARY KEY,
+			profile_name VARCHAR(64) NOT NULL,
+			base_rate_limit VARCHAR(64) NOT NULL,
+			boosted_rate_limit VARCHAR(64) DEFAULT '',
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -454,6 +482,11 @@ func (d *DB) InitSchema() error {
 		_, _ = d.Exec(`INSERT IGNORE INTO whatsapp_templates (event_key, event_name, enabled, template_text) VALUES (?, ?, 1, ?)`,
 			dt.key, dt.name, dt.text)
 	}
+
+	// Seed default speed control config row
+	_, _ = d.Exec(`INSERT IGNORE INTO speed_control_config (id, mode, boost_type, boost_value, temp_hours, recurring_enabled, recurring_start_time, recurring_end_time, disconnect_users, is_currently_boosted)
+		VALUES (1, 'off', 'multiply', 2.00, 2, 0, '02:00', '08:00', 0, 0)`)
+	_ = d.SyncProfileBaseSpeeds()
 
 	// Seed default Admin if not present
 	var adminCount int
@@ -2277,6 +2310,314 @@ func (d *DB) LogWhatsAppMessage(phone, recipient, msgType, content, status, errM
 	)
 	return err
 }
+
+// ============================================================================
+// Speed Control (التحكم بالسرعات ومضاعفة الباقات)
+// ============================================================================
+
+func (d *DB) GetSpeedControlConfig() (*models.SpeedControlConfig, error) {
+	row := d.QueryRow(`SELECT id, mode, boost_type, boost_value, temp_hours, temp_expires_at,
+		recurring_enabled, recurring_start_time, recurring_end_time, disconnect_users, is_currently_boosted, updated_at
+		FROM speed_control_config WHERE id = 1`)
+
+	cfg := &models.SpeedControlConfig{}
+	var tempExp sql.NullTime
+	var recEnabled, disUsers, isBoosted int
+
+	err := row.Scan(&cfg.ID, &cfg.Mode, &cfg.BoostType, &cfg.BoostValue, &cfg.TempHours, &tempExp,
+		&recEnabled, &cfg.RecurringStartTime, &cfg.RecurringEndTime, &disUsers, &isBoosted, &cfg.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			cfg.ID = 1
+			cfg.Mode = "off"
+			cfg.BoostType = "multiply"
+			cfg.BoostValue = 2.0
+			cfg.TempHours = 2
+			cfg.RecurringStartTime = "02:00"
+			cfg.RecurringEndTime = "08:00"
+			return cfg, nil
+		}
+		return nil, err
+	}
+
+	if tempExp.Valid {
+		cfg.TempExpiresAt = &tempExp.Time
+	}
+	cfg.RecurringEnabled = recEnabled == 1
+	cfg.DisconnectUsers = disUsers == 1
+	cfg.IsCurrentlyBoosted = isBoosted == 1
+
+	return cfg, nil
+}
+
+func (d *DB) SaveSpeedControlConfig(cfg *models.SpeedControlConfig) error {
+	var tempExp interface{}
+	if cfg.TempExpiresAt != nil {
+		tempExp = *cfg.TempExpiresAt
+	}
+
+	recVal := 0
+	if cfg.RecurringEnabled {
+		recVal = 1
+	}
+	disVal := 0
+	if cfg.DisconnectUsers {
+		disVal = 1
+	}
+	boostedVal := 0
+	if cfg.IsCurrentlyBoosted {
+		boostedVal = 1
+	}
+
+	_, err := d.Exec(`UPDATE speed_control_config SET
+		mode = ?, boost_type = ?, boost_value = ?, temp_hours = ?, temp_expires_at = ?,
+		recurring_enabled = ?, recurring_start_time = ?, recurring_end_time = ?,
+		disconnect_users = ?, is_currently_boosted = ?
+		WHERE id = 1`,
+		cfg.Mode, cfg.BoostType, cfg.BoostValue, cfg.TempHours, tempExp,
+		recVal, cfg.RecurringStartTime, cfg.RecurringEndTime,
+		disVal, boostedVal,
+	)
+	return err
+}
+
+func (d *DB) SyncProfileBaseSpeeds() error {
+	// Sync existing profiles into profile_base_speeds if not present
+	rows, err := d.Query("SELECT id, name, display_name, rate_limit FROM profiles")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int64
+		var name, dispName, rate string
+		if err := rows.Scan(&id, &name, &dispName, &rate); err == nil {
+			_, _ = d.Exec(`INSERT IGNORE INTO profile_base_speeds (profile_id, profile_name, base_rate_limit)
+				VALUES (?, ?, ?)`, id, name, rate)
+		}
+	}
+	return nil
+}
+
+func (d *DB) GetProfileBaseSpeeds() ([]models.ProfileBaseSpeed, error) {
+	_ = d.SyncProfileBaseSpeeds()
+
+	rows, err := d.Query(`SELECT p.id, p.name, p.display_name, COALESCE(pbs.base_rate_limit, p.rate_limit),
+		COALESCE(pbs.boosted_rate_limit, ''), p.rate_limit
+		FROM profiles p
+		LEFT JOIN profile_base_speeds pbs ON p.id = pbs.profile_id
+		ORDER BY p.id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.ProfileBaseSpeed
+	for rows.Next() {
+		var item models.ProfileBaseSpeed
+		if err := rows.Scan(&item.ProfileID, &item.ProfileName, &item.DisplayName, &item.BaseRateLimit, &item.BoostedRateLimit, &item.CurrentRateLimit); err == nil {
+			list = append(list, item)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) ApplySpeedBoost(boostType string, boostVal float64, disconnectUsers bool) error {
+	_ = d.SyncProfileBaseSpeeds()
+
+	speeds, err := d.GetProfileBaseSpeeds()
+	if err != nil {
+		return err
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, p := range speeds {
+		base := p.BaseRateLimit
+		if base == "" {
+			base = p.CurrentRateLimit
+		}
+		boosted := speedutil.BoostRateLimit(base, boostType, boostVal)
+		if boosted == "" {
+			continue
+		}
+
+		// Update profile
+		_, _ = tx.Exec("UPDATE profiles SET rate_limit = ? WHERE id = ?", boosted, p.ProfileID)
+		// Update radgroupreply
+		_, _ = tx.Exec("UPDATE radgroupreply SET value = ? WHERE groupname = ? AND attribute = 'Mikrotik-Rate-Limit'", boosted, p.ProfileName)
+		// Update profile_base_speeds
+		_, _ = tx.Exec("UPDATE profile_base_speeds SET boosted_rate_limit = ? WHERE profile_id = ?", boosted, p.ProfileID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	if disconnectUsers {
+		go func() {
+			_, _ = d.DisconnectAllActiveSessions()
+		}()
+	}
+
+	return nil
+}
+
+func (d *DB) RestoreBaseSpeeds(disconnectUsers bool) error {
+	_ = d.SyncProfileBaseSpeeds()
+
+	speeds, err := d.GetProfileBaseSpeeds()
+	if err != nil {
+		return err
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, p := range speeds {
+		base := p.BaseRateLimit
+		if base == "" {
+			continue
+		}
+
+		// Restore profile
+		_, _ = tx.Exec("UPDATE profiles SET rate_limit = ? WHERE id = ?", base, p.ProfileID)
+		// Restore radgroupreply
+		_, _ = tx.Exec("UPDATE radgroupreply SET value = ? WHERE groupname = ? AND attribute = 'Mikrotik-Rate-Limit'", base, p.ProfileName)
+		// Clear boosted in tracking
+		_, _ = tx.Exec("UPDATE profile_base_speeds SET boosted_rate_limit = '' WHERE profile_id = ?", p.ProfileID)
+	}
+
+	// Update config
+	_, _ = tx.Exec("UPDATE speed_control_config SET is_currently_boosted = 0, mode = 'off', temp_expires_at = NULL WHERE id = 1")
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	if disconnectUsers {
+		go func() {
+			_, _ = d.DisconnectAllActiveSessions()
+		}()
+	}
+
+	return nil
+}
+
+func (d *DB) DisconnectAllActiveSessions() (int, error) {
+	rows, err := d.Query(`SELECT acctsessionid, username, nasipaddress, framedipaddress
+		FROM radacct WHERE acctstoptime IS NULL`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type sess struct {
+		sessionID string
+		username  string
+		nasIP     string
+		framedIP  string
+	}
+	var sessions []sess
+	for rows.Next() {
+		var s sess
+		_ = rows.Scan(&s.sessionID, &s.username, &s.nasIP, &s.framedIP)
+		sessions = append(sessions, s)
+	}
+
+	count := 0
+	for _, s := range sessions {
+		var secret string
+		var coaPort int
+		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
+		if secret == "" {
+			secret = "radius123"
+		}
+		if coaPort <= 0 {
+			coaPort = 3799
+		}
+
+		var fIP net.IP
+		if s.framedIP != "" {
+			fIP = net.ParseIP(s.framedIP)
+		}
+
+		_, _ = radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, fIP)
+		_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
+			WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, s.sessionID, s.nasIP)
+		count++
+	}
+
+	return count, nil
+}
+
+func parseTimeHM(hm string) int {
+	parts := strings.Split(strings.TrimSpace(hm), ":")
+	if len(parts) != 2 {
+		return 0
+	}
+	h, _ := strconv.Atoi(parts[0])
+	m, _ := strconv.Atoi(parts[1])
+	return h*60 + m
+}
+
+func (d *DB) CheckSpeedControlSchedule() error {
+	cfg, err := d.GetSpeedControlConfig()
+	if err != nil || cfg == nil {
+		return err
+	}
+
+	now := time.Now()
+
+	// 1. Check Temporary Boost expiration
+	if cfg.Mode == "temp" && cfg.IsCurrentlyBoosted && cfg.TempExpiresAt != nil {
+		if now.After(*cfg.TempExpiresAt) {
+			_ = d.RestoreBaseSpeeds(cfg.DisconnectUsers)
+			cfg.IsCurrentlyBoosted = false
+			cfg.Mode = "off"
+			cfg.TempExpiresAt = nil
+			_ = d.SaveSpeedControlConfig(cfg)
+			return nil
+		}
+	}
+
+	// 2. Check Daily Recurring Schedule
+	if cfg.RecurringEnabled {
+		curMin := now.Hour()*60 + now.Minute()
+		startMin := parseTimeHM(cfg.RecurringStartTime)
+		endMin := parseTimeHM(cfg.RecurringEndTime)
+
+		var inWindow bool
+		if startMin < endMin {
+			inWindow = curMin >= startMin && curMin < endMin
+		} else if startMin > endMin {
+			// Crosses midnight (e.g. 23:00 to 07:00)
+			inWindow = curMin >= startMin || curMin < endMin
+		}
+
+		if inWindow && !cfg.IsCurrentlyBoosted {
+			_ = d.ApplySpeedBoost(cfg.BoostType, cfg.BoostValue, cfg.DisconnectUsers)
+			cfg.IsCurrentlyBoosted = true
+			cfg.Mode = "recurring"
+			_ = d.SaveSpeedControlConfig(cfg)
+		} else if !inWindow && cfg.IsCurrentlyBoosted && cfg.Mode == "recurring" {
+			_ = d.RestoreBaseSpeeds(cfg.DisconnectUsers)
+			cfg.IsCurrentlyBoosted = false
+			_ = d.SaveSpeedControlConfig(cfg)
+		}
+	}
+
+	return nil
+}
+
 
 
 

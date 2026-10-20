@@ -1,0 +1,389 @@
+{{ define "content" }}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <span class="p-2 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                <i class="bi bi-speedometer fs-5"></i>
+            </span>
+            <span>التحكم بالسرعات ومضاعفة الباقات</span>
+        </h3>
+        <p class="text-muted small mb-0">رفع وزيادة سرعات جميع البروفايلات دفعة واحدة بنقرة زر (بشكل دائم، مؤقتاً بالساعات، أو مجدولاً يومياً كـ Happy Hours)</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/profiles" class="btn btn-outline-secondary">
+            <i class="bi bi-sliders2-vertical me-1"></i> إدارة البروفايلات
+        </a>
+        {{ if .Config.IsCurrentlyBoosted }}
+        <form method="POST" action="/profiles/speed-control/restore" class="d-inline" onsubmit="return confirm('هل أنت متأكد من إلغاء الزيادة واستعادة السرعات الأصلية فوراً؟')">
+            <button type="submit" class="btn btn-danger fw-bold shadow-sm">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة السرعات الأصلية الآن
+            </button>
+        </form>
+        {{ end }}
+    </div>
+</div>
+
+<!-- System Status Banner -->
+<div class="card border-0 shadow-sm mb-4 {{ if .Config.IsCurrentlyBoosted }}border-start border-4 border-success{{ else }}border-start border-4 border-primary{{ end }}">
+    <div class="card-body p-3 p-md-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center {{ if .Config.IsCurrentlyBoosted }}bg-success-subtle text-success{{ else }}bg-primary-subtle text-primary{{ end }}" style="width: 52px; height: 52px; font-size: 1.5rem;">
+                    {{ if .Config.IsCurrentlyBoosted }}
+                    <i class="bi bi-lightning-charge-fill"></i>
+                    {{ else }}
+                    <i class="bi bi-shield-check"></i>
+                    {{ end }}
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <h5 class="fw-bold mb-0">
+                            {{ if .Config.IsCurrentlyBoosted }}
+                            <span class="text-success">السرعات مضاعفة ونشطة حالياً (Speed Boost Active)</span>
+                            {{ else }}
+                            <span class="text-primary">السرعات الأساسية الطبيعية تعمل الآن (Normal Speeds)</span>
+                            {{ end }}
+                        </h5>
+                        {{ if .Config.IsCurrentlyBoosted }}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                            <span class="pulse-dot-green me-1"></span> نشط حالياً
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-secondary border">وضع طبيعي</span>
+                        {{ end }}
+                    </div>
+                    <div class="text-muted small">
+                        {{ if .Config.IsCurrentlyBoosted }}
+                            {{ if eq .Config.Mode "temp" }}
+                                وضع زيادة مؤقتة: ينتهي بعد <strong>{{ .RemainingTimeStr }}</strong> (عند {{ if .Config.TempExpiresAt }}{{ .Config.TempExpiresAt.Format "15:04" }}{{ end }}).
+                            {{ else if eq .Config.Mode "recurring" }}
+                                زيادة مجدولة يومياً (ساعات السعادة): تعمل الآن حتى الساعة <strong>{{ .Config.RecurringEndTime }}</strong>.
+                            {{ else }}
+                                زيادة دائمة مفعلة على كافة البروفايلات.
+                            {{ end }}
+                        {{ else }}
+                            {{ if .Config.RecurringEnabled }}
+                                الجدول اليومي مفعل: ستبدأ السرعات بالتضاعف تلقائياً في تمام الساعة <strong>{{ .Config.RecurringStartTime }}</strong> وحتى <strong>{{ .Config.RecurringEndTime }}</strong>.
+                            {{ else }}
+                                لا توجد أي زيادات مؤقتة أو جداول نشطة حالياً. يمكنك تفعيل الزيادة من الخيارات أدناه.
+                            {{ end }}
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <div class="text-center px-3 py-2 bg-light rounded-3 border">
+                    <span class="d-block small text-muted">إجمالي البروفايلات</span>
+                    <strong class="fs-5 text-dark">{{ .ProfilesCount }}</strong>
+                </div>
+                {{ if .Config.IsCurrentlyBoosted }}
+                <div class="text-center px-3 py-2 bg-success-subtle text-success rounded-3 border border-success-subtle">
+                    <span class="d-block small">قيمة الزيادة</span>
+                    <strong class="fs-5">
+                        {{ if eq .Config.BoostType "add_fixed" }}
+                        +{{ printf "%.0f" .Config.BoostValue }}M
+                        {{ else }}
+                        {{ printf "%.1f" .Config.BoostValue }}x
+                        {{ end }}
+                    </strong>
+                </div>
+                {{ end }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three Boost Control Cards -->
+<div class="row g-4 mb-4">
+    <!-- Option 1: Temporary Boost (مؤقت لمهلة معينة) -->
+    <div class="col-lg-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <span class="p-2 bg-warning-subtle text-warning rounded-2">
+                    <i class="bi bi-hourglass-split"></i>
+                </span>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">1. زيادة مؤقتة لمهلة معينة</h6>
+                    <small class="text-muted">مضاعفة السرعة لعدة ساعات والرجوع ذاتياً</small>
+                </div>
+            </div>
+            <div class="card-body p-3 p-md-4 d-flex flex-column justify-content-between">
+                <form method="POST" action="/profiles/speed-control/apply-temporary" id="tempBoostForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">نوع الزيادة والمضاعفة:</label>
+                        <select name="boost_type" class="form-select" id="tempBoostType" onchange="toggleBoostInputs('temp')">
+                            <option value="multiply" selected>مضاعفة بنسبة (Multiplication 2x, 3x)</option>
+                            <option value="add_fixed">إضافة سرعة ثابتة (+Mbps Addition)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="tempMultiplierDiv">
+                        <label class="form-label fw-bold small text-secondary">معامل المضاعفة:</label>
+                        <select name="boost_multiplier" class="form-select">
+                            <option value="1.5">+50% (زيادة بمقدار النصف)</option>
+                            <option value="2.0" selected>2x (مضاعفة السرعة 100%)</option>
+                            <option value="2.5">2.5x (مرتين ونصف)</option>
+                            <option value="3.0">3x (ثلاثة أضعاف السرعة)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 d-none" id="tempAddDiv">
+                        <label class="form-label fw-bold small text-secondary">إضافة سرعة ثابتة (Mbps):</label>
+                        <div class="input-group">
+                            <input type="number" name="boost_add_mbps" class="form-control" value="5" min="1" max="100">
+                            <span class="input-group-text">Mbps</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">مدة الزيادة المؤقتة:</label>
+                        <select name="temp_hours" class="form-select">
+                            <option value="1">ساعة واحدة (1 Hour)</option>
+                            <option value="2" selected>ساعتان (2 Hours)</option>
+                            <option value="3">3 ساعات (3 Hours)</option>
+                            <option value="6">6 ساعات (6 Hours)</option>
+                            <option value="12">12 ساعة (نصف يوم)</option>
+                            <option value="24">24 ساعة (يوم كامل)</option>
+                            <option value="48">48 ساعة (يومان)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="tempDisconn" checked>
+                        <label class="form-check-label small fw-semibold" for="tempDisconn">
+                            تحديث سرعة المتصلين الآن فوراً (قطع اتصال سلس)
+                        </label>
+                    </div>
+
+                    <div class="p-2 bg-light rounded-2 text-muted small mb-3 border">
+                        <i class="bi bi-info-circle me-1 text-primary"></i> عند انتهاء المهلة، سيقوم النظام تلقائياً وبشكل ذاتي بإرجاع جميع البروفايلات لسرعاتها الأصلية.
+                    </div>
+
+                    <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm">
+                        <i class="bi bi-lightning-charge me-1"></i> تفعيل الزيادة المؤقتة الآن
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Option 2: Daily Recurring Schedule (ساعات السعادة اليومية) -->
+    <div class="col-lg-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <span class="p-2 bg-success-subtle text-success rounded-2">
+                    <i class="bi bi-alarm"></i>
+                </span>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">2. مؤقت يومي متكرر (Happy Hours)</h6>
+                    <small class="text-muted">مضاعفة السرعة يومياً في ساعات محددة تلقائياً</small>
+                </div>
+            </div>
+            <div class="card-body p-3 p-md-4 d-flex flex-column justify-content-between">
+                <form method="POST" action="/profiles/speed-control/save-recurring" id="recBoostForm">
+                    <div class="form-check form-switch p-3 bg-light rounded-3 border mb-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <label class="form-check-label fw-bold text-dark d-block" for="recEnabled">تفعيل الجدولة اليومية</label>
+                            <small class="text-muted">تشغيل ميزة ساعات السعادة التلقائية</small>
+                        </div>
+                        <input class="form-check-input ms-0 fs-5" type="checkbox" name="recurring_enabled" value="1" id="recEnabled" {{ if .Config.RecurringEnabled }}checked{{ end }}>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">وقت البدء (من):</label>
+                            <input type="time" name="recurring_start_time" class="form-control font-monospace" value="{{ .Config.RecurringStartTime }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">وقت الانتهاء (إلى):</label>
+                            <input type="time" name="recurring_end_time" class="form-control font-monospace" value="{{ .Config.RecurringEndTime }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">نوع الزيادة اليومية:</label>
+                        <select name="boost_type" class="form-select" id="recBoostType" onchange="toggleBoostInputs('rec')">
+                            <option value="multiply" {{ if eq .Config.BoostType "multiply" }}selected{{ end }}>مضاعفة بنسبة (Multiplication 2x, 3x)</option>
+                            <option value="add_fixed" {{ if eq .Config.BoostType "add_fixed" }}selected{{ end }}>إضافة سرعة ثابتة (+Mbps Addition)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 {{ if eq .Config.BoostType "add_fixed" }}d-none{{ end }}" id="recMultiplierDiv">
+                        <label class="form-label fw-bold small text-secondary">معامل المضاعفة اليومي:</label>
+                        <select name="boost_multiplier" class="form-select">
+                            <option value="1.5" {{ if eq (printf "%.1f" .Config.BoostValue) "1.5" }}selected{{ end }}>+50% (زيادة بمقدار النصف)</option>
+                            <option value="2.0" {{ if or (eq (printf "%.1f" .Config.BoostValue) "2.0") (eq .Config.BoostValue 0.0) }}selected{{ end }}>2x (مضاعفة السرعة 100%)</option>
+                            <option value="2.5" {{ if eq (printf "%.1f" .Config.BoostValue) "2.5" }}selected{{ end }}>2.5x (مرتين ونصف)</option>
+                            <option value="3.0" {{ if eq (printf "%.1f" .Config.BoostValue) "3.0" }}selected{{ end }}>3x (ثلاثة أضعاف السرعة)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 {{ if ne .Config.BoostType "add_fixed" }}d-none{{ end }}" id="recAddDiv">
+                        <label class="form-label fw-bold small text-secondary">إضافة سرعة ثابتة (Mbps):</label>
+                        <div class="input-group">
+                            <input type="number" name="boost_add_mbps" class="form-control" value="{{ if eq .Config.BoostType "add_fixed" }}{{ printf "%.0f" .Config.BoostValue }}{{ else }}5{{ end }}" min="1" max="100">
+                            <span class="input-group-text">Mbps</span>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="recDisconn" {{ if .Config.DisconnectUsers }}checked{{ end }}>
+                        <label class="form-check-label small fw-semibold" for="recDisconn">
+                            تحديث سرعة المتصلين الآن فوراً
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 fw-bold py-2 shadow-sm">
+                        <i class="bi bi-check2-circle me-1"></i> حفظ وتفعيل الجدول اليومي
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Option 3: Permanent Boost (زيادة دائمة) -->
+    <div class="col-lg-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <span class="p-2 bg-primary-subtle text-primary rounded-2">
+                    <i class="bi bi-infinity"></i>
+                </span>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">3. زيادة دائمة لجميع البروفايلات</h6>
+                    <small class="text-muted">ترقية سرعات كافة الباقات بشكل نهائي</small>
+                </div>
+            </div>
+            <div class="card-body p-3 p-md-4 d-flex flex-column justify-content-between">
+                <form method="POST" action="/profiles/speed-control/apply-permanent" id="permBoostForm" onsubmit="return confirm('تنبيه: سيتم تطبيق الزيادة كسرعة أساسية دائمة لجميع الباقات. هل أنت متأكد؟')">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">نوع الزيادة الدائمة:</label>
+                        <select name="boost_type" class="form-select" id="permBoostType" onchange="toggleBoostInputs('perm')">
+                            <option value="multiply" selected>مضاعفة بنسبة (Multiplication 2x, 3x)</option>
+                            <option value="add_fixed">إضافة سرعة ثابتة (+Mbps Addition)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="permMultiplierDiv">
+                        <label class="form-label fw-bold small text-secondary">معامل المضاعفة الدائم:</label>
+                        <select name="boost_multiplier" class="form-select">
+                            <option value="1.5">+50% (زيادة بمقدار النصف)</option>
+                            <option value="2.0" selected>2x (مضاعفة السرعة 100%)</option>
+                            <option value="2.5">2.5x (مرتين ونصف)</option>
+                            <option value="3.0">3x (ثلاثة أضعاف السرعة)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 d-none" id="permAddDiv">
+                        <label class="form-label fw-bold small text-secondary">إضافة سرعة ثابتة (Mbps):</label>
+                        <div class="input-group">
+                            <input type="number" name="boost_add_mbps" class="form-control" value="5" min="1" max="100">
+                            <span class="input-group-text">Mbps</span>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="permDisconn" checked>
+                        <label class="form-check-label small fw-semibold" for="permDisconn">
+                            تحديث سرعة المتصلين الآن فوراً (قطع اتصال سلس)
+                        </label>
+                    </div>
+
+                    <div class="p-2 bg-danger-subtle text-danger rounded-2 small mb-3 border border-danger-subtle">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> هذه الزيادة دائمة وتعتمد كسرعة رسمية جديدة لجميع الباقات ولا تنتهي بوقت محدد.
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
+                        <i class="bi bi-check-all me-1"></i> تطبيق الزيادة بشكل دائم
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Profiles Live Speeds Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-table text-primary fs-5"></i>
+            <h6 class="fw-bold mb-0 text-dark">مقارنة سرعات البروفايلات الحالية (Live Speeds Comparison)</h6>
+        </div>
+        <span class="badge bg-light text-secondary border">
+            {{ .ProfilesCount }} باقة مسجلة
+        </span>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 60px;">#</th>
+                    <th>اسم البروفايل</th>
+                    <th>السرعة الأصلية (Base Rate)</th>
+                    <th>السرعة النشطة الآن (Active Rate)</th>
+                    <th>حالة السرعة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range $index, $p := .Speeds }}
+                <tr>
+                    <td><span class="text-muted small">{{ add $index 1 }}</span></td>
+                    <td>
+                        <strong>{{ $p.DisplayName }}</strong>
+                        <code class="text-muted small ms-1">({{ $p.ProfileName }})</code>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border font-monospace px-2 py-1">
+                            {{ $p.BaseRateLimit }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge {{ if $.Config.IsCurrentlyBoosted }}bg-success-subtle text-success border border-success-subtle{{ else }}bg-info-subtle text-info border border-info-subtle{{ end }} font-monospace px-3 py-1 fs-6">
+                            {{ $p.CurrentRateLimit }}
+                        </span>
+                    </td>
+                    <td>
+                        {{ if $.Config.IsCurrentlyBoosted }}
+                        <span class="badge bg-success text-white">
+                            <i class="bi bi-lightning-fill me-1"></i> مضاعفة (Boosted)
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-secondary border">
+                            سرعة طبيعية
+                        </span>
+                        {{ end }}
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                        لا يوجد أي بروفايلات مسجلة حتى الآن.
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+function toggleBoostInputs(prefix) {
+    const typeSelect = document.getElementById(prefix + 'BoostType');
+    const mulDiv = document.getElementById(prefix + 'MultiplierDiv');
+    const addDiv = document.getElementById(prefix + 'AddDiv');
+    if (!typeSelect || !mulDiv || !addDiv) return;
+
+    if (typeSelect.value === 'add_fixed') {
+        mulDiv.classList.add('d-none');
+        addDiv.classList.remove('d-none');
+    } else {
+        mulDiv.classList.remove('d-none');
+        addDiv.classList.add('d-none');
+    }
+}
+</script>
+{{ end }}

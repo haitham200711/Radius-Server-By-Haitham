@@ -33,14 +33,19 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"cards/generate":      {"templates/base.html", "templates/cards/generate.html"},
 		"cards/print":         {"templates/cards/print.html"},
 		"card_templates/list": {"templates/base.html", "templates/card_templates/list.html"},
-		"profiles/list":       {"templates/base.html", "templates/profiles/list.html"},
-		"routers/list":        {"templates/base.html", "templates/routers/list.html"},
-		"resellers/list":      {"templates/base.html", "templates/resellers/list.html"},
-		"sessions/list":       {"templates/base.html", "templates/sessions/list.html"},
-		"sstp/index":          {"templates/base.html", "templates/sstp/index.html"},
-		"reports/index":       {"templates/base.html", "templates/reports/index.html"},
-		"settings/index":      {"templates/base.html", "templates/settings/index.html"},
-		"whatsapp/index":      {"templates/base.html", "templates/whatsapp/index.html"},
+		"profiles/list":          {"templates/base.html", "templates/profiles/list.html"},
+		"profiles/speed_control": {"templates/base.html", "templates/profiles/speed_control.html"},
+		"routers/list":           {"templates/base.html", "templates/routers/list.html"},
+		"resellers/list":         {"templates/base.html", "templates/resellers/list.html"},
+		"sessions/list":          {"templates/base.html", "templates/sessions/list.html"},
+		"sstp/index":             {"templates/base.html", "templates/sstp/index.html"},
+		"reports/index":          {"templates/base.html", "templates/reports/index.html"},
+		"settings/index":         {"templates/base.html", "templates/settings/index.html"},
+		"whatsapp/index":         {"templates/base.html", "templates/whatsapp/index.html"},
+	}
+
+	funcMap := template.FuncMap{
+		"add": func(a, b int) int { return a + b },
 	}
 
 	for key, files := range pages {
@@ -48,7 +53,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		for _, f := range files {
 			fullPaths = append(fullPaths, filepath.Join(baseDir, f))
 		}
-		tmpl, err := template.ParseFiles(fullPaths...)
+		tmpl, err := template.New(filepath.Base(fullPaths[0])).Funcs(funcMap).ParseFiles(fullPaths...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse template %s: %w", key, err)
 		}

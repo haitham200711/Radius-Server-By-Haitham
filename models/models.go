@@ -344,4 +344,32 @@ type WhatsAppLog struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// SpeedControlConfig holds system-wide speed boosting and scheduling configuration
+type SpeedControlConfig struct {
+	ID                 int64      `json:"id"`
+	Mode               string     `json:"mode"`               // "off", "permanent", "temp", "recurring"
+	BoostType          string     `json:"boost_type"`         // "multiply", "add_fixed"
+	BoostValue         float64    `json:"boost_value"`        // e.g. 2.0 (for 2x) or 5 (for +5M)
+	TempHours          int        `json:"temp_hours"`         // temporary boost duration in hours
+	TempExpiresAt      *time.Time `json:"temp_expires_at"`    // expiration timestamp
+	RecurringEnabled   bool       `json:"recurring_enabled"`  // daily happy hours enabled
+	RecurringStartTime string     `json:"recurring_start_time"` // e.g. "02:00"
+	RecurringEndTime   string     `json:"recurring_end_time"`   // e.g. "08:00"
+	DisconnectUsers    bool       `json:"disconnect_users"`   // whether to kick active sessions to apply speed immediately
+	IsCurrentlyBoosted bool       `json:"is_currently_boosted"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// ProfileBaseSpeed tracks original rate limits before boosting
+type ProfileBaseSpeed struct {
+	ProfileID        int64     `json:"profile_id"`
+	ProfileName      string    `json:"profile_name"`
+	DisplayName      string    `json:"display_name"`
+	BaseRateLimit    string    `json:"base_rate_limit"`
+	BoostedRateLimit string    `json:"boosted_rate_limit"`
+	CurrentRateLimit string    `json:"current_rate_limit"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+
 
