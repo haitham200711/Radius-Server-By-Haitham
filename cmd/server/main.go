@@ -1,12 +1,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/auth"
@@ -25,6 +27,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
+	"github.com/haitham200711/Radius-Server-By-Haitham/models"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/cert"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
@@ -45,6 +48,48 @@ func main() {
 		log.Fatalf("[FATAL] Database connection failed: %v", err)
 	}
 	defer db.Close()
+
+	// CLI Flag: Reset Admin Password
+	resetAdmin := flag.String("reset-admin", "", "Reset admin password (format: username:newpassword or newpassword)")
+	flag.Parse()
+
+	if *resetAdmin != "" {
+		parts := strings.SplitN(*resetAdmin, ":", 2)
+		targetUser := "admin"
+		newPass := ""
+		if len(parts) == 2 {
+			targetUser = parts[0]
+			newPass = parts[1]
+		} else {
+			newPass = parts[0]
+		}
+
+		if len(newPass) < 4 {
+			log.Fatalf("[ERROR] Password must be at least 4 characters")
+		}
+
+		adminObj := &models.Admin{}
+		if err := adminObj.SetPassword(newPass); err != nil {
+			log.Fatalf("[ERROR] Failed to hash password: %v", err)
+		}
+
+		res, err := db.Exec("UPDATE admins SET password_hash = ? WHERE username = ?", adminObj.PasswordHash, targetUser)
+		if err != nil {
+			log.Fatalf("[ERROR] Failed to update password: %v", err)
+		}
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			_, err = db.Exec("INSERT INTO admins (username, password_hash, role, is_active) VALUES (?, ?, 'admin', 1)", targetUser, adminObj.PasswordHash)
+			if err != nil {
+				log.Fatalf("[ERROR] Failed to create admin user: %v", err)
+			}
+			fmt.Printf("✅ Admin user '%s' created successfully with the new password.\n", targetUser)
+		} else {
+			fmt.Printf("✅ Password for admin user '%s' updated successfully.\n", targetUser)
+		}
+		return
+	}
+
 	log.Println("[INIT] Database connected and schema synchronized successfully.")
 	db.EnsureAllSSTPClientsHaveSequentialIP()
 
@@ -187,6 +232,7 @@ func main() {
 	// Settings Blueprint
 	settBP := settings.New(db, renderer)
 	mux.HandleFunc("/settings", middleware.RequireAuth(settBP.IndexHandler))
+	mux.HandleFunc("/settings/change-password", middleware.RequireAuth(settBP.ChangePasswordHandler))
 
 	// WhatsApp Blueprint
 	waBP := whatsappBP.New(db, renderer)

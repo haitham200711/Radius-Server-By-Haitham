@@ -1,56 +1,138 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">إعدادات النظام والربط بمايكروتك</h3>
-        <p class="text-muted small mb-0">حالة خادم الراديوس وكود التفعيل السريع لراوترات المايكروتك</p>
+        <h3 class="fw-bold mb-1">إعدادات النظام والأمان</h3>
+        <p class="text-muted small mb-0">إدارة كلمة المرور، أمان المشرف، وإعدادات الربط بمايكروتك</p>
     </div>
 </div>
 
+{{ if .FlashMsg }}
+<div class="alert alert-{{ if eq .FlashStatus "success" }}success{{ else }}danger{{ end }} alert-dismissible fade show d-flex align-items-center gap-2 mb-4" role="alert">
+    <i class="bi {{ if eq .FlashStatus "success" }}bi-check-circle-fill{{ else }}bi-exclamation-triangle-fill{{ end }} fs-5"></i>
+    <div>{{ .FlashMsg }}</div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
 <div class="row g-4">
-    <div class="col-lg-5">
-        <div class="card h-100">
-            <div class="card-header">
-                <i class="bi bi-info-circle me-1 text-primary"></i> بيانات ومعلومات السيرفر
+    <!-- Security & Change Password Card -->
+    <div class="col-lg-5" id="change-password">
+        <div class="card h-100 shadow-sm border-0" style="border-radius: 14px;">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <div class="p-2 bg-primary-subtle rounded-3 text-primary">
+                    <i class="bi bi-shield-lock-fill fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">تغيير كلمة المرور</h6>
+                    <small class="text-muted">تحديث كلمة سر الحساب الحالي ({{ .CurrentUser.Username }})</small>
+                </div>
             </div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>محرك الراديوس:</span>
-                        <span class="badge bg-success">RADIUS Core (Active)</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>بورت المصادقة (Auth UDP):</span>
-                        <code class="fw-bold text-primary">1812</code>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>بورت المحاسبة (Acct UDP):</span>
-                        <code class="fw-bold text-primary">1813</code>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>بورت الفصل الفوري (CoA UDP):</span>
-                        <code class="fw-bold text-primary">3799</code>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>قاعدة البيانات:</span>
-                        <span class="badge bg-primary">MariaDB Enterprise Database</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>نظام التشغيل:</span>
-                        <span>Ubuntu 22.04 LTS</span>
-                    </li>
-                </ul>
+            <div class="card-body p-4">
+                <div id="pwdAlertBox" style="display: none;"></div>
+
+                <form id="changePasswordForm" method="POST" action="/settings/change-password">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">اسم المستخدم:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-secondary"></i></span>
+                            <input type="text" class="form-control bg-light border-start-0" value="{{ .CurrentUser.Username }} ({{ if eq .CurrentUser.Role "admin" }}مدير النظام{{ else }}موزع{{ end }})" readonly disabled>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">كلمة المرور الحالية: <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-key text-muted"></i></span>
+                            <input type="password" name="old_password" id="old_password" class="form-control" required placeholder="أدخل كلمة المرور الحالية">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('old_password', this)">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">كلمة المرور الجديدة: <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock text-muted"></i></span>
+                            <input type="password" name="new_password" id="new_password" class="form-control" required placeholder="6 خانات أو أكثر">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('new_password', this)">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold">تأكيد كلمة المرور الجديدة: <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-check2-circle text-muted"></i></span>
+                            <input type="password" name="confirm_password" id="confirm_password" class="form-control" required placeholder="أعد إدخال كلمة المرور الجديدة">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('confirm_password', this)">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSavePwd" class="btn btn-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-check-circle-fill"></i> حفظ وتحديث كلمة المرور
+                    </button>
+                </form>
             </div>
         </div>
     </div>
 
+    <!-- Server Info & MikroTik Script Card -->
     <div class="col-lg-7">
-        <div class="card h-100">
-            <div class="card-header">
-                <i class="bi bi-terminal me-1 text-primary"></i> كود إعداد راوتر المايكروتك (MikroTik Terminal Script)
+        <div class="card shadow-sm border-0 mb-4" style="border-radius: 14px;">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <div class="p-2 bg-info-subtle rounded-3 text-info">
+                    <i class="bi bi-info-circle-fill fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">بيانات ومعلومات الخادم</h6>
+                    <small class="text-muted">المنافذ وحالة محرك الراديوس وقاعدة البيانات</small>
+                </div>
             </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">انسخ هذا الكود والصقه مباشرة في <b>New Terminal</b> في راوتر المايكروتك لتفعيل الراديوس لـ PPPoE والهوتسبوت والـ CoA:</p>
-                
+            <div class="card-body p-3">
+                <div class="row g-2">
+                    <div class="col-sm-6">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <span class="text-muted small d-block">لوحة التحكم المشفرة:</span>
+                            <span class="fw-bold text-success"><i class="bi bi-lock-fill"></i> HTTPS (بورت 443)</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <span class="text-muted small d-block">بورت المصادقة (Auth UDP):</span>
+                            <code class="fw-bold text-primary fs-6">1812</code>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <span class="text-muted small d-block">بورت المحاسبة (Acct UDP):</span>
+                            <code class="fw-bold text-primary fs-6">1813</code>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="p-2 border rounded-3 bg-light">
+                            <span class="text-muted small d-block">بورت الفصل الفوري (CoA UDP):</span>
+                            <code class="fw-bold text-primary fs-6">3799</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0" style="border-radius: 14px;">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                <div class="p-2 bg-secondary-subtle rounded-3 text-secondary">
+                    <i class="bi bi-terminal-fill fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">كود إعداد راوتر المايكروتك (MikroTik Script)</h6>
+                    <small class="text-muted">انسخ الكود والصقه في New Terminal لتفعيل الراديوس</small>
+                </div>
+            </div>
+            <div class="card-body p-4">
                 <form method="GET" action="/settings" class="row g-2 mb-3">
                     <div class="col-md-6">
                         <label class="form-label small fw-bold">آيبي سيرفر الراديوس:</label>
@@ -66,7 +148,7 @@
                 </form>
 
                 <div class="position-relative">
-                    <textarea class="form-control font-monospace bg-dark text-info p-3" rows="10" readonly id="scriptBox">{{ .MikrotikScript }}</textarea>
+                    <textarea class="form-control font-monospace bg-dark text-info p-3" rows="8" readonly id="scriptBox">{{ .MikrotikScript }}</textarea>
                     <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 fw-bold" onclick="window.copyToClipboard(document.getElementById('scriptBox').value, () => window.showCopyToast('تم نسخ كود إعداد المايكروتك بنجاح!'));">
                         <i class="bi bi-clipboard"></i> نسخ الكود
                     </button>
@@ -78,4 +160,87 @@
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+
+{{ define "scripts" }}
+<script>
+function togglePassVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+
+document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSavePwd');
+    const alertBox = document.getElementById('pwdAlertBox');
+    const oldPass = document.getElementById('old_password').value;
+    const newPass = document.getElementById('new_password').value;
+    const confirmPass = document.getElementById('confirm_password').value;
+
+    if (newPass.length < 6) {
+        alertBox.className = 'alert alert-danger d-flex align-items-center gap-2';
+        alertBox.innerHTML = '<i class="bi bi-exclamation-triangle-fill fs-5"></i><div>يجب أن تتكون كلمة المرور الجديدة من 6 خانات على الأقل.</div>';
+        alertBox.style.display = 'flex';
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        alertBox.className = 'alert alert-danger d-flex align-items-center gap-2';
+        alertBox.innerHTML = '<i class="bi bi-exclamation-triangle-fill fs-5"></i><div>كلمة المرور الجديدة وتأكيدها غير متطابقين.</div>';
+        alertBox.style.display = 'flex';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري الحفظ...';
+
+    const formData = new URLSearchParams();
+    formData.append('old_password', oldPass);
+    formData.append('new_password', newPass);
+    formData.append('confirm_password', confirmPass);
+
+    fetch('/settings/change-password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData.toString()
+    })
+    .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, body: data })))
+    .then(result => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> حفظ وتحديث كلمة المرور';
+
+        if (result.ok && result.body.status === 'success') {
+            alertBox.className = 'alert alert-success d-flex align-items-center gap-2';
+            alertBox.innerHTML = `<i class="bi bi-check-circle-fill fs-5"></i><div>${result.body.message}</div>`;
+            alertBox.style.display = 'flex';
+            document.getElementById('changePasswordForm').reset();
+            if (window.showCopyToast) {
+                window.showCopyToast('تم تغيير كلمة المرور بنجاح!');
+            }
+        } else {
+            alertBox.className = 'alert alert-danger d-flex align-items-center gap-2';
+            alertBox.innerHTML = `<i class="bi bi-exclamation-triangle-fill fs-5"></i><div>${result.body.message || 'حدث خطأ أثناء تغيير كلمة المرور'}</div>`;
+            alertBox.style.display = 'flex';
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> حفظ وتحديث كلمة المرور';
+        alertBox.className = 'alert alert-danger d-flex align-items-center gap-2';
+        alertBox.innerHTML = `<i class="bi bi-exclamation-triangle-fill fs-5"></i><div>تعذر الاتصال بالسيرفر: ${err.message}</div>`;
+        alertBox.style.display = 'flex';
+    });
+});
+</script>
+{{ end }}
