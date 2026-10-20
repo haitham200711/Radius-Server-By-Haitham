@@ -354,12 +354,8 @@ func (bp *Blueprint) generateRSCScript(serverHost string, sstpPort int, gatewayI
 /interface sstp-client add name=Radius-Pro connect-to=%s:%d user="%s" password="%s" profile=Radius-VPN authentication=mschap2,chap,pap verify-server-certificate=no disabled=no comment="Haitham RADIUS SSTP Tunnel"
 :log info "[RADIUS-SETUP] Connection Radius-Pro created and enabled."
 
-# 4. Create Netwatch Watchdog on VPN Gateway
-/tool netwatch add host=%s interval=10s timeout=1000ms down-script="/interface sstp-client disable [find name=\"Radius-Pro\"]; :delay 2s; /interface sstp-client enable [find name=\"Radius-Pro\"]; :log warning \"[SSTP-Watchdog] VPN Gateway unreachable, restarting Radius-Pro...\"" comment="SSTP-Radius-Pro-Watchdog"
-:log info "[RADIUS-SETUP] Netwatch Watchdog installed on Gateway: %s"
-
 :log info "[RADIUS-SETUP] Configuration completed successfully!"
-`, time.Now().Format("2006-01-02 15:04:05"), gatewayIP, serverHost, sstpPort, username, password, gatewayIP, gatewayIP)
+`, time.Now().Format("2006-01-02 15:04:05"), serverHost, sstpPort, username, password)
 }
 
 func (bp *Blueprint) GenerateTokenHandler(w http.ResponseWriter, r *http.Request) {

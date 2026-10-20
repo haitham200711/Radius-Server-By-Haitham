@@ -3830,11 +3830,22 @@ func (d *DB) GetSubscriberLiveTraffic(username string) (*models.SubscriberLiveTr
 
 		// 3.1 Try Live MikroTik RouterOS API measurement first
 		var (
+			targetIP         string
 			apiPort          sql.NullInt64
 			apiUser, apiPass sql.NullString
 			apiSuccess       bool
 		)
-		_ = d.QueryRow("SELECT api_port, api_user, api_password FROM nas WHERE nasname = ? LIMIT 1", traffic.NASIP).Scan(&apiPort, &apiUser, &apiPass)
+
+		targetIP = traffic.NASIP
+		if targetIP == "" {
+			targetIP = "10.171.171.15"
+		}
+
+		_ = d.QueryRow("SELECT nasname, api_port, api_user, api_password FROM nas WHERE nasname = ? LIMIT 1", targetIP).Scan(&targetIP, &apiPort, &apiUser, &apiPass)
+		if !apiPort.Valid || apiPort.Int64 <= 0 {
+			// Fallback to first configured mikrotik router in nas table
+			_ = d.QueryRow("SELECT nasname, api_port, api_user, api_password FROM nas WHERE type = 'mikrotik' ORDER BY id ASC LIMIT 1").Scan(&targetIP, &apiPort, &apiUser, &apiPass)
+		}
 
 		portNum := 8728
 		if apiPort.Valid && apiPort.Int64 > 0 {
@@ -3849,18 +3860,20 @@ func (d *DB) GetSubscriberLiveTraffic(username string) (*models.SubscriberLiveTr
 			pwd = apiPass.String
 		}
 
-		if traffic.NASIP != "" && portNum > 0 {
-			addr := fmt.Sprintf("%s:%d", traffic.NASIP, portNum)
-			mkClient, mkErr := mikrotik.Connect(addr, uName, pwd, 800*time.Millisecond)
+		if targetIP != "" && portNum > 0 {
+			addr := fmt.Sprintf("%s:%d", targetIP, portNum)
+			mkClient, mkErr := mikrotik.GetPooledClient(addr, uName, pwd, 2500*time.Millisecond)
 			if mkErr == nil {
 				rxBps, txBps, trErr := mkClient.GetInterfaceTraffic(username)
-				_ = mkClient.Close()
 				if trErr == nil {
 					apiSuccess = true
 					traffic.IsAPI = true
 					traffic.DataSource = "MikroTik RouterOS API (لايف فوري)"
 					traffic.CurrentDownloadBps = txBps
 					traffic.CurrentUploadBps = rxBps
+				} else {
+					// Invalidate pool client if connection was lost or broken
+					mikrotik.InvalidatePoolClient(addr, uName, pwd)
 				}
 			}
 		}
