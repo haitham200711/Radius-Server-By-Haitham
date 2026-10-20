@@ -1,44 +1,62 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <div>
-        <h3 class="fw-bold mb-1">راوترات وسيرفرات المايكروتك (NAS Devices)</h3>
+        <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <span class="p-1.5 bg-primary-subtle text-primary rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <i class="bi bi-router"></i>
+            </span>
+            <span>راوترات وسيرفرات المايكروتك (NAS Devices)</span>
+        </h4>
         <p class="text-muted small mb-0">أجهزة الشبكة المسموح لها بإرسال واستقبال طلبات الراديوس والـ CoA Disconnect</p>
     </div>
-    <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+    <button class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addRouterModal">
         <i class="bi bi-plus-circle me-1"></i> إضافة راوتر مايكروتك
     </button>
 </div>
 
-<div class="card">
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-hdd-network-fill text-primary"></i>
+            <h6 class="fw-bold mb-0">سيرفرات الراديوس والراوترات المسجلة (NAS)</h6>
+            <span class="badge bg-light text-secondary border small">{{ len .Routers }} راوتر</span>
+        </div>
+        <button class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addRouterModal">
+            <i class="bi bi-plus-lg me-1"></i> إضافة راوتر
+        </button>
+    </div>
     <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light small">
                 <tr>
-                    <th>اسم الراوتر</th>
+                    <th>اسم الراوتر التعريفي</th>
                     <th>عنوان IP (NAS IP)</th>
                     <th>الباسورد المشترك (Secret)</th>
                     <th>منفذ الـ CoA</th>
-                    <th>الوصف</th>
-                    <th class="text-end">خيارات</th>
+                    <th>الوصف والموقع</th>
+                    <th class="text-end">الإجراءات</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="small">
                 {{ range .Routers }}
                 <tr>
                     <td><strong>{{ .ShortName }}</strong></td>
-                    <td><code class="text-primary">{{ .NASName }}</code></td>
-                    <td><code>{{ .Secret }}</code></td>
-                    <td><span class="badge bg-secondary">{{ .CoAPort }}</span></td>
-                    <td>{{ .Description }}</td>
+                    <td><code class="text-primary fw-bold">{{ .NASName }}</code></td>
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ .Secret }}</span></td>
+                    <td><span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace">{{ .CoAPort }}</span></td>
+                    <td><span class="text-muted">{{ if .Description }}{{ .Description }}{{ else }}-{{ end }}</span></td>
                     <td class="text-end">
-                        <a href="/routers/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا الراوتر؟');">
+                        <a href="/routers/delete?id={{ .ID }}" class="btn btn-sm btn-light border text-danger py-1 px-2" onclick="return confirm('هل أنت متأكد من حذف هذا الراوتر من الراديوس؟');" title="حذف الراوتر">
                             <i class="bi bi-trash"></i> حذف
                         </a>
                     </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">لا يوجد راوترات مضافة</td>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="bi bi-router fs-2 d-block mb-2 text-secondary opacity-50"></i>
+                        لا يوجد راوترات NAS مسجلة حالياً
+                    </td>
                 </tr>
                 {{ end }}
             </tbody>
@@ -49,37 +67,45 @@
 <!-- Modal Add Router -->
 <div class="modal fade" id="addRouterModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">إضافة راوتر مايكروتك جديد</h5>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-router text-primary fs-5"></i>
+                    <h6 class="modal-title fw-bold text-dark mb-0">إضافة راوتر مايكروتك جديد (NAS)</h6>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/routers/add">
-                <div class="modal-body">
+                <div class="modal-body p-3">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اسم الراوتر التعريفي:</label>
-                        <input type="text" name="shortname" class="form-control" placeholder="مثال: RB-Main-Tower" required>
+                        <label class="form-label fw-bold small">اسم الراوتر التعريفي (Short Name): <span class="text-danger">*</span></label>
+                        <input type="text" name="shortname" class="form-control form-control-sm" placeholder="مثال: RB-Main-Tower" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">عنوان IP الراوتر (NAS IP):</label>
-                        <input type="text" name="nasname" class="form-control" placeholder="مثال: 192.168.2.1" required>
+                        <label class="form-label fw-bold small">عنوان IP الراوتر (NAS IP): <span class="text-danger">*</span></label>
+                        <input type="text" name="nasname" class="form-control form-control-sm font-monospace" placeholder="مثال: 192.168.2.1 أو 10.10.10.2" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">عنوان الـ IP الذي يتصل منه المايكروتك بسيرفر الراديوس.</small>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">كلمة السر المشتركة (RADIUS Secret):</label>
-                        <input type="text" name="secret" class="form-control" value="radius123" required>
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="form-label fw-bold small">كلمة السر المشتركة (RADIUS Secret): <span class="text-danger">*</span></label>
+                            <input type="text" name="secret" class="form-control form-control-sm font-monospace" value="radius123" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label fw-bold small">منفذ الـ CoA / PoD:</label>
+                            <input type="number" name="coa_port" class="form-control form-control-sm font-monospace" value="3799" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">منفذ استقبال أوامر الفصل (CoA / PoD Port):</label>
-                        <input type="number" name="coa_port" class="form-control" value="3799" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">الوصف / الموقع:</label>
-                        <input type="text" name="description" class="form-control" placeholder="موقع البرج أو المحطة">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small">الوصف / الموقع:</label>
+                        <input type="text" name="description" class="form-control form-control-sm" placeholder="موقع البرج أو الفرع...">
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">حفظ الراوتر في سيرفر الراديوس</button>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                        <i class="bi bi-check-lg me-1"></i> حفظ الراوتر في سيرفر الراديوس
+                    </button>
                 </div>
             </form>
         </div>
