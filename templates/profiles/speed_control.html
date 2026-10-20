@@ -9,17 +9,36 @@
         </h4>
         <p class="text-muted small mb-0">رفع سرعات البروفايلات دفعة واحدة (مؤقتاً، مجدولاً يومياً، أو بشكل دائم)</p>
     </div>
-    <div class="d-flex align-items-center gap-2">
-        <a href="/profiles" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-sliders2-vertical me-1"></i> إدارة البروفايلات
-        </a>
+
+    <!-- Top Action Buttons -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <!-- 1. زر زيادة مؤقتة بالساعات -->
+        <button type="button" class="btn btn-sm btn-warning fw-bold shadow-sm text-dark" data-bs-toggle="modal" data-bs-target="#tempBoostModal">
+            <i class="bi bi-hourglass-split me-1"></i> زيادة مؤقتة بالساعات
+        </button>
+
+        <!-- 2. زر جدول يومي متكرر -->
+        <button type="button" class="btn btn-sm btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#recBoostModal">
+            <i class="bi bi-clock-history me-1"></i> جدول يومي (Happy Hours)
+        </button>
+
+        <!-- 3. زر زيادة دائمة -->
+        <button type="button" class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#permBoostModal">
+            <i class="bi bi-infinity me-1"></i> زيادة دائمة
+        </button>
+
+        <!-- زر استعادة كافة السرعات (عند التفعيل) -->
         {{ if .Config.IsCurrentlyBoosted }}
-        <form method="POST" action="/profiles/speed-control/restore" class="d-inline" onsubmit="return confirm('هل أنت متأكد من استعادة كافة السرعات الأصلية لجميع البروفايلات؟')">
+        <form method="POST" action="/profiles/speed-control/restore" class="d-inline" onsubmit="return confirm('هل أنت متأكد من استعادة كافة السرعات الأصلية لجميع البروفايلات الآن؟')">
             <button type="submit" class="btn btn-sm btn-danger fw-bold shadow-sm">
-                <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة كافة السرعات الأصلية
+                <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة كافة السرعات
             </button>
         </form>
         {{ end }}
+
+        <a href="/profiles" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-sliders2-vertical me-1"></i> إدارة البروفايلات
+        </a>
     </div>
 </div>
 
@@ -61,7 +80,7 @@
     <div class="card-body p-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-2.5">
-                <span class="rounded-circle d-inline-flex align-items-center justify-content-center {{ if .Config.IsCurrentlyBoosted }}bg-success-subtle text-success{{ else }}bg-light text-secondary border{{ end }}" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                <span class="rounded-circle d-inline-flex align-items-center justify-content-center {{ if .Config.IsCurrentlyBoosted }}bg-success-subtle text-success{{ else }}bg-light text-secondary border{{ end }}" style="width: 36px; height: 36px; font-size: 1.1rem;">
                     {{ if .Config.IsCurrentlyBoosted }}
                     <i class="bi bi-lightning-charge-fill"></i>
                     {{ else }}
@@ -98,7 +117,7 @@
                             {{ if .Config.RecurringEnabled }}
                                 الجدول اليومي مفعل: ستبدأ الزيادة تلقائياً من الساعة <strong>{{ .Config.RecurringStartTime }}</strong> إلى <strong>{{ .Config.RecurringEndTime }}</strong>.
                             {{ else }}
-                                لا توجد أي زيادات نشطة. يمكنك تفعيل الزيادة عبر أحد الخيارات أدناه.
+                                لا توجد أي زيادات نشطة حالياً. اختر من الأزرار أعلاه لتطبيق زيادة مؤقتة أو مجدولة أو دائمة.
                             {{ end }}
                         {{ end }}
                     </div>
@@ -114,193 +133,6 @@
                     قيمة الزيادة: {{ if eq .Config.BoostType "add_fixed" }}+{{ printf "%.0f" .Config.BoostValue }}M{{ else }}{{ printf "%.1f" .Config.BoostValue }}x{{ end }}
                 </span>
                 {{ end }}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Three Compact Control Cards -->
-<div class="row g-3 mb-4">
-    <!-- Option 1: Temporary Boost (مؤقت لمهلة معينة) -->
-    <div class="col-lg-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center gap-2">
-                <span class="p-1 bg-warning-subtle text-warning-emphasis rounded">
-                    <i class="bi bi-hourglass-split"></i>
-                </span>
-                <span class="fw-bold small text-dark">1. زيادة مؤقتة (بالساعات)</span>
-            </div>
-            <div class="card-body p-3 d-flex flex-column justify-content-between">
-                <form method="POST" action="/profiles/speed-control/apply-temporary" id="tempBoostForm">
-                    <div class="mb-2">
-                        <label class="form-label small text-secondary fw-semibold mb-1">نوع الزيادة:</label>
-                        <select name="boost_type" class="form-select form-select-sm" id="tempBoostType" onchange="toggleBoostInputs('temp')">
-                            <option value="multiply" selected>مضاعفة بنسبة (2x, 3x)</option>
-                            <option value="add_fixed">إضافة سرعة ثابتة (+Mbps)</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2" id="tempMultiplierDiv">
-                        <label class="form-label small text-secondary fw-semibold mb-1">المعامل:</label>
-                        <select name="boost_multiplier" class="form-select form-select-sm">
-                            <option value="1.5">+50% (نصف ضعف)</option>
-                            <option value="2.0" selected>2x (مضاعفة 100%)</option>
-                            <option value="2.5">2.5x</option>
-                            <option value="3.0">3x (ثلاثة أضعاف)</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2 d-none" id="tempAddDiv">
-                        <label class="form-label small text-secondary fw-semibold mb-1">إضافة ثابتة:</label>
-                        <div class="input-group input-group-sm">
-                            <input type="number" name="boost_add_mbps" class="form-control" value="5" min="1" max="100">
-                            <span class="input-group-text">Mbps</span>
-                        </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label small text-secondary fw-semibold mb-1">المدة بالساعات:</label>
-                        <select name="temp_hours" class="form-select form-select-sm">
-                            <option value="1">ساعة واحدة</option>
-                            <option value="2" selected>ساعتان (2 Hours)</option>
-                            <option value="3">3 ساعات</option>
-                            <option value="6">6 ساعات</option>
-                            <option value="12">12 ساعة</option>
-                            <option value="24">24 ساعة (يوم كامل)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="tempDisconn" checked>
-                        <label class="form-check-label text-muted" style="font-size: 0.78rem;" for="tempDisconn">
-                            تحديث سرعة المتصلين الآن فوراً
-                        </label>
-                    </div>
-
-                    <button type="submit" class="btn btn-warning btn-sm w-100 fw-bold py-1.5 shadow-sm">
-                        <i class="bi bi-lightning-charge me-1"></i> تفعيل الزيادة المؤقتة
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Option 2: Daily Recurring Schedule (ساعات السعادة) -->
-    <div class="col-lg-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center gap-2">
-                <span class="p-1 bg-success-subtle text-success-emphasis rounded">
-                    <i class="bi bi-clock-history"></i>
-                </span>
-                <span class="fw-bold small text-dark">2. جدول يومي (Happy Hours)</span>
-            </div>
-            <div class="card-body p-3 d-flex flex-column justify-content-between">
-                <form method="POST" action="/profiles/speed-control/save-recurring" id="recBoostForm">
-                    <div class="form-check form-switch p-2 bg-light rounded-2 border mb-2 d-flex align-items-center justify-content-between">
-                        <label class="form-check-label small fw-bold text-dark mb-0 cursor-pointer" for="recEnabled">تفعيل الجدولة اليومية</label>
-                        <input class="form-check-input ms-0" type="checkbox" name="recurring_enabled" value="1" id="recEnabled" {{ if .Config.RecurringEnabled }}checked{{ end }}>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <label class="form-label small text-secondary fw-semibold mb-1">من (البدء):</label>
-                            <input type="time" name="recurring_start_time" class="form-control form-control-sm font-monospace" value="{{ .Config.RecurringStartTime }}" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small text-secondary fw-semibold mb-1">إلى (الانتهاء):</label>
-                            <input type="time" name="recurring_end_time" class="form-control form-control-sm font-monospace" value="{{ .Config.RecurringEndTime }}" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label small text-secondary fw-semibold mb-1">نوع الزيادة:</label>
-                        <select name="boost_type" class="form-select form-select-sm" id="recBoostType" onchange="toggleBoostInputs('rec')">
-                            <option value="multiply" {{ if eq .Config.BoostType "multiply" }}selected{{ end }}>مضاعفة بنسبة (2x, 3x)</option>
-                            <option value="add_fixed" {{ if eq .Config.BoostType "add_fixed" }}selected{{ end }}>إضافة سرعة ثابتة (+Mbps)</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2 {{ if eq .Config.BoostType "add_fixed" }}d-none{{ end }}" id="recMultiplierDiv">
-                        <label class="form-label small text-secondary fw-semibold mb-1">المعامل:</label>
-                        <select name="boost_multiplier" class="form-select form-select-sm">
-                            <option value="1.5" {{ if eq (printf "%.1f" .Config.BoostValue) "1.5" }}selected{{ end }}>+50%</option>
-                            <option value="2.0" {{ if or (eq (printf "%.1f" .Config.BoostValue) "2.0") (eq .Config.BoostValue 0.0) }}selected{{ end }}>2x (مضاعفة 100%)</option>
-                            <option value="2.5" {{ if eq (printf "%.1f" .Config.BoostValue) "2.5" }}selected{{ end }}>2.5x</option>
-                            <option value="3.0" {{ if eq (printf "%.1f" .Config.BoostValue) "3.0" }}selected{{ end }}>3x</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2 {{ if ne .Config.BoostType "add_fixed" }}d-none{{ end }}" id="recAddDiv">
-                        <label class="form-label small text-secondary fw-semibold mb-1">إضافة ثابتة:</label>
-                        <div class="input-group input-group-sm">
-                            <input type="number" name="boost_add_mbps" class="form-control" value="{{ if eq .Config.BoostType "add_fixed" }}{{ printf "%.0f" .Config.BoostValue }}{{ else }}5{{ end }}" min="1" max="100">
-                            <span class="input-group-text">Mbps</span>
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="recDisconn" {{ if .Config.DisconnectUsers }}checked{{ end }}>
-                        <label class="form-check-label text-muted" style="font-size: 0.78rem;" for="recDisconn">
-                            تحديث سرعة المتصلين الآن فوراً
-                        </label>
-                    </div>
-
-                    <button type="submit" class="btn btn-success btn-sm w-100 fw-bold py-1.5 shadow-sm">
-                        <i class="bi bi-check2-circle me-1"></i> حفظ وتفعيل الجدول
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Option 3: Permanent Boost (زيادة دائمة) -->
-    <div class="col-lg-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center gap-2">
-                <span class="p-1 bg-primary-subtle text-primary-emphasis rounded">
-                    <i class="bi bi-infinity"></i>
-                </span>
-                <span class="fw-bold small text-dark">3. زيادة دائمة لجميع الباقات</span>
-            </div>
-            <div class="card-body p-3 d-flex flex-column justify-content-between">
-                <form method="POST" action="/profiles/speed-control/apply-permanent" id="permBoostForm" onsubmit="return confirm('تنبيه: سيتم تطبيق الزيادة كسرعة أساسية دائمة لجميع الباقات. هل أنت متأكد؟')">
-                    <div class="mb-2">
-                        <label class="form-label small text-secondary fw-semibold mb-1">نوع الزيادة:</label>
-                        <select name="boost_type" class="form-select form-select-sm" id="permBoostType" onchange="toggleBoostInputs('perm')">
-                            <option value="multiply" selected>مضاعفة بنسبة (2x, 3x)</option>
-                            <option value="add_fixed">إضافة سرعة ثابتة (+Mbps)</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2" id="permMultiplierDiv">
-                        <label class="form-label small text-secondary fw-semibold mb-1">المعامل الدائم:</label>
-                        <select name="boost_multiplier" class="form-select form-select-sm">
-                            <option value="1.5">+50%</option>
-                            <option value="2.0" selected>2x (مضاعفة 100%)</option>
-                            <option value="2.5">2.5x</option>
-                            <option value="3.0">3x</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2 d-none" id="permAddDiv">
-                        <label class="form-label small text-secondary fw-semibold mb-1">إضافة ثابتة:</label>
-                        <div class="input-group input-group-sm">
-                            <input type="number" name="boost_add_mbps" class="form-control" value="5" min="1" max="100">
-                            <span class="input-group-text">Mbps</span>
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="permDisconn" checked>
-                        <label class="form-check-label text-muted" style="font-size: 0.78rem;" for="permDisconn">
-                            تحديث سرعة المتصلين الآن فوراً
-                        </label>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold py-1.5 shadow-sm">
-                        <i class="bi bi-check-all me-1"></i> تطبيق الزيادة بشكل دائم
-                    </button>
-                </form>
             </div>
         </div>
     </div>
@@ -382,6 +214,219 @@
         </table>
     </div>
 </div>
+
+<!-- ==================== Modals for Boost Actions ==================== -->
+
+<!-- Modal 1: Temporary Boost (زيادة مؤقتة بالساعات) -->
+<div class="modal fade" id="tempBoostModal" tabindex="-1" aria-labelledby="tempBoostModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header py-2.5 px-3 bg-light border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-1 bg-warning-subtle text-warning-emphasis rounded">
+                        <i class="bi bi-hourglass-split"></i>
+                    </span>
+                    <h6 class="modal-title fw-bold mb-0 text-dark" id="tempBoostModalLabel">زيادة سرعة مؤقتة (بالساعات)</h6>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/profiles/speed-control/apply-temporary" id="tempBoostForm">
+                <div class="modal-body p-3">
+                    <div class="mb-2.5">
+                        <label class="form-label small text-secondary fw-semibold mb-1">نوع الزيادة والمضاعفة:</label>
+                        <select name="boost_type" class="form-select form-select-sm" id="tempBoostType" onchange="toggleBoostInputs('temp')">
+                            <option value="multiply" selected>مضاعفة بنسبة (2x, 3x)</option>
+                            <option value="add_fixed">إضافة سرعة ثابتة (+Mbps)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2.5" id="tempMultiplierDiv">
+                        <label class="form-label small text-secondary fw-semibold mb-1">معامل المضاعفة:</label>
+                        <select name="boost_multiplier" class="form-select form-select-sm">
+                            <option value="1.5">+50% (نصف ضعف إضافي)</option>
+                            <option value="2.0" selected>2x (مضاعفة 100%)</option>
+                            <option value="2.5">2.5x (مرتان ونصف)</option>
+                            <option value="3.0">3x (ثلاثة أضعاف)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2.5 d-none" id="tempAddDiv">
+                        <label class="form-label small text-secondary fw-semibold mb-1">إضافة سرعة ثابتة (Mbps):</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" name="boost_add_mbps" class="form-control" value="5" min="1" max="100">
+                            <span class="input-group-text">Mbps</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-2.5">
+                        <label class="form-label small text-secondary fw-semibold mb-1">مدة الزيادة بالساعات:</label>
+                        <select name="temp_hours" class="form-select form-select-sm">
+                            <option value="1">ساعة واحدة</option>
+                            <option value="2" selected>ساعتان (2 Hours)</option>
+                            <option value="3">3 ساعات</option>
+                            <option value="6">6 ساعات</option>
+                            <option value="12">12 ساعة</option>
+                            <option value="24">24 ساعة (يوم كامل)</option>
+                        </select>
+                        <div class="form-text small text-muted">يعود النظام تلقائياً للسرعات الأصلية بعد انتهاء المهلة.</div>
+                    </div>
+
+                    <div class="form-check form-switch pt-1">
+                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="tempDisconn" checked>
+                        <label class="form-check-label text-dark small fw-semibold" for="tempDisconn">
+                            تحديث سرعة المتصلين الآن فوراً (قطع اتصال سلس)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 shadow-sm text-dark">
+                        <i class="bi bi-lightning-charge me-1"></i> تفعيل الزيادة المؤقتة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Daily Recurring Schedule (ساعات السعادة) -->
+<div class="modal fade" id="recBoostModal" tabindex="-1" aria-labelledby="recBoostModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header py-2.5 px-3 bg-light border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-1 bg-success-subtle text-success-emphasis rounded">
+                        <i class="bi bi-clock-history"></i>
+                    </span>
+                    <h6 class="modal-title fw-bold mb-0 text-dark" id="recBoostModalLabel">جدول يومي متكرر (Happy Hours)</h6>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/profiles/speed-control/save-recurring" id="recBoostForm">
+                <div class="modal-body p-3">
+                    <div class="form-check form-switch p-2 bg-light rounded-2 border mb-3 d-flex align-items-center justify-content-between">
+                        <label class="form-check-label small fw-bold text-dark mb-0 cursor-pointer" for="recEnabled">تفعيل الجدولة اليومية التلقائية</label>
+                        <input class="form-check-input ms-0" type="checkbox" name="recurring_enabled" value="1" id="recEnabled" {{ if .Config.RecurringEnabled }}checked{{ end }}>
+                    </div>
+
+                    <div class="row g-2 mb-2.5">
+                        <div class="col-6">
+                            <label class="form-label small text-secondary fw-semibold mb-1">وقت البدء (من):</label>
+                            <input type="time" name="recurring_start_time" class="form-control form-control-sm font-monospace" value="{{ .Config.RecurringStartTime }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-secondary fw-semibold mb-1">وقت الانتهاء (إلى):</label>
+                            <input type="time" name="recurring_end_time" class="form-control form-control-sm font-monospace" value="{{ .Config.RecurringEndTime }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-2.5">
+                        <label class="form-label small text-secondary fw-semibold mb-1">نوع الزيادة اليومية:</label>
+                        <select name="boost_type" class="form-select form-select-sm" id="recBoostType" onchange="toggleBoostInputs('rec')">
+                            <option value="multiply" {{ if eq .Config.BoostType "multiply" }}selected{{ end }}>مضاعفة بنسبة (2x, 3x)</option>
+                            <option value="add_fixed" {{ if eq .Config.BoostType "add_fixed" }}selected{{ end }}>إضافة سرعة ثابتة (+Mbps)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2.5 {{ if eq .Config.BoostType "add_fixed" }}d-none{{ end }}" id="recMultiplierDiv">
+                        <label class="form-label small text-secondary fw-semibold mb-1">المعامل اليومي:</label>
+                        <select name="boost_multiplier" class="form-select form-select-sm">
+                            <option value="1.5" {{ if eq (printf "%.1f" .Config.BoostValue) "1.5" }}selected{{ end }}>+50%</option>
+                            <option value="2.0" {{ if or (eq (printf "%.1f" .Config.BoostValue) "2.0") (eq .Config.BoostValue 0.0) }}selected{{ end }}>2x (مضاعفة 100%)</option>
+                            <option value="2.5" {{ if eq (printf "%.1f" .Config.BoostValue) "2.5" }}selected{{ end }}>2.5x</option>
+                            <option value="3.0" {{ if eq (printf "%.1f" .Config.BoostValue) "3.0" }}selected{{ end }}>3x</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2.5 {{ if ne .Config.BoostType "add_fixed" }}d-none{{ end }}" id="recAddDiv">
+                        <label class="form-label small text-secondary fw-semibold mb-1">إضافة ثابتة (Mbps):</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" name="boost_add_mbps" class="form-control" value="{{ if eq .Config.BoostType "add_fixed" }}{{ printf "%.0f" .Config.BoostValue }}{{ else }}5{{ end }}" min="1" max="100">
+                            <span class="input-group-text">Mbps</span>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch pt-1">
+                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="recDisconn" {{ if .Config.DisconnectUsers }}checked{{ end }}>
+                        <label class="form-check-label text-dark small fw-semibold" for="recDisconn">
+                            تحديث سرعة المتصلين الآن فوراً
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-success fw-bold px-3 shadow-sm">
+                        <i class="bi bi-check2-circle me-1"></i> حفظ وتفعيل الجدول
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Permanent Boost (زيادة دائمة) -->
+<div class="modal fade" id="permBoostModal" tabindex="-1" aria-labelledby="permBoostModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header py-2.5 px-3 bg-light border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-1 bg-primary-subtle text-primary-emphasis rounded">
+                        <i class="bi bi-infinity"></i>
+                    </span>
+                    <h6 class="modal-title fw-bold mb-0 text-dark" id="permBoostModalLabel">زيادة سرعة دائمة لكافة الباقات</h6>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/profiles/speed-control/apply-permanent" id="permBoostForm" onsubmit="return confirm('تنبيه: سيتم اعتماد السرعات الجديدة كسرعات أساسية دائمة لكافة البروفايلات. هل تريد المتابعة؟')">
+                <div class="modal-body p-3">
+                    <div class="mb-2.5">
+                        <label class="form-label small text-secondary fw-semibold mb-1">نوع الزيادة الدائمة:</label>
+                        <select name="boost_type" class="form-select form-select-sm" id="permBoostType" onchange="toggleBoostInputs('perm')">
+                            <option value="multiply" selected>مضاعفة بنسبة (2x, 3x)</option>
+                            <option value="add_fixed">إضافة سرعة ثابتة (+Mbps)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2.5" id="permMultiplierDiv">
+                        <label class="form-label small text-secondary fw-semibold mb-1">معامل المضاعفة الدائم:</label>
+                        <select name="boost_multiplier" class="form-select form-select-sm">
+                            <option value="1.5">+50%</option>
+                            <option value="2.0" selected>2x (مضاعفة 100%)</option>
+                            <option value="2.5">2.5x</option>
+                            <option value="3.0">3x</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2.5 d-none" id="permAddDiv">
+                        <label class="form-label small text-secondary fw-semibold mb-1">إضافة ثابتة (Mbps):</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" name="boost_add_mbps" class="form-control" value="5" min="1" max="100">
+                            <span class="input-group-text">Mbps</span>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch pt-1">
+                        <input class="form-check-input" type="checkbox" name="disconnect_users" value="1" id="permDisconn" checked>
+                        <label class="form-check-label text-dark small fw-semibold" for="permDisconn">
+                            تحديث سرعة المتصلين الآن فوراً
+                        </label>
+                    </div>
+
+                    <div class="p-2 bg-light rounded-2 text-muted small mt-2 border">
+                        <i class="bi bi-info-circle me-1 text-primary"></i> تعتمد هذه السرعات كسرعة أساسية جديدة ولا تنتهي بوقت محدد.
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3 shadow-sm">
+                        <i class="bi bi-check-all me-1"></i> تطبيق الزيادة الدائمة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
