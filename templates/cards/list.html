@@ -1,11 +1,11 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">دفعات كروت الواي فاي (Batches)</h3>
-        <p class="text-muted small mb-0">سجل دفعات الكروت المولدة والمطبوعة والمحفوظة في النظام</p>
+        <h3 class="fw-bold mb-1">{{ if eq .CardType "cafe" }}كروت الكافيهات (Hotspot Batches){{ else }}كروت الشحن (Recharge Batches){{ end }}</h3>
+        <p class="text-muted small mb-0">{{ if eq .CardType "cafe" }}سجل دفعات كروت هوتسبوت الكافيهات المولدة في النظام{{ else }}سجل دفعات كروت الشحن المولدة والمحفوظة في النظام{{ end }}</p>
     </div>
-    <a href="/cards/generate" class="btn btn-primary fw-bold">
-        <i class="bi bi-plus-circle me-1"></i> توليد دفعة كروت جديدة
+    <a href="/cards/generate{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="btn btn-primary fw-bold">
+        <i class="bi bi-plus-circle me-1"></i> توليد دفعة جديدة
     </a>
 </div>
 

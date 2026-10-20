@@ -23,6 +23,14 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	u := middleware.GetUser(r)
 
+	cardType := r.URL.Query().Get("type")
+	activeMenu := "cards"
+	pageTitle := "كروت الشحن"
+	if cardType == "cafe" {
+		activeMenu = "cafe_cards"
+		pageTitle = "كروت الكافيهات"
+	}
+
 	query := `SELECT b.id, b.batch_code, b.profile_id, COALESCE(p.display_name, ''),
 		b.reseller_id, COALESCE(res.name, 'المدير العام'), b.count, b.price_per_card, b.total_price, b.created_at
 		FROM batches b
@@ -50,8 +58,9 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = bp.renderer.Render(w, "cards/list", map[string]interface{}{
-		"Title":       "إدارة كروت الواي فاي والشحن",
-		"ActiveMenu":  "cards",
+		"Title":       pageTitle,
+		"ActiveMenu":  activeMenu,
+		"CardType":    cardType,
 		"CurrentUser": u,
 		"Batches":     batches,
 	})
@@ -59,6 +68,17 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 
 func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 	u := middleware.GetUser(r)
+
+	cardType := r.URL.Query().Get("type")
+	if cardType == "" {
+		cardType = r.FormValue("card_type")
+	}
+	activeMenu := "cards"
+	pageTitle := "توليد كروت شحن جديدة"
+	if cardType == "cafe" {
+		activeMenu = "cafe_cards"
+		pageTitle = "توليد كروت كافيهات جديدة"
+	}
 
 	if r.Method == http.MethodGet {
 		pRows, _ := bp.db.Query("SELECT id, name, display_name, price FROM profiles ORDER BY id ASC")
@@ -86,8 +106,9 @@ func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		_ = bp.renderer.Render(w, "cards/generate", map[string]interface{}{
-			"Title":       "توليد كروت جديدة",
-			"ActiveMenu":  "cards",
+			"Title":       pageTitle,
+			"ActiveMenu":  activeMenu,
+			"CardType":    cardType,
 			"CurrentUser": u,
 			"Profiles":    profiles,
 			"Resellers":   resellers,
@@ -112,7 +133,11 @@ func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/cards/print?batch="+batchCode, http.StatusFound)
+	redir := "/cards/print?batch=" + batchCode
+	if cardType == "cafe" {
+		redir += "&type=cafe"
+	}
+	http.Redirect(w, r, redir, http.StatusFound)
 }
 
 func (bp *Blueprint) PrintHandler(w http.ResponseWriter, r *http.Request) {

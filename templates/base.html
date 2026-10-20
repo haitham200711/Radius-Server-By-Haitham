@@ -49,7 +49,7 @@
 
             <a href="/sessions" class="status-pill text-decoration-none d-none d-xl-inline-flex">
                 <span class="pulse-dot-primary"></span>
-                <span>جلسات CoA الحية</span>
+                <span>المشتركين المتصلين</span>
             </a>
         </div>
 
@@ -102,112 +102,132 @@
         <div class="d-flex flex-column flex-lg-row">
             <!-- Sidebar Navigation -->
             <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex">
-                <!-- Section: Overview -->
-                <div class="sidebar-section-title">الرئيسية والمتابعة</div>
                 <div class="nav flex-column">
+                    <!-- 1. الرئيسية -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "dashboard" }}active{{ end }}" href="/dashboard">
                         <span class="sidebar-nav-content">
                             <i class="bi bi-grid-1x2-fill text-primary"></i>
-                            <span>الداشبورد والمراقبة</span>
+                            <span>الرئيسية</span>
                         </span>
                         {{ if eq .ActiveMenu "dashboard" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
+
+                    <!-- 2. بروفايلات -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "profiles" }}active{{ end }}" href="/profiles">
                         <span class="sidebar-nav-content">
-                            <i class="bi bi-lightning-charge-fill text-warning"></i>
-                            <span>باقات السرعات والأسعار</span>
+                            <i class="bi bi-sliders2-vertical text-warning"></i>
+                            <span>بروفايلات</span>
                         </span>
                         {{ if eq .ActiveMenu "profiles" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
-                </div>
 
-                <!-- Section: Subscribers & Billing -->
-                <div class="sidebar-section-title">إدارة المشتركين والماليات</div>
-                <div class="nav flex-column">
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "subscribers" }}active{{ end }}" href="/subscribers">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-people-fill text-primary"></i>
-                            <span>المشتركين (PPPoE / HS)</span>
-                        </span>
-                        {{ if eq .ActiveMenu "subscribers" }}<i class="bi bi-chevron-left small"></i>{{ end }}
-                    </a>
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "reports" }}active{{ end }}" href="/reports">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-file-earmark-bar-graph-fill text-info"></i>
-                            <span>سجلات المحاسبة والديون</span>
-                        </span>
-                        {{ if eq .ActiveMenu "reports" }}<i class="bi bi-chevron-left small"></i>{{ end }}
-                    </a>
-                </div>
+                    <!-- 3. المشتركين (Dropdown: المشتركين + المشتركين المتصلين) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#subscribersSubmenu" role="button" 
+                           aria-expanded="{{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-people-fill text-primary"></i>
+                                <span>المشتركين</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}show{{ end }} sidebar-submenu" id="subscribersSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "subscribers" }}active{{ end }}" href="/subscribers">
+                                <i class="bi bi-circle-fill dot-icon"></i>
+                                <span>المشتركين</span>
+                            </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "sessions" }}active{{ end }}" href="/sessions">
+                                <i class="bi bi-circle-fill dot-icon text-danger"></i>
+                                <span>المشتركين المتصلين</span>
+                            </a>
+                        </div>
+                    </div>
 
-                <!-- Section: Cards & Printing -->
-                <div class="sidebar-section-title">الكروت والطباعة</div>
-                <div class="nav flex-column">
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "cards" }}active{{ end }}" href="/cards">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-credit-card-2-front-fill text-warning"></i>
-                            <span>كروت الشحن وتوليدها</span>
-                        </span>
-                        {{ if eq .ActiveMenu "cards" }}<i class="bi bi-chevron-left small"></i>{{ end }}
-                    </a>
+                    <!-- 4. كروت (Dropdown: كروت الشحن + كروت الكافيهات) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#cardsSubmenu" role="button" 
+                           aria-expanded="{{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-credit-card-2-front-fill text-warning"></i>
+                                <span>كروت</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}show{{ end }} sidebar-submenu" id="cardsSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "cards" }}active{{ end }}" href="/cards">
+                                <i class="bi bi-circle-fill dot-icon"></i>
+                                <span>كروت الشحن</span>
+                            </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "cafe_cards" }}active{{ end }}" href="/cards?type=cafe">
+                                <i class="bi bi-cup-hot-fill dot-icon text-warning"></i>
+                                <span>كروت الكافيهات</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 5. اشكال الكروت -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "card_templates" }}active{{ end }}" href="/card-templates">
                         <span class="sidebar-nav-content">
                             <i class="bi bi-palette-fill" style="color: #8b5cf6;"></i>
-                            <span>أشكال وتصاميم الكروت</span>
+                            <span>اشكال الكروت</span>
                         </span>
                         {{ if eq .ActiveMenu "card_templates" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
-                </div>
 
-                <!-- Section: Networking & Tunnels -->
-                <div class="sidebar-section-title">الشبكات والتوجيه</div>
-                <div class="nav flex-column">
+                    <!-- 6. NAS -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "routers" }}active{{ end }}" href="/routers">
                         <span class="sidebar-nav-content">
                             <i class="bi bi-hdd-network-fill text-success"></i>
-                            <span>راوترات المايكروتك (NAS)</span>
+                            <span>NAS</span>
                         </span>
                         {{ if eq .ActiveMenu "routers" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
+
+                    <!-- 7. SSTP Server -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "sstp" }}active{{ end }}" href="/sstp">
                         <span class="sidebar-nav-content">
-                            <i class="bi bi-shield-lock-fill text-primary"></i>
-                            <span>سيرفر SSTP VPN والتوجيه</span>
+                            <i class="bi bi-shield-lock-fill text-info"></i>
+                            <span>SSTP Server</span>
                         </span>
                         {{ if eq .ActiveMenu "sstp" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "sessions" }}active{{ end }}" href="/sessions">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-activity text-danger"></i>
-                            <span>المتصلين الآن (CoA/PoD)</span>
-                        </span>
-                        {{ if eq .ActiveMenu "sessions" }}<i class="bi bi-chevron-left small"></i>{{ end }}
-                    </a>
-                </div>
 
-                <!-- Section: Automation & Settings -->
-                <div class="sidebar-section-title">الأتمتة والربط</div>
-                <div class="nav flex-column">
+                    <!-- 8. التقارير -->
+                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "reports" }}active{{ end }}" href="/reports">
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-file-earmark-bar-graph-fill text-secondary"></i>
+                            <span>التقارير</span>
+                        </span>
+                        {{ if eq .ActiveMenu "reports" }}<i class="bi bi-chevron-left small"></i>{{ end }}
+                    </a>
+
+                    <!-- 9. الواتساب -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "whatsapp" }}active{{ end }}" href="/whatsapp">
                         <span class="sidebar-nav-content">
                             <i class="bi bi-whatsapp text-success"></i>
-                            <span>ربط الواتساب الذكي</span>
+                            <span>الواتساب</span>
                         </span>
                         {{ if eq .ActiveMenu "whatsapp" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
+
                     {{ if eq .CurrentUser.Role "admin" }}
+                    <!-- 10. الموزعين -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "resellers" }}active{{ end }}" href="/resellers">
                         <span class="sidebar-nav-content">
-                            <i class="bi bi-shop-window text-info"></i>
-                            <span>الموزعين والوكلاء</span>
+                            <i class="bi bi-shop-window text-primary"></i>
+                            <span>الموزعين</span>
                         </span>
                         {{ if eq .ActiveMenu "resellers" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>
                     {{ end }}
+
+                    <!-- 11. الإعدادات -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "settings" }}active{{ end }}" href="/settings">
                         <span class="sidebar-nav-content">
                             <i class="bi bi-gear-wide-connected text-secondary"></i>
-                            <span>إعدادات النظام والأمان</span>
+                            <span>الإعدادات</span>
                         </span>
                         {{ if eq .ActiveMenu "settings" }}<i class="bi bi-chevron-left small"></i>{{ end }}
                     </a>

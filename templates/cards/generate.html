@@ -1,10 +1,10 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">توليد كروت جديدة بكميات ضخمة</h3>
+        <h3 class="fw-bold mb-1">{{ if eq .CardType "cafe" }}توليد كروت كافيهات جديدة (Hotspot){{ else }}توليد كروت شحن جديدة (Recharge){{ end }}</h3>
         <p class="text-muted small mb-0">إنشاء وتخزين الكروت في نظام الراديوس وتجهيزها للطباعة الفورية</p>
     </div>
-    <a href="/cards" class="btn btn-outline-secondary">
+    <a href="/cards{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-right me-1"></i> رجوع للدفعات
     </a>
 </div>
@@ -12,6 +12,7 @@
 <div class="card max-w-700 mx-auto" style="max-width: 650px;">
     <div class="card-body p-4">
         <form method="POST" action="/cards/generate">
+            <input type="hidden" name="card_type" value="{{ .CardType }}">
             <div class="mb-3">
                 <label class="form-label fw-bold">عدد الكروت المطلوبة:</label>
                 <input type="number" name="count" class="form-control" value="100" min="1" max="50000" required>
