@@ -21,7 +21,8 @@
                     <th>مدة الصلاحية</th>
                     <th>عند نفاد الكوتة</th>
                     <th>عند انتهاء الوقت</th>
-                    <th>السعر</th>
+                    <th>سعر الجمهور</th>
+                    <th>سعر التكلفة</th>
                     <th class="text-end">خيارات</th>
                 </tr>
             </thead>
@@ -72,6 +73,7 @@
                         {{ end }}
                     </td>
                     <td><strong class="text-success">{{ printf "%.2f" .Price }} ج.م</strong></td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ printf "%.2f" .CostPrice }} ج.م</span></td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-primary me-1 btn-edit-profile"
                             data-id="{{ .ID }}"
@@ -79,6 +81,7 @@
                             data-display="{{ .DisplayName }}"
                             data-ratelimit="{{ .RateLimit }}"
                             data-pool="{{ .PoolName }}"
+                            data-costprice="{{ .CostPrice }}"
                             data-price="{{ .Price }}"
                             data-quotagb="{{ .QuotaGB }}"
                             data-validityval="{{ .ValidityValue }}"
@@ -134,18 +137,24 @@
                             <label class="form-label fw-bold">الاسم التجاري المعروض: <span class="text-danger">*</span></label>
                             <input type="text" name="display_name" class="form-control" placeholder="مثال: باقة سوبر 10 ميجا - 140 جيجا" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">السرعة (Rate-Limit): <span class="text-danger">*</span></label>
                             <input type="text" name="rate_limit" class="form-control font-monospace" placeholder="مثال: 5M/10M" required>
                             <small class="text-muted">رفع / تحميل (Upload/Download)</small>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">بول الآيبيهات (IP Pool - اختياري):</label>
                             <input type="text" name="pool_name" class="form-control font-monospace" placeholder="مثال: pppoe-pool">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">السعر الافتراضي (ج.م):</label>
-                            <input type="number" step="0.5" name="price" class="form-control" value="150" required>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-success">سعر الجمهور / البيع (ج.م): <span class="text-danger">*</span></label>
+                            <input type="number" step="0.5" name="price" class="form-control fw-bold" value="150" required>
+                            <small class="text-muted">السعر الظاهر للعميل في شاشات التجديد والفواتير.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">سعر التكلفة (ج.م):</label>
+                            <input type="number" step="0.5" name="cost_price" class="form-control font-monospace" value="100">
+                            <small class="text-muted">التكلفة الفعلية للباقة (لحساب الأرباح والتقارير المالية داخلياً).</small>
                         </div>
                     </div>
 
@@ -271,17 +280,23 @@
                             <label class="form-label fw-bold">الاسم التجاري المعروض: <span class="text-danger">*</span></label>
                             <input type="text" name="display_name" id="edit_display_name" class="form-control" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">السرعة (Rate-Limit): <span class="text-danger">*</span></label>
                             <input type="text" name="rate_limit" id="edit_rate_limit" class="form-control font-monospace" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">بول الآيبيهات (IP Pool):</label>
                             <input type="text" name="pool_name" id="edit_pool_name" class="form-control font-monospace">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">السعر الافتراضي (ج.م):</label>
-                            <input type="number" step="0.5" name="price" id="edit_price" class="form-control" required>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-success">سعر الجمهور / البيع (ج.م): <span class="text-danger">*</span></label>
+                            <input type="number" step="0.5" name="price" id="edit_price" class="form-control fw-bold" required>
+                            <small class="text-muted">السعر الظاهر للعميل في شاشات التجديد والفواتير.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary">سعر التكلفة (ج.م):</label>
+                            <input type="number" step="0.5" name="cost_price" id="edit_cost_price" class="form-control font-monospace">
+                            <small class="text-muted">التكلفة الفعلية للباقة لحساب الأرباح والتقارير.</small>
                         </div>
                     </div>
 
@@ -423,6 +438,7 @@ document.querySelectorAll('.btn-edit-profile').forEach(btn => {
         document.getElementById('edit_display_name').value = d.display;
         document.getElementById('edit_rate_limit').value = d.ratelimit;
         document.getElementById('edit_pool_name').value = d.pool;
+        document.getElementById('edit_cost_price').value = d.costprice || 0;
         document.getElementById('edit_price').value = d.price;
         document.getElementById('edit_quota_gb').value = d.quotagb;
         document.getElementById('edit_validity_value').value = d.validityval || 30;

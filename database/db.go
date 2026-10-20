@@ -425,9 +425,12 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS last_debt_reminder_at DATETIME NULL;`,
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT '';`,
 		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS is_cafe TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS batch_name VARCHAR(100) DEFAULT '';`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS cost_price_per_card DECIMAL(10, 2) DEFAULT 0.00;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS total_cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS quota_bytes BIGINT DEFAULT 0;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS time_limit_seconds BIGINT DEFAULT 0;`,
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS time_calc_mode VARCHAR(20) DEFAULT 'first_login';`,
@@ -440,6 +443,7 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS affix_value VARCHAR(50) DEFAULT '';`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS quota_bytes BIGINT DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS time_limit_seconds BIGINT DEFAULT 0;`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS time_calc_mode VARCHAR(20) DEFAULT 'first_login';`,
@@ -752,14 +756,17 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 	}
 
 	var prof models.Profile
-	err := d.QueryRow("SELECT id, name, display_name, price, quota_bytes, uptime_seconds, validity_value, validity_unit FROM profiles WHERE id = ?", opts.ProfileID).Scan(
-		&prof.ID, &prof.Name, &prof.DisplayName, &prof.Price, &prof.QuotaBytes, &prof.UptimeSeconds, &prof.ValidityValue, &prof.ValidityUnit)
+	err := d.QueryRow("SELECT id, name, display_name, cost_price, price, quota_bytes, uptime_seconds, validity_value, validity_unit FROM profiles WHERE id = ?", opts.ProfileID).Scan(
+		&prof.ID, &prof.Name, &prof.DisplayName, &prof.CostPrice, &prof.Price, &prof.QuotaBytes, &prof.UptimeSeconds, &prof.ValidityValue, &prof.ValidityUnit)
 	if err != nil {
 		return "", 0, fmt.Errorf("profile not found: %w", err)
 	}
 
 	if opts.PricePerCard <= 0 {
 		opts.PricePerCard = prof.Price
+	}
+	if opts.CostPricePerCard <= 0 {
+		opts.CostPricePerCard = prof.CostPrice
 	}
 	if opts.QuotaBytes == 0 && prof.QuotaBytes > 0 {
 		opts.QuotaBytes = prof.QuotaBytes
@@ -790,6 +797,7 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 		opts.BatchName = fmt.Sprintf("دفعة %s", batchCode)
 	}
 	totalPrice := float64(opts.Count) * opts.PricePerCard
+	totalCostPrice := float64(opts.Count) * opts.CostPricePerCard
 
 	tx, err := d.Begin()
 	if err != nil {
@@ -799,13 +807,13 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 
 	// 1. Insert Batch record
 	res, err := tx.Exec(`INSERT INTO batches (
-		batch_code, batch_name, profile_id, reseller_id, count, price_per_card, total_price,
-		card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode, simultaneous_sessions,
-		stop_on_quota, bind_mac, lock_mac, service_name, affix_type, affix_value, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-		batchCode, opts.BatchName, opts.ProfileID, opts.ResellerID, opts.Count, opts.PricePerCard, totalPrice,
-		opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode, opts.SimultaneousSessions,
-		opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName, opts.AffixType, opts.AffixValue)
+		batch_code, batch_name, profile_id, reseller_id, count, cost_price_per_card, price_per_card,
+		total_cost_price, total_price, card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode,
+		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, service_name, affix_type, affix_value, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		batchCode, opts.BatchName, opts.ProfileID, opts.ResellerID, opts.Count, opts.CostPricePerCard, opts.PricePerCard,
+		totalCostPrice, totalPrice, opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode,
+		opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName, opts.AffixType, opts.AffixValue)
 	if err != nil {
 		return "", 0, err
 	}
@@ -813,10 +821,10 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 
 	// 2. Prepare bulk insert statements
 	stmtCard, err := tx.Prepare(`INSERT INTO cards (
-		batch_id, username, password, profile_id, reseller_id, status, price,
+		batch_id, username, password, profile_id, reseller_id, status, cost_price, price,
 		card_type, nas_id, quota_bytes, time_limit_seconds, time_calc_mode,
 		simultaneous_sessions, stop_on_quota, bind_mac, lock_mac, service_name, created_at
-	) VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
+	) VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`)
 	if err != nil {
 		return "", 0, err
 	}
@@ -860,7 +868,7 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 
 		p := u // Standard hotspot login: username == password
 
-		if _, err := stmtCard.Exec(batchID, u, p, opts.ProfileID, opts.ResellerID, opts.PricePerCard,
+		if _, err := stmtCard.Exec(batchID, u, p, opts.ProfileID, opts.ResellerID, opts.CostPricePerCard, opts.PricePerCard,
 			opts.CardType, opts.NASID, opts.QuotaBytes, opts.TimeLimitSeconds, opts.TimeCalcMode,
 			opts.SimultaneousSessions, opts.StopOnQuota, opts.BindMAC, opts.LockMAC, opts.ServiceName); err == nil {
 
@@ -947,7 +955,7 @@ func randomLetters(n int) string {
 
 func (d *DB) GetProfiles() ([]models.Profile, error) {
 	rows, err := d.Query(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
-		validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+		validity_value, validity_unit, COALESCE(cost_price, 0.00), price, shared_users, mikrotik_address_list,
 		on_quota_action, on_quota_profile, on_quota_pool,
 		on_time_action, on_time_profile, on_time_pool, created_at
 		FROM profiles ORDER BY id ASC`)
@@ -961,7 +969,7 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 		var p models.Profile
 		err := rows.Scan(
 			&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
-			&p.ValidityValue, &p.ValidityUnit, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
+			&p.ValidityValue, &p.ValidityUnit, &p.CostPrice, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
 			&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
 			&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
 		)
@@ -978,12 +986,12 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 func (d *DB) GetProfile(id int64) (*models.Profile, error) {
 	var p models.Profile
 	err := d.QueryRow(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
-		validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+		validity_value, validity_unit, COALESCE(cost_price, 0.00), price, shared_users, mikrotik_address_list,
 		on_quota_action, on_quota_profile, on_quota_pool,
 		on_time_action, on_time_profile, on_time_pool, created_at
 		FROM profiles WHERE id = ?`, id).Scan(
 		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
-		&p.ValidityValue, &p.ValidityUnit, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
+		&p.ValidityValue, &p.ValidityUnit, &p.CostPrice, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
 		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
 		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
 	)
@@ -999,12 +1007,12 @@ func (d *DB) GetProfile(id int64) (*models.Profile, error) {
 func (d *DB) GetProfileByName(name string) (*models.Profile, error) {
 	var p models.Profile
 	err := d.QueryRow(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
-		validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+		validity_value, validity_unit, COALESCE(cost_price, 0.00), price, shared_users, mikrotik_address_list,
 		on_quota_action, on_quota_profile, on_quota_pool,
 		on_time_action, on_time_profile, on_time_pool, created_at
 		FROM profiles WHERE name = ?`, name).Scan(
 		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
-		&p.ValidityValue, &p.ValidityUnit, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
+		&p.ValidityValue, &p.ValidityUnit, &p.CostPrice, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
 		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
 		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
 	)
@@ -1039,12 +1047,12 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 
 	if p.ID == 0 {
 		res, err := tx.Exec(`INSERT INTO profiles (name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
-			validity_value, validity_unit, price, shared_users, mikrotik_address_list,
+			validity_value, validity_unit, cost_price, price, shared_users, mikrotik_address_list,
 			on_quota_action, on_quota_profile, on_quota_pool,
 			on_time_action, on_time_profile, on_time_pool)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
-			p.ValidityValue, p.ValidityUnit, p.Price, p.SharedUsers, p.MikrotikAddressList,
+			p.ValidityValue, p.ValidityUnit, p.CostPrice, p.Price, p.SharedUsers, p.MikrotikAddressList,
 			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
 			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool)
 		if err != nil {
@@ -1054,12 +1062,12 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 	} else {
 		_, err := tx.Exec(`UPDATE profiles SET
 			name = ?, display_name = ?, rate_limit = ?, pool_name = ?, quota_bytes = ?, uptime_seconds = ?,
-			validity_value = ?, validity_unit = ?, price = ?, shared_users = ?, mikrotik_address_list = ?,
+			validity_value = ?, validity_unit = ?, cost_price = ?, price = ?, shared_users = ?, mikrotik_address_list = ?,
 			on_quota_action = ?, on_quota_profile = ?, on_quota_pool = ?,
 			on_time_action = ?, on_time_profile = ?, on_time_pool = ?
 			WHERE id = ?`,
 			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
-			p.ValidityValue, p.ValidityUnit, p.Price, p.SharedUsers, p.MikrotikAddressList,
+			p.ValidityValue, p.ValidityUnit, p.CostPrice, p.Price, p.SharedUsers, p.MikrotikAddressList,
 			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
 			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool, p.ID)
 		if err != nil {
@@ -2825,8 +2833,9 @@ func (d *DB) GetCafeRouters() ([]models.NAS, error) {
 }
 
 func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
-	query := `SELECT b.id, b.batch_code, b.profile_id, COALESCE(p.display_name, ''),
-		b.count, b.price_per_card, b.total_price, b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
+	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
+		b.count, COALESCE(b.cost_price_per_card, 0.0), b.price_per_card, COALESCE(b.total_cost_price, 0.0), b.total_price,
+		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN nas n ON b.nas_id = n.id
@@ -2841,10 +2850,12 @@ func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 
 	row := d.QueryRow(query, args...)
 	var b models.Batch
-	err := row.Scan(&b.ID, &b.BatchCode, &b.ProfileID, &b.ProfileName, &b.Count, &b.PricePerCard, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName)
+	err := row.Scan(&b.ID, &b.BatchCode, &b.BatchName, &b.ProfileID, &b.ProfileName, &b.Count,
+		&b.CostPricePerCard, &b.PricePerCard, &b.TotalCostPrice, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName)
 	if err != nil {
 		return nil, err
 	}
+	b.TotalProfit = b.TotalPrice - b.TotalCostPrice
 
 	// Compute available, used, and currently online cards
 	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NULL", b.ID).Scan(&b.AvailableCount)
@@ -2859,8 +2870,9 @@ func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 }
 
 func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
-	query := `SELECT b.id, b.batch_code, b.profile_id, COALESCE(p.display_name, ''),
-		b.count, b.price_per_card, b.total_price, b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
+	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
+		b.count, COALESCE(b.cost_price_per_card, 0.0), b.price_per_card, COALESCE(b.total_cost_price, 0.0), b.total_price,
+		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN nas n ON b.nas_id = n.id
@@ -2882,7 +2894,9 @@ func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 	var list []models.Batch
 	for rows.Next() {
 		var b models.Batch
-		if err := rows.Scan(&b.ID, &b.BatchCode, &b.ProfileID, &b.ProfileName, &b.Count, &b.PricePerCard, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName); err == nil {
+		if err := rows.Scan(&b.ID, &b.BatchCode, &b.BatchName, &b.ProfileID, &b.ProfileName, &b.Count,
+			&b.CostPricePerCard, &b.PricePerCard, &b.TotalCostPrice, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName); err == nil {
+			b.TotalProfit = b.TotalPrice - b.TotalCostPrice
 			_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NULL", b.ID).Scan(&b.AvailableCount)
 			_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NOT NULL", b.ID).Scan(&b.UsedCount)
 			list = append(list, b)

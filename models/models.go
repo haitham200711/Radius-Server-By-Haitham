@@ -72,7 +72,8 @@ type Profile struct {
 	ValidityValue       int       `json:"validity_value"` // e.g. 30
 	ValidityUnit        string    `json:"validity_unit"`  // "minutes", "hours", "days", "months", "years"
 	UptimeSeconds       int64     `json:"uptime_seconds"` // 0 = unlimited
-	Price               float64   `json:"price"`
+	CostPrice           float64   `json:"cost_price"`     // سعر التكلفة
+	Price               float64   `json:"price"`          // سعر الجمهور / البيع
 	SharedUsers         int       `json:"shared_users"`
 	MikrotikAddressList string    `json:"mikrotik_address_list"`
 	OnQuotaAction       string    `json:"on_quota_action"`  // "disconnect", "profile", "pool"
@@ -135,8 +136,11 @@ type Batch struct {
 	AvailableCount       int       `json:"available_count"`
 	UsedCount            int       `json:"used_count"`
 	OnlineCount          int       `json:"online_count"`
-	PricePerCard         float64   `json:"price_per_card"`
-	TotalPrice           float64   `json:"total_price"`
+	CostPricePerCard     float64   `json:"cost_price_per_card"` // سعر التكلفة للكارت
+	PricePerCard         float64   `json:"price_per_card"`      // سعر الجمهور للكارت
+	TotalCostPrice       float64   `json:"total_cost_price"`    // إجمالي سعر التكلفة
+	TotalPrice           float64   `json:"total_price"`         // إجمالي سعر الجمهور
+	TotalProfit          float64   `json:"total_profit"`        // إجمالي الأرباح المتوقعة
 	CardType             string    `json:"card_type"` // "charge" or "cafe"
 	NASID                int64     `json:"nas_id"`
 	NASName              string    `json:"nas_name"`
@@ -161,7 +165,8 @@ type GenerateBatchOptions struct {
 	ResellerID           int64   `json:"reseller_id"`
 	NASID                int64   `json:"nas_id"`
 	CardType             string  `json:"card_type"` // "charge" or "cafe"
-	PricePerCard         float64 `json:"price_per_card"`
+	CostPricePerCard     float64 `json:"cost_price_per_card"` // سعر التكلفة
+	PricePerCard         float64 `json:"price_per_card"`      // سعر الجمهور
 	AffixType            string  `json:"affix_type"` // "prefix" or "suffix"
 	AffixValue           string  `json:"affix_value"`
 	CharLen              int     `json:"char_len"`
@@ -223,7 +228,8 @@ type Card struct {
 	ProfileName          string       `json:"profile_name"`
 	ResellerID           int64        `json:"reseller_id"`
 	Status               string       `json:"status"` // "available", "used", "expired", "locked"
-	Price                float64      `json:"price"`
+	CostPrice            float64      `json:"cost_price"` // سعر التكلفة
+	Price                float64      `json:"price"`      // سعر الجمهور
 	CardType             string       `json:"card_type"`
 	NASID                int64        `json:"nas_id"`
 	QuotaBytes           int64        `json:"quota_bytes"`

@@ -37,7 +37,9 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	pageTitle := "كروت الشحن"
 
 	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
-		b.reseller_id, COALESCE(res.name, 'المدير العام'), b.count, b.price_per_card, b.total_price, b.created_at
+		b.reseller_id, COALESCE(res.name, 'المدير العام'), b.count,
+		COALESCE(b.cost_price_per_card, 0.0), b.price_per_card,
+		COALESCE(b.total_cost_price, 0.0), b.total_price, b.created_at
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN resellers res ON b.reseller_id = res.id
@@ -57,11 +59,15 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			var b models.Batch
 			if err := rows.Scan(&b.ID, &b.BatchCode, &b.BatchName, &b.ProfileID, &b.ProfileName,
-				&b.ResellerID, &b.ResellerName, &b.Count, &b.PricePerCard, &b.TotalPrice, &b.CreatedAt); err == nil {
+				&b.ResellerID, &b.ResellerName, &b.Count,
+				&b.CostPricePerCard, &b.PricePerCard,
+				&b.TotalCostPrice, &b.TotalPrice, &b.CreatedAt); err == nil {
+				b.TotalProfit = b.TotalPrice - b.TotalCostPrice
 				batches = append(batches, b)
 			}
 		}
 	}
+
 
 	_ = bp.renderer.Render(w, "cards/list", map[string]interface{}{
 		"Title":       pageTitle,
@@ -77,6 +83,7 @@ func parseGenerateOptions(r *http.Request) models.GenerateBatchOptions {
 	profileID, _ := strconv.ParseInt(r.FormValue("profile_id"), 10, 64)
 	resellerID, _ := strconv.ParseInt(r.FormValue("reseller_id"), 10, 64)
 	nasID, _ := strconv.ParseInt(r.FormValue("nas_id"), 10, 64)
+	costPricePerCard, _ := strconv.ParseFloat(r.FormValue("cost_price_per_card"), 64)
 	pricePerCard, _ := strconv.ParseFloat(r.FormValue("price_per_card"), 64)
 	charLen, _ := strconv.Atoi(r.FormValue("char_len"))
 	simultaneous, _ := strconv.Atoi(r.FormValue("simultaneous_sessions"))
@@ -161,6 +168,7 @@ func parseGenerateOptions(r *http.Request) models.GenerateBatchOptions {
 		ResellerID:           resellerID,
 		NASID:                nasID,
 		CardType:             cardType,
+		CostPricePerCard:     costPricePerCard,
 		PricePerCard:         pricePerCard,
 		AffixType:            affixType,
 		AffixValue:           affixVal,

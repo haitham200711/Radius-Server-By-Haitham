@@ -45,6 +45,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	displayName := strings.TrimSpace(r.FormValue("display_name"))
 	rateLimit := strings.TrimSpace(r.FormValue("rate_limit"))
 	poolName := strings.TrimSpace(r.FormValue("pool_name"))
+	costPrice, _ := strconv.ParseFloat(r.FormValue("cost_price"), 64)
 	price, _ := strconv.ParseFloat(r.FormValue("price"), 64)
 
 	// Quota (GB to bytes)
@@ -86,6 +87,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 			QuotaBytes:     quotaBytes,
 			ValidityValue:  valVal,
 			ValidityUnit:   valUnit,
+			CostPrice:      costPrice,
 			Price:          price,
 			SharedUsers:    1,
 			OnQuotaAction:  onQuotaAction,
@@ -127,6 +129,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		p.DisplayName = strings.TrimSpace(r.FormValue("display_name"))
 		p.RateLimit = strings.TrimSpace(r.FormValue("rate_limit"))
 		p.PoolName = strings.TrimSpace(r.FormValue("pool_name"))
+		p.CostPrice, _ = strconv.ParseFloat(r.FormValue("cost_price"), 64)
 		p.Price, _ = strconv.ParseFloat(r.FormValue("price"), 64)
 
 		quotaGB, _ := strconv.ParseFloat(r.FormValue("quota_gb"), 64)
