@@ -58,7 +58,7 @@
     --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.08);
     
     /* Dimensions */
-    --sidebar-w: 255px;
+    --sidebar-w: 250px;
     --header-h: 62px;
     --radius-base: 8px;
     --radius-sm: 6px;
@@ -234,17 +234,26 @@ body {
    Sidebar Navigation (Tabler Clean Vertical Style)
    ========================================================================== */
 .app-sidebar {
-    width: var(--sidebar-w);
+    width: var(--sidebar-w) !important;
+    min-width: var(--sidebar-w) !important;
+    max-width: var(--sidebar-w) !important;
+    flex: 0 0 var(--sidebar-w) !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    white-space: nowrap !important;
     background-color: var(--bg-sidebar);
     border-left: 1px solid var(--border-color);
     min-height: calc(100vh - var(--header-h));
-    padding: 1rem 0.75rem;
+    padding: 0.85rem 0.65rem;
     display: flex;
     flex-direction: column;
     position: sticky;
     top: var(--header-h);
     height: calc(100vh - var(--header-h));
     overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    z-index: 100;
 }
 
 .sidebar-section-title {
@@ -256,6 +265,7 @@ body {
     padding: 0 10px;
     margin-top: 1.15rem;
     margin-bottom: 0.35rem;
+    white-space: nowrap !important;
 }
 .sidebar-section-title:first-child {
     margin-top: 0.1rem;
@@ -266,19 +276,22 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    color: #475569;
+    color: #334155;
     text-decoration: none;
     font-weight: 600;
     font-size: 0.88rem;
     border-radius: var(--radius-sm);
     margin-bottom: 2px;
     transition: all 0.15s ease;
+    white-space: nowrap !important;
+    overflow: hidden;
 }
 
 .sidebar-nav-content {
     display: flex;
     align-items: center;
     gap: 10px;
+    white-space: nowrap !important;
 }
 
 .sidebar-nav-link i {
@@ -286,6 +299,7 @@ body {
     width: 20px;
     text-align: center;
     transition: color 0.15s ease;
+    flex-shrink: 0;
 }
 
 .sidebar-nav-link:hover {
@@ -313,13 +327,15 @@ body {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
+    flex-shrink: 0 !important;
 }
 
 .sidebar-submenu {
-    padding-right: 20px;
+    padding-right: 18px;
     margin-top: 3px;
     margin-bottom: 6px;
     width: 100% !important;
+    flex-shrink: 0 !important;
 }
 
 .sidebar-submenu.show,
@@ -327,6 +343,7 @@ body {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
+    flex-shrink: 0 !important;
 }
 
 .sidebar-sub-link {
@@ -338,12 +355,14 @@ body {
     padding: 7px 12px;
     color: #64748b;
     text-decoration: none;
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
     transition: all 0.15s ease;
     margin-bottom: 3px;
     box-sizing: border-box;
+    white-space: nowrap !important;
+    overflow: hidden;
 }
 
 .sidebar-sub-link:hover {
@@ -367,6 +386,7 @@ body {
     transition: transform 0.2s ease;
     font-size: 0.72rem;
     color: #94a3b8;
+    flex-shrink: 0;
 }
 
 .sidebar-nav-link[aria-expanded="true"] .submenu-arrow {
@@ -377,16 +397,21 @@ body {
     margin-top: auto;
     padding-top: 1rem;
     border-top: 1px solid var(--border-color);
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
 }
 
 /* ==========================================================================
    Main App Content
    ========================================================================== */
 .app-main {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0 !important;
+    width: calc(100% - var(--sidebar-w));
     min-height: calc(100vh - var(--header-h));
-    padding: 1.5rem 1.75rem;
+    padding: 1.25rem 1.5rem;
     background-color: var(--bg-body);
+    overflow-x: auto;
 }
 
 /* ==========================================================================

@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- Unified Modern SaaS Theme -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261020_sidebar_fix">
 </head>
 <body>
 {{ if .CurrentUser }}
@@ -101,7 +101,7 @@
     <div class="container-fluid px-0">
         <div class="d-flex flex-column flex-lg-row">
             <!-- Sidebar Navigation -->
-            <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex">
+            <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex" style="width: 250px; min-width: 250px; max-width: 250px; flex: 0 0 250px;">
                 <div class="nav flex-column">
                     <!-- 1. الرئيسية -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "dashboard" }}active{{ end }}" href="/dashboard">
@@ -261,7 +261,7 @@
             </nav>
 
             <!-- Main App Content -->
-            <main class="app-main">
+            <main class="app-main" style="min-width: 0; flex: 1 1 auto; overflow-x: auto;">
                 {{ if .FlashMessage }}
                 <div class="alert alert-{{ .FlashType }} alert-dismissible fade show shadow-sm border-0 mb-4 d-flex align-items-center justify-content-between" role="alert">
                     <div class="d-flex align-items-center gap-2">
