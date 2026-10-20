@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,18 +33,89 @@ func (a *Admin) CheckPassword(password string) bool {
 	return err == nil
 }
 
-// Reseller represents commercial dealers/agents
+// ResellerPermissions defines fine-grained RBAC capabilities for distributors
+type ResellerPermissions struct {
+	CanAddSubscribers    bool `json:"can_add_subscribers"`
+	CanEditSubscribers   bool `json:"can_edit_subscribers"`
+	CanDeleteSubscribers bool `json:"can_delete_subscribers"`
+	CanRenew             bool `json:"can_renew"`
+	CanChangeProfile     bool `json:"can_change_profile"`
+	CanAddQuota          bool `json:"can_add_quota"`
+	CanViewPasswords     bool `json:"can_view_passwords"`
+	CanCollectDebt       bool `json:"can_collect_debt"`
+	CanAllowDebt         bool `json:"can_allow_debt"`
+	CanGenerateCards     bool `json:"can_generate_cards"`
+	CanDisconnect        bool `json:"can_disconnect"`
+}
+
+// DefaultResellerPermissions returns standard agent permissions
+func DefaultResellerPermissions() ResellerPermissions {
+	return ResellerPermissions{
+		CanAddSubscribers:    true,
+		CanEditSubscribers:   true,
+		CanDeleteSubscribers: false,
+		CanRenew:             true,
+		CanChangeProfile:     true,
+		CanAddQuota:          true,
+		CanViewPasswords:     false,
+		CanCollectDebt:       true,
+		CanAllowDebt:         false,
+		CanGenerateCards:     false,
+		CanDisconnect:        true,
+	}
+}
+
+// FullResellerPermissions returns all permissions enabled
+func FullResellerPermissions() ResellerPermissions {
+	return ResellerPermissions{
+		CanAddSubscribers:    true,
+		CanEditSubscribers:   true,
+		CanDeleteSubscribers: true,
+		CanRenew:             true,
+		CanChangeProfile:     true,
+		CanAddQuota:          true,
+		CanViewPasswords:     true,
+		CanCollectDebt:       true,
+		CanAllowDebt:         true,
+		CanGenerateCards:     true,
+		CanDisconnect:        true,
+	}
+}
+
+func (rp ResellerPermissions) ToJSON() string {
+	b, err := json.Marshal(rp)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+func ParseResellerPermissions(raw string) ResellerPermissions {
+	perms := DefaultResellerPermissions()
+	if raw == "" {
+		return perms
+	}
+	_ = json.Unmarshal([]byte(raw), &perms)
+	return perms
+}
+
+// Reseller represents commercial dealers/agents with balance & permissions
 type Reseller struct {
-	ID           int64     `json:"id"`
-	Name         string    `json:"name"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"-"`
-	Phone        string    `json:"phone"`
-	Balance      float64   `json:"balance"`
-	CreditLimit  float64   `json:"credit_limit"`
-	Notes        string    `json:"notes"`
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                int64               `json:"id"`
+	Name              string              `json:"name"`
+	Username          string              `json:"username"`
+	PasswordHash      string              `json:"-"`
+	Phone             string              `json:"phone"`
+	Balance           float64             `json:"balance"`
+	CreditLimit       float64             `json:"credit_limit"`
+	Debt              float64             `json:"debt"`
+	CommissionPercent float64             `json:"commission_percent"`
+	Permissions       ResellerPermissions `json:"permissions"`
+	PermissionsJSON   string              `json:"permissions_json"`
+	Notes             string              `json:"notes"`
+	IsActive          bool                `json:"is_active"`
+	SubscribersCount  int                 `json:"subscribers_count"`
+	CreatedAt         time.Time           `json:"created_at"`
 }
 
 func (r *Reseller) SetPassword(password string) error {
@@ -58,6 +130,24 @@ func (r *Reseller) SetPassword(password string) error {
 func (r *Reseller) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(r.PasswordHash), []byte(password))
 	return err == nil
+}
+
+// ResellerTransaction logs all balance and debt changes for distributors
+type ResellerTransaction struct {
+	ID             int64     `json:"id"`
+	ResellerID     int64     `json:"reseller_id"`
+	ResellerName   string    `json:"reseller_name"`
+	Type           string    `json:"type"` // "deposit", "withdraw", "pay_debt", "renew", "quota", "adjustment"
+	Amount         float64   `json:"amount"`
+	BalanceBefore  float64   `json:"balance_before"`
+	BalanceAfter   float64   `json:"balance_after"`
+	DebtBefore     float64   `json:"debt_before"`
+	DebtAfter      float64   `json:"debt_after"`
+	SubscriberID   int64     `json:"subscriber_id"`
+	SubscriberName string    `json:"subscriber_name"`
+	Notes          string    `json:"notes"`
+	CreatedBy      string    `json:"created_by"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // Profile represents service plans (Speed limits, Quotas, Pricing)
@@ -396,6 +486,8 @@ type Subscriber struct {
 	QuotaBytes     int64        `json:"quota_bytes"` // in bytes (0 = unlimited)
 	ExpirationDate sql.NullTime `json:"expiration_date"`
 	Status         string       `json:"status"` // "active", "disabled", "expired"
+	ResellerID     int64        `json:"reseller_id"`
+	ResellerName   string       `json:"reseller_name,omitempty"`
 	CreatedAt      time.Time    `json:"created_at"`
 	UpdatedAt      time.Time    `json:"updated_at"`
 }

@@ -95,6 +95,18 @@
                                 <option value="expired" {{ if eq .Sub.Status "expired" }}selected{{ end }}>منتهي (Expired)</option>
                             </select>
                         </div>
+
+                        {{ if .Resellers }}
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">الموزع / الفرع التابع له:</label>
+                            <select name="reseller_id" class="form-select">
+                                <option value="0">المركز الرئيسي (بدون موزع)</option>
+                                {{ range .Resellers }}
+                                <option value="{{ .ID }}" {{ if eq $.Sub.ResellerID .ID }}selected{{ end }}>{{ .Name }} ({{ .Username }}) - هاتف: {{ .Phone }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        {{ end }}
                     </div>
                 </div>
             </div>

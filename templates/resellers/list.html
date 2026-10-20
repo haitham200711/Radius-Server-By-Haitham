@@ -1,52 +1,257 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<!-- Alert Messages -->
+{{ if .Success }}
+<div class="alert alert-success alert-dismissible fade show shadow-sm d-flex align-items-center mb-3" role="alert">
+    <i class="bi bi-check-circle-fill fs-5 me-2"></i>
     <div>
-        <h3 class="fw-bold mb-1">إدارة الموزعين والوكلاء (Resellers)</h3>
-        <p class="text-muted small mb-0">إنشاء حسابات الموزعين وتحديد الصلاحيات والأرصدة المالية</p>
+        {{ if eq .Success "added" }}تمت إضافة الموزع بنجاح وتفعيل حسابه.
+        {{ else if eq .Success "updated" }}تم تحديث بيانات الموزع بنجاح.
+        {{ else if eq .Success "perms_updated" }}تم تحديث وتخصيص صلاحيات الموزع بنجاح.
+        {{ else if eq .Success "balance_adjusted" }}تمت العملية المالية على رصيد / مديونية الموزع بنجاح.
+        {{ else if eq .Success "status_toggled" }}تم تغيير حالة حساب الموزع بنجاح.
+        {{ else if eq .Success "deleted" }}تم حذف حساب الموزع بنجاح.
+        {{ else }}{{ .Success }}{{ end }}
     </div>
-    <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addResellerModal">
-        <i class="bi bi-person-plus me-1"></i> إضافة موزع جديد
-    </button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
+{{ if .Error }}
+<div class="alert alert-danger alert-dismissible fade show shadow-sm d-flex align-items-center mb-3" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+    <div><strong>خطأ: </strong>{{ .Error }}</div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
+<!-- Top Action Toolbar -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-primary-subtle text-primary p-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                <i class="bi bi-shop fs-3"></i>
+            </div>
+            <div>
+                <h4 class="fw-bold mb-0 text-dark">إدارة الموزعين والوكلاء والصلاحيات (Resellers & RBAC)</h4>
+                <p class="text-muted small mb-0">محافظ مالية، سقف ائتماني، عمولات وتخفيضات، كشف حساب دقيق، وتخصيص صلاحيات كامل</p>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addResellerModal">
+                <i class="bi bi-person-plus-fill me-1"></i> إضافة موزع جديد
+            </button>
+            <button class="btn btn-outline-success fw-bold" onclick="openRechargeModal(0, '', 0, 0)">
+                <i class="bi bi-wallet2 me-1"></i> شحن / تسوية رصيد
+            </button>
+            <button class="btn btn-outline-secondary fw-bold" onclick="viewStatement(0, 'جميع الموزعين')">
+                <i class="bi bi-receipt me-1"></i> كشف العمليات المالية
+            </button>
+            <a href="/resellers" class="btn btn-light border" title="تحديث البيانات">
+                <i class="bi bi-arrow-clockwise"></i>
+            </a>
+        </div>
+    </div>
 </div>
 
-<div class="card">
+<!-- Stats Ribbon -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-bold d-block mb-1">إجمالي الموزعين</span>
+                    <h3 class="fw-bold mb-0 text-dark">{{ index .Summary "TotalResellers" }}</h3>
+                    <small class="text-success fw-bold"><i class="bi bi-check-circle me-1"></i>{{ index .Summary "ActiveResellers" }} موزع نشط</small>
+                </div>
+                <div class="bg-primary-subtle text-primary p-3 rounded-3">
+                    <i class="bi bi-people-fill fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-bold d-block mb-1">إجمالي أرصدة المحافظ</span>
+                    <h3 class="fw-bold mb-0 text-success">{{ printf "%.2f" (index .Summary "TotalBalance") }} <small class="fs-6 text-muted">ج.م</small></h3>
+                    <small class="text-muted">مجموع الرصيد المتاح للموزعين</small>
+                </div>
+                <div class="bg-success-subtle text-success p-3 rounded-3">
+                    <i class="bi bi-cash-coin fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-bold d-block mb-1">إجمالي مديونيات الموزعين</span>
+                    <h3 class="fw-bold mb-0 text-danger">{{ printf "%.2f" (index .Summary "TotalDebt") }} <small class="fs-6 text-muted">ج.م</small></h3>
+                    <small class="text-muted">مستحقات واجبة التحصيل</small>
+                </div>
+                <div class="bg-danger-subtle text-danger p-3 rounded-3">
+                    <i class="bi bi-exclamation-octagon-fill fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-bold d-block mb-1">مشتركي شبكة الموزعين</span>
+                    <h3 class="fw-bold mb-0 text-info">{{ index .Summary "TotalSubscribers" }}</h3>
+                    <small class="text-muted">عميل مسجل تحت الوكلاء</small>
+                </div>
+                <div class="bg-info-subtle text-info p-3 rounded-3">
+                    <i class="bi bi-diagram-3-fill fs-3"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resellers Main Table -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-list-ul me-2 text-primary"></i> قائمة الموزعين والوكلاء المعتمدين
+        </h5>
+        <span class="badge bg-light text-dark border px-3 py-2">عدد الموزعين: {{ len .Resellers }}</span>
+    </div>
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>اسم الموزع</th>
-                    <th>اسم المستخدم (Login)</th>
-                    <th>رقم الهاتف</th>
-                    <th>الرصيد المالي</th>
-                    <th>الحد الائتماني</th>
+                    <th style="width: 40px;">#</th>
+                    <th>بيانات الموزع / الوكيل</th>
+                    <th>رصيد المحفظة</th>
+                    <th>الحد الائتماني والمديونية</th>
+                    <th>المشتركين</th>
+                    <th>الخصم / العمولة</th>
+                    <th>الصلاحيات الممنوحة</th>
                     <th>الحالة</th>
-                    <th class="text-end">خيارات</th>
+                    <th class="text-end" style="min-width: 220px;">إجراءات سريعة</th>
                 </tr>
             </thead>
             <tbody>
-                {{ range .Resellers }}
+                {{ range $idx, $res := .Resellers }}
                 <tr>
-                    <td><strong>{{ .Name }}</strong></td>
-                    <td><code>{{ .Username }}</code></td>
-                    <td>{{ if .Phone }}{{ .Phone }}{{ else }}<span class="text-muted">-</span>{{ end }}</td>
-                    <td><strong class="text-success fs-6">{{ printf "%.2f" .Balance }} ج.م</strong></td>
-                    <td>{{ printf "%.2f" .CreditLimit }} ج.م</td>
+                    <td class="text-muted small font-monospace">{{ $res.ID }}</td>
                     <td>
-                        {{ if .IsActive }}
-                        <span class="badge bg-success">نشط</span>
+                        <div class="fw-bold fs-6 text-dark">{{ $res.Name }}</div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <span class="badge bg-light text-dark border font-monospace"><i class="bi bi-person me-1"></i>{{ $res.Username }}</span>
+                            {{ if $res.Phone }}
+                            <a href="tel:{{ $res.Phone }}" class="text-decoration-none text-muted small"><i class="bi bi-telephone text-primary me-1"></i>{{ $res.Phone }}</a>
+                            {{ end }}
+                        </div>
+                        {{ if $res.Notes }}
+                        <div class="text-muted small mt-1 text-truncate" style="max-width: 200px;" title="{{ $res.Notes }}"><i class="bi bi-card-text me-1"></i>{{ $res.Notes }}</div>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <div>
+                            {{ if gt $res.Balance 0.0 }}
+                            <strong class="text-success fs-5">{{ printf "%.2f" $res.Balance }}</strong> <small class="text-muted">ج.م</small>
+                            {{ else if lt $res.Balance 0.0 }}
+                            <strong class="text-danger fs-5">{{ printf "%.2f" $res.Balance }}</strong> <small class="text-muted">ج.م</small>
+                            {{ else }}
+                            <span class="text-muted fs-6">0.00 ج.م</span>
+                            {{ end }}
+                        </div>
+                        <button class="btn btn-link btn-sm p-0 text-decoration-none fw-bold small text-primary" onclick="openRechargeModal({{ $res.ID }}, '{{ $res.Name }}', {{ $res.Balance }}, {{ $res.Debt }})">
+                            <i class="bi bi-plus-circle me-1"></i> شحن المحفظة
+                        </button>
+                    </td>
+                    <td>
+                        <div class="small mb-1">
+                            <span class="text-muted">الحد الائتماني:</span> <strong>{{ printf "%.2f" $res.CreditLimit }} ج.م</strong>
+                        </div>
+                        <div>
+                            {{ if gt $res.Debt 0.0 }}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold">
+                                <i class="bi bi-exclamation-circle me-1"></i>مديونية: {{ printf "%.2f" $res.Debt }} ج.م
+                            </span>
+                            {{ else }}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">لا توجد ديون</span>
+                            {{ end }}
+                        </div>
+                    </td>
+                    <td>
+                        <a href="/subscribers?reseller_id={{ $res.ID }}" class="btn btn-sm btn-outline-primary fw-bold" title="عرض مشتركي هذا الموزع">
+                            <i class="bi bi-people me-1"></i> {{ $res.SubscribersCount }} مشترك
+                        </a>
+                    </td>
+                    <td>
+                        {{ if gt $res.CommissionPercent 0.0 }}
+                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold fs-6">
+                            {{ printf "%.1f" $res.CommissionPercent }}%
+                        </span>
                         {{ else }}
-                        <span class="badge bg-danger">معطل</span>
+                        <span class="badge bg-light text-muted border">0% (أسعار عادية)</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-1" style="max-width: 220px;">
+                            {{ if $res.Permissions.CanAddSubscribers }}<span class="badge bg-primary-subtle text-primary border" title="إضافة مشتركين"><i class="bi bi-person-plus"></i> إضافة</span>{{ end }}
+                            {{ if $res.Permissions.CanRenew }}<span class="badge bg-success-subtle text-success border" title="تجديد باقات"><i class="bi bi-arrow-repeat"></i> تجديد</span>{{ end }}
+                            {{ if $res.Permissions.CanAddQuota }}<span class="badge bg-info-subtle text-info border" title="إضافة كوتة"><i class="bi bi-database-add"></i> كوتة</span>{{ end }}
+                            {{ if $res.Permissions.CanCollectDebt }}<span class="badge bg-warning-subtle text-dark border" title="تحصيل مديونية"><i class="bi bi-cash"></i> تحصيل</span>{{ end }}
+                            {{ if $res.Permissions.CanViewPasswords }}<span class="badge bg-secondary-subtle text-dark border" title="رؤية كلمات المرور"><i class="bi bi-eye"></i> باسوردات</span>{{ end }}
+                            {{ if $res.Permissions.CanGenerateCards }}<span class="badge bg-purple-subtle text-purple border" title="توليد كروت"><i class="bi bi-ticket-perforated"></i> كروت</span>{{ end }}
+                        </div>
+                        <button class="btn btn-link btn-sm p-0 text-decoration-none small text-secondary mt-1" onclick="editPermissions({{ $res.ID }}, '{{ $res.Name }}')">
+                            <i class="bi bi-shield-lock me-1"></i> تخصيص الصلاحيات
+                        </button>
+                    </td>
+                    <td>
+                        {{ if $res.IsActive }}
+                        <a href="/resellers/toggle-status?id={{ $res.ID }}" class="badge bg-success text-decoration-none" title="انقر للتعطيل">
+                            <i class="bi bi-check-circle me-1"></i> نشط
+                        </a>
+                        {{ else }}
+                        <a href="/resellers/toggle-status?id={{ $res.ID }}" class="badge bg-danger text-decoration-none" title="انقر للتفعيل">
+                            <i class="bi bi-slash-circle me-1"></i> معطل
+                        </a>
                         {{ end }}
                     </td>
                     <td class="text-end">
-                        <a href="/resellers/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا الموزع؟');">
-                            <i class="bi bi-trash"></i> حذف
-                        </a>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-success" title="شحن رصيد / تسوية" onclick="openRechargeModal({{ $res.ID }}, '{{ $res.Name }}', {{ $res.Balance }}, {{ $res.Debt }})">
+                                <i class="bi bi-wallet2"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-info text-dark" title="تخصيص الصلاحيات" onclick="editPermissions({{ $res.ID }}, '{{ $res.Name }}')">
+                                <i class="bi bi-shield-check"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" title="كشف حساب المعاملات" onclick="viewStatement({{ $res.ID }}, '{{ $res.Name }}')">
+                                <i class="bi bi-receipt"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" title="تعديل البيانات" onclick="editReseller({{ $res.ID }})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <a href="/resellers/delete?id={{ $res.ID }}" class="btn btn-outline-danger" title="حذف الموزع" onclick="return confirm('هل أنت متأكد من حذف هذا الموزع؟ سيتم فك ربط المشتركين التابعين له ونقلهم للمركز الرئيسي.');">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">لا يوجد أي موزع مسجل حالياً</td>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="bi bi-shop fs-1 d-block mb-3 text-muted"></i>
+                        <h5>لا يوجد أي موزع أو وكيل مسجل حالياً</h5>
+                        <p class="small text-muted mb-3">ابدأ بإضافة موزعك الأول لتمكينه من إدارة المشتركين وتجديد الباقات</p>
+                        <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addResellerModal">
+                            <i class="bi bi-person-plus-fill me-1"></i> إضافة موزع جديد الآن
+                        </button>
+                    </td>
                 </tr>
                 {{ end }}
             </tbody>
@@ -54,58 +259,652 @@
     </div>
 </div>
 
-<!-- Modal Add Reseller -->
+<!-- Modal 1: Add Reseller -->
 <div class="modal fade" id="addResellerModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">إضافة موزع / وكيل جديد</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus-fill me-2"></i> إضافة موزع / وكيل تجاري جديد</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/resellers/add">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">اسم الموزع الكامل:</label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: سنتر النور للخدمات" required>
-                    </div>
-                    <div class="row g-2 mb-3">
+                <div class="modal-body p-4">
+                    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-1"></i> البيانات الأساسية والدخول</h6>
+                    <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">اسم الدخول (Username):</label>
-                            <input type="text" name="username" class="form-control" placeholder="مثال: elnoor" required>
+                            <label class="form-label fw-bold">اسم الموزع / الفرع بالكامل <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="مثال: سنتر النور لخدمات الإنترنت" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">كلمة المرور:</label>
-                            <input type="password" name="password" class="form-control" placeholder="كلمة المرور" required>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">رقم الهاتف:</label>
-                        <input type="text" name="phone" class="form-control" placeholder="01xxxxxxxxx">
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">الرصيد الافتتاحي (ج.م):</label>
-                            <input type="number" step="10" name="balance" class="form-control" value="0">
+                            <label class="form-label fw-bold">رقم الهاتف / الموبايل</label>
+                            <input type="text" name="phone" class="form-control" placeholder="01xxxxxxxxx">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">الحد الائتماني (سلف):</label>
-                            <input type="number" step="10" name="credit_limit" class="form-control" value="0">
+                            <label class="form-label fw-bold">اسم المستخدم للدخول (Username) <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control font-monospace" placeholder="مثال: elnoor_agent" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">كلمة المرور للدخول <span class="text-danger">*</span></label>
+                            <input type="password" name="password" class="form-control font-monospace" placeholder="كلمة المرور" required>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">ملاحظات إضافية:</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="العنوان أو الملاحظات"></textarea>
+
+                    <h6 class="fw-bold text-success mb-3"><i class="bi bi-wallet2 me-1"></i> المعاملات المالية والمحفظة</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الرصيد الافتتاحي (ج.م)</label>
+                            <input type="number" step="0.5" name="balance" class="form-control" value="0.00">
+                            <small class="text-muted">يُضاف فوراً للمحفظة.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الحد الائتماني / سقف السلف (ج.م)</label>
+                            <input type="number" step="10" name="credit_limit" class="form-control" value="0.00">
+                            <small class="text-muted">أقصى مديونية مسموح بها للموزع.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">نسبة الخصم / العمولة (%)</label>
+                            <input type="number" step="0.5" name="commission_percent" class="form-control" value="0.0">
+                            <small class="text-muted">خصم تلقائي من سعر الباقة عند التجديد.</small>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-shield-check me-1"></i> الصلاحيات المبدئية للموزع (RBAC)</h6>
+                    <div class="card bg-light border p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_add_subscribers" value="1" id="add_can_add_subscribers" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_add_subscribers">إضافة مشتركين</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_edit_subscribers" value="1" id="add_can_edit_subscribers" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_edit_subscribers">تعديل بيانات المشتركين</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_delete_subscribers" value="1" id="add_can_delete_subscribers">
+                                    <label class="form-check-label fw-bold small" for="add_can_delete_subscribers">حذف المشتركين</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_renew" value="1" id="add_can_renew" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_renew">تجديد الباقات</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_change_profile" value="1" id="add_can_change_profile" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_change_profile">ترقية وتغيير الباقة</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_add_quota" value="1" id="add_can_add_quota" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_add_quota">إضافة كوتة رصيد</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_collect_debt" value="1" id="add_can_collect_debt" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_collect_debt">تحصيل ديون المشتركين</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_allow_debt" value="1" id="add_can_allow_debt">
+                                    <label class="form-check-label fw-bold small" for="add_can_allow_debt">السماح بديون للمشتركين</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_view_passwords" value="1" id="add_can_view_passwords">
+                                    <label class="form-check-label fw-bold small" for="add_can_view_passwords">رؤية كلمات المرور</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_generate_cards" value="1" id="add_can_generate_cards">
+                                    <label class="form-check-label fw-bold small" for="add_can_generate_cards">توليد وطباعة الكروت</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="can_disconnect" value="1" id="add_can_disconnect" checked>
+                                    <label class="form-check-label fw-bold small" for="add_can_disconnect">فصل جلسات المشتركين</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label fw-bold">ملاحظات أو عنوان الموزع</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="العنوان، رقم السجل التجاري، أو أية ملاحظات إدارية..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">حفظ الموزع</button>
+                    <button type="submit" class="btn btn-primary fw-bold"><i class="bi bi-save me-1"></i> حفظ وإنشاء الموزع</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Modal 2: Edit Reseller -->
+<div class="modal fade" id="editResellerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i> تعديل بيانات الموزع</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/resellers/edit">
+                <input type="hidden" name="id" id="edit_id">
+                <div class="modal-body p-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم الموزع / الفرع <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="edit_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">رقم الهاتف</label>
+                            <input type="text" name="phone" id="edit_phone" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم المستخدم (Login Username) <span class="text-danger">*</span></label>
+                            <input type="text" name="username" id="edit_username" class="form-control font-monospace" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">تغيير كلمة المرور (اتركها فارغة للإبقاء على الحالية)</label>
+                            <input type="password" name="password" class="form-control font-monospace" placeholder="كلمة المرور الجديدة...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">الحد الائتماني (سقف السلف)</label>
+                            <input type="number" step="10" name="credit_limit" id="edit_credit_limit" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">نسبة الخصم / العمولة (%)</label>
+                            <input type="number" step="0.5" name="commission_percent" id="edit_commission_percent" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">حالة الحساب</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="is_active" value="1" id="edit_is_active">
+                                <label class="form-check-label fw-bold" for="edit_is_active">حساب نشط ومفعّل</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">ملاحظات إضافية</label>
+                            <textarea name="notes" id="edit_notes" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-dark fw-bold"><i class="bi bi-save me-1"></i> حفظ التعديلات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Customizable Permissions Matrix (RBAC) -->
+<div class="modal fade" id="permissionsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info-subtle text-dark border-bottom">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-shield-lock-fill text-info me-2"></i> تخصيص مصفوفة الصلاحيات: <span id="perms_reseller_name" class="text-primary"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/resellers/permissions">
+                <input type="hidden" name="id" id="perms_id">
+                <div class="modal-body p-4">
+                    <!-- Quick Preset Buttons -->
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 bg-light p-3 rounded mb-4 border">
+                        <span class="fw-bold small text-muted"><i class="bi bi-lightning-charge me-1"></i> قوالب جاهزة سريعة:</span>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-success" onclick="applyPermPreset('full')">
+                                <i class="bi bi-star-fill me-1"></i> صلاحيات كاملة
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" onclick="applyPermPreset('cashier')">
+                                <i class="bi bi-wallet me-1"></i> كاشير وتجديد فقط
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="applyPermPreset('view_only')">
+                                <i class="bi bi-eye me-1"></i> مشاهدة واستعلام فقط
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <!-- Group 1: Subscribers CRM -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border">
+                                <div class="card-header bg-light py-2 fw-bold text-dark">
+                                    <i class="bi bi-people me-1 text-primary"></i> إدارة المشتركين والعقود
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_add_subscribers" value="1" id="perm_can_add_subscribers">
+                                        <label class="form-check-label fw-bold" for="perm_can_add_subscribers">إضافة مشتركين جدد</label>
+                                        <div class="text-muted small">السماح بتسجيل مشتركين جدد تحت حساب الموزع</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_edit_subscribers" value="1" id="perm_can_edit_subscribers">
+                                        <label class="form-check-label fw-bold" for="perm_can_edit_subscribers">تعديل بيانات المشتركين</label>
+                                        <div class="text-muted small">تعديل الأسماء والهواتف وعناوين المشتركين</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_delete_subscribers" value="1" id="perm_can_delete_subscribers">
+                                        <label class="form-check-label fw-bold text-danger" for="perm_can_delete_subscribers">حذف المشتركين</label>
+                                        <div class="text-muted small">إمكانية حذف المشترك نهائياً من السيستم</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_view_passwords" value="1" id="perm_can_view_passwords">
+                                        <label class="form-check-label fw-bold text-warning" for="perm_can_view_passwords">رؤية كلمات المرور</label>
+                                        <div class="text-muted small">إظهار باسوردات المشتركين بدلاً من إخفائها</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Group 2: Packages & Activations -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border">
+                                <div class="card-header bg-light py-2 fw-bold text-dark">
+                                    <i class="bi bi-speedometer2 me-1 text-success"></i> التفعيلات والاشتراكات
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_renew" value="1" id="perm_can_renew">
+                                        <label class="form-check-label fw-bold" for="perm_can_renew">تجديد باقات المشتركين</label>
+                                        <div class="text-muted small">تجديد الاشتراك مع خصم التكلفة من محفظة الموزع</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_change_profile" value="1" id="perm_can_change_profile">
+                                        <label class="form-check-label fw-bold" for="perm_can_change_profile">ترقية وتغيير الباقة</label>
+                                        <div class="text-muted small">تغيير سرعة أو نوع باقة المشترك لباقة أعلى/أقل</div>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_add_quota" value="1" id="perm_can_add_quota">
+                                        <label class="form-check-label fw-bold" for="perm_can_add_quota">شحن كوتة رصيد إضافية</label>
+                                        <div class="text-muted small">إضافة باقات الجيجات الإضافية للمشتركين</div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input perm-switch" type="checkbox" name="can_disconnect" value="1" id="perm_can_disconnect">
+                                        <label class="form-check-label fw-bold" for="perm_can_disconnect">فصل الجلسات النشطة (CoA)</label>
+                                        <div class="text-muted small">طرد جلسة المشترك من المايكروتك لتجديد الاتصال</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Group 3: Financial & Cards -->
+                        <div class="col-md-12">
+                            <div class="card border">
+                                <div class="card-header bg-light py-2 fw-bold text-dark">
+                                    <i class="bi bi-cash-stack me-1 text-warning"></i> المالية والديون وكروت الشحن
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input perm-switch" type="checkbox" name="can_collect_debt" value="1" id="perm_can_collect_debt">
+                                                <label class="form-check-label fw-bold" for="perm_can_collect_debt">تحصيل ديون المشتركين</label>
+                                                <div class="text-muted small">تسجيل مبالغ التحصيل وسداد ديون العملاء</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input perm-switch" type="checkbox" name="can_allow_debt" value="1" id="perm_can_allow_debt">
+                                                <label class="form-check-label fw-bold" for="perm_can_allow_debt">السماح بتسجيل ديون</label>
+                                                <div class="text-muted small">تجديد الباقات للمشتركين آجل (على النوتة)</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input perm-switch" type="checkbox" name="can_generate_cards" value="1" id="perm_can_generate_cards">
+                                                <label class="form-check-label fw-bold" for="perm_can_generate_cards">توليد وطباعة الكروت</label>
+                                                <div class="text-muted small">توليد كروت شحن باسم الموزع وخصمها من رصيده</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold"><i class="bi bi-check-lg me-1"></i> تطبيق وحفظ الصلاحيات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 4: Recharge & Settle Wallet / Debts -->
+<div class="modal fade" id="rechargeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-wallet2 me-2"></i> شحن رصيد / تسوية مديونية الموزع</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/resellers/recharge">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختر الموزع / الوكيل <span class="text-danger">*</span></label>
+                        <select name="id" id="recharge_reseller_id" class="form-select" required onchange="onRechargeResellerChanged()">
+                            <option value="">-- اختر الموزع --</option>
+                            {{ range .Resellers }}
+                            <option value="{{ .ID }}" data-balance="{{ .Balance }}" data-debt="{{ .Debt }}">{{ .Name }} ({{ .Username }}) - رصيد: {{ printf "%.2f" .Balance }} ج.م</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <div id="recharge_info_box" class="alert alert-light border d-none mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>الرصيد الحالي بالمحفظة:</span>
+                            <strong id="recharge_curr_balance" class="text-success">0.00 ج.م</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span>المديونية المستحقة الحالية:</span>
+                            <strong id="recharge_curr_debt" class="text-danger">0.00 ج.م</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">نوع العملية المالية <span class="text-danger">*</span></label>
+                        <select name="action_type" id="recharge_action_type" class="form-select" required>
+                            <option value="deposit">🟢 شحن رصيد محفظة (+ إضافة رصيد)</option>
+                            <option value="withdraw">🔴 سحب / خصم من المحفظة (- خصم رصيد)</option>
+                            <option value="pay_debt">💵 سداد مديونية نقداً (تقليل دين الموزع)</option>
+                            <option value="pay_debt_from_balance">🔄 سداد مديونية خصماً من رصيد المحفظة</option>
+                            <option value="add_debt">⚠️ إضافة مديونية جديدة على الموزع (+ دين)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المبلغ (ج.م) <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-currency-exchange"></i></span>
+                            <input type="number" step="0.5" min="1" name="amount" id="recharge_amount" class="form-control fs-5 fw-bold" placeholder="0.00" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">بيان وملاحظات العملية</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="مثال: إيداع نقدي بالخزينة، تحويل فودافون كاش، تسوية دورية..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success fw-bold"><i class="bi bi-check-circle me-1"></i> تنفيذ العملية المالية</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 5: Financial Statement Ledger -->
+<div class="modal fade" id="statementModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-receipt me-2"></i> كشف الحساب وسجل الحركات المالية: <span id="stmt_reseller_name" class="text-warning"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3 no-print">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-bold small text-muted">تصفية حسب موزع:</span>
+                        <select id="stmt_filter_select" class="form-select form-select-sm" style="width: 250px;" onchange="onStatementFilterChanged()">
+                            <option value="0">جميع الموزعين</option>
+                            {{ range .Resellers }}
+                            <option value="{{ .ID }}">{{ .Name }} ({{ .Username }})</option>
+                            {{ end }}
+                        </select>
+                    </div>
+                    <button class="btn btn-sm btn-outline-dark fw-bold" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> طباعة كشف الحساب
+                    </button>
+                </div>
+
+                <div class="table-responsive border rounded">
+                    <table class="table table-striped table-hover align-middle mb-0" id="statementTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>التاريخ والوقت</th>
+                                <th>الموزع</th>
+                                <th>نوع العملية</th>
+                                <th>المبلغ</th>
+                                <th>الرصيد (قبل / بعد)</th>
+                                <th>المديونية (قبل / بعد)</th>
+                                <th>البيان والملاحظات</th>
+                                <th>المنفذ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statementTbody">
+                            <tr>
+                                <td colspan="9" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2"></div> جاري تحميل سجل الحركات...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+// 1. Edit Reseller details
+function editReseller(id) {
+    fetch('/resellers/details?id=' + id)
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success || !data.reseller) {
+                alert('فشل جلب بيانات الموزع: ' + (data.error || 'غير معروف'));
+                return;
+            }
+            const r = data.reseller;
+            document.getElementById('edit_id').value = r.id;
+            document.getElementById('edit_name').value = r.name;
+            document.getElementById('edit_username').value = r.username;
+            document.getElementById('edit_phone').value = r.phone || '';
+            document.getElementById('edit_credit_limit').value = r.credit_limit;
+            document.getElementById('edit_commission_percent').value = r.commission_percent || 0;
+            document.getElementById('edit_notes').value = r.notes || '';
+            document.getElementById('edit_is_active').checked = r.is_active;
+
+            const modal = new bootstrap.Modal(document.getElementById('editResellerModal'));
+            modal.show();
+        })
+        .catch(err => alert('خطأ في الاتصال: ' + err));
+}
+
+// 2. Edit Permissions Matrix
+function editPermissions(id, name) {
+    document.getElementById('perms_id').value = id;
+    document.getElementById('perms_reseller_name').textContent = name;
+
+    fetch('/resellers/details?id=' + id)
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success || !data.reseller) {
+                alert('فشل جلب بيانات الموزع');
+                return;
+            }
+            const p = data.reseller.permissions || {};
+            document.getElementById('perm_can_add_subscribers').checked = !!p.can_add_subscribers;
+            document.getElementById('perm_can_edit_subscribers').checked = !!p.can_edit_subscribers;
+            document.getElementById('perm_can_delete_subscribers').checked = !!p.can_delete_subscribers;
+            document.getElementById('perm_can_renew').checked = !!p.can_renew;
+            document.getElementById('perm_can_change_profile').checked = !!p.can_change_profile;
+            document.getElementById('perm_can_add_quota').checked = !!p.can_add_quota;
+            document.getElementById('perm_can_view_passwords').checked = !!p.can_view_passwords;
+            document.getElementById('perm_can_collect_debt').checked = !!p.can_collect_debt;
+            document.getElementById('perm_can_allow_debt').checked = !!p.can_allow_debt;
+            document.getElementById('perm_can_generate_cards').checked = !!p.can_generate_cards;
+            document.getElementById('perm_can_disconnect').checked = !!p.can_disconnect;
+
+            const modal = new bootstrap.Modal(document.getElementById('permissionsModal'));
+            modal.show();
+        })
+        .catch(err => alert('خطأ في الاتصال: ' + err));
+}
+
+// Permission presets helper
+function applyPermPreset(type) {
+    const setAll = (val) => {
+        document.querySelectorAll('.perm-switch').forEach(el => el.checked = val);
+    };
+
+    if (type === 'full') {
+        setAll(true);
+    } else if (type === 'view_only') {
+        setAll(false);
+    } else if (type === 'cashier') {
+        setAll(false);
+        document.getElementById('perm_can_renew').checked = true;
+        document.getElementById('perm_can_add_quota').checked = true;
+        document.getElementById('perm_can_collect_debt').checked = true;
+        document.getElementById('perm_can_disconnect').checked = true;
+    }
+}
+
+// 3. Recharge & Balance Settle Modal
+function openRechargeModal(id, name, balance, debt) {
+    const select = document.getElementById('recharge_reseller_id');
+    if (id > 0) {
+        select.value = id;
+    }
+    onRechargeResellerChanged();
+    const modal = new bootstrap.Modal(document.getElementById('rechargeModal'));
+    modal.show();
+}
+
+function onRechargeResellerChanged() {
+    const select = document.getElementById('recharge_reseller_id');
+    const box = document.getElementById('recharge_info_box');
+    const opt = select.options[select.selectedIndex];
+    if (opt && opt.value) {
+        const bal = parseFloat(opt.getAttribute('data-balance') || '0');
+        const debt = parseFloat(opt.getAttribute('data-debt') || '0');
+        document.getElementById('recharge_curr_balance').textContent = bal.toFixed(2) + ' ج.م';
+        document.getElementById('recharge_curr_debt').textContent = debt.toFixed(2) + ' ج.م';
+        box.classList.remove('d-none');
+    } else {
+        box.classList.add('d-none');
+    }
+}
+
+// 4. Financial Statement
+function viewStatement(id, name) {
+    document.getElementById('stmt_reseller_name').textContent = name;
+    document.getElementById('stmt_filter_select').value = id;
+    loadStatementTable(id);
+    const modal = new bootstrap.Modal(document.getElementById('statementModal'));
+    modal.show();
+}
+
+function onStatementFilterChanged() {
+    const sel = document.getElementById('stmt_filter_select');
+    const id = sel.value;
+    const name = sel.options[sel.selectedIndex].text;
+    document.getElementById('stmt_reseller_name').textContent = name;
+    loadStatementTable(id);
+}
+
+function loadStatementTable(resellerID) {
+    const tbody = document.getElementById('statementTbody');
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> جاري تحميل سجل الحركات...</td></tr>';
+
+    fetch('/resellers/transactions?id=' + resellerID + '&limit=150')
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success || !data.transactions || data.transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">لا توجد حركات مالية مسجلة لهذا الموزع بعد</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.transactions.forEach((tx, idx) => {
+                let badgeClass = 'bg-secondary';
+                let typeName = tx.type;
+                let sign = '';
+                let amountClass = 'text-dark';
+
+                if (tx.type === 'deposit') {
+                    badgeClass = 'bg-success';
+                    typeName = 'شحن رصيد';
+                    sign = '+';
+                    amountClass = 'text-success fw-bold';
+                } else if (tx.type === 'withdraw') {
+                    badgeClass = 'bg-danger';
+                    typeName = 'خصم / سحب';
+                    sign = '-';
+                    amountClass = 'text-danger fw-bold';
+                } else if (tx.type === 'pay_debt' || tx.type === 'pay_debt_from_balance') {
+                    badgeClass = 'bg-info text-dark';
+                    typeName = 'سداد مديونية';
+                    sign = '-';
+                    amountClass = 'text-info fw-bold';
+                } else if (tx.type === 'add_debt') {
+                    badgeClass = 'bg-warning text-dark';
+                    typeName = 'إضافة مديونية';
+                    sign = '+';
+                    amountClass = 'text-danger fw-bold';
+                } else if (tx.type === 'renew') {
+                    badgeClass = 'bg-primary';
+                    typeName = 'تجديد اشتراك';
+                    sign = '-';
+                    amountClass = 'text-danger fw-bold';
+                } else if (tx.type === 'quota') {
+                    badgeClass = 'bg-purple text-purple';
+                    typeName = 'إضافة كوتة';
+                    sign = '-';
+                    amountClass = 'text-danger fw-bold';
+                }
+
+                const d = new Date(tx.created_at);
+                const dateStr = d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                html += `<tr>
+                    <td class="text-muted font-monospace small">${tx.id}</td>
+                    <td class="small">${dateStr}</td>
+                    <td class="fw-bold">${tx.reseller_name || '-'}</td>
+                    <td><span class="badge ${badgeClass}">${typeName}</span></td>
+                    <td class="${amountClass}">${sign}${parseFloat(tx.amount).toFixed(2)} ج.م</td>
+                    <td class="small font-monospace">${parseFloat(tx.balance_before).toFixed(2)} ➔ <strong>${parseFloat(tx.balance_after).toFixed(2)}</strong></td>
+                    <td class="small font-monospace">${parseFloat(tx.debt_before).toFixed(2)} ➔ <strong>${parseFloat(tx.debt_after).toFixed(2)}</strong></td>
+                    <td class="small">${tx.notes || '-'} ${tx.subscriber_name ? '<span class="badge bg-light text-dark border ms-1">' + tx.subscriber_name + '</span>' : ''}</td>
+                    <td class="small text-muted">${tx.created_by || 'admin'}</td>
+                </tr>`;
+            });
+
+            tbody.innerHTML = html;
+        })
+        .catch(err => {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">حدث خطأ أثناء تحميل البيانات: ' + err + '</td></tr>';
+        });
+}
+</script>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}

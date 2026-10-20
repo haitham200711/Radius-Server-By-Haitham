@@ -164,7 +164,13 @@ func main() {
 	resBP := resellers.New(db, renderer)
 	mux.HandleFunc("/resellers", middleware.RequireAdmin(resBP.ListHandler))
 	mux.HandleFunc("/resellers/add", middleware.RequireAdmin(resBP.AddHandler))
+	mux.HandleFunc("/resellers/edit", middleware.RequireAdmin(resBP.EditHandler))
+	mux.HandleFunc("/resellers/permissions", middleware.RequireAdmin(resBP.PermissionsHandler))
+	mux.HandleFunc("/resellers/recharge", middleware.RequireAdmin(resBP.RechargeHandler))
+	mux.HandleFunc("/resellers/toggle-status", middleware.RequireAdmin(resBP.ToggleStatusHandler))
 	mux.HandleFunc("/resellers/delete", middleware.RequireAdmin(resBP.DeleteHandler))
+	mux.HandleFunc("/resellers/details", middleware.RequireAdmin(resBP.DetailsAPIHandler))
+	mux.HandleFunc("/resellers/transactions", middleware.RequireAdmin(resBP.TransactionsAPIHandler))
 
 	// Sessions & CoA Blueprint
 	sessBP := sessions.New(db, renderer)

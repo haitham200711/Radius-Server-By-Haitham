@@ -49,6 +49,8 @@ type SubscriberItem struct {
 	Status           string
 	IsOnline         bool
 	OnlineIP         string
+	ResellerID       int64
+	ResellerName     string
 }
 
 func getPageNumbers(current, total int) []int {
@@ -82,6 +84,16 @@ func getPageNumbers(current, total int) []int {
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	search := strings.TrimSpace(r.URL.Query().Get("q"))
 	statusFilter := strings.TrimSpace(r.URL.Query().Get("status")) // "online", "offline", or ""
+	resellerFilter, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("reseller_id")), 10, 64)
+
+	currentUser := middleware.GetUser(r)
+	var resellerPerms *models.ResellerPermissions
+	if currentUser != nil && currentUser.Role == "reseller" {
+		resellerFilter = currentUser.ID
+		if currentRes, err := bp.db.GetReseller(currentUser.ID); err == nil && currentRes != nil {
+			resellerPerms = &currentRes.Permissions
+		}
+	}
 
 	// 1. Pagination & Limits (default 10, max 500)
 	limit := 10
@@ -134,6 +146,11 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		countQuery += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	}
 
+	if resellerFilter > 0 {
+		countQuery += " AND s.reseller_id = ?"
+		countArgs = append(countArgs, resellerFilter)
+	}
+
 	var totalCount int
 	_ = bp.db.QueryRow(countQuery, countArgs...).Scan(&totalCount)
 
@@ -164,9 +181,12 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		COALESCE(s.quota_bytes, 0),
 		s.expiration_date,
 		COALESCE(s.status, 'active'),
-		s.last_renewed_at
+		s.last_renewed_at,
+		COALESCE(s.reseller_id, 0),
+		COALESCE(res.name, '')
 	FROM radcheck rc
 	LEFT JOIN subscribers s ON rc.username = s.username
+	LEFT JOIN resellers res ON s.reseller_id = res.id
 	LEFT JOIN radusergroup rug ON rc.username = rug.username
 	LEFT JOIN radreply rr ON rc.username = rr.username AND rr.attribute = 'Framed-IP-Address'
 	WHERE rc.attribute = 'Cleartext-Password'`
@@ -182,6 +202,11 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		query += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	} else if statusFilter == "offline" {
 		query += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+	}
+
+	if resellerFilter > 0 {
+		query += " AND s.reseller_id = ?"
+		args = append(args, resellerFilter)
 	}
 
 	query += " GROUP BY rc.username ORDER BY COALESCE(s.id, rc.id) DESC LIMIT ? OFFSET ?"
@@ -210,7 +235,13 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				&exp,
 				&s.Status,
 				&lastRenewed,
+				&s.ResellerID,
+				&s.ResellerName,
 			); err == nil {
+				if resellerPerms != nil && !resellerPerms.CanViewPasswords {
+					s.Password = "••••••"
+				}
+
 				if s.QuotaBytes > 0 {
 					s.QuotaGB = float64(s.QuotaBytes) / (1024 * 1024 * 1024)
 					s.QuotaDisplay = database.FormatBytesHuman(s.QuotaBytes)
@@ -274,28 +305,32 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	profiles, _ := bp.db.GetProfiles()
+	resellersList, _ := bp.db.GetResellers()
 
 	_ = bp.renderer.Render(w, "subscribers/list", map[string]interface{}{
-		"Title":        "إدارة المشتركين والعقود",
-		"ActiveMenu":   "subscribers",
-		"CurrentUser":  middleware.GetUser(r),
-		"Subscribers":  list,
-		"SearchQuery":  search,
-		"FilterStatus": statusFilter,
-		"OnlineCount":  onlineCount,
-		"Page":         page,
-		"Limit":        limit,
-		"TotalCount":   totalCount,
-		"TotalPages":   totalPages,
-		"HasPrev":      page > 1,
-		"HasNext":      page < totalPages,
-		"PrevPage":     page - 1,
-		"NextPage":     page + 1,
-		"FromIndex":    fromIndex,
-		"ToIndex":      toIndex,
-		"PageNumbers":  getPageNumbers(page, totalPages),
-		"PageSizes":    []int{10, 25, 50, 100, 200, 500},
-		"Profiles":     profiles,
+		"Title":            "إدارة المشتركين والعقود",
+		"ActiveMenu":       "subscribers",
+		"CurrentUser":      middleware.GetUser(r),
+		"Subscribers":      list,
+		"SearchQuery":      search,
+		"FilterStatus":     statusFilter,
+		"SelectedReseller": resellerFilter,
+		"Resellers":        resellersList,
+		"ResellerPerms":    resellerPerms,
+		"OnlineCount":      onlineCount,
+		"Page":             page,
+		"Limit":            limit,
+		"TotalCount":       totalCount,
+		"TotalPages":       totalPages,
+		"HasPrev":          page > 1,
+		"HasNext":          page < totalPages,
+		"PrevPage":         page - 1,
+		"NextPage":         page + 1,
+		"FromIndex":        fromIndex,
+		"ToIndex":          toIndex,
+		"PageNumbers":      getPageNumbers(page, totalPages),
+		"PageSizes":        []int{10, 25, 50, 100, 200, 500},
+		"Profiles":         profiles,
 	})
 }
 
@@ -369,12 +404,14 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		profiles, _ := bp.db.GetProfiles()
+		resellersList, _ := bp.db.GetResellers()
 
 		_ = bp.renderer.Render(w, "subscribers/add", map[string]interface{}{
 			"Title":       "إضافة مشترك جديد",
 			"ActiveMenu":  "subscribers",
 			"CurrentUser": middleware.GetUser(r),
 			"Profiles":    profiles,
+			"Resellers":   resellersList,
 		})
 		return
 	}
@@ -391,6 +428,12 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	debtStr := strings.TrimSpace(r.FormValue("debt"))
 	quotaGBStr := strings.TrimSpace(r.FormValue("quota_gb"))
 	expStr := strings.TrimSpace(r.FormValue("expiration_date"))
+	resellerID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("reseller_id")), 10, 64)
+
+	currentUser := middleware.GetUser(r)
+	if currentUser != nil && currentUser.Role == "reseller" {
+		resellerID = currentUser.ID
+	}
 
 	if username == "" || password == "" {
 		http.Redirect(w, r, "/subscribers/add?error=missing_fields", http.StatusFound)
@@ -433,6 +476,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 		QuotaBytes:     quotaBytes,
 		ExpirationDate: expNullTime,
 		Status:         "active",
+		ResellerID:     resellerID,
 	}
 
 	if err := bp.db.AddSubscriberCRM(sub, password); err != nil {
@@ -466,9 +510,10 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
+	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
-	if u := middleware.GetUser(r); u != nil {
-		adminUser = u.Username
+	if currentUser != nil {
+		adminUser = currentUser.Username
 	}
 
 	limit := r.FormValue("limit")
@@ -476,13 +521,22 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.FormValue("q")
 	status := r.FormValue("status")
 
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+
 	if username != "" {
-		if err := bp.db.RenewSubscriberBilling(username, profile, price, isPaid, paymentMethod, notes, adminUser); err != nil {
-			fmt.Printf("[Subscribers] Error renewing subscriber %s: %v\n", username, err)
+		if currentUser != nil && currentUser.Role == "reseller" {
+			if err := bp.db.ResellerRenewSubscriber(currentUser.ID, username, profile, isPaid, currentUser.Username); err != nil {
+				fmt.Printf("[Subscribers] Reseller Renew Error: %v\n", err)
+				http.Redirect(w, r, redirectURL+"&error="+err.Error(), http.StatusFound)
+				return
+			}
+		} else {
+			if err := bp.db.RenewSubscriberBilling(username, profile, price, isPaid, paymentMethod, notes, adminUser); err != nil {
+				fmt.Printf("[Subscribers] Error renewing subscriber %s: %v\n", username, err)
+			}
 		}
 	}
 
-	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
@@ -550,6 +604,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		profiles, _ := bp.db.GetProfiles()
+		resellersList, _ := bp.db.GetResellers()
 
 		var quotaGB float64
 		if sub.QuotaBytes > 0 {
@@ -567,6 +622,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 			"CurrentUser":    middleware.GetUser(r),
 			"Sub":            sub,
 			"Profiles":       profiles,
+			"Resellers":      resellersList,
 			"QuotaGB":        quotaGB,
 			"ExpirationDate": expStr,
 		})
@@ -584,6 +640,13 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	quotaGBStr := strings.TrimSpace(r.FormValue("quota_gb"))
 	expStr := strings.TrimSpace(r.FormValue("expiration_date"))
 	status := strings.TrimSpace(r.FormValue("status"))
+	resellerID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("reseller_id")), 10, 64)
+
+	currentUser := middleware.GetUser(r)
+	if currentUser != nil && currentUser.Role == "reseller" {
+		resellerID = currentUser.ID
+	}
+
 	if status == "" {
 		status = "active"
 	}
@@ -618,6 +681,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		QuotaBytes:     quotaBytes,
 		ExpirationDate: expNullTime,
 		Status:         status,
+		ResellerID:     resellerID,
 	}
 
 	_ = bp.db.UpdateSubscriberCRM(sub, password)

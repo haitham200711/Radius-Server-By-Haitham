@@ -73,7 +73,11 @@ func (r *Renderer) Render(w http.ResponseWriter, name string, data interface{}) 
 	if name == "cards/print" {
 		return tmpl.Execute(w, data)
 	}
-	return tmpl.ExecuteTemplate(w, "base.html", data)
+	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
+		fmt.Printf("[RENDER ERROR] Template %s failed to execute: %v\n", name, err)
+		return err
+	}
+	return nil
 }
 
 func StaticHandler(staticDir string) http.Handler {

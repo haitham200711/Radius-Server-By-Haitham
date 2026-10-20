@@ -90,6 +90,19 @@
                                 {{ end }}
                             </select>
                         </div>
+
+                        {{ if .Resellers }}
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">الموزع / الفرع التابع له المشترك</label>
+                            <select name="reseller_id" class="form-select">
+                                <option value="0">المركز الرئيسي (بدون موزع)</option>
+                                {{ range .Resellers }}
+                                <option value="{{ .ID }}">{{ .Name }} ({{ .Username }}) - هاتف: {{ .Phone }}</option>
+                                {{ end }}
+                            </select>
+                            <small class="text-muted">اختر الموزع إذا كان المشترك يتبع وكيلاً أو فرعاً معيناً.</small>
+                        </div>
+                        {{ end }}
                     </div>
                 </div>
             </div>

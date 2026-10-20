@@ -83,13 +83,23 @@
     <div class="card-body">
         <form method="GET" action="/subscribers" id="filterForm" class="row g-2 align-items-center">
             <input type="hidden" name="status" value="{{ .FilterStatus }}">
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <div class="input-group">
                     <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
                     <input type="text" name="q" class="form-control" placeholder="بحث باسم العميل، اسم المستخدم، رقم العقد، أو رقم الهاتف..." value="{{ .SearchQuery }}">
                 </div>
             </div>
-            <div class="col-md-3">
+            {{ if .Resellers }}
+            <div class="col-md-2">
+                <select name="reseller_id" class="form-select font-monospace" onchange="document.getElementById('filterForm').submit()">
+                    <option value="0">كل الموزعين والوكلاء</option>
+                    {{ range .Resellers }}
+                    <option value="{{ .ID }}" {{ if eq $.SelectedReseller .ID }}selected{{ end }}>{{ .Name }}</option>
+                    {{ end }}
+                </select>
+            </div>
+            {{ end }}
+            <div class="col-md-2">
                 <div class="input-group">
                     <span class="input-group-text bg-white small fw-bold">عرض بالصفحة:</span>
                     <select name="limit" class="form-select font-monospace" onchange="document.getElementById('filterForm').submit()">
@@ -266,7 +276,10 @@
                     <td class="col-contract"><span class="badge bg-light text-dark border font-monospace">{{ .ContractNo }}</span></td>
                     <td class="col-name">
                         <div class="fw-bold">{{ .FullName }}</div>
-                        {{ if .Address }}<small class="text-muted"><i class="bi bi-geo-alt"></i> {{ .Address }}</small>{{ end }}
+                        <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                            {{ if .Address }}<small class="text-muted"><i class="bi bi-geo-alt"></i> {{ .Address }}</small>{{ end }}
+                            {{ if .ResellerName }}<a href="/subscribers?reseller_id={{ .ResellerID }}" class="badge bg-secondary-subtle text-secondary border text-decoration-none" title="تصفية حسب هذا الموزع"><i class="bi bi-shop me-1"></i>{{ .ResellerName }}</a>{{ end }}
+                        </div>
                     </td>
                     <td class="col-username">
                         <div class="font-monospace fw-bold text-primary">{{ .Username }}</div>

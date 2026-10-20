@@ -68,7 +68,7 @@ func (d *DB) InitSchema() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 2. Resellers (ط§ظ„ظ…ظˆط²ط¹ظٹظ†)
+		// 2. Resellers (الموزعين)
 		`CREATE TABLE IF NOT EXISTS resellers (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(100) NOT NULL,
@@ -77,6 +77,9 @@ func (d *DB) InitSchema() error {
 			phone VARCHAR(30) DEFAULT '',
 			balance DECIMAL(12, 2) DEFAULT 0.00,
 			credit_limit DECIMAL(12, 2) DEFAULT 0.00,
+			debt DECIMAL(12, 2) DEFAULT 0.00,
+			commission_percent DECIMAL(5, 2) DEFAULT 0.00,
+			permissions LONGTEXT,
 			notes TEXT,
 			is_active TINYINT(1) DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -390,13 +393,33 @@ func (d *DB) InitSchema() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 
-		// 18. Profile Base Speeds (ط³ط¬ظ„ ط§ظ„ط³ط±ط¹ط§طھ ط§ظ„ط£ط³ط§ط³ظٹط© ظ„ظ„ط¨ط±ظˆظپط§ظٹظ„ط§طھ)
+		// 18. Profile Base Speeds (سجل السرعات الأساسية للباقات)
 		`CREATE TABLE IF NOT EXISTS profile_base_speeds (
 			profile_id INT PRIMARY KEY,
 			profile_name VARCHAR(64) NOT NULL,
 			base_rate_limit VARCHAR(64) NOT NULL,
 			boosted_rate_limit VARCHAR(64) DEFAULT '',
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 19. Reseller Transactions (سجل حركات ومعاملات الموزعين والوكلاء)
+		`CREATE TABLE IF NOT EXISTS reseller_transactions (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			reseller_id INT NOT NULL,
+			type VARCHAR(32) NOT NULL,
+			amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+			balance_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+			balance_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+			debt_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+			debt_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+			subscriber_id INT DEFAULT 0,
+			subscriber_name VARCHAR(100) DEFAULT '',
+			notes TEXT,
+			created_by VARCHAR(64) DEFAULT 'admin',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_res_tx_reseller (reseller_id),
+			INDEX idx_res_tx_type (type),
+			INDEX idx_res_tx_date (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
@@ -480,6 +503,10 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS service_name VARCHAR(100) DEFAULT '';`,
 		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS calling_mac VARCHAR(32) DEFAULT '';`,
 		`UPDATE cards SET original_code = username WHERE original_code = '' OR original_code IS NULL;`,
+		`ALTER TABLE resellers ADD COLUMN IF NOT EXISTS debt DECIMAL(12, 2) DEFAULT 0.00;`,
+		`ALTER TABLE resellers ADD COLUMN IF NOT EXISTS commission_percent DECIMAL(5, 2) DEFAULT 0.00;`,
+		`ALTER TABLE resellers ADD COLUMN IF NOT EXISTS permissions LONGTEXT;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS reseller_id INT DEFAULT 0;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -733,11 +760,11 @@ func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 	}
 
 	// 1. Insert or update in subscribers table
-	query := `INSERT INTO subscribers (username, contract_no, full_name, phone, address, debt, profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	query := `INSERT INTO subscribers (username, contract_no, full_name, phone, address, debt, profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status, reseller_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE contract_no = VALUES(contract_no), full_name = VALUES(full_name), phone = VALUES(phone),
 		address = VALUES(address), debt = VALUES(debt), profile_name = VALUES(profile_name), static_ip = VALUES(static_ip),
-		calling_mac = VALUES(calling_mac), quota_bytes = VALUES(quota_bytes), expiration_date = VALUES(expiration_date), status = VALUES(status)`
+		calling_mac = VALUES(calling_mac), quota_bytes = VALUES(quota_bytes), expiration_date = VALUES(expiration_date), status = VALUES(status), reseller_id = VALUES(reseller_id)`
 
 	var expDate interface{}
 	if sub.ExpirationDate.Valid {
@@ -745,7 +772,7 @@ func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 	}
 
 	_, err = tx.Exec(query, sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt,
-		sub.ProfileName, sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status)
+		sub.ProfileName, sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status, sub.ResellerID)
 	if err != nil {
 		return err
 	}
@@ -1033,6 +1060,371 @@ func randomLetters(n int) string {
 	return string(b)
 }
 
+// --- Reseller Management & RBAC Methods ---
+
+func (d *DB) GetResellers() ([]models.Reseller, error) {
+	query := `SELECT 
+		r.id, r.name, r.username, r.phone, r.balance, r.credit_limit, 
+		COALESCE(r.debt, 0.00), COALESCE(r.commission_percent, 0.00), 
+		COALESCE(r.permissions, ''), r.notes, r.is_active, r.created_at,
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count
+	FROM resellers r
+	ORDER BY r.id DESC`
+
+	rows, err := d.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var resellers []models.Reseller
+	for rows.Next() {
+		var res models.Reseller
+		var permsJSON string
+		if err := rows.Scan(
+			&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit,
+			&res.Debt, &res.CommissionPercent, &permsJSON, &res.Notes, &res.IsActive, &res.CreatedAt,
+			&res.SubscribersCount,
+		); err == nil {
+			res.PermissionsJSON = permsJSON
+			res.Permissions = models.ParseResellerPermissions(permsJSON)
+			resellers = append(resellers, res)
+		}
+	}
+	return resellers, nil
+}
+
+func (d *DB) GetReseller(id int64) (*models.Reseller, error) {
+	query := `SELECT 
+		r.id, r.name, r.username, r.phone, r.balance, r.credit_limit, 
+		COALESCE(r.debt, 0.00), COALESCE(r.commission_percent, 0.00), 
+		COALESCE(r.permissions, ''), r.notes, r.is_active, r.created_at,
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count
+	FROM resellers r
+	WHERE r.id = ?`
+
+	var res models.Reseller
+	var permsJSON string
+	err := d.QueryRow(query, id).Scan(
+		&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit,
+		&res.Debt, &res.CommissionPercent, &permsJSON, &res.Notes, &res.IsActive, &res.CreatedAt,
+		&res.SubscribersCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	res.PermissionsJSON = permsJSON
+	res.Permissions = models.ParseResellerPermissions(permsJSON)
+	return &res, nil
+}
+
+func (d *DB) GetResellerByUsername(username string) (*models.Reseller, error) {
+	query := `SELECT 
+		r.id, r.name, r.username, r.phone, r.balance, r.credit_limit, 
+		COALESCE(r.debt, 0.00), COALESCE(r.commission_percent, 0.00), 
+		COALESCE(r.permissions, ''), r.notes, r.is_active, r.created_at,
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count
+	FROM resellers r
+	WHERE r.username = ?`
+
+	var res models.Reseller
+	var permsJSON string
+	err := d.QueryRow(query, username).Scan(
+		&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit,
+		&res.Debt, &res.CommissionPercent, &permsJSON, &res.Notes, &res.IsActive, &res.CreatedAt,
+		&res.SubscribersCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	res.PermissionsJSON = permsJSON
+	res.Permissions = models.ParseResellerPermissions(permsJSON)
+	return &res, nil
+}
+
+func (d *DB) AddReseller(res *models.Reseller, password string) (int64, error) {
+	if err := res.SetPassword(password); err != nil {
+		return 0, err
+	}
+	permsJSON := res.Permissions.ToJSON()
+	res.PermissionsJSON = permsJSON
+
+	result, err := d.Exec(`INSERT INTO resellers 
+		(name, username, password_hash, phone, balance, credit_limit, debt, commission_percent, permissions, notes, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		res.Name, res.Username, res.PasswordHash, res.Phone, res.Balance, res.CreditLimit,
+		res.Debt, res.CommissionPercent, permsJSON, res.Notes, res.IsActive)
+	if err != nil {
+		return 0, err
+	}
+
+	id, _ := result.LastInsertId()
+	res.ID = id
+
+	if res.Balance > 0 {
+		_, _ = d.Exec(`INSERT INTO reseller_transactions (reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, notes, created_by)
+			VALUES (?, 'deposit', ?, 0, ?, 0, ?, 'رصيد افتتاحي عند إنشاء الحساب', 'admin')`,
+			id, res.Balance, res.Balance, res.Debt)
+	}
+
+	return id, nil
+}
+
+func (d *DB) UpdateReseller(res *models.Reseller, password string) error {
+	if password != "" {
+		if err := res.SetPassword(password); err != nil {
+			return err
+		}
+		_, err := d.Exec(`UPDATE resellers SET 
+			name = ?, username = ?, password_hash = ?, phone = ?, credit_limit = ?, 
+			commission_percent = ?, notes = ?, is_active = ?
+			WHERE id = ?`,
+			res.Name, res.Username, res.PasswordHash, res.Phone, res.CreditLimit,
+			res.CommissionPercent, res.Notes, res.IsActive, res.ID)
+		return err
+	}
+
+	_, err := d.Exec(`UPDATE resellers SET 
+		name = ?, username = ?, phone = ?, credit_limit = ?, 
+		commission_percent = ?, notes = ?, is_active = ?
+		WHERE id = ?`,
+		res.Name, res.Username, res.Phone, res.CreditLimit,
+		res.CommissionPercent, res.Notes, res.IsActive, res.ID)
+	return err
+}
+
+func (d *DB) UpdateResellerPermissions(resellerID int64, perms models.ResellerPermissions) error {
+	permsJSON := perms.ToJSON()
+	_, err := d.Exec("UPDATE resellers SET permissions = ? WHERE id = ?", permsJSON, resellerID)
+	return err
+}
+
+func (d *DB) ToggleResellerStatus(id int64) error {
+	_, err := d.Exec("UPDATE resellers SET is_active = NOT is_active WHERE id = ?", id)
+	return err
+}
+
+func (d *DB) DeleteReseller(id int64) error {
+	_, _ = d.Exec("UPDATE subscribers SET reseller_id = 0 WHERE reseller_id = ?", id)
+	_, err := d.Exec("DELETE FROM resellers WHERE id = ?", id)
+	return err
+}
+
+func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount float64, notes, adminUser string) error {
+	if amount <= 0 {
+		return fmt.Errorf("المبلغ يجب أن يكون أكبر من صفر")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var balance, debt float64
+	var resName string
+	err = tx.QueryRow("SELECT name, balance, COALESCE(debt, 0.00) FROM resellers WHERE id = ? FOR UPDATE", resellerID).Scan(&resName, &balance, &debt)
+	if err != nil {
+		return fmt.Errorf("الموزع غير موجود: %w", err)
+	}
+
+	newBalance := balance
+	newDebt := debt
+
+	switch actionType {
+	case "deposit":
+		newBalance = balance + amount
+	case "withdraw":
+		newBalance = balance - amount
+	case "pay_debt":
+		newDebt = debt - amount
+		if newDebt < 0 {
+			newDebt = 0
+		}
+	case "pay_debt_from_balance":
+		newBalance = balance - amount
+		newDebt = debt - amount
+		if newDebt < 0 {
+			newDebt = 0
+		}
+	case "add_debt":
+		newDebt = debt + amount
+	default:
+		return fmt.Errorf("نوع العملية غير صالح: %s", actionType)
+	}
+
+	_, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newBalance, newDebt, resellerID)
+	if err != nil {
+		return err
+	}
+
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+	if notes == "" {
+		switch actionType {
+		case "deposit":
+			notes = fmt.Sprintf("شحن رصيد للموزع %s بقيمة %.2f ج.م", resName, amount)
+		case "withdraw":
+			notes = fmt.Sprintf("خصم / سحب رصيد من الموزع %s بقيمة %.2f ج.م", resName, amount)
+		case "pay_debt":
+			notes = fmt.Sprintf("سداد مديونية نقداً للموزع %s بقيمة %.2f ج.م", resName, amount)
+		case "pay_debt_from_balance":
+			notes = fmt.Sprintf("سداد مديونية من رصيد المحفظة للموزع %s بقيمة %.2f ج.م", resName, amount)
+		case "add_debt":
+			notes = fmt.Sprintf("إضافة مديونية على الموزع %s بقيمة %.2f ج.م", resName, amount)
+		}
+	}
+
+	_, err = tx.Exec(`INSERT INTO reseller_transactions 
+		(reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, notes, created_by)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		resellerID, actionType, amount, balance, newBalance, debt, newDebt, notes, adminUser)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (d *DB) GetResellerTransactions(resellerID int64, limit int) ([]models.ResellerTransaction, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := `SELECT 
+		t.id, t.reseller_id, COALESCE(r.name, ''), t.type, t.amount,
+		t.balance_before, t.balance_after, t.debt_before, t.debt_after,
+		t.subscriber_id, COALESCE(t.subscriber_name, ''),
+		t.notes, t.created_by, t.created_at
+	FROM reseller_transactions t
+	LEFT JOIN resellers r ON t.reseller_id = r.id`
+
+	var args []interface{}
+	if resellerID > 0 {
+		query += " WHERE t.reseller_id = ?"
+		args = append(args, resellerID)
+	}
+	query += " ORDER BY t.id DESC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := d.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var txs []models.ResellerTransaction
+	for rows.Next() {
+		var t models.ResellerTransaction
+		if err := rows.Scan(
+			&t.ID, &t.ResellerID, &t.ResellerName, &t.Type, &t.Amount,
+			&t.BalanceBefore, &t.BalanceAfter, &t.DebtBefore, &t.DebtAfter,
+			&t.SubscriberID, &t.SubscriberName, &t.Notes, &t.CreatedBy, &t.CreatedAt,
+		); err == nil {
+			txs = append(txs, t)
+		}
+	}
+	return txs, nil
+}
+
+func (d *DB) GetResellerFinancialSummary() (map[string]interface{}, error) {
+	summary := make(map[string]interface{})
+
+	var totalResellers, activeResellers, totalSubs int
+	var totalBalance, totalDebt float64
+
+	_ = d.QueryRow("SELECT COUNT(*), COALESCE(SUM(balance), 0.00), COALESCE(SUM(debt), 0.00) FROM resellers").Scan(&totalResellers, &totalBalance, &totalDebt)
+	_ = d.QueryRow("SELECT COUNT(*) FROM resellers WHERE is_active = 1").Scan(&activeResellers)
+	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE reseller_id > 0").Scan(&totalSubs)
+
+	var todayTxCount int
+	var todayTxAmount float64
+	_ = d.QueryRow("SELECT COUNT(*), COALESCE(SUM(amount), 0.00) FROM reseller_transactions WHERE DATE(created_at) = CURDATE()").Scan(&todayTxCount, &todayTxAmount)
+
+	summary["TotalResellers"] = totalResellers
+	summary["ActiveResellers"] = activeResellers
+	summary["TotalBalance"] = totalBalance
+	summary["TotalDebt"] = totalDebt
+	summary["TotalSubscribers"] = totalSubs
+	summary["TodayTxCount"] = todayTxCount
+	summary["TodayTxAmount"] = todayTxAmount
+
+	return summary, nil
+}
+
+func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName string, isCustomerPaid bool, adminUser string) error {
+	res, err := d.GetReseller(resellerID)
+	if err != nil {
+		return fmt.Errorf("الموزع غير موجود: %w", err)
+	}
+	if !res.IsActive {
+		return fmt.Errorf("حساب الموزع معطل حالياً")
+	}
+	if !res.Permissions.CanRenew {
+		return fmt.Errorf("ليس لديك صلاحية تجديد باقات المشتركين")
+	}
+
+	var subResellerID int64
+	var subID int64
+	var currentProf string
+	err = d.QueryRow("SELECT id, reseller_id, profile_name FROM subscribers WHERE username = ?", username).Scan(&subID, &subResellerID, &currentProf)
+	if err != nil {
+		return fmt.Errorf("المشترك غير موجود")
+	}
+	if subResellerID != resellerID {
+		return fmt.Errorf("هذا المشترك غير مسجل تحت حسابك كموزع")
+	}
+
+	if profileName == "" {
+		profileName = currentProf
+	}
+
+	var prof models.Profile
+	err = d.QueryRow(`SELECT id, name, display_name, cost_price, price, quota_bytes, validity_value, validity_unit FROM profiles WHERE name = ?`, profileName).Scan(
+		&prof.ID, &prof.Name, &prof.DisplayName, &prof.CostPrice, &prof.Price, &prof.QuotaBytes, &prof.ValidityValue, &prof.ValidityUnit,
+	)
+	if err != nil {
+		return fmt.Errorf("الباقة غير موجودة")
+	}
+
+	cost := prof.Price
+	if res.CommissionPercent > 0 {
+		cost = prof.Price * (1.0 - (res.CommissionPercent / 100.0))
+	} else if prof.CostPrice > 0 {
+		cost = prof.CostPrice
+	}
+
+	availablePower := res.Balance + res.CreditLimit
+	if availablePower < cost {
+		return fmt.Errorf("رصيدك غير كافٍ لتجديد الباقة. تكلفة الباقة: %.2f ج.م، رصيدك المتاح: %.2f ج.م", cost, availablePower)
+	}
+
+	err = d.RenewSubscriberBilling(username, profileName, prof.Price, isCustomerPaid, "reseller", fmt.Sprintf("تجديد عبر الموزع %s", res.Name), adminUser)
+	if err != nil {
+		return err
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	newBalance := res.Balance - cost
+	_, err = tx.Exec("UPDATE resellers SET balance = ? WHERE id = ?", newBalance, resellerID)
+	if err != nil {
+		return err
+	}
+
+	notes := fmt.Sprintf("تجديد باقة %s للمشترك %s (سعر الجمهور %.2f - خصم الموزع)", prof.DisplayName, username, prof.Price)
+	_, _ = tx.Exec(`INSERT INTO reseller_transactions (reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
+		VALUES (?, 'renew', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		resellerID, cost, res.Balance, newBalance, res.Debt, res.Debt, subID, username, notes, adminUser)
+
+	return tx.Commit()
+}
+
 // --- Profile Methods ---
 
 func (d *DB) GetProfiles() ([]models.Profile, error) {
@@ -1237,11 +1629,15 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 func (d *DB) GetSubscriber(username string) (*models.Subscriber, error) {
 	var s models.Subscriber
 	var exp sql.NullTime
-	err := d.QueryRow(`SELECT id, username, contract_no, full_name, phone, address, debt,
-		profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status, created_at, updated_at
-		FROM subscribers WHERE username = ?`, username).Scan(
+	err := d.QueryRow(`SELECT s.id, s.username, s.contract_no, s.full_name, s.phone, s.address, s.debt,
+		s.profile_name, s.static_ip, s.calling_mac, s.quota_bytes, s.expiration_date, s.status,
+		COALESCE(s.reseller_id, 0), COALESCE(r.name, ''), s.created_at, s.updated_at
+		FROM subscribers s
+		LEFT JOIN resellers r ON s.reseller_id = r.id
+		WHERE s.username = ?`, username).Scan(
 		&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Address, &s.Debt,
-		&s.ProfileName, &s.StaticIP, &s.CallingMAC, &s.QuotaBytes, &exp, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+		&s.ProfileName, &s.StaticIP, &s.CallingMAC, &s.QuotaBytes, &exp, &s.Status,
+		&s.ResellerID, &s.ResellerName, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -1297,8 +1693,8 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 
 	_, err = tx.Exec(`INSERT INTO subscribers (
 		username, contract_no, full_name, phone, address, debt, profile_name,
-		static_ip, calling_mac, quota_bytes, expiration_date, status, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+		static_ip, calling_mac, quota_bytes, expiration_date, status, reseller_id, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 	ON DUPLICATE KEY UPDATE
 		full_name = VALUES(full_name),
 		phone = VALUES(phone),
@@ -1310,9 +1706,10 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 		quota_bytes = VALUES(quota_bytes),
 		expiration_date = VALUES(expiration_date),
 		status = VALUES(status),
+		reseller_id = VALUES(reseller_id),
 		updated_at = NOW()`,
 		sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt, sub.ProfileName,
-		sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status)
+		sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status, sub.ResellerID)
 	if err != nil {
 		return err
 	}

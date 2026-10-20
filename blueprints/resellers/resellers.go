@@ -1,8 +1,10 @@
 package resellers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
@@ -20,16 +22,14 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 }
 
 func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := bp.db.Query("SELECT id, name, username, phone, balance, credit_limit, notes, is_active, created_at FROM resellers ORDER BY id DESC")
-	var resellers []models.Reseller
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var res models.Reseller
-			if err := rows.Scan(&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit, &res.Notes, &res.IsActive, &res.CreatedAt); err == nil {
-				resellers = append(resellers, res)
-			}
-		}
+	resellers, err := bp.db.GetResellers()
+	if err != nil {
+		resellers = []models.Reseller{}
+	}
+
+	summary, err := bp.db.GetResellerFinancialSummary()
+	if err != nil {
+		summary = make(map[string]interface{})
 	}
 
 	_ = bp.renderer.Render(w, "resellers/list", map[string]interface{}{
@@ -37,40 +37,217 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"ActiveMenu":  "resellers",
 		"CurrentUser": middleware.GetUser(r),
 		"Resellers":   resellers,
+		"Summary":     summary,
+		"Success":     r.URL.Query().Get("success"),
+		"Error":       r.URL.Query().Get("error"),
 	})
 }
 
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		name := r.FormValue("name")
-		username := r.FormValue("username")
-		password := r.FormValue("password")
-		phone := r.FormValue("phone")
-		balance, _ := strconv.ParseFloat(r.FormValue("balance"), 64)
-		creditLimit, _ := strconv.ParseFloat(r.FormValue("credit_limit"), 64)
-		notes := r.FormValue("notes")
-
-		res := &models.Reseller{
-			Name:        name,
-			Username:    username,
-			Phone:       phone,
-			Balance:     balance,
-			CreditLimit: creditLimit,
-			Notes:       notes,
-			IsActive:    true,
-		}
-		_ = res.SetPassword(password)
-
-		_, _ = bp.db.Exec(`INSERT INTO resellers (name, username, password_hash, phone, balance, credit_limit, notes, is_active)
-			VALUES (?, ?, ?, ?, ?, ?, ?, 1)`, res.Name, res.Username, res.PasswordHash, res.Phone, res.Balance, res.CreditLimit, res.Notes)
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/resellers", http.StatusFound)
+		return
 	}
-	http.Redirect(w, r, "/resellers", http.StatusFound)
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	username := strings.TrimSpace(r.FormValue("username"))
+	password := strings.TrimSpace(r.FormValue("password"))
+	phone := strings.TrimSpace(r.FormValue("phone"))
+	balance, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("balance")), 64)
+	creditLimit, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("credit_limit")), 64)
+	commissionPercent, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("commission_percent")), 64)
+	notes := strings.TrimSpace(r.FormValue("notes"))
+
+	if name == "" || username == "" || password == "" {
+		http.Redirect(w, r, "/resellers?error=missing_fields", http.StatusFound)
+		return
+	}
+
+	// RBAC permissions from form checkboxes
+	perms := models.ResellerPermissions{
+		CanAddSubscribers:    r.FormValue("can_add_subscribers") == "1",
+		CanEditSubscribers:   r.FormValue("can_edit_subscribers") == "1",
+		CanDeleteSubscribers: r.FormValue("can_delete_subscribers") == "1",
+		CanRenew:             r.FormValue("can_renew") == "1",
+		CanChangeProfile:     r.FormValue("can_change_profile") == "1",
+		CanAddQuota:          r.FormValue("can_add_quota") == "1",
+		CanViewPasswords:     r.FormValue("can_view_passwords") == "1",
+		CanCollectDebt:       r.FormValue("can_collect_debt") == "1",
+		CanAllowDebt:         r.FormValue("can_allow_debt") == "1",
+		CanGenerateCards:     r.FormValue("can_generate_cards") == "1",
+		CanDisconnect:        r.FormValue("can_disconnect") == "1",
+	}
+
+	res := &models.Reseller{
+		Name:              name,
+		Username:          username,
+		Phone:             phone,
+		Balance:           balance,
+		CreditLimit:       creditLimit,
+		CommissionPercent: commissionPercent,
+		Permissions:       perms,
+		Notes:             notes,
+		IsActive:          true,
+	}
+
+	_, err := bp.db.AddReseller(res, password)
+	if err != nil {
+		http.Redirect(w, r, "/resellers?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/resellers?success=added", http.StatusFound)
+}
+
+func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/resellers", http.StatusFound)
+		return
+	}
+
+	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if id <= 0 {
+		http.Redirect(w, r, "/resellers?error=invalid_id", http.StatusFound)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	username := strings.TrimSpace(r.FormValue("username"))
+	password := strings.TrimSpace(r.FormValue("password"))
+	phone := strings.TrimSpace(r.FormValue("phone"))
+	creditLimit, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("credit_limit")), 64)
+	commissionPercent, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("commission_percent")), 64)
+	notes := strings.TrimSpace(r.FormValue("notes"))
+	isActive := r.FormValue("is_active") == "1"
+
+	res := &models.Reseller{
+		ID:                id,
+		Name:              name,
+		Username:          username,
+		Phone:             phone,
+		CreditLimit:       creditLimit,
+		CommissionPercent: commissionPercent,
+		Notes:             notes,
+		IsActive:          isActive,
+	}
+
+	if err := bp.db.UpdateReseller(res, password); err != nil {
+		http.Redirect(w, r, "/resellers?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/resellers?success=updated", http.StatusFound)
+}
+
+func (bp *Blueprint) PermissionsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/resellers", http.StatusFound)
+		return
+	}
+
+	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if id <= 0 {
+		http.Redirect(w, r, "/resellers?error=invalid_id", http.StatusFound)
+		return
+	}
+
+	perms := models.ResellerPermissions{
+		CanAddSubscribers:    r.FormValue("can_add_subscribers") == "1",
+		CanEditSubscribers:   r.FormValue("can_edit_subscribers") == "1",
+		CanDeleteSubscribers: r.FormValue("can_delete_subscribers") == "1",
+		CanRenew:             r.FormValue("can_renew") == "1",
+		CanChangeProfile:     r.FormValue("can_change_profile") == "1",
+		CanAddQuota:          r.FormValue("can_add_quota") == "1",
+		CanViewPasswords:     r.FormValue("can_view_passwords") == "1",
+		CanCollectDebt:       r.FormValue("can_collect_debt") == "1",
+		CanAllowDebt:         r.FormValue("can_allow_debt") == "1",
+		CanGenerateCards:     r.FormValue("can_generate_cards") == "1",
+		CanDisconnect:        r.FormValue("can_disconnect") == "1",
+	}
+
+	if err := bp.db.UpdateResellerPermissions(id, perms); err != nil {
+		http.Redirect(w, r, "/resellers?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/resellers?success=perms_updated", http.StatusFound)
+}
+
+func (bp *Blueprint) RechargeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/resellers", http.StatusFound)
+		return
+	}
+
+	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	actionType := strings.TrimSpace(r.FormValue("action_type"))
+	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+	notes := strings.TrimSpace(r.FormValue("notes"))
+
+	adminUser := "admin"
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+	}
+
+	if id <= 0 || amount <= 0 {
+		http.Redirect(w, r, "/resellers?error=invalid_amount", http.StatusFound)
+		return
+	}
+
+	if err := bp.db.AdjustResellerBalance(id, actionType, amount, notes, adminUser); err != nil {
+		http.Redirect(w, r, "/resellers?error="+err.Error(), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/resellers?success=balance_adjusted", http.StatusFound)
+}
+
+func (bp *Blueprint) ToggleStatusHandler(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if id > 0 {
+		_ = bp.db.ToggleResellerStatus(id)
+	}
+	http.Redirect(w, r, "/resellers?success=status_toggled", http.StatusFound)
 }
 
 func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id != "" {
-		_, _ = bp.db.Exec("DELETE FROM resellers WHERE id = ?", id)
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if id > 0 {
+		_ = bp.db.DeleteReseller(id)
 	}
-	http.Redirect(w, r, "/resellers", http.StatusFound)
+	http.Redirect(w, r, "/resellers?success=deleted", http.StatusFound)
+}
+
+func (bp *Blueprint) DetailsAPIHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if id <= 0 {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "invalid id"})
+		return
+	}
+
+	res, err := bp.db.GetReseller(id)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "reseller": res})
+}
+
+func (bp *Blueprint) TransactionsAPIHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 {
+		limit = 100
+	}
+
+	txs, err := bp.db.GetResellerTransactions(id, limit)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "transactions": txs})
 }
