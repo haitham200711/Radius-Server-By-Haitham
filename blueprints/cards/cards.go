@@ -300,15 +300,15 @@ func (bp *Blueprint) CafePortalHandler(w http.ResponseWriter, r *http.Request) {
 	var selectedRouterID int64
 	if routerIDStr != "" {
 		selectedRouterID, _ = strconv.ParseInt(routerIDStr, 10, 64)
-	} else if len(routers) > 0 {
-		selectedRouterID = routers[0].ID
 	}
 
 	var selectedRouter *models.NAS
-	for _, rtr := range routers {
-		if rtr.ID == selectedRouterID {
-			selectedRouter = &rtr
-			break
+	if selectedRouterID > 0 {
+		for _, rtr := range routers {
+			if rtr.ID == selectedRouterID {
+				selectedRouter = &rtr
+				break
+			}
 		}
 	}
 
