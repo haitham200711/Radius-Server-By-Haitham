@@ -2,6 +2,7 @@ package subscribers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -575,4 +576,78 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 
 	_ = bp.db.UpdateSubscriberCRM(sub, password)
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
+}
+
+func (bp *Blueprint) LiveTrafficHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	// If list=1 is requested, return lightweight array of all subscribers for the selection dropdown
+	if r.URL.Query().Get("list") == "1" {
+		list, err := bp.db.GetAllSubscribersForLiveMonitor()
+		if err != nil {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":  "error",
+				"message": err.Error(),
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":      "success",
+			"subscribers": list,
+		})
+		return
+	}
+
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	if username == "" {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": "اسم المستخدم مطلوب",
+		})
+		return
+	}
+
+	traffic, err := bp.db.GetSubscriberLiveTraffic(username)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"data":   traffic,
+	})
+}
+
+func (bp *Blueprint) DisconnectSessionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	if username == "" {
+		username = strings.TrimSpace(r.FormValue("username"))
+	}
+	if username == "" {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": "اسم المستخدم مطلوب",
+		})
+		return
+	}
+
+	err := bp.db.DisconnectSubscriberSession(username)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "تم قطع اتصال الجلسة وتجديد الاتصال بنجاح",
+	})
 }

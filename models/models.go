@@ -490,5 +490,69 @@ type ProfileBaseSpeed struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+// SubscriberLiveTraffic represents real-time telemetry, bandwidth speeds, and session statistics for a subscriber
+type SubscriberLiveTraffic struct {
+	Username               string  `json:"username"`
+	FullName               string  `json:"full_name"`
+	ContractNo             string  `json:"contract_no"`
+	Phone                  string  `json:"phone"`
+	Address                string  `json:"address"`
+	ProfileName            string  `json:"profile_name"`
+	RateLimit              string  `json:"rate_limit"`
+	MaxDownloadBps         int64   `json:"max_download_bps"`
+	MaxUploadBps           int64   `json:"max_upload_bps"`
+	MaxDownloadDisplay     string  `json:"max_download_display"`
+	MaxUploadDisplay       string  `json:"max_upload_display"`
+	Status                 string  `json:"status"` // "online", "offline"
+	IsOnline               bool    `json:"is_online"`
+	StatusBadgeClass       string  `json:"status_badge_class"`
+	StatusText             string  `json:"status_text"`
+	SessionID              string  `json:"session_id"`
+	NASIP                  string  `json:"nas_ip"`
+	NASName                string  `json:"nas_name"`
+	FramedIP               string  `json:"framed_ip"`
+	CallingMAC             string  `json:"calling_mac"`
+	StartTime              string  `json:"start_time"`
+	Uptime                 string  `json:"uptime"`
+	SessionTimeSec         int64   `json:"session_time_sec"`
+	// Real-time calculated speeds
+	CurrentDownloadBps     int64   `json:"current_download_bps"`
+	CurrentUploadBps       int64   `json:"current_upload_bps"`
+	DownloadSpeedDisplay   string  `json:"download_speed_display"`
+	UploadSpeedDisplay     string  `json:"upload_speed_display"`
+	DownloadPercent        float64 `json:"download_percent"`
+	UploadPercent          float64 `json:"upload_percent"`
+	// Current session bytes
+	SessionDownloadBytes   int64   `json:"session_download_bytes"`
+	SessionUploadBytes     int64   `json:"session_upload_bytes"`
+	SessionTotalBytes      int64   `json:"session_total_bytes"`
+	SessionDownloadDisplay string  `json:"session_download_display"`
+	SessionUploadDisplay   string  `json:"session_upload_display"`
+	SessionTotalDisplay    string  `json:"session_total_display"`
+	// All-time / monthly totals
+	TotalDownloadBytes     int64   `json:"total_download_bytes"`
+	TotalUploadBytes       int64   `json:"total_upload_bytes"`
+	TotalBytes             int64   `json:"total_bytes"`
+	TotalBytesDisplay      string  `json:"total_bytes_display"`
+	// Quota & Expiry
+	QuotaBytes             int64   `json:"quota_bytes"`
+	QuotaDisplay           string  `json:"quota_display"`
+	QuotaRemainingBytes    int64   `json:"quota_remaining_bytes"`
+	QuotaRemainingDisplay  string  `json:"quota_remaining_display"`
+	QuotaUsagePercent      float64 `json:"quota_usage_percent"`
+	ExpirationDate         string  `json:"expiration_date"`
+	LastUpdate             string  `json:"last_update"`
+}
+
+// SubscriberTrafficOption provides lightweight subscriber list items for search/dropdown
+type SubscriberTrafficOption struct {
+	Username   string `json:"username"`
+	FullName   string `json:"full_name"`
+	ContractNo string `json:"contract_no"`
+	Profile    string `json:"profile"`
+	IsOnline   bool   `json:"is_online"`
+	LiveIP     string `json:"live_ip"`
+}
+
 
 

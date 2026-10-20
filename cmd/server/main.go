@@ -92,6 +92,8 @@ func main() {
 	mux.HandleFunc("/subscribers/add-quota", middleware.RequireAuth(subBP.AddQuotaHandler))
 	mux.HandleFunc("/subscribers/pay-debt", middleware.RequireAuth(subBP.PayDebtHandler))
 	mux.HandleFunc("/subscribers/bulk", middleware.RequireAuth(subBP.BulkHandler))
+	mux.HandleFunc("/subscribers/live-traffic", middleware.RequireAuth(subBP.LiveTrafficHandler))
+	mux.HandleFunc("/subscribers/disconnect-session", middleware.RequireAuth(subBP.DisconnectSessionHandler))
 
 	// Cards Blueprint
 	cardsBP := cards.New(db, renderer)

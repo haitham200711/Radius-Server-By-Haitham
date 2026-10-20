@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -3529,6 +3530,438 @@ func (d *DB) syncActiveCards() {
 			_, _ = d.DisconnectCard(u)
 		}
 	}
+}
+
+// --- Live Traffic Telemetry & Monitoring for Subscribers ---
+
+type subTrafficPoint struct {
+	timestamp time.Time
+	inOctets  int64
+	outOctets int64
+	downBps   int64
+	upBps     int64
+}
+
+var (
+	subTrafficMu      sync.Mutex
+	subTrafficHistory = make(map[string]*subTrafficPoint)
+)
+
+func parseRateLimitBps(rateStr string) (uploadBps int64, downloadBps int64) {
+	rateStr = strings.TrimSpace(rateStr)
+	if rateStr == "" {
+		return 0, 0
+	}
+	parts := strings.Split(rateStr, "/")
+	parseSingle := func(s string) int64 {
+		s = strings.TrimSpace(strings.ToUpper(s))
+		if s == "" {
+			return 0
+		}
+		var mult int64 = 1
+		if strings.HasSuffix(s, "G") || strings.HasSuffix(s, "GBPS") {
+			mult = 1000 * 1000 * 1000
+			s = strings.TrimSuffix(strings.TrimSuffix(s, "GBPS"), "G")
+		} else if strings.HasSuffix(s, "M") || strings.HasSuffix(s, "MBPS") {
+			mult = 1000 * 1000
+			s = strings.TrimSuffix(strings.TrimSuffix(s, "MBPS"), "M")
+		} else if strings.HasSuffix(s, "K") || strings.HasSuffix(s, "KBPS") {
+			mult = 1000
+			s = strings.TrimSuffix(strings.TrimSuffix(s, "KBPS"), "K")
+		}
+		val, _ := strconv.ParseFloat(s, 64)
+		return int64(val * float64(mult))
+	}
+
+	if len(parts) >= 2 {
+		uploadBps = parseSingle(parts[0])
+		downloadBps = parseSingle(parts[1])
+	} else {
+		downloadBps = parseSingle(parts[0])
+		uploadBps = downloadBps / 2
+	}
+	return uploadBps, downloadBps
+}
+
+func FormatSpeedBps(bps int64) string {
+	if bps <= 0 {
+		return "0.00 Kbps"
+	}
+	if bps >= 1000*1000*1000 {
+		return fmt.Sprintf("%.2f Gbps", float64(bps)/(1000.0*1000.0*1000.0))
+	}
+	if bps >= 1000*1000 {
+		return fmt.Sprintf("%.2f Mbps", float64(bps)/(1000.0*1000.0))
+	}
+	if bps >= 1000 {
+		return fmt.Sprintf("%.1f Kbps", float64(bps)/1000.0)
+	}
+	return fmt.Sprintf("%d bps", bps)
+}
+
+func (d *DB) GetSubscriberLiveTraffic(username string) (*models.SubscriberLiveTraffic, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	traffic := &models.SubscriberLiveTraffic{
+		Username:   username,
+		LastUpdate: time.Now().Format("15:04:05"),
+	}
+
+	// 1. Fetch Subscriber Details
+	var (
+		fullName, contractNo, phone, address, profileName, staticIP sql.NullString
+		quotaBytes                                                  sql.NullInt64
+		expDate                                                     sql.NullTime
+		status                                                      sql.NullString
+	)
+
+	_ = d.QueryRow(`SELECT full_name, contract_no, phone, address, profile_name, static_ip, quota_bytes, expiration_date, status
+		FROM subscribers WHERE username = ?`, username).Scan(
+		&fullName, &contractNo, &phone, &address, &profileName, &staticIP, &quotaBytes, &expDate, &status)
+
+	if fullName.Valid && fullName.String != "" {
+		traffic.FullName = fullName.String
+	} else {
+		traffic.FullName = username
+	}
+	if contractNo.Valid {
+		traffic.ContractNo = contractNo.String
+	} else {
+		traffic.ContractNo = "-"
+	}
+	if phone.Valid {
+		traffic.Phone = phone.String
+	}
+	if address.Valid {
+		traffic.Address = address.String
+	}
+	if profileName.Valid {
+		traffic.ProfileName = profileName.String
+	}
+	if quotaBytes.Valid {
+		traffic.QuotaBytes = quotaBytes.Int64
+	}
+	if expDate.Valid {
+		traffic.ExpirationDate = expDate.Time.Format("2006-01-02 15:04")
+	} else {
+		traffic.ExpirationDate = "غير محدد"
+	}
+
+	// 2. Fetch Profile Rate Limit
+	if traffic.ProfileName != "" {
+		var rateLimit sql.NullString
+		_ = d.QueryRow("SELECT rate_limit FROM profiles WHERE name = ?", traffic.ProfileName).Scan(&rateLimit)
+		if rateLimit.Valid && rateLimit.String != "" {
+			traffic.RateLimit = rateLimit.String
+		}
+	}
+	if traffic.RateLimit == "" {
+		// Fallback check radgroupreply
+		var grpRate sql.NullString
+		_ = d.QueryRow(`SELECT rgr.value FROM radusergroup rug
+			JOIN radgroupreply rgr ON rug.groupname = rgr.groupname
+			WHERE rug.username = ? AND rgr.attribute = 'Mikrotik-Rate-Limit' LIMIT 1`, username).Scan(&grpRate)
+		if grpRate.Valid {
+			traffic.RateLimit = grpRate.String
+		}
+	}
+	if traffic.RateLimit == "" {
+		traffic.RateLimit = "غير محدد"
+	}
+
+	upMax, downMax := parseRateLimitBps(traffic.RateLimit)
+	traffic.MaxUploadBps = upMax
+	traffic.MaxDownloadBps = downMax
+	if downMax > 0 {
+		traffic.MaxDownloadDisplay = FormatSpeedBps(downMax)
+	} else {
+		traffic.MaxDownloadDisplay = "غير محدود"
+	}
+	if upMax > 0 {
+		traffic.MaxUploadDisplay = FormatSpeedBps(upMax)
+	} else {
+		traffic.MaxUploadDisplay = "غير محدود"
+	}
+
+	// 3. Check Live Session in radacct
+	var (
+		sessID, nasIP, framedIP, callingMAC  sql.NullString
+		sessStart, sessUpdate                sql.NullTime
+		sessTime, inOctets, outOctets        sql.NullInt64
+	)
+
+	_ = d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress, callingstationid,
+		acctstarttime, acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets
+		FROM radacct
+		WHERE username = ? AND acctstoptime IS NULL
+		ORDER BY radacctid DESC LIMIT 1`, username).Scan(
+		&sessID, &nasIP, &framedIP, &callingMAC, &sessStart, &sessUpdate, &sessTime, &inOctets, &outOctets)
+
+	now := time.Now()
+
+	if sessID.Valid && sessID.String != "" {
+		traffic.IsOnline = true
+		traffic.Status = "online"
+		traffic.StatusText = "متصل الآن (Online)"
+		traffic.StatusBadgeClass = "bg-success text-white"
+		traffic.SessionID = sessID.String
+		traffic.NASIP = nasIP.String
+		traffic.FramedIP = framedIP.String
+		traffic.CallingMAC = callingMAC.String
+		if sessStart.Valid {
+			traffic.StartTime = sessStart.Time.Format("2006-01-02 15:04:05")
+		}
+		if sessTime.Valid {
+			traffic.SessionTimeSec = sessTime.Int64
+			traffic.Uptime = FormatDurationHuman(sessTime.Int64)
+		}
+		if inOctets.Valid {
+			traffic.SessionUploadBytes = inOctets.Int64
+		}
+		if outOctets.Valid {
+			traffic.SessionDownloadBytes = outOctets.Int64
+		}
+		traffic.SessionTotalBytes = traffic.SessionUploadBytes + traffic.SessionDownloadBytes
+		traffic.SessionUploadDisplay = FormatBytesHuman(traffic.SessionUploadBytes)
+		traffic.SessionDownloadDisplay = FormatBytesHuman(traffic.SessionDownloadBytes)
+		traffic.SessionTotalDisplay = FormatBytesHuman(traffic.SessionTotalBytes)
+
+		// Lookup NAS Router Name
+		if traffic.NASIP != "" {
+			var shortName, desc sql.NullString
+			_ = d.QueryRow("SELECT shortname, description FROM nas WHERE nasname = ? LIMIT 1", traffic.NASIP).Scan(&shortName, &desc)
+			if shortName.Valid && shortName.String != "" {
+				traffic.NASName = fmt.Sprintf("%s (%s)", shortName.String, traffic.NASIP)
+			} else {
+				traffic.NASName = traffic.NASIP
+			}
+		}
+
+		// Calculate Real-Time Bandwidth Speed (Bps)
+		subTrafficMu.Lock()
+		prev, exists := subTrafficHistory[username]
+		if !exists {
+			initDown := int64(0)
+			initUp := int64(0)
+			if traffic.SessionTimeSec > 5 {
+				initDown = (traffic.SessionDownloadBytes * 8) / traffic.SessionTimeSec
+				initUp = (traffic.SessionUploadBytes * 8) / traffic.SessionTimeSec
+				if downMax > 0 && initDown > downMax {
+					initDown = downMax
+				}
+				if upMax > 0 && initUp > upMax {
+					initUp = upMax
+				}
+			}
+			subTrafficHistory[username] = &subTrafficPoint{
+				timestamp: now,
+				inOctets:  traffic.SessionUploadBytes,
+				outOctets: traffic.SessionDownloadBytes,
+				downBps:   initDown,
+				upBps:     initUp,
+			}
+			traffic.CurrentDownloadBps = initDown
+			traffic.CurrentUploadBps = initUp
+		} else {
+			diffSec := now.Sub(prev.timestamp).Seconds()
+			deltaIn := traffic.SessionUploadBytes - prev.inOctets
+			deltaOut := traffic.SessionDownloadBytes - prev.outOctets
+
+			if diffSec >= 0.8 {
+				if deltaIn > 0 || deltaOut > 0 {
+					newUp := int64(float64(deltaIn*8) / diffSec)
+					newDown := int64(float64(deltaOut*8) / diffSec)
+					if downMax > 0 && newDown > downMax*2 {
+						newDown = downMax
+					}
+					if upMax > 0 && newUp > upMax*2 {
+						newUp = upMax
+					}
+					prev.upBps = newUp
+					prev.downBps = newDown
+				} else if diffSec > 12 {
+					// Soft decay
+					prev.downBps = prev.downBps * 85 / 100
+					prev.upBps = prev.upBps * 85 / 100
+				}
+				prev.timestamp = now
+				prev.inOctets = traffic.SessionUploadBytes
+				prev.outOctets = traffic.SessionDownloadBytes
+			}
+			traffic.CurrentDownloadBps = prev.downBps
+			traffic.CurrentUploadBps = prev.upBps
+		}
+		subTrafficMu.Unlock()
+
+		traffic.DownloadSpeedDisplay = FormatSpeedBps(traffic.CurrentDownloadBps)
+		traffic.UploadSpeedDisplay = FormatSpeedBps(traffic.CurrentUploadBps)
+
+		if downMax > 0 {
+			traffic.DownloadPercent = (float64(traffic.CurrentDownloadBps) / float64(downMax)) * 100.0
+			if traffic.DownloadPercent > 100.0 {
+				traffic.DownloadPercent = 100.0
+			}
+		}
+		if upMax > 0 {
+			traffic.UploadPercent = (float64(traffic.CurrentUploadBps) / float64(upMax)) * 100.0
+			if traffic.UploadPercent > 100.0 {
+				traffic.UploadPercent = 100.0
+			}
+		}
+	} else {
+		traffic.IsOnline = false
+		traffic.Status = "offline"
+		traffic.StatusText = "غير متصل (Offline)"
+		traffic.StatusBadgeClass = "bg-secondary text-white"
+		traffic.DownloadSpeedDisplay = "0.00 Kbps"
+		traffic.UploadSpeedDisplay = "0.00 Kbps"
+		traffic.DownloadPercent = 0
+		traffic.UploadPercent = 0
+		traffic.SessionUploadDisplay = "0 MB"
+		traffic.SessionDownloadDisplay = "0 MB"
+		traffic.SessionTotalDisplay = "0 MB"
+		traffic.Uptime = "غير متصل"
+
+		// Get last known session info
+		var lastIP, lastMAC sql.NullString
+		var lastStop sql.NullTime
+		_ = d.QueryRow(`SELECT framedipaddress, callingstationid, acctstoptime
+			FROM radacct WHERE username = ? ORDER BY radacctid DESC LIMIT 1`, username).Scan(&lastIP, &lastMAC, &lastStop)
+		if lastIP.Valid {
+			traffic.FramedIP = lastIP.String
+		}
+		if lastMAC.Valid {
+			traffic.CallingMAC = lastMAC.String
+		}
+		if lastStop.Valid {
+			traffic.StartTime = "آخر اتصال: " + lastStop.Time.Format("2006-01-02 15:04:05")
+		}
+	}
+
+	// 4. All-time / Monthly Traffic Aggregation
+	var sumIn, sumOut sql.NullInt64
+	_ = d.QueryRow("SELECT SUM(acctinputoctets), SUM(acctoutputoctets) FROM radacct WHERE username = ?", username).Scan(&sumIn, &sumOut)
+	if sumIn.Valid {
+		traffic.TotalUploadBytes = sumIn.Int64
+	}
+	if sumOut.Valid {
+		traffic.TotalDownloadBytes = sumOut.Int64
+	}
+	traffic.TotalBytes = traffic.TotalUploadBytes + traffic.TotalDownloadBytes
+	traffic.TotalBytesDisplay = FormatBytesHuman(traffic.TotalBytes)
+
+	// 5. Quota Calculations
+	if traffic.QuotaBytes > 0 {
+		traffic.QuotaDisplay = FormatBytesHuman(traffic.QuotaBytes)
+		rem := traffic.QuotaBytes - traffic.TotalBytes
+		if rem < 0 {
+			rem = 0
+		}
+		traffic.QuotaRemainingBytes = rem
+		traffic.QuotaRemainingDisplay = FormatBytesHuman(rem)
+		traffic.QuotaUsagePercent = (float64(traffic.TotalBytes) / float64(traffic.QuotaBytes)) * 100.0
+		if traffic.QuotaUsagePercent > 100.0 {
+			traffic.QuotaUsagePercent = 100.0
+		}
+	} else {
+		traffic.QuotaDisplay = "غير محدود ∞"
+		traffic.QuotaRemainingDisplay = "مفتوح ∞"
+		traffic.QuotaUsagePercent = 0.0
+	}
+
+	return traffic, nil
+}
+
+func (d *DB) GetAllSubscribersForLiveMonitor() ([]models.SubscriberTrafficOption, error) {
+	// 1. Fetch active users map from radacct
+	onlineMap := make(map[string]string)
+	actRows, err := d.Query("SELECT username, framedipaddress FROM radacct WHERE acctstoptime IS NULL")
+	if err == nil {
+		defer actRows.Close()
+		for actRows.Next() {
+			var u, ip string
+			if err := actRows.Scan(&u, &ip); err == nil && u != "" {
+				onlineMap[u] = ip
+			}
+		}
+	}
+
+	// 2. Fetch all subscribers
+	rows, err := d.Query(`SELECT rc.username, COALESCE(s.full_name, rc.username), COALESCE(s.contract_no, '-'), COALESCE(s.profile_name, '')
+		FROM radcheck rc
+		LEFT JOIN subscribers s ON rc.username = s.username
+		WHERE rc.attribute = 'Cleartext-Password'
+		GROUP BY rc.username
+		ORDER BY rc.username ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var onlineList []models.SubscriberTrafficOption
+	var offlineList []models.SubscriberTrafficOption
+
+	for rows.Next() {
+		var opt models.SubscriberTrafficOption
+		if err := rows.Scan(&opt.Username, &opt.FullName, &opt.ContractNo, &opt.Profile); err == nil {
+			if ip, online := onlineMap[opt.Username]; online {
+				opt.IsOnline = true
+				opt.LiveIP = ip
+				onlineList = append(onlineList, opt)
+			} else {
+				opt.IsOnline = false
+				offlineList = append(offlineList, opt)
+			}
+		}
+	}
+
+	// Combine with online users first
+	result := append(onlineList, offlineList...)
+	return result, nil
+}
+
+func (d *DB) DisconnectSubscriberSession(username string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	var sessionID, nasIP, framedIPStr sql.NullString
+	err := d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(
+		&sessionID, &nasIP, &framedIPStr)
+	if err != nil || !sessionID.Valid {
+		return fmt.Errorf("المشترك غير متصل أونلاين حالياً")
+	}
+
+	var secret string
+	var coaPort int
+	_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP.String).Scan(&secret, &coaPort)
+	if secret == "" {
+		secret = "radius123"
+	}
+	if coaPort <= 0 {
+		coaPort = 3799
+	}
+
+	var framedIP net.IP
+	if framedIPStr.Valid && framedIPStr.String != "" {
+		framedIP = net.ParseIP(framedIPStr.String)
+	}
+
+	_, _ = radius.SendDisconnectRequest(nasIP.String, coaPort, []byte(secret), username, sessionID.String, framedIP)
+
+	_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
+		WHERE username = ? AND acctstoptime IS NULL`, username)
+
+	subTrafficMu.Lock()
+	delete(subTrafficHistory, username)
+	subTrafficMu.Unlock()
+
+	return nil
 }
 
 

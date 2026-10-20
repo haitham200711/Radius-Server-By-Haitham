@@ -4,9 +4,14 @@
         <h3 class="fw-bold mb-1">إدارة المشتركين والعقود (PPPoE / Hotspot)</h3>
         <p class="text-muted small mb-0">سجل المشتركين المتكامل مع النظام وقاعدة بيانات المشتركين</p>
     </div>
-    <a href="/subscribers/add" class="btn btn-primary fw-bold shadow-sm">
-        <i class="bi bi-person-plus-fill me-1"></i> إضافة مشترك جديد
-    </a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary fw-bold shadow-sm" onclick="openLiveTrafficModal('', '')">
+            <i class="bi bi-activity text-danger me-1"></i> مراقبة السحب لايف
+        </button>
+        <a href="/subscribers/add" class="btn btn-primary fw-bold shadow-sm">
+            <i class="bi bi-person-plus-fill me-1"></i> إضافة مشترك جديد
+        </a>
+    </div>
 </div>
 
 <!-- Status Filter Tabs -->
@@ -248,6 +253,9 @@
                         {{ end }}
                     </td>
                     <td class="text-end text-nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1 fw-bold" onclick="openLiveTrafficModal('{{ .Username }}', '{{ .FullName }}')" title="مراقبة سحب العميل لايف">
+                            <i class="bi bi-activity text-danger me-1"></i> سحب لايف
+                        </button>
                         {{ if gt .Debt 0.0 }}
                         <button type="button" class="btn btn-sm btn-outline-warning text-dark me-1" onclick="openPayDebtModal('{{ .Username }}', '{{ .FullName }}', '{{ printf "%.2f" .Debt }}')" title="سداد مديونية المشترك">
                             <i class="bi bi-cash-stack"></i> سداد
@@ -775,6 +783,232 @@
     </div>
 </div>
 
+<!-- Modal Live Traffic Monitor -->
+<div class="modal fade" id="liveTrafficModal" tabindex="-1" aria-labelledby="liveTrafficModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-1.5 bg-primary-subtle text-primary rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="bi bi-speedometer2"></i>
+                    </span>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0" id="liveTrafficModalLabel">
+                            مراقبة سحب واستهلاك العميل لايف (Live Bandwidth Monitor)
+                        </h6>
+                        <span class="text-muted small" style="font-size: 0.75rem;">تحديث مباشر للحزم اللحظية وسرعة الرفع والتحميل</span>
+                    </div>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-2 py-1 px-2 small">
+                        <span class="spinner-grow spinner-grow-sm me-1" style="width: 0.4rem; height: 0.4rem;"></span>مباشر
+                    </span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="closeLiveTrafficModal()"></button>
+            </div>
+            <div class="modal-body p-3">
+                <!-- 1. Subscriber Selector Dropdown -->
+                <div class="card border bg-light-subtle mb-3">
+                    <div class="card-body p-2.5">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold small text-dark mb-0 d-flex align-items-center gap-1">
+                                    <i class="bi bi-person-lines-fill text-primary"></i>
+                                    <span>اختيار العميل:</span>
+                                </label>
+                            </div>
+                            <div class="col-md-7">
+                                <select id="liveTrafficSelectUser" class="form-select form-select-sm fw-bold font-monospace shadow-none" onchange="onLiveTrafficUserChanged(this.value)">
+                                    <option value="">-- جاري تحميل قائمة المشتركين... --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100 fw-bold" onclick="refreshLiveTrafficUserList()" title="تحديث قائمة المشتركين">
+                                    <i class="bi bi-arrow-repeat me-1"></i> تحديث
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Subscriber Telemetry Info Strip -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-body p-2.5">
+                        <div class="row g-2 align-items-center small">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="rounded-circle bg-primary-subtle text-primary border border-primary-subtle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
+                                        <i class="bi bi-person-fill fs-5"></i>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <strong class="d-block text-dark text-truncate" id="ltFullName">-</strong>
+                                        <span class="font-monospace text-primary fw-bold" id="ltUsername">-</span>
+                                        <span class="text-muted ms-1" id="ltContractNo">(-)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 border-start border-end px-2.5">
+                                <div>
+                                    <span class="text-muted d-block" style="font-size: 0.72rem;">حالة الاتصال والآيبي:</span>
+                                    <span id="ltStatusBadge" class="badge bg-secondary">جاري الفحص...</span>
+                                    <code class="fw-bold text-dark ms-1" id="ltFramedIP">-</code>
+                                </div>
+                                <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                                    الماك: <span class="font-monospace text-dark" id="ltCallingMAC">-</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div>
+                                    <span class="text-muted d-block" style="font-size: 0.72rem;">الباقة والسرعة المحددة:</span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold" id="ltProfileName">-</span>
+                                    <span class="badge bg-white text-dark border font-monospace ms-1" id="ltRateLimit">-</span>
+                                </div>
+                                <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                                    الراوتر: <span class="fw-bold text-dark" id="ltNASName">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Real-Time Speedometer / Bandwidth Gauges -->
+                <div class="row g-2 mb-3">
+                    <!-- Download Card -->
+                    <div class="col-md-6">
+                        <div class="card border border-primary-subtle bg-primary bg-opacity-10 h-100">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold small text-primary d-flex align-items-center gap-1">
+                                        <i class="bi bi-arrow-down-circle-fill fs-5"></i>
+                                        <span>سرعة التحميل اللحظية (Download Rx)</span>
+                                    </span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace small" id="ltMaxDownBadge">الحد: -</span>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-1 my-1">
+                                    <span class="display-6 fw-bold font-monospace text-primary" id="ltDownloadRate">0.00</span>
+                                    <span class="fw-bold text-primary opacity-75" id="ltDownloadUnit">Mbps</span>
+                                </div>
+                                <!-- Progress Bar relative to profile speed -->
+                                <div class="progress mb-2" style="height: 6px;">
+                                    <div class="progress-bar bg-primary" id="ltDownloadProgressBar" role="progressbar" style="width: 0%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.75rem;">
+                                    <span>سحب الجلسة: <b class="text-dark" id="ltSessionDown">0 MB</b></span>
+                                    <span id="ltDownPercentText">0% من السرعة القصوى</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Card -->
+                    <div class="col-md-6">
+                        <div class="card border border-success-subtle bg-success bg-opacity-10 h-100">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold small text-success d-flex align-items-center gap-1">
+                                        <i class="bi bi-arrow-up-circle-fill fs-5"></i>
+                                        <span>سرعة الرفع اللحظية (Upload Tx)</span>
+                                    </span>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace small" id="ltMaxUpBadge">الحد: -</span>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-1 my-1">
+                                    <span class="display-6 fw-bold font-monospace text-success" id="ltUploadRate">0.00</span>
+                                    <span class="fw-bold text-success opacity-75" id="ltUploadUnit">Mbps</span>
+                                </div>
+                                <!-- Progress Bar relative to profile speed -->
+                                <div class="progress mb-2" style="height: 6px;">
+                                    <div class="progress-bar bg-success" id="ltUploadProgressBar" role="progressbar" style="width: 0%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.75rem;">
+                                    <span>رفع الجلسة: <b class="text-dark" id="ltSessionUp">0 MB</b></span>
+                                    <span id="ltUpPercentText">0% من السرعة القصوى</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Real-Time Canvas Live Traffic Wave Chart -->
+                <div class="card border mb-3">
+                    <div class="card-header bg-white py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="fw-bold small text-dark d-flex align-items-center gap-1.5">
+                            <i class="bi bi-graph-up text-primary"></i>
+                            <span>الرسم البياني اللحظي لسحب العميل (Real-time Live Wave)</span>
+                        </span>
+                        <div class="d-flex align-items-center gap-3 small" style="font-size: 0.75rem;">
+                            <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-primary"> </span> <span class="text-dark">التحميل (Rx)</span></span>
+                            <span class="d-flex align-items-center gap-1"><span class="badge rounded-circle p-1 bg-success"> </span> <span class="text-dark">الرفع (Tx)</span></span>
+                        </div>
+                    </div>
+                    <div class="card-body p-2 bg-dark rounded-bottom">
+                        <canvas id="liveTrafficCanvas" height="150" style="width: 100%; display: block;"></canvas>
+                    </div>
+                </div>
+
+                <!-- 5. Session Consumption & Quota Progress Details -->
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light p-2.5 h-100">
+                            <span class="text-muted d-block small fw-bold mb-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-clock-history text-secondary me-1"></i> إحصائيات الجلسة الحالية:
+                            </span>
+                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom small">
+                                <span class="text-muted">مدة الاتصال (Uptime):</span>
+                                <strong class="text-dark font-monospace" id="ltUptime">-</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom small">
+                                <span class="text-muted">إجمالي سحب الجلسة:</span>
+                                <strong class="text-primary font-monospace" id="ltSessionTotal">0 MB</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center py-1 small">
+                                <span class="text-muted">تاريخ بدء الاتصال:</span>
+                                <span class="text-dark" id="ltStartTime">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light p-2.5 h-100">
+                            <span class="text-muted d-block small fw-bold mb-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-database text-secondary me-1"></i> استهلاك الكوتة والصلاحية:
+                            </span>
+                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom small">
+                                <span class="text-muted">الكوتة المتبقية:</span>
+                                <strong class="text-success font-monospace" id="ltQuotaRemaining">-</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom small">
+                                <span class="text-muted">إجمالي السحب الكلي:</span>
+                                <strong class="text-dark font-monospace" id="ltTotalBytes">0 MB</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center py-1 small">
+                                <span class="text-muted">تاريخ انتهاء الاشتراك:</span>
+                                <span class="text-dark" id="ltExpDate">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer Controls -->
+            <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="ltAutoRefreshCheck" checked onchange="toggleLiveTrafficAutoRefresh(this.checked)">
+                        <label class="form-check-label small fw-bold text-dark" for="ltAutoRefreshCheck">تحديث تلقائي (1.5 ث)</label>
+                    </div>
+                    <span class="text-muted small ms-2" style="font-size: 0.72rem;" id="ltLastUpdateStatus">آخر فحص: -</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold" id="btnLtDisconnect" onclick="disconnectCurrentSubSession()" title="قطع اتصال الجلسة وتجديد الآيبي">
+                        <i class="bi bi-power me-1"></i> قطع الجلسة
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="fetchLiveTrafficData()" title="تحديث القراءات اللحظية فوراً">
+                        <i class="bi bi-arrow-repeat me-1"></i> تحديث فوري
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" onclick="closeLiveTrafficModal()">إغلاق</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
@@ -971,6 +1205,420 @@ function onRenewProfileChange() {
     if (opt && opt.dataset.price) {
         document.getElementById('singleRenewPrice').value = opt.dataset.price;
     }
+}
+
+// 4. Live Traffic Telemetry & Telemetry Monitoring
+let ltPollingInterval = null;
+let ltCurrentUsername = '';
+let ltSubscribersList = [];
+let ltChartHistory = []; // { down: bps, up: bps, time: '15:04:05' }
+const LT_MAX_HISTORY = 30;
+
+function openLiveTrafficModal(targetUsername, targetFullName) {
+    ltCurrentUsername = targetUsername || '';
+
+    // Show modal
+    const modalEl = document.getElementById('liveTrafficModal');
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.show();
+
+    // Reset fields to loading state
+    resetLiveTrafficUI(targetUsername, targetFullName);
+
+    // Initialize clean chart canvas
+    initLiveTrafficCanvas();
+
+    // Load subscribers list for dropdown
+    loadLiveTrafficUserList(function() {
+        if (!ltCurrentUsername && ltSubscribersList.length > 0) {
+            // Auto-select first online user or first user
+            const firstOnline = ltSubscribersList.find(s => s.is_online);
+            ltCurrentUsername = firstOnline ? firstOnline.username : ltSubscribersList[0].username;
+        }
+        if (ltCurrentUsername) {
+            document.getElementById('liveTrafficSelectUser').value = ltCurrentUsername;
+            fetchLiveTrafficData();
+            startLiveTrafficPolling();
+        }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function() {
+        stopLiveTrafficPolling();
+    }, { once: true });
+}
+
+function closeLiveTrafficModal() {
+    stopLiveTrafficPolling();
+}
+
+function resetLiveTrafficUI(user, name) {
+    document.getElementById('ltFullName').textContent = name || user || 'جاري التحميل...';
+    document.getElementById('ltUsername').textContent = user ? '@' + user : '-';
+    document.getElementById('ltContractNo').textContent = '';
+    document.getElementById('ltStatusBadge').className = 'badge bg-secondary';
+    document.getElementById('ltStatusBadge').textContent = 'جاري الفحص...';
+    document.getElementById('ltFramedIP').textContent = '-';
+    document.getElementById('ltCallingMAC').textContent = '-';
+    document.getElementById('ltProfileName').textContent = '-';
+    document.getElementById('ltRateLimit').textContent = '-';
+    document.getElementById('ltNASName').textContent = '-';
+    document.getElementById('ltDownloadRate').textContent = '0.00';
+    document.getElementById('ltUploadRate').textContent = '0.00';
+    document.getElementById('ltDownloadProgressBar').style.width = '0%';
+    document.getElementById('ltUploadProgressBar').style.width = '0%';
+    document.getElementById('ltSessionDown').textContent = '0 MB';
+    document.getElementById('ltSessionUp').textContent = '0 MB';
+    document.getElementById('ltSessionTotal').textContent = '0 MB';
+    document.getElementById('ltUptime').textContent = '-';
+    document.getElementById('ltStartTime').textContent = '-';
+    document.getElementById('ltQuotaRemaining').textContent = '-';
+    document.getElementById('ltTotalBytes').textContent = '0 MB';
+    document.getElementById('ltExpDate').textContent = '-';
+    ltChartHistory = [];
+}
+
+function loadLiveTrafficUserList(callback) {
+    const select = document.getElementById('liveTrafficSelectUser');
+    select.innerHTML = '<option value="">-- جاري تحميل قائمة المشتركين... --</option>';
+
+    fetch('/subscribers/live-traffic?list=1')
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && Array.isArray(data.subscribers)) {
+                ltSubscribersList = data.subscribers;
+                select.innerHTML = '';
+
+                if (ltSubscribersList.length === 0) {
+                    select.innerHTML = '<option value="">لا يوجد مشتركون مسجلون</option>';
+                    return;
+                }
+
+                ltSubscribersList.forEach(sub => {
+                    const opt = document.createElement('option');
+                    opt.value = sub.username;
+                    const onlineIcon = sub.is_online ? '🟢' : '⚪';
+                    const ipText = sub.live_ip ? ` (${sub.live_ip})` : '';
+                    opt.textContent = `${onlineIcon} ${sub.full_name} (${sub.username})${ipText} - [${sub.contract_no}]`;
+                    select.appendChild(opt);
+                });
+
+                if (ltCurrentUsername) {
+                    select.value = ltCurrentUsername;
+                }
+
+                if (callback) callback();
+            }
+        })
+        .catch(err => {
+            console.error('Error loading subscribers list:', err);
+            select.innerHTML = '<option value="">تعذر تحميل القائمة</option>';
+        });
+}
+
+function refreshLiveTrafficUserList() {
+    loadLiveTrafficUserList(function() {
+        if (ltCurrentUsername) {
+            document.getElementById('liveTrafficSelectUser').value = ltCurrentUsername;
+        }
+    });
+}
+
+function onLiveTrafficUserChanged(username) {
+    if (!username) return;
+    ltCurrentUsername = username;
+    ltChartHistory = [];
+    resetLiveTrafficUI(username, '');
+    fetchLiveTrafficData();
+}
+
+function startLiveTrafficPolling() {
+    stopLiveTrafficPolling();
+    const isAuto = document.getElementById('ltAutoRefreshCheck').checked;
+    if (isAuto) {
+        ltPollingInterval = setInterval(fetchLiveTrafficData, 1500);
+    }
+}
+
+function stopLiveTrafficPolling() {
+    if (ltPollingInterval) {
+        clearInterval(ltPollingInterval);
+        ltPollingInterval = null;
+    }
+}
+
+function toggleLiveTrafficAutoRefresh(enabled) {
+    if (enabled) {
+        startLiveTrafficPolling();
+    } else {
+        stopLiveTrafficPolling();
+    }
+}
+
+function fetchLiveTrafficData() {
+    if (!ltCurrentUsername) return;
+
+    fetch(`/subscribers/live-traffic?username=${encodeURIComponent(ltCurrentUsername)}`)
+        .then(res => res.json())
+        .then(res => {
+            if (res.status === 'success' && res.data) {
+                updateLiveTrafficUI(res.data);
+            } else {
+                document.getElementById('ltStatusBadge').textContent = 'خطأ في الاتصال';
+                document.getElementById('ltStatusBadge').className = 'badge bg-danger';
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching live traffic:', err);
+        });
+}
+
+function updateLiveTrafficUI(d) {
+    document.getElementById('ltFullName').textContent = d.full_name || d.username;
+    document.getElementById('ltUsername').textContent = '@' + d.username;
+    document.getElementById('ltContractNo').textContent = d.contract_no ? `[${d.contract_no}]` : '';
+
+    const badge = document.getElementById('ltStatusBadge');
+    badge.className = 'badge ' + (d.is_online ? 'bg-success text-white' : 'bg-secondary text-white');
+    badge.innerHTML = d.is_online ? '<i class="bi bi-record-fill me-1"></i>متصل الآن' : 'غير متصل';
+
+    document.getElementById('ltFramedIP').textContent = d.framed_ip || (d.is_online ? 'تلقائي' : 'لا يوجد');
+    document.getElementById('ltCallingMAC').textContent = d.calling_mac || '-';
+    document.getElementById('ltProfileName').textContent = d.profile_name || 'افتراضي';
+    document.getElementById('ltRateLimit').textContent = d.rate_limit || 'غير محدد';
+    document.getElementById('ltNASName').textContent = d.nas_name || (d.nas_ip || '-');
+
+    // Speeds & Units
+    const downFormatted = formatBpsComponents(d.current_download_bps || 0);
+    const upFormatted = formatBpsComponents(d.current_upload_bps || 0);
+
+    document.getElementById('ltDownloadRate').textContent = downFormatted.val;
+    document.getElementById('ltDownloadUnit').textContent = downFormatted.unit;
+    document.getElementById('ltUploadRate').textContent = upFormatted.val;
+    document.getElementById('ltUploadUnit').textContent = upFormatted.unit;
+
+    // Badges & Progress Bars
+    document.getElementById('ltMaxDownBadge').textContent = 'الحد: ' + (d.max_download_display || 'غير محدد');
+    document.getElementById('ltMaxUpBadge').textContent = 'الحد: ' + (d.max_upload_display || 'غير محدد');
+
+    document.getElementById('ltDownloadProgressBar').style.width = (d.download_percent || 0) + '%';
+    document.getElementById('ltUploadProgressBar').style.width = (d.upload_percent || 0) + '%';
+
+    document.getElementById('ltDownPercentText').textContent = Math.round(d.download_percent || 0) + '% من السرعة القصوى';
+    document.getElementById('ltUpPercentText').textContent = Math.round(d.upload_percent || 0) + '% من السرعة القصوى';
+
+    // Sessions & Octets
+    document.getElementById('ltSessionDown').textContent = d.session_download_display || '0 MB';
+    document.getElementById('ltSessionUp').textContent = d.session_upload_display || '0 MB';
+    document.getElementById('ltSessionTotal').textContent = d.session_total_display || '0 MB';
+    document.getElementById('ltUptime').textContent = d.uptime || '-';
+    document.getElementById('ltStartTime').textContent = d.start_time || '-';
+
+    // Quota & Exp
+    document.getElementById('ltQuotaRemaining').textContent = d.quota_remaining_display || 'مفتوح ∞';
+    document.getElementById('ltTotalBytes').textContent = d.total_bytes_display || '0 MB';
+    document.getElementById('ltExpDate').textContent = d.expiration_date || 'غير محدد';
+
+    document.getElementById('ltLastUpdateStatus').textContent = 'آخر تحديث: ' + (d.last_update || '-');
+
+    // Disconnect button state
+    const btnDisc = document.getElementById('btnLtDisconnect');
+    if (btnDisc) {
+        btnDisc.disabled = !d.is_online;
+    }
+
+    // Append to live chart history
+    ltChartHistory.push({
+        time: d.last_update || new Date().toLocaleTimeString('ar-EG'),
+        downBps: d.current_download_bps || 0,
+        upBps: d.current_upload_bps || 0
+    });
+    if (ltChartHistory.length > LT_MAX_HISTORY) {
+        ltChartHistory.shift();
+    }
+
+    drawTrafficChart();
+}
+
+function formatBpsComponents(bps) {
+    if (bps >= 1000 * 1000 * 1000) {
+        return { val: (bps / (1000 * 1000 * 1000)).toFixed(2), unit: 'Gbps' };
+    }
+    if (bps >= 1000 * 1000) {
+        return { val: (bps / (1000 * 1000)).toFixed(2), unit: 'Mbps' };
+    }
+    if (bps >= 1000) {
+        return { val: (bps / 1000).toFixed(1), unit: 'Kbps' };
+    }
+    return { val: bps.toString(), unit: 'bps' };
+}
+
+// Canvas Live Smooth Chart Renderer
+function initLiveTrafficCanvas() {
+    const canvas = document.getElementById('liveTrafficCanvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = (rect.width || 600) * dpr;
+    canvas.height = 150 * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    drawTrafficChart();
+}
+
+function drawTrafficChart() {
+    const canvas = document.getElementById('liveTrafficCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+
+    // Clear background
+    ctx.fillStyle = '#121720';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    for (let y = 25; y < h - 20; y += 30) {
+        ctx.beginPath();
+        ctx.moveTo(40, y);
+        ctx.lineTo(w - 10, y);
+        ctx.stroke();
+    }
+
+    if (ltChartHistory.length < 2) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.font = '12px Tahoma, Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('في انتظار تدفق البيانات اللحظية...', w / 2, h / 2);
+        return;
+    }
+
+    // Determine scale
+    let maxVal = 1000 * 100; // at least 100 Kbps baseline
+    ltChartHistory.forEach(pt => {
+        if (pt.downBps > maxVal) maxVal = pt.downBps;
+        if (pt.upBps > maxVal) maxVal = pt.upBps;
+    });
+    maxVal = maxVal * 1.15; // 15% headroom
+
+    // Y Axis labels
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.font = '10px Tahoma, Arial';
+    ctx.textAlign = 'right';
+    const topFormatted = formatBpsComponents(maxVal);
+    ctx.fillText(`${topFormatted.val} ${topFormatted.unit}`, 38, 15);
+    ctx.fillText('0', 38, h - 15);
+
+    const plotX = (i) => 45 + (i / (LT_MAX_HISTORY - 1)) * (w - 55);
+    const plotY = (val) => (h - 20) - (val / maxVal) * (h - 40);
+
+    // 1. Draw Download Area & Line (Blue)
+    const downGradient = ctx.createLinearGradient(0, 20, 0, h - 20);
+    downGradient.addColorStop(0, 'rgba(13, 110, 253, 0.35)');
+    downGradient.addColorStop(1, 'rgba(13, 110, 253, 0.0)');
+
+    ctx.beginPath();
+    ctx.moveTo(plotX(0), plotY(ltChartHistory[0].downBps));
+    for (let i = 1; i < ltChartHistory.length; i++) {
+        ctx.lineTo(plotX(i), plotY(ltChartHistory[i].downBps));
+    }
+    // Fill
+    ctx.lineTo(plotX(ltChartHistory.length - 1), h - 20);
+    ctx.lineTo(plotX(0), h - 20);
+    ctx.closePath();
+    ctx.fillStyle = downGradient;
+    ctx.fill();
+
+    // Stroke line
+    ctx.beginPath();
+    ctx.moveTo(plotX(0), plotY(ltChartHistory[0].downBps));
+    for (let i = 1; i < ltChartHistory.length; i++) {
+        ctx.lineTo(plotX(i), plotY(ltChartHistory[i].downBps));
+    }
+    ctx.strokeStyle = '#0d6efd';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // 2. Draw Upload Area & Line (Green)
+    const upGradient = ctx.createLinearGradient(0, 20, 0, h - 20);
+    upGradient.addColorStop(0, 'rgba(25, 135, 84, 0.35)');
+    upGradient.addColorStop(1, 'rgba(25, 135, 84, 0.0)');
+
+    ctx.beginPath();
+    ctx.moveTo(plotX(0), plotY(ltChartHistory[0].upBps));
+    for (let i = 1; i < ltChartHistory.length; i++) {
+        ctx.lineTo(plotX(i), plotY(ltChartHistory[i].upBps));
+    }
+    ctx.lineTo(plotX(ltChartHistory.length - 1), h - 20);
+    ctx.lineTo(plotX(0), h - 20);
+    ctx.closePath();
+    ctx.fillStyle = upGradient;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(plotX(0), plotY(ltChartHistory[0].upBps));
+    for (let i = 1; i < ltChartHistory.length; i++) {
+        ctx.lineTo(plotX(i), plotY(ltChartHistory[i].upBps));
+    }
+    ctx.strokeStyle = '#198754';
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+
+    // Glow dot on last points
+    const lastIdx = ltChartHistory.length - 1;
+    const lastDownX = plotX(lastIdx);
+    const lastDownY = plotY(ltChartHistory[lastIdx].downBps);
+    const lastUpY = plotY(ltChartHistory[lastIdx].upBps);
+
+    ctx.fillStyle = '#0d6efd';
+    ctx.beginPath();
+    ctx.arc(lastDownX, lastDownY, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#198754';
+    ctx.beginPath();
+    ctx.arc(lastDownX, lastUpY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function disconnectCurrentSubSession() {
+    if (!ltCurrentUsername) return;
+    if (!confirm(`هل أنت متأكد من قطع جلسة المشترك (${ltCurrentUsername}) وتجديد الآيبي الخاص به الآن؟`)) {
+        return;
+    }
+
+    const btn = document.getElementById('btnLtDisconnect');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري القطع...';
+    }
+
+    fetch(`/subscribers/disconnect-session?username=${encodeURIComponent(ltCurrentUsername)}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (window.showCopyToast) {
+                    window.showCopyToast('تم قطع اتصال الجلسة بنجاح!');
+                } else {
+                    alert('تم قطع اتصال الجلسة بنجاح!');
+                }
+                fetchLiveTrafficData();
+            } else {
+                alert('تعذر قطع الجلسة: ' + (data.message || 'غير معروف'));
+            }
+        })
+        .catch(err => {
+            console.error('Error disconnecting session:', err);
+            alert('حدث خطأ أثناء إرسال طلب قطع الاتصال.');
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-power me-1"></i> قطع الجلسة';
+            }
+        });
 }
 </script>
 {{ end }}
