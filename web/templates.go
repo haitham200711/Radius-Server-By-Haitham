@@ -31,6 +31,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"subscribers/edit":    {"templates/base.html", "templates/subscribers/edit.html"},
 		"cards/list":          {"templates/base.html", "templates/cards/list.html"},
 		"cards/generate":      {"templates/base.html", "templates/cards/generate.html"},
+		"cards/cafe_portal":   {"templates/base.html", "templates/cards/cafe_portal.html"},
 		"cards/print":         {"templates/cards/print.html"},
 		"card_templates/list": {"templates/base.html", "templates/card_templates/list.html"},
 		"profiles/list":          {"templates/base.html", "templates/profiles/list.html"},

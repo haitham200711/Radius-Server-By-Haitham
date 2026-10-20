@@ -1,0 +1,531 @@
+{{ define "content" }}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <span class="p-2 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                <i class="bi bi-cup-hot-fill fs-5"></i>
+            </span>
+            <span>منظومة كروت الكافيهات على الراديوس</span>
+        </h3>
+        <p class="text-muted small mb-0">إدارة ومتابعة كروت الهوتسبوت الخاصة بكل كافيه لحظياً عبر الراديوس و radacct مع التوليد والإرسال عبر الواتساب</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#generateCafeBatchModal">
+            <i class="bi bi-plus-circle me-1"></i> توليد دفعة كروت للكافيه
+        </button>
+        <a href="/cards" class="btn btn-outline-secondary">
+            <i class="bi bi-credit-card me-1"></i> كروت الشحن العامة
+        </a>
+    </div>
+</div>
+
+<!-- Alerts -->
+{{ if .Message }}
+<div class="alert alert-success alert-dismissible fade show d-flex align-items-center rounded-3 shadow-sm mb-4 border-0" role="alert">
+    <i class="bi bi-check-circle-fill fs-4 me-2 text-success"></i>
+    <div>
+        <strong>تم بنجاح!</strong>
+        {{ if eq .Message "batch_created" }}
+        تم إنشاء دفعة كروت الكافيه وتخزينها في الراديوس بنجاح.
+        {{ else if eq .Message "disconnected" }}
+        تم إرسال أمر فصل الكارت (PoD Disconnect) إلى راوتر الكافيه بنجاح.
+        {{ else }}
+        {{ .Message }}
+        {{ end }}
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
+{{ if .Error }}
+<div class="alert alert-danger alert-dismissible fade show d-flex align-items-center rounded-3 shadow-sm mb-4 border-0" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-4 me-2 text-danger"></i>
+    <div><strong>تنبيه:</strong> {{ .Error }}</div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
+<!-- 1. Cafe / Branch Selector Bar -->
+<div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-body p-3 p-md-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-lg-5 col-md-6">
+                <label class="form-label fw-bold small text-secondary mb-1">
+                    <i class="bi bi-shop me-1 text-primary"></i> اختر الفرع / الكافيه المطلوب متابعته:
+                </label>
+                <select class="form-select font-monospace fw-bold" onchange="location.href='/cards/cafe?router_id=' + this.value">
+                    {{ range .Routers }}
+                    <option value="{{ .ID }}" {{ if eq .ID $.SelectedRouterID }}selected{{ end }}>
+                        {{ .ShortName }} ({{ .NASName }}) {{ if .Phone }}- 📱 {{ .Phone }}{{ end }}
+                    </option>
+                    {{ else }}
+                    <option value="0">لا يوجد راوترات كافيهات مسجلة</option>
+                    {{ end }}
+                </select>
+            </div>
+            <div class="col-lg-7 col-md-6">
+                {{ if .SelectedRouter }}
+                <div class="d-flex flex-wrap align-items-center justify-content-md-end gap-2 pt-md-3">
+                    <span class="badge bg-light text-dark border p-2">
+                        <i class="bi bi-router text-primary me-1"></i> الآي بي: <code>{{ .SelectedRouter.NASName }}</code>
+                    </span>
+                    {{ if .SelectedRouter.Phone }}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle p-2">
+                        <i class="bi bi-whatsapp me-1"></i> واتساب: <strong dir="ltr">{{ .SelectedRouter.Phone }}</strong>
+                    </span>
+                    {{ else }}
+                    <span class="badge bg-light text-muted border p-2">
+                        <i class="bi bi-telephone-x me-1"></i> بدون رقم واتساب
+                    </span>
+                    {{ end }}
+                    <span class="badge bg-light text-secondary border p-2 font-monospace">
+                        CoA: {{ .SelectedRouter.CoAPort }}
+                    </span>
+                </div>
+                {{ end }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Active Batch Dashboard (الدفعة النشطة للكافيه) -->
+{{ if .ActiveBatch }}
+<div class="card border-0 shadow-sm mb-4 bg-white overflow-hidden">
+    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="p-2 bg-primary-subtle text-primary rounded-2">
+                <i class="bi bi-stack"></i>
+            </span>
+            <div>
+                <h6 class="fw-bold mb-0 text-dark">
+                    الدفعة النشطة الحالية (Active Batch): <strong class="text-primary font-monospace">{{ .ActiveBatch.BatchCode }}</strong>
+                </h6>
+                <small class="text-muted">
+                    الباقة: <span class="badge bg-primary-subtle text-primary border">{{ .ActiveBatch.ProfileName }}</span>
+                    | استلام: <span class="text-secondary">{{ .ActiveBatch.CreatedAt.Format "2006-01-02 15:04" }}</span>
+                </small>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/cards/print?batch={{ .ActiveBatch.BatchCode }}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">
+                <i class="bi bi-printer me-1"></i> طباعة الشيت (A4)
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-3 p-md-4">
+        <!-- 4 Metric Cards -->
+        <div class="row g-3 mb-4">
+            <!-- Total Cards -->
+            <div class="col-6 col-md-3">
+                <div class="p-3 rounded-3 bg-light border h-100">
+                    <span class="text-muted small fw-bold d-block mb-1">إجمالي كروت الدفعة</span>
+                    <h3 class="mb-0 fw-bold text-dark">{{ .ActiveBatch.Count }} <small class="fs-6 text-muted">كارت</small></h3>
+                    <div class="mt-2 small text-muted">الدفعة كاملة</div>
+                </div>
+            </div>
+
+            <!-- Available Cards (فاضل كام للبيع) -->
+            <div class="col-6 col-md-3">
+                <div class="p-3 rounded-3 bg-success-subtle border border-success-subtle h-100">
+                    <span class="text-success small fw-bold d-block mb-1">الكروت المتاحة (فاضل كام كارت)</span>
+                    <h3 class="mb-0 fw-bold text-success">{{ .ActiveBatch.AvailableCount }} <small class="fs-6 text-success">كارت</small></h3>
+                    <div class="mt-2 small text-success fw-bold">
+                        <i class="bi bi-check-circle-fill me-1"></i> {{ printf "%.1f" .AvailablePercent }}% متاح للبيع
+                    </div>
+                </div>
+            </div>
+
+            <!-- Used / Expired Cards (منتهي منه كام) -->
+            <div class="col-6 col-md-3">
+                <div class="p-3 rounded-3 bg-danger-subtle border border-danger-subtle h-100">
+                    <span class="text-danger small fw-bold d-block mb-1">الكروت المستهلكة والمنتهية</span>
+                    <h3 class="mb-0 fw-bold text-danger">{{ .ActiveBatch.UsedCount }} <small class="fs-6 text-danger">كارت</small></h3>
+                    <div class="mt-2 small text-danger fw-bold">
+                        <i class="bi bi-x-circle-fill me-1"></i> {{ printf "%.1f" .UsedPercent }}% مستهلك
+                    </div>
+                </div>
+            </div>
+
+            <!-- Online Connected Right Now -->
+            <div class="col-6 col-md-3">
+                <div class="p-3 rounded-3 bg-primary-subtle border border-primary-subtle h-100">
+                    <span class="text-primary small fw-bold d-block mb-1">المتصلين بالدفعة الآن</span>
+                    <h3 class="mb-0 fw-bold text-primary">{{ .ActiveBatch.OnlineCount }} <small class="fs-6 text-primary">أونلاين</small></h3>
+                    <div class="mt-2 small text-primary fw-bold">
+                        <span class="pulse-dot-green me-1"></span> متصلين بالهوتسبوت
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar for Batch consumption -->
+        <div>
+            <div class="d-flex justify-content-between small fw-bold mb-2">
+                <span class="text-success"><i class="bi bi-check-circle me-1"></i> المتبقي للبيع: {{ .ActiveBatch.AvailableCount }} كارت ({{ printf "%.1f" .AvailablePercent }}%)</span>
+                <span class="text-danger"><i class="bi bi-x-circle me-1"></i> المستهلك: {{ .ActiveBatch.UsedCount }} كارت ({{ printf "%.1f" .UsedPercent }}%)</span>
+            </div>
+            <div class="progress" style="height: 14px; background-color: #f1f5f9;">
+                <div class="progress-bar bg-success fw-bold" role="progressbar" style="width: {{ .AvailablePercent }}%"></div>
+                <div class="progress-bar bg-danger fw-bold" role="progressbar" style="width: {{ .UsedPercent }}%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{{ else }}
+<div class="card border-0 shadow-sm mb-4 bg-white p-4 text-center">
+    <div class="p-3 text-muted">
+        <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+        <h6 class="fw-bold text-dark">لا توجد دفعات كروت مسجلة لهذا الكافيه حالياً</h6>
+        <p class="small text-muted mb-3">يمكنك توليد أول دفعة كروت هوتسبوت لهذا الكافيه وربطها بالراديوس فوراً</p>
+        <button class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#generateCafeBatchModal">
+            <i class="bi bi-plus-circle me-1"></i> توليد دفعة كروت الآن
+        </button>
+    </div>
+</div>
+{{ end }}
+
+<!-- 3. Card Inspector & Diagnostics (أداة الاستعلام وتشخيص الكروت) -->
+<div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-body p-3 p-md-4">
+        <form action="/cards/cafe" method="GET" class="row g-3 align-items-center">
+            <input type="hidden" name="router_id" value="{{ .SelectedRouterID }}">
+            <div class="col-lg-8 col-md-7 col-12">
+                <label for="searchCodeInput" class="form-label fw-bold text-dark mb-1">
+                    <i class="bi bi-search text-primary me-1"></i> استعلام وتشخيص كارت من كروت الكافيه:
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light text-primary">
+                        <i class="bi bi-ticket-perforated-fill fs-5"></i>
+                    </span>
+                    <input type="text" class="form-control font-monospace ps-2 fs-6" id="searchCodeInput" name="code" 
+                           placeholder="أدخل كود الكارت هنا (Username) للاستعلام الحي..." 
+                           value="{{ .SearchCode }}" required autofocus>
+                </div>
+                <div class="form-text text-muted small mt-1">
+                    فحص استهلاك الكوتة، الوقت المستهلك، عنوان الماك، عنوان الآي بي، وحالة الاتصال الحية عبر سجلات الراديوس radacct.
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-5 col-12 d-flex gap-2 align-items-end pt-md-4">
+                <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
+                    <i class="bi bi-search me-1"></i> فحص وتشخيص الكارت
+                </button>
+                {{ if .SearchCode }}
+                <a href="/cards/cafe?router_id={{ .SelectedRouterID }}" class="btn btn-outline-secondary" title="مسح">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {{ end }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Search Error Alert -->
+{{ if .SearchError }}
+<div class="alert alert-warning border-warning shadow-sm rounded-3 mb-4 d-flex align-items-center">
+    <i class="bi bi-exclamation-triangle-fill fs-4 text-warning me-3"></i>
+    <div>
+        <strong class="d-block text-dark">نتيجة الفحص:</strong>
+        <span>{{ .SearchError }}</span>
+    </div>
+</div>
+{{ end }}
+
+<!-- Live Tracked Card Details Card -->
+{{ if .TrackedCard }}
+<div class="card border-0 shadow-sm mb-4 bg-white overflow-hidden">
+    <div class="card-header bg-white p-3 p-md-4 border-bottom">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-3 mb-1">
+                    <h4 class="mb-0 fw-bold text-dark font-monospace">
+                        <i class="bi bi-ticket-detailed text-primary me-1"></i> {{ .TrackedCard.CardCode }}
+                    </h4>
+                    <span class="badge {{ .TrackedCard.StatusBadgeClass }} px-3 py-2 rounded-pill fs-6">
+                        {{ if .TrackedCard.IsOnline }}
+                        <span class="pulse-dot-green me-1"></span>
+                        {{ end }}
+                        {{ .TrackedCard.StatusLabel }}
+                    </span>
+                </div>
+                <p class="text-muted mb-0 small">
+                    كلمة المرور: <code class="fw-bold text-dark">{{ .TrackedCard.Password }}</code>
+                    | الباقة: <strong class="text-dark">{{ .TrackedCard.ProfileDisplay }}</strong>
+                    | السرعة: <code class="text-primary">{{ .TrackedCard.RateLimit }}</code>
+                    | الكوتة: <strong class="text-dark">{{ .TrackedCard.QuotaDisplay }}</strong>
+                    | الفرع: <span class="badge bg-light text-secondary border">{{ .TrackedCard.NASName }}</span>
+                </p>
+            </div>
+            <div>
+                {{ if .TrackedCard.IsOnline }}
+                <form method="POST" action="/cards/cafe/disconnect?code={{ .TrackedCard.CardCode }}&router_id={{ $.SelectedRouterID }}" onsubmit="return confirm('هل أنت متأكد من فصل اتصال الكارت الآن عبر RADIUS CoA؟')">
+                    <button type="submit" class="btn btn-danger fw-bold rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-plug-fill me-1"></i> فصل اتصال الكارت الآن (CoA)
+                    </button>
+                </form>
+                {{ end }}
+            </div>
+        </div>
+
+        <!-- Diagnosis Alert -->
+        <div class="alert alert-light border mt-3 mb-0 d-flex align-items-center rounded-3">
+            <i class="bi bi-info-circle-fill fs-4 text-primary me-3"></i>
+            <div>
+                <strong class="d-block text-dark small">تشخيص حالة الكارت في الراديوس:</strong>
+                <span class="text-secondary fw-semibold">{{ .TrackedCard.ExpireReason }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body p-3 p-md-4 bg-light bg-opacity-50">
+        <div class="row g-3">
+            <!-- 1. Quota & Data Consumption -->
+            <div class="col-md-4 col-12">
+                <div class="card bg-white p-3 h-100 shadow-sm border-0">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-pie-chart-fill text-primary me-2"></i> استهلاك البيانات والكوتة
+                    </h6>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small fw-bold mb-1">
+                            <span>المستهلك: {{ .TrackedCard.TotalBytesDisplay }}</span>
+                            <span>{{ printf "%.1f" .TrackedCard.UsagePercent }}%</span>
+                        </div>
+                        <div class="progress" style="height: 9px;">
+                            <div class="progress-bar {{ if gt .TrackedCard.UsagePercent 90.0 }}bg-danger{{ else if gt .TrackedCard.UsagePercent 70.0 }}bg-warning{{ else }}bg-success{{ end }}" 
+                                 style="width: {{ .TrackedCard.UsagePercent }}%"></div>
+                        </div>
+                    </div>
+                    <div class="row g-2 text-center small">
+                        <div class="col-4 p-2 bg-light rounded border">
+                            <span class="text-muted d-block small">تحميل (Down)</span>
+                            <strong class="font-monospace">{{ .TrackedCard.BytesOutDisplay }}</strong>
+                        </div>
+                        <div class="col-4 p-2 bg-light rounded border">
+                            <span class="text-muted d-block small">رفع (Up)</span>
+                            <strong class="font-monospace">{{ .TrackedCard.BytesInDisplay }}</strong>
+                        </div>
+                        <div class="col-4 p-2 bg-light rounded border">
+                            <span class="text-muted d-block small">المتبقي</span>
+                            <strong class="text-success font-monospace">{{ .TrackedCard.RemainingDisplay }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Timing & Uptime -->
+            <div class="col-md-4 col-12">
+                <div class="card bg-white p-3 h-100 shadow-sm border-0">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-clock-history text-info me-2"></i> التوقيت وأول اتصال
+                    </h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between px-0 py-2 border-0">
+                            <span class="text-muted"><i class="bi bi-play-circle me-1"></i> أول اتصال للكارت:</span>
+                            <strong class="text-dark">{{ if .TrackedCard.FirstLogin }}{{ .TrackedCard.FirstLogin }}{{ else }}لم يبدأ بعد{{ end }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0 py-2 border-0">
+                            <span class="text-muted"><i class="bi bi-hourglass-split me-1"></i> إجمالي مدة الاستخدام:</span>
+                            <strong class="text-dark font-monospace">{{ .TrackedCard.UptimeDisplay }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0 py-2 border-0">
+                            <span class="text-muted"><i class="bi bi-speedometer2 me-1"></i> سرعة البروفايل:</span>
+                            <code class="text-primary fw-bold">{{ .TrackedCard.RateLimit }}</code>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 3. Client Device & Network Info -->
+            <div class="col-md-4 col-12">
+                <div class="card bg-white p-3 h-100 shadow-sm border-0">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-phone-fill text-warning me-2"></i> بيانات الجهاز والماك أدرس
+                    </h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item px-0 py-2 border-0">
+                            <span class="text-muted d-block mb-1">عنوان الماك (MAC Address):</span>
+                            {{ if .TrackedCard.CallingMAC }}
+                            <div class="d-flex align-items-center gap-1">
+                                <code class="fs-6 fw-bold text-dark">{{ .TrackedCard.CallingMAC }}</code>
+                                <button type="button" class="btn btn-sm btn-light border py-0 px-2" onclick="copyToClipboard('{{ .TrackedCard.CallingMAC }}', function(){ showCopyToast('تم نسخ الماك'); })">
+                                    <i class="bi bi-copy"></i>
+                                </button>
+                            </div>
+                            {{ else }}
+                            <span class="text-muted">لم يُسجل بعد (لم يتصل العميل)</span>
+                            {{ end }}
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0 py-2 border-0">
+                            <span class="text-muted">الآي بي المسجل:</span>
+                            {{ if .TrackedCard.FramedIP }}
+                            <code class="text-success fw-bold">{{ .TrackedCard.FramedIP }}</code>
+                            {{ else }}
+                            <span class="text-muted">-</span>
+                            {{ end }}
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0 py-2 border-0">
+                            <span class="text-muted">حالة الجلسة:</span>
+                            {{ if .TrackedCard.IsOnline }}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">جلسة نشطة الآن</span>
+                            {{ else }}
+                            <span class="badge bg-light text-secondary border">غير متصل حالياً</span>
+                            {{ end }}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<!-- 4. Cafe Batches Table (سجل دفعات الكروت السابقة للكافيه) -->
+<div class="card border-0 shadow-sm bg-white">
+    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-ticket-detailed text-primary fs-5"></i>
+            <h6 class="fw-bold mb-0 text-dark">سجل دفعات كروت الكافيه (Batches History)</h6>
+        </div>
+        <span class="badge bg-light text-secondary border">
+            {{ len .Batches }} دفعة مسجلة
+        </span>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th>كود الدفعة</th>
+                    <th>الفرع / الكافيه</th>
+                    <th>الباقة المخصصة</th>
+                    <th>عدد الكروت</th>
+                    <th>متاح للبيع</th>
+                    <th>مستهلك</th>
+                    <th>سعر الكارت</th>
+                    <th>الإجمالي</th>
+                    <th>تاريخ التوليد</th>
+                    <th class="text-end">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Batches }}
+                <tr>
+                    <td><strong class="font-monospace text-primary">{{ .BatchCode }}</strong></td>
+                    <td><span class="badge bg-light text-dark border">{{ .NASName }}</span></td>
+                    <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ .ProfileName }}</span></td>
+                    <td><span class="fw-bold">{{ .Count }}</span></td>
+                    <td><span class="badge bg-success-subtle text-success border border-success-subtle fw-bold">{{ .AvailableCount }}</span></td>
+                    <td><span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ .UsedCount }}</span></td>
+                    <td>{{ printf "%.2f" .PricePerCard }} ج.م</td>
+                    <td><strong class="text-success">{{ printf "%.2f" .TotalPrice }} ج.م</strong></td>
+                    <td class="small text-muted">{{ .CreatedAt.Format "2006-01-02 15:04" }}</td>
+                    <td class="text-end">
+                        <a href="/cards/print?batch={{ .BatchCode }}" target="_blank" class="btn btn-sm btn-outline-primary" title="طباعة">
+                            <i class="bi bi-printer"></i> طباعة شيت
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="10" class="text-center py-5 text-muted">
+                        لا توجد أي دفعات كروت مسجلة لهذا الكافيه حتى الآن.
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Generate Cafe Batch Modal -->
+<div class="modal fade" id="generateCafeBatchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-white py-3 border-bottom">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <span class="p-2 bg-primary-subtle text-primary rounded-2 d-inline-flex">
+                        <i class="bi bi-cup-hot-fill"></i>
+                    </span>
+                    <span>توليد دفعة كروت جديدة للكافيه</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/cards/cafe/generate">
+                <div class="modal-body p-4">
+                    <!-- 1. Cafe Router Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">فرع الكافيه (MikroTik Router NAS):</label>
+                        <select name="nas_id" class="form-select" required>
+                            {{ range .Routers }}
+                            <option value="{{ .ID }}" {{ if eq .ID $.SelectedRouterID }}selected{{ end }}>
+                                {{ .ShortName }} ({{ .NASName }})
+                            </option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <!-- 2. Profile Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">الباقة والسرعة والكوتة:</label>
+                        <select name="profile_id" class="form-select" required>
+                            {{ range .Profiles }}
+                            <option value="{{ .ID }}">
+                                {{ .DisplayName }} ({{ .RateLimit }}) - {{ .Price }} ج.م
+                            </option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <!-- 3. Count & Prefix -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">عدد الكروت:</label>
+                            <input type="number" name="count" class="form-control" value="100" min="1" max="10000" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">بادئة الكود (Prefix):</label>
+                            <input type="text" name="prefix" class="form-control font-monospace" value="CF-">
+                        </div>
+                    </div>
+
+                    <!-- 4. Price & Code Length -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">سعر الكارت (ج.م):</label>
+                            <input type="number" step="0.5" name="price_per_card" class="form-control" placeholder="اتركه لاعتماد الباقة">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">طول الكود العشوائي:</label>
+                            <input type="number" name="char_len" class="form-control" value="6" min="4" max="12">
+                        </div>
+                    </div>
+
+                    <!-- 5. WhatsApp Cafe Phone -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">رقم واتساب صاحب الكافيه (اختياري):</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-success"><i class="bi bi-whatsapp"></i></span>
+                            <input type="text" name="cafe_phone" class="form-control font-monospace" placeholder="مثال: 201012345678" value="{{ if .SelectedRouter }}{{ .SelectedRouter.Phone }}{{ end }}">
+                        </div>
+                    </div>
+
+                    <!-- 6. Send WhatsApp Checkbox -->
+                    <div class="form-check form-switch p-3 bg-light rounded-3 border">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" name="send_whatsapp" value="1" id="sendWaCheck" checked>
+                        <label class="form-check-label small fw-bold text-dark" for="sendWaCheck">
+                            إرسال إشعار فوري بكود الدفعة وتفاصيلها إلى واتساب الكافيه
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-4 border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-lightning-charge me-1"></i> توليد الكروت وحفظها في الراديوس
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ define "auth_content" }}{{ end }}
+{{ define "scripts" }}{{ end }}

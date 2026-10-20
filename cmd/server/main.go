@@ -96,6 +96,9 @@ func main() {
 	mux.HandleFunc("/cards", middleware.RequireAuth(cardsBP.ListHandler))
 	mux.HandleFunc("/cards/generate", middleware.RequireAuth(cardsBP.GenerateHandler))
 	mux.HandleFunc("/cards/print", middleware.RequireAuth(cardsBP.PrintHandler))
+	mux.HandleFunc("/cards/cafe", middleware.RequireAuth(cardsBP.CafePortalHandler))
+	mux.HandleFunc("/cards/cafe/generate", middleware.RequireAuth(cardsBP.CafeGenerateHandler))
+	mux.HandleFunc("/cards/cafe/disconnect", middleware.RequireAuth(cardsBP.CafeDisconnectHandler))
 
 	// Card Templates Blueprint
 	tmplBP := card_templates.New(db, renderer)

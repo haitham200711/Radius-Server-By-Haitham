@@ -423,6 +423,12 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS notified_quota_75 TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS notified_quota_100 TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS last_debt_reminder_at DATETIME NULL;`,
+		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT '';`,
+		`ALTER TABLE nas ADD COLUMN IF NOT EXISTS is_cafe TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
+		`ALTER TABLE batches ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS nas_id INT DEFAULT 0;`,
+		`ALTER TABLE cards ADD COLUMN IF NOT EXISTS card_type VARCHAR(20) DEFAULT 'charge';`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -2617,6 +2623,387 @@ func (d *DB) CheckSpeedControlSchedule() error {
 
 	return nil
 }
+
+// ============================================================================
+// Cafe Hotspot Cards Management (منظومة كروت الكافيهات على الراديوس)
+// ============================================================================
+
+func FormatBytesHuman(b int64) string {
+	if b <= 0 {
+		return "0 MB"
+	}
+	const GB = 1024 * 1024 * 1024
+	const MB = 1024 * 1024
+	const KB = 1024
+
+	if b >= GB {
+		return fmt.Sprintf("%.2f GB", float64(b)/float64(GB))
+	} else if b >= MB {
+		return fmt.Sprintf("%.1f MB", float64(b)/float64(MB))
+	} else if b >= KB {
+		return fmt.Sprintf("%.1f KB", float64(b)/float64(KB))
+	}
+	return fmt.Sprintf("%d B", b)
+}
+
+func FormatDurationHuman(sec int64) string {
+	if sec <= 0 {
+		return "0 دقيقة"
+	}
+	hours := sec / 3600
+	mins := (sec % 3600) / 60
+	secs := sec % 60
+	if hours > 0 {
+		return fmt.Sprintf("%d ساعة و %d دقيقة", hours, mins)
+	}
+	if mins > 0 {
+		return fmt.Sprintf("%d دقيقة و %d ثانية", mins, secs)
+	}
+	return fmt.Sprintf("%d ثانية", secs)
+}
+
+func (d *DB) GetCafeRouters() ([]models.NAS, error) {
+	rows, err := d.Query(`SELECT id, nasname, shortname, type, secret, description, coa_port,
+		COALESCE(phone, ''), COALESCE(is_cafe, 0), created_at
+		FROM nas ORDER BY id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.NAS
+	for rows.Next() {
+		var n models.NAS
+		var isCafeInt int
+		if err := rows.Scan(&n.ID, &n.NASName, &n.ShortName, &n.Type, &n.Secret, &n.Description,
+			&n.CoAPort, &n.Phone, &isCafeInt, &n.CreatedAt); err == nil {
+			n.IsCafe = isCafeInt == 1
+			list = append(list, n)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
+	query := `SELECT b.id, b.batch_code, b.profile_id, COALESCE(p.display_name, ''),
+		b.count, b.price_per_card, b.total_price, b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
+		FROM batches b
+		LEFT JOIN profiles p ON b.profile_id = p.id
+		LEFT JOIN nas n ON b.nas_id = n.id
+		WHERE b.card_type = 'cafe'`
+
+	var args []interface{}
+	if nasID > 0 {
+		query += " AND b.nas_id = ?"
+		args = append(args, nasID)
+	}
+	query += " ORDER BY b.id DESC LIMIT 1"
+
+	row := d.QueryRow(query, args...)
+	var b models.Batch
+	err := row.Scan(&b.ID, &b.BatchCode, &b.ProfileID, &b.ProfileName, &b.Count, &b.PricePerCard, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compute available, used, and currently online cards
+	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NULL", b.ID).Scan(&b.AvailableCount)
+	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NOT NULL", b.ID).Scan(&b.UsedCount)
+
+	_ = d.QueryRow(`SELECT COUNT(DISTINCT r.username)
+		FROM radacct r
+		JOIN cards c ON r.username = c.username
+		WHERE c.batch_id = ? AND r.acctstoptime IS NULL`, b.ID).Scan(&b.OnlineCount)
+
+	return &b, nil
+}
+
+func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
+	query := `SELECT b.id, b.batch_code, b.profile_id, COALESCE(p.display_name, ''),
+		b.count, b.price_per_card, b.total_price, b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
+		FROM batches b
+		LEFT JOIN profiles p ON b.profile_id = p.id
+		LEFT JOIN nas n ON b.nas_id = n.id
+		WHERE b.card_type = 'cafe'`
+
+	var args []interface{}
+	if nasID > 0 {
+		query += " AND b.nas_id = ?"
+		args = append(args, nasID)
+	}
+	query += " ORDER BY b.id DESC LIMIT 50"
+
+	rows, err := d.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.Batch
+	for rows.Next() {
+		var b models.Batch
+		if err := rows.Scan(&b.ID, &b.BatchCode, &b.ProfileID, &b.ProfileName, &b.Count, &b.PricePerCard, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName); err == nil {
+			_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NULL", b.ID).Scan(&b.AvailableCount)
+			_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NOT NULL", b.ID).Scan(&b.UsedCount)
+			list = append(list, b)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) GenerateCafeBatch(count int, prefix string, charLen int, profileID int64, nasID int64, pricePerCard float64) (string, int, error) {
+	if count <= 0 || count > 50000 {
+		count = 100
+	}
+	if charLen < 4 {
+		charLen = 6
+	}
+
+	var prof models.Profile
+	err := d.QueryRow("SELECT id, name, display_name, price FROM profiles WHERE id = ?", profileID).Scan(
+		&prof.ID, &prof.Name, &prof.DisplayName, &prof.Price)
+	if err != nil {
+		return "", 0, fmt.Errorf("profile not found: %w", err)
+	}
+
+	if pricePerCard <= 0 {
+		pricePerCard = prof.Price
+	}
+
+	batchCode := fmt.Sprintf("CF%d-%s", time.Now().Unix(), randomLetters(4))
+	totalPrice := float64(count) * pricePerCard
+
+	tx, err := d.Begin()
+	if err != nil {
+		return "", 0, err
+	}
+	defer tx.Rollback()
+
+	// 1. Insert Batch record with card_type = 'cafe' and nas_id
+	res, err := tx.Exec(`INSERT INTO batches (batch_code, profile_id, reseller_id, count, price_per_card, total_price, card_type, nas_id, created_at)
+		VALUES (?, ?, 0, ?, ?, ?, 'cafe', ?, CURRENT_TIMESTAMP)`, batchCode, profileID, count, pricePerCard, totalPrice, nasID)
+	if err != nil {
+		return "", 0, err
+	}
+	batchID, _ := res.LastInsertId()
+
+	// 2. Prepare bulk insert statements
+	stmtCard, err := tx.Prepare(`INSERT INTO cards (batch_id, username, password, profile_id, reseller_id, status, price, card_type, nas_id, created_at)
+		VALUES (?, ?, ?, ?, 0, 'available', ?, 'cafe', ?, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		return "", 0, err
+	}
+	defer stmtCard.Close()
+
+	stmtRadCheck, err := tx.Prepare(`INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)`)
+	if err != nil {
+		return "", 0, err
+	}
+	defer stmtRadCheck.Close()
+
+	stmtRadGroup, err := tx.Prepare(`INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)`)
+	if err != nil {
+		return "", 0, err
+	}
+	defer stmtRadGroup.Close()
+
+	created := 0
+	for i := 0; i < count; i++ {
+		u := fmt.Sprintf("%s%s", prefix, randomAlphanumeric(charLen))
+		p := randomAlphanumeric(6)
+
+		if _, err := stmtCard.Exec(batchID, u, p, profileID, pricePerCard, nasID); err == nil {
+			_, _ = stmtRadCheck.Exec(u, p)
+			_, _ = stmtRadGroup.Exec(u, prof.Name)
+			created++
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", 0, err
+	}
+
+	return batchCode, created, nil
+}
+
+func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, fmt.Errorf("يرجى إدخال كود الكارت")
+	}
+
+	// 1. Fetch card details
+	var c models.Card
+	var profileName, profileDisp, rateLimit string
+	var quotaBytes int64
+	var batchID int64
+	var batchCode string
+	var nasID int64
+	var nasName string
+
+	query := `SELECT c.id, c.username, c.password, c.price, c.status, c.first_login_at, c.expired_at,
+		c.batch_id, COALESCE(b.batch_code, ''), COALESCE(c.nas_id, 0), COALESCE(n.shortname, 'عام / غير مقيد'),
+		p.name, p.display_name, p.rate_limit, p.quota_bytes
+		FROM cards c
+		LEFT JOIN batches b ON c.batch_id = b.id
+		LEFT JOIN nas n ON c.nas_id = n.id
+		LEFT JOIN profiles p ON c.profile_id = p.id
+		WHERE c.username = ? LIMIT 1`
+
+	row := d.QueryRow(query, code)
+	err := row.Scan(&c.ID, &c.Username, &c.Password, &c.Price, &c.Status, &c.FirstLoginAt, &c.ExpiredAt,
+		&batchID, &batchCode, &nasID, &nasName,
+		&profileName, &profileDisp, &rateLimit, &quotaBytes)
+	if err != nil {
+		return nil, fmt.Errorf("الكارت '%s' غير مسجل في النظام", code)
+	}
+
+	tracker := &models.CafeCardTracker{
+		CardCode:       c.Username,
+		Password:       c.Password,
+		BatchID:        batchID,
+		BatchCode:      batchCode,
+		ProfileName:    profileName,
+		ProfileDisplay: profileDisp,
+		RateLimit:      rateLimit,
+		QuotaBytes:     quotaBytes,
+		Price:          c.Price,
+		NASID:          nasID,
+		NASName:        nasName,
+	}
+
+	if quotaBytes > 0 {
+		tracker.QuotaDisplay = FormatBytesHuman(quotaBytes)
+	} else {
+		tracker.QuotaDisplay = "غير محدود (Open ∞)"
+	}
+
+	// 2. Query Accounting consumption from radacct
+	var sumIn, sumOut, sumTime sql.NullInt64
+	var minStart sql.NullTime
+	var lastMAC, lastIP sql.NullString
+
+	_ = d.QueryRow(`SELECT SUM(acctinputoctets), SUM(acctoutputoctets), SUM(acctsessiontime),
+		MIN(acctstarttime), MAX(callingstationid), MAX(framedipaddress)
+		FROM radacct WHERE username = ?`, code).Scan(&sumIn, &sumOut, &sumTime, &minStart, &lastMAC, &lastIP)
+
+	if sumIn.Valid {
+		tracker.BytesIn = sumIn.Int64
+	}
+	if sumOut.Valid {
+		tracker.BytesOut = sumOut.Int64
+	}
+	if sumTime.Valid {
+		tracker.SessionTimeSec = sumTime.Int64
+	}
+	tracker.TotalBytes = tracker.BytesIn + tracker.BytesOut
+	tracker.TotalBytesDisplay = FormatBytesHuman(tracker.TotalBytes)
+	tracker.BytesInDisplay = FormatBytesHuman(tracker.BytesIn)
+	tracker.BytesOutDisplay = FormatBytesHuman(tracker.BytesOut)
+	tracker.UptimeDisplay = FormatDurationHuman(tracker.SessionTimeSec)
+
+	if lastMAC.Valid && lastMAC.String != "" {
+		tracker.CallingMAC = lastMAC.String
+	}
+	if lastIP.Valid && lastIP.String != "" {
+		tracker.FramedIP = lastIP.String
+	}
+
+	if minStart.Valid {
+		tracker.FirstLogin = minStart.Time.Format("2006-01-02 15:04:05")
+	} else if c.FirstLoginAt.Valid {
+		tracker.FirstLogin = c.FirstLoginAt.Time.Format("2006-01-02 15:04:05")
+	}
+
+	// 3. Check if currently online
+	var activeSessionID, activeNASIP, activeFramedIP sql.NullString
+	_ = d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, code).Scan(
+		&activeSessionID, &activeNASIP, &activeFramedIP)
+
+	if activeSessionID.Valid && activeSessionID.String != "" {
+		tracker.IsOnline = true
+		tracker.SessionID = activeSessionID.String
+		tracker.NASIP = activeNASIP.String
+		if activeFramedIP.Valid && activeFramedIP.String != "" {
+			tracker.FramedIP = activeFramedIP.String
+		}
+	}
+
+	// 4. Quota remaining and percentage
+	if quotaBytes > 0 {
+		rem := quotaBytes - tracker.TotalBytes
+		if rem < 0 {
+			rem = 0
+		}
+		tracker.RemainingBytes = rem
+		tracker.RemainingDisplay = FormatBytesHuman(rem)
+		tracker.UsagePercent = (float64(tracker.TotalBytes) / float64(quotaBytes)) * 100.0
+		if tracker.UsagePercent > 100.0 {
+			tracker.UsagePercent = 100.0
+		}
+	} else {
+		tracker.RemainingDisplay = "مفتوح ∞"
+		tracker.UsagePercent = 0.0
+	}
+
+	// 5. Diagnostics & Status
+	if tracker.IsOnline {
+		tracker.Status = "online"
+		tracker.StatusLabel = "متصل الآن (Online)"
+		tracker.StatusBadgeClass = "bg-success text-white"
+		tracker.ExpireReason = "الكارت يعمل ويتصل بالشبكة حالياً بشكل ممتاز."
+	} else if tracker.TotalBytes == 0 && tracker.FirstLogin == "" {
+		tracker.Status = "available"
+		tracker.StatusLabel = "متاح للبيع (لم يبدأ بعد)"
+		tracker.StatusBadgeClass = "bg-light text-secondary border"
+		tracker.ExpireReason = "الكارت جديد وجاهز للبيع، لم يسجل العميل الدخول به حتى الآن."
+	} else if quotaBytes > 0 && tracker.TotalBytes >= quotaBytes {
+		tracker.Status = "expired"
+		tracker.StatusLabel = "منتهي الكوتة (Expired Quota)"
+		tracker.StatusBadgeClass = "bg-danger text-white"
+		tracker.ExpireReason = "انتهت كوتة التحميل المخصصة للكارت بالكامل وتم إيقاف الخدمة."
+	} else {
+		tracker.Status = "used"
+		tracker.StatusLabel = "مستهلك / غير متصل"
+		tracker.StatusBadgeClass = "bg-secondary text-white"
+		tracker.ExpireReason = "الكارت مستخدم وغير متصل حالياً (قد تكون مدة الصلاحية أو الجلسة انتهت)."
+	}
+
+	return tracker, nil
+}
+
+func (d *DB) DisconnectCard(code string) (bool, error) {
+	var sessionID, nasIP, framedIPStr sql.NullString
+	err := d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, code).Scan(
+		&sessionID, &nasIP, &framedIPStr)
+	if err != nil || !sessionID.Valid {
+		return false, fmt.Errorf("الكارت غير متصل أونلاين حالياً")
+	}
+
+	var secret string
+	var coaPort int
+	_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP.String).Scan(&secret, &coaPort)
+	if secret == "" {
+		secret = "radius123"
+	}
+	if coaPort <= 0 {
+		coaPort = 3799
+	}
+
+	var framedIP net.IP
+	if framedIPStr.Valid && framedIPStr.String != "" {
+		framedIP = net.ParseIP(framedIPStr.String)
+	}
+
+	_, _ = radius.SendDisconnectRequest(nasIP.String, coaPort, []byte(secret), code, sessionID.String, framedIP)
+	_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
+		WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, sessionID.String, nasIP.String)
+
+	return true, nil
+}
+
 
 
 

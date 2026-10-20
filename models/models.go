@@ -124,16 +124,59 @@ func (p *Profile) CalculateExpiration(from time.Time) time.Time {
 
 // Batch represents a generated batch of voucher cards
 type Batch struct {
-	ID           int64     `json:"id"`
-	BatchCode    string    `json:"batch_code"`
-	ProfileID    int64     `json:"profile_id"`
-	ProfileName  string    `json:"profile_name"`
-	ResellerID   int64     `json:"reseller_id"` // 0 = admin
-	ResellerName string    `json:"reseller_name"`
-	Count        int       `json:"count"`
-	PricePerCard float64   `json:"price_per_card"`
-	TotalPrice   float64   `json:"total_price"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	BatchCode      string    `json:"batch_code"`
+	ProfileID      int64     `json:"profile_id"`
+	ProfileName    string    `json:"profile_name"`
+	ResellerID     int64     `json:"reseller_id"` // 0 = admin
+	ResellerName   string    `json:"reseller_name"`
+	Count          int       `json:"count"`
+	AvailableCount int       `json:"available_count"`
+	UsedCount      int       `json:"used_count"`
+	OnlineCount    int       `json:"online_count"`
+	PricePerCard   float64   `json:"price_per_card"`
+	TotalPrice     float64   `json:"total_price"`
+	CardType       string    `json:"card_type"` // "charge" or "cafe"
+	NASID          int64     `json:"nas_id"`
+	NASName        string    `json:"nas_name"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// CafeCardTracker represents real-time diagnostic inspection of a cafe card
+type CafeCardTracker struct {
+	CardCode          string  `json:"card_code"`
+	Password          string  `json:"password"`
+	BatchID           int64   `json:"batch_id"`
+	BatchCode         string  `json:"batch_code"`
+	ProfileName       string  `json:"profile_name"`
+	ProfileDisplay    string  `json:"profile_display"`
+	RateLimit         string  `json:"rate_limit"`
+	QuotaBytes        int64   `json:"quota_bytes"`
+	QuotaDisplay      string  `json:"quota_display"`
+	Price             float64 `json:"price"`
+	NASID             int64   `json:"nas_id"`
+	NASName           string  `json:"nas_name"`
+	Status            string  `json:"status"` // "available", "online", "expired", "used"
+	StatusLabel       string  `json:"status_label"`
+	StatusBadgeClass  string  `json:"status_badge_class"`
+	IsOnline          bool    `json:"is_online"`
+	SessionID         string  `json:"session_id"`
+	NASIP             string  `json:"nas_ip"`
+	FramedIP          string  `json:"framed_ip"`
+	CallingMAC        string  `json:"calling_mac"`
+	BytesIn           int64   `json:"bytes_in"`
+	BytesOut          int64   `json:"bytes_out"`
+	TotalBytes        int64   `json:"total_bytes"`
+	TotalBytesDisplay string  `json:"total_bytes_display"`
+	BytesInDisplay    string  `json:"bytes_in_display"`
+	BytesOutDisplay   string  `json:"bytes_out_display"`
+	RemainingBytes    int64   `json:"remaining_bytes"`
+	RemainingDisplay  string  `json:"remaining_display"`
+	UsagePercent      float64 `json:"usage_percent"`
+	FirstLogin        string  `json:"first_login"`
+	SessionTimeSec    int64   `json:"session_time_sec"`
+	UptimeDisplay     string  `json:"uptime_display"`
+	ExpireReason      string  `json:"expire_reason"`
 }
 
 // Card represents an individual hotspot / voucher card
@@ -221,6 +264,8 @@ type NAS struct {
 	Community   string    `json:"community"`
 	Description string    `json:"description"`
 	CoAPort     int       `json:"coa_port"`
+	Phone       string    `json:"phone"`   // Cafe owner WhatsApp phone
+	IsCafe      bool      `json:"is_cafe"` // true if branch is a Cafe
 	CreatedAt   time.Time `json:"created_at"`
 }
 
