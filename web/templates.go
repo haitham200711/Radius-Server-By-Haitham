@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -43,6 +44,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"reports/index":          {"templates/base.html", "templates/reports/index.html"},
 		"settings/index":         {"templates/base.html", "templates/settings/index.html"},
 		"whatsapp/index":         {"templates/base.html", "templates/whatsapp/index.html"},
+		"backups/index":          {"templates/base.html", "templates/backups/index.html"},
 	}
 
 	funcMap := template.FuncMap{
@@ -67,14 +69,18 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 func (r *Renderer) Render(w http.ResponseWriter, name string, data interface{}) error {
 	tmpl, ok := r.templates[name]
 	if !ok {
-		return fmt.Errorf("template %s not found", name)
+		err := fmt.Errorf("template '%s' not registered in Renderer", name)
+		log.Printf("[RENDER ERROR] %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if name == "cards/print" {
 		return tmpl.Execute(w, data)
 	}
 	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
-		fmt.Printf("[RENDER ERROR] Template %s failed to execute: %v\n", name, err)
+		log.Printf("[RENDER ERROR] Template %s failed to execute: %v\n", name, err)
+		http.Error(w, "Template execution error: "+err.Error(), http.StatusInternalServerError)
 		return err
 	}
 	return nil
