@@ -1,141 +1,141 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <div>
-        <h3 class="fw-bold mb-1">إدارة سيرفر SSTP VPN للمايكروتك (Accel-PPP)</h3>
-        <p class="text-muted small mb-0">ربط راوترات المايكروتك البعيدة بنفق مشفر وإدارتها عن بعد عبر واجهة النظام</p>
+        <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <span class="p-1.5 bg-primary-subtle text-primary rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <i class="bi bi-shield-lock"></i>
+            </span>
+            <span>إدارة سيرفر SSTP VPN (Accel-PPP)</span>
+        </h4>
+        <p class="text-muted small mb-0">ربط راوترات المايكروتك بنفق مشفر وإدارتها والتوجيه الثابت للشبكات</p>
     </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addClientModal">
-            <i class="bi bi-router me-1"></i> إضافة راوتر SSTP جديد
+
+    <!-- Top Action Buttons -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <button class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addClientModal">
+            <i class="bi bi-plus-circle me-1"></i> إضافة راوتر جديد
         </button>
-        <button class="btn btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#settingsModal">
+        <button class="btn btn-sm btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#settingsModal">
             <i class="bi bi-gear me-1"></i> إعدادات السيرفر
         </button>
+        <a href="/sstp/routes/apply" class="btn btn-sm btn-outline-secondary" title="إعادة تطبيق ومزامنة المسارات في كيرنل لينكس">
+            <i class="bi bi-arrow-clockwise me-1"></i> مزامنة المسارات
+        </a>
     </div>
 </div>
 
-<!-- Stats Row -->
-<div class="row g-3 mb-4">
+<!-- Compact Stats Ribbon -->
+<div class="row g-2 mb-3">
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-3 d-flex align-items-center">
-                <div class="bg-primary bg-opacity-10 text-primary rounded p-3 me-3">
-                    <i class="bi bi-shield-lock-fill fs-3"></i>
-                </div>
-                <div>
-                    <span class="text-muted small">حالة سيرفر SSTP</span>
-                    <h5 class="fw-bold mb-0 text-success">
-                        <i class="bi bi-check-circle-fill me-1"></i> نشط (منفذ {{ .Settings.Port }})
-                    </h5>
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center bg-success-subtle text-success flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-shield-check"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">حالة السيرفر</span>
+                    <span class="fw-bold text-success small">
+                        <i class="bi bi-record-fill me-1"></i>نشط (منفذ {{ .Settings.Port }})
+                    </span>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-3 d-flex align-items-center">
-                <div class="bg-success bg-opacity-10 text-success rounded p-3 me-3">
-                    <i class="bi bi-broadcast fs-3"></i>
-                </div>
-                <div>
-                    <span class="text-muted small">الراوترات المتصلة أونلاين</span>
-                    <h5 class="fw-bold mb-0 text-dark">{{ .OnlineCount }} متصل</h5>
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-router"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">الراوترات المتصلة أونلاين</span>
+                    <span class="fw-bold text-dark small">{{ .OnlineCount }} متصل من إجمالي {{ len .Clients }}</span>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-3 d-flex align-items-center">
-                <div class="bg-info bg-opacity-10 text-info rounded p-3 me-3">
-                    <i class="bi bi-hdd-network fs-3"></i>
-                </div>
-                <div>
-                    <span class="text-muted small">بوابة الشبكة (Gateway)</span>
-                    <h5 class="fw-bold mb-0 font-monospace text-dark">{{ .Settings.GatewayIP }}</h5>
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-2.5 d-flex align-items-center gap-3">
+                <span class="rounded-2 d-inline-flex align-items-center justify-content-center bg-info-subtle text-info flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.15rem;">
+                    <i class="bi bi-hdd-network"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block" style="font-size: 0.8rem;">بوابة الشبكة (Gateway)</span>
+                    <code class="fw-bold text-dark">{{ .Settings.GatewayIP }}</code>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Connect Script for MikroTik -->
-<div class="card mb-4 border-0 shadow-sm">
-    <div class="card-header bg-white py-3 border-bottom">
-        <h5 class="card-title fw-bold mb-0 text-primary">
-            <i class="bi bi-terminal me-2"></i> كود ربط سريع لمايكروتك (RouterOS v6 / v7 Terminal Script)
-        </h5>
-    </div>
-    <div class="card-body">
-        <p class="text-muted small mb-2">توليد ملف كونفجريشن <code>.rsc</code> برابط مؤقت (للاستخدام لمرة واحدة) لتثبيت بروفايل <b>Radius-VPN</b> ونفق <b>Radius-Pro</b> مع مراقبة <b>Netwatch</b>:</p>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button class="btn btn-primary fw-bold" onclick="openRouterScriptModal(0, 'ربط مايكروتك جديد', '{{ .RandUser }}', '{{ .RandPass }}')">
-                <i class="bi bi-file-earmark-code me-1"></i> توليد كود ورابط ملف التثبيت المباشر (.rsc)
-            </button>
-            <span class="text-muted small">يتم إنشاء ملف كامل لمرة واحدة برابط مؤقت يمكن استيراده بضغطة زر.</span>
         </div>
     </div>
 </div>
 
 <!-- SSTP Routers Table -->
-<div class="card mb-4 border-0 shadow-sm">
-    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-        <h5 class="card-title fw-bold mb-0">
-            <i class="bi bi-router-fill me-2"></i> راوترات وفروع المايكروتك المسجلة
-        </h5>
-        <span class="badge bg-light text-dark border">{{ len .Clients }} راوتر</span>
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-router-fill text-primary"></i>
+            <h6 class="fw-bold mb-0">راوترات وفروع المايكروتك المسجلة</h6>
+            <span class="badge bg-light text-secondary border small">{{ len .Clients }}</span>
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                <i class="bi bi-plus-lg me-1"></i> إضافة راوتر
+            </button>
+        </div>
     </div>
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0 text-nowrap">
-            <thead class="table-light">
+            <thead class="table-light small">
                 <tr>
                     <th>اسم الفرع / الراوتر</th>
-                    <th>اسم مستخدم SSTP</th>
+                    <th>اسم المستخدم</th>
                     <th>كلمة المرور</th>
                     <th>آي بي النفق (VPN IP)</th>
-                    <th>حالة الاتصال</th>
+                    <th>الحالة</th>
                     <th>ملاحظات</th>
-                    <th class="text-end">خيارات</th>
+                    <th class="text-end">الإجراءات</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="small">
                 {{ range .Clients }}
                 <tr>
                     <td><strong>{{ .Name }}</strong></td>
                     <td><span class="badge bg-light text-dark border font-monospace">{{ .Username }}</span></td>
-                    <td><code>{{ .Password }}</code></td>
+                    <td><code class="text-secondary">{{ .Password }}</code></td>
                     <td>
                         {{ if .AssignedIP }}
-                        <code class="text-primary">{{ .AssignedIP }}</code>
+                        <code class="text-primary fw-bold">{{ .AssignedIP }}</code>
                         {{ else }}
-                        <span class="text-muted">تلقائي من الـ Pool</span>
+                        <span class="text-muted">تلقائي من Pool</span>
                         {{ end }}
                     </td>
                     <td>
                         {{ if .IsOnline }}
-                        <span class="badge bg-success"><i class="bi bi-record-fill me-1"></i>متصل الآن (Online)</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                            <i class="bi bi-record-fill me-1"></i>أونلاين
+                        </span>
                         {{ else }}
-                        <span class="badge bg-secondary">غير متصل (Offline)</span>
+                        <span class="badge bg-light text-secondary border">غير متصل</span>
                         {{ end }}
                     </td>
-                    <td><small class="text-muted">{{ if .Notes }}{{ .Notes }}{{ else }}-{{ end }}</small></td>
+                    <td><span class="text-muted">{{ if .Notes }}{{ .Notes }}{{ else }}-{{ end }}</span></td>
                     <td class="text-end text-nowrap">
-                        <button class="btn btn-sm btn-outline-primary me-1 fw-bold" onclick="openRouterScriptModal({{ .ID }}, '{{ .Name }}', '{{ .Username }}', '{{ .Password }}')" title="كود ورابط ملف التثبيت المباشر">
-                            <i class="bi bi-file-earmark-code me-1"></i> كود المايكروتك (.rsc)
+                        <button class="btn btn-sm btn-light border text-primary fw-bold py-1 px-2 me-1" onclick="openRouterScriptModal({{ .ID }}, '{{ .Name }}', '{{ .Username }}', '{{ .Password }}')" title="كود ورابط ملف التثبيت المباشر">
+                            <i class="bi bi-file-earmark-code me-1"></i> كود .rsc
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-warning text-dark me-1 fw-bold" onclick="openEditClientModal({{ .ID }}, '{{ .Name }}', '{{ .Username }}', '{{ .Password }}', '{{ .AssignedIP }}', '{{ .Notes }}', {{ .Enabled }})" title="تعديل بيانات الراوتر">
-                            <i class="bi bi-pencil-square"></i> تعديل
+                        <button type="button" class="btn btn-sm btn-light border text-secondary py-1 px-2 me-1" onclick="openEditClientModal({{ .ID }}, '{{ .Name }}', '{{ .Username }}', '{{ .Password }}', '{{ .AssignedIP }}', '{{ .Notes }}', {{ .Enabled }})" title="تعديل بيانات الراوتر">
+                            <i class="bi bi-pencil"></i>
                         </button>
-                        <a href="/sstp/clients/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف هذا الراوتر من SSTP؟');" title="حذف">
+                        <a href="/sstp/clients/delete?id={{ .ID }}" class="btn btn-sm btn-light border text-danger py-1 px-2" onclick="return confirm('هل تريد حذف هذا الراوتر من SSTP؟');" title="حذف">
                             <i class="bi bi-trash"></i>
                         </a>
                     </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
-                        <i class="bi bi-router fs-2 d-block mb-2"></i>
-                        لا يوجد راوترات SSTP مسجلة حتى الآن
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-router fs-3 d-block mb-1 text-secondary opacity-50"></i>
+                        لا توجد راوترات مسجلة حتى الآن
                     </td>
                 </tr>
                 {{ end }}
@@ -145,46 +145,48 @@
 </div>
 
 <!-- Static Routing Management Section -->
-<div class="card mb-4 border-0 shadow-sm">
-    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <h5 class="card-title fw-bold mb-0 text-dark">
-                <i class="bi bi-diagram-3-fill me-2 text-primary"></i> جدول التوجيه الثابت للشبكات والفروع (Linux Static Routing)
-            </h5>
-            <p class="text-muted small mb-0">توجيه الترافيك لشبكات أجهزة الفروع (مثل <code>192.168.100.0/24</code>) عبر آي بي نفق الـ SSTP للراوتر وتطبيقها بكيرنل لينكس</p>
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-diagram-3-fill text-primary"></i>
+                <h6 class="fw-bold mb-0">جدول التوجيه الثابت (Static Routing)</h6>
+                <span class="badge bg-light text-secondary border small">{{ len .StaticRoutes }}</span>
+            </div>
+            <p class="text-muted small mb-0 mt-0.5" style="font-size: 0.78rem;">توجيه شبكات الفروع عبر آي بي نفق الـ SSTP في كيرنل لينكس</p>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#addRouteModal">
-                <i class="bi bi-plus-circle me-1"></i> إضافة مسار ثابت جديد
+            <button class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#addRouteModal">
+                <i class="bi bi-plus-lg me-1"></i> إضافة مسار
             </button>
-            <a href="/sstp/routes/apply" class="btn btn-outline-secondary btn-sm fw-bold" title="إعادة مزامنة وتطبيق كافة المسارات النشطة في كيرنل لينكس فوراً">
-                <i class="bi bi-arrow-clockwise me-1"></i> مزامنة المسارات
+            <a href="/sstp/routes/apply" class="btn btn-sm btn-outline-secondary" title="إعادة مزامنة المسارات في كيرنل لينكس">
+                <i class="bi bi-arrow-clockwise me-1"></i> مزامنة
             </a>
         </div>
     </div>
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0 text-nowrap">
-            <thead class="table-light">
+            <thead class="table-light small">
                 <tr>
-                    <th>شبكة الوجهة (Destination Subnet)</th>
-                    <th>عبر البوابة (Via Gateway IP)</th>
-                    <th>الراوتر / الفرع المرتبط</th>
-                    <th>واجهة النفق (Interface)</th>
-                    <th>البيان والوصف</th>
-                    <th>الحالة في لينكس</th>
-                    <th class="text-end">خيارات</th>
+                    <th>شبكة الوجهة (Destination)</th>
+                    <th>عبر البوابة (Via Gateway)</th>
+                    <th>الراوتر المرتبط</th>
+                    <th>الواجهة (Interface)</th>
+                    <th>الوصف</th>
+                    <th>الحالة</th>
+                    <th class="text-end">الإجراءات</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="small">
                 {{ range .StaticRoutes }}
                 <tr>
                     <td>
-                        <span class="badge bg-dark-subtle text-dark border font-monospace fs-6 px-2 py-1">
+                        <span class="badge bg-light text-dark border font-monospace">
                             {{ .DestinationCIDR }}
                         </span>
                     </td>
                     <td>
-                        <span class="badge bg-primary-subtle text-primary border font-monospace fs-6 px-2 py-1">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">
                             via {{ .GatewayIP }}
                         </span>
                     </td>
@@ -192,37 +194,37 @@
                         {{ if .ClientName }}
                         <strong class="text-dark">{{ .ClientName }}</strong>
                         {{ else }}
-                        <span class="text-muted">يدوي (Manual)</span>
+                        <span class="text-muted">يدوي</span>
                         {{ end }}
                     </td>
                     <td>
                         {{ if .ActiveDev }}
                         <code class="fw-bold text-success">{{ .ActiveDev }}</code>
                         {{ else }}
-                        <span class="text-muted small">تلقائي (auto)</span>
+                        <span class="text-muted small">تلقائي</span>
                         {{ end }}
                     </td>
                     <td>
-                        <small class="text-dark">{{ if .Description }}{{ .Description }}{{ else }}-{{ end }}</small>
+                        <span class="text-muted">{{ if .Description }}{{ .Description }}{{ else }}-{{ end }}</span>
                     </td>
                     <td>
                         {{ if not .Enabled }}
-                        <span class="badge bg-secondary">معطل</span>
+                        <span class="badge bg-light text-secondary border">معطل</span>
                         {{ else if .IsApplied }}
-                        <span class="badge bg-success">
-                            <i class="bi bi-check-circle-fill me-1"></i> نشط ومطبق في لينكس
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                            <i class="bi bi-check-circle-fill me-1"></i>مطبق بنشاط
                         </span>
                         {{ else }}
-                        <span class="badge bg-warning text-dark">
-                            <i class="bi bi-clock-history me-1"></i> معلق (في انتظار اتصال الراوتر)
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                            <i class="bi bi-clock-history me-1"></i>في انتظار الاتصال
                         </span>
                         {{ end }}
                     </td>
                     <td class="text-end text-nowrap">
-                        <button type="button" class="btn btn-sm btn-outline-warning text-dark me-1 fw-bold" onclick="openEditRouteModal({{ .ID }}, '{{ .DestinationCIDR }}', '{{ .GatewayIP }}', {{ .ClientID }}, '{{ .Description }}', {{ .Enabled }})" title="تعديل المسار">
-                            <i class="bi bi-pencil-square"></i> تعديل
+                        <button type="button" class="btn btn-sm btn-light border text-secondary py-1 px-2 me-1" onclick="openEditRouteModal({{ .ID }}, '{{ .DestinationCIDR }}', '{{ .GatewayIP }}', {{ .ClientID }}, '{{ .Description }}', {{ .Enabled }})" title="تعديل">
+                            <i class="bi bi-pencil"></i>
                         </button>
-                        <a href="/sstp/routes/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد حذف هذا المسار الثابت ومسحه من لينكس نهائياً؟');" title="حذف المسار">
+                        <a href="/sstp/routes/delete?id={{ .ID }}" class="btn btn-sm btn-light border text-danger py-1 px-2" onclick="return confirm('هل تريد حذف هذا المسار الثابت نهائياً؟');" title="حذف">
                             <i class="bi bi-trash"></i>
                         </a>
                     </td>
@@ -230,8 +232,8 @@
                 {{ else }}
                 <tr>
                     <td colspan="7" class="text-center py-4 text-muted">
-                        <i class="bi bi-signpost-split fs-2 d-block mb-2"></i>
-                        لا توجد مسارات ثابتة مضافة حتى الآن. يمكنك إضافة مسار مثل <code>192.168.100.0/24 via 10.171.171.2</code>
+                        <i class="bi bi-signpost-split fs-3 d-block mb-1 text-secondary opacity-50"></i>
+                        لا توجد مسارات ثابتة مضافة حتى الآن
                     </td>
                 </tr>
                 {{ end }}
@@ -241,40 +243,40 @@
 </div>
 
 <!-- Active Live Sessions -->
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white py-3 border-bottom">
-        <h5 class="card-title fw-bold mb-0 text-success">
-            <i class="bi bi-activity me-2"></i> الجلسات والراوترات المتصلة حالياً بالسيرفر (Active Tunnels)
-        </h5>
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center gap-2">
+        <i class="bi bi-activity text-success"></i>
+        <h6 class="fw-bold mb-0 text-success">الجلسات المتصلة حالياً (Active Tunnels)</h6>
+        <span class="badge bg-success-subtle text-success small border border-success-subtle">{{ len .ActiveSessions }}</span>
     </div>
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0 text-nowrap">
-            <thead class="table-light">
+            <thead class="table-light small">
                 <tr>
                     <th>الواجهة (Interface)</th>
                     <th>المستخدم</th>
                     <th>الآي بي الحقيقي للراوتر</th>
-                    <th>آي بي نفق الـ VPN</th>
+                    <th>آي بي الـ VPN</th>
                     <th>النوع</th>
                     <th>الحالة</th>
                     <th>مدة الاتصال</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="small">
                 {{ range .ActiveSessions }}
                 <tr>
-                    <td><code class="fw-bold">{{ .IfName }}</code></td>
+                    <td><code class="fw-bold text-dark">{{ .IfName }}</code></td>
                     <td><strong>{{ .Username }}</strong></td>
                     <td><code>{{ .CallingIP }}</code></td>
-                    <td><span class="badge bg-primary font-monospace">{{ .IP }}</span></td>
+                    <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">{{ .IP }}</span></td>
                     <td><span class="badge bg-light text-dark border">{{ .Type }}</span></td>
-                    <td><span class="badge bg-success">{{ .State }}</span></td>
-                    <td><small class="text-muted"><i class="bi bi-clock me-1"></i>{{ .Uptime }}</small></td>
+                    <td><span class="badge bg-success-subtle text-success border border-success-subtle">{{ .State }}</span></td>
+                    <td><span class="text-muted"><i class="bi bi-clock me-1"></i>{{ .Uptime }}</span></td>
                 </tr>
                 {{ else }}
                 <tr>
                     <td colspan="7" class="text-center py-4 text-muted">
-                        لا يوجد جلسات SSTP متصلة حالياً
+                        لا توجد جلسات متصلة حالياً
                     </td>
                 </tr>
                 {{ end }}
@@ -286,46 +288,46 @@
 <!-- Modal Add Client -->
 <div class="modal fade" id="addClientModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title fw-bold text-primary">
-                    <i class="bi bi-plus-circle me-1"></i> إضافة راوتر / فرع SSTP
-                </h5>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5">
+                <h6 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-plus-circle text-primary me-1"></i> إضافة راوتر / فرع SSTP
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/sstp/clients/add">
-                <div class="modal-body p-4">
+                <div class="modal-body p-3">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اسم الراوتر أو الفرع: <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: راوتر فرع المعادي" required>
+                        <label class="form-label fw-bold small">اسم الراوتر أو الفرع: <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control form-control-sm" placeholder="مثال: راوتر فرع المعادي" required>
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label fw-bold">اسم مستخدم SSTP:</label>
-                            <input type="text" name="username" class="form-control font-monospace" value="{{ .RandUser }}">
-                            <small class="text-muted">تلقائي إذا تُرك فارغاً</small>
+                            <label class="form-label fw-bold small">اسم مستخدم SSTP:</label>
+                            <input type="text" name="username" class="form-control form-control-sm font-monospace" value="{{ .RandUser }}">
+                            <small class="text-muted" style="font-size: 0.75rem;">تلقائي إذا تُرك فارغاً</small>
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold">كلمة مرور SSTP:</label>
-                            <input type="text" name="password" class="form-control font-monospace" value="{{ .RandPass }}">
+                            <label class="form-label fw-bold small">كلمة مرور SSTP:</label>
+                            <input type="text" name="password" class="form-control form-control-sm font-monospace" value="{{ .RandPass }}">
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">آي بي الـ VPN الثابت (اختياري):</label>
-                        <input type="text" name="assigned_ip" class="form-control font-monospace" placeholder="مثال: 10.10.10.25 (اتركه فارغاً للتلقائي)">
-                        <small class="text-muted">الآي بي الذي سيحصل عليه المايكروتك داخل نفق الـ VPN.</small>
+                        <label class="form-label fw-bold small">آي بي الـ VPN الثابت (اختياري):</label>
+                        <input type="text" name="assigned_ip" class="form-control form-control-sm font-monospace" placeholder="مثال: 10.10.10.25 (اتركه فارغاً للتلقائي)">
+                        <small class="text-muted" style="font-size: 0.75rem;">الآي بي الذي سيحصل عليه المايكروتك داخل نفق الـ VPN.</small>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">ملاحظات إضافية:</label>
-                        <input type="text" name="notes" class="form-control" placeholder="مثال: راوتر CCR2004 - فرع 2">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small">ملاحظات إضافية:</label>
+                        <input type="text" name="notes" class="form-control form-control-sm" placeholder="مثال: راوتر CCR2004 - فرع 2">
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">حفظ وتوليد الكود</button>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">حفظ وتوليد الكود</button>
                 </div>
             </form>
         </div>
@@ -335,64 +337,60 @@
 <!-- Modal Edit SSTP Client / Router -->
 <div class="modal fade" id="editClientModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-pencil-square me-1"></i> تعديل بيانات راوتر SSTP
-                </h5>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5">
+                <h6 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-pencil-square text-primary me-1"></i> تعديل بيانات راوتر SSTP
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/sstp/clients/edit">
-                <div class="modal-body p-4">
+                <div class="modal-body p-3">
                     <input type="hidden" name="id" id="editClientID">
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اسم الفرع / الراوتر:</label>
-                        <input type="text" name="name" id="editClientName" class="form-control" required>
+                        <label class="form-label fw-bold small">اسم الفرع / الراوتر:</label>
+                        <input type="text" name="name" id="editClientName" class="form-control form-control-sm" required>
                     </div>
 
-                    <!-- Non-editable Username and Password as requested -->
+                    <!-- Non-editable Username and Password -->
                     <div class="card bg-light border-0 mb-3">
-                        <div class="card-body p-3">
+                        <div class="card-body p-2.5">
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold small text-muted mb-1">
-                                        <i class="bi bi-lock-fill text-danger me-1"></i> اسم المستخدم (ثابت):
+                                    <label class="form-label fw-bold text-muted mb-1" style="font-size: 0.75rem;">
+                                        <i class="bi bi-lock-fill text-secondary me-1"></i> اسم المستخدم (ثابت):
                                     </label>
-                                    <input type="text" id="editClientUsername" class="form-control font-monospace bg-white text-muted" readonly disabled>
+                                    <input type="text" id="editClientUsername" class="form-control form-control-sm font-monospace bg-white text-muted" readonly disabled>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold small text-muted mb-1">
-                                        <i class="bi bi-lock-fill text-danger me-1"></i> كلمة المرور (ثابتة):
+                                    <label class="form-label fw-bold text-muted mb-1" style="font-size: 0.75rem;">
+                                        <i class="bi bi-lock-fill text-secondary me-1"></i> كلمة المرور (ثابتة):
                                     </label>
-                                    <input type="text" id="editClientPassword" class="form-control font-monospace bg-white text-muted" readonly disabled>
+                                    <input type="text" id="editClientPassword" class="form-control form-control-sm font-monospace bg-white text-muted" readonly disabled>
                                 </div>
                             </div>
-                            <small class="text-muted d-block mt-2">
-                                <i class="bi bi-info-circle me-1"></i> اسم المستخدم وكلمة المرور غير قابلة للتعديل للحفاظ على استقرار اتصال النفق.
-                            </small>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">آي بي الـ VPN المخصص (Assigned IP):</label>
-                        <input type="text" name="assigned_ip" id="editClientAssignedIP" class="form-control font-monospace" placeholder="اتركه فارغاً للتلقائي من الـ Pool">
-                        <small class="text-muted">الآي بي الذي سيحصل عليه الراوتر عند الاتصال.</small>
+                        <label class="form-label fw-bold small">آي بي الـ VPN المخصص (Assigned IP):</label>
+                        <input type="text" name="assigned_ip" id="editClientAssignedIP" class="form-control form-control-sm font-monospace" placeholder="اتركه فارغاً للتلقائي من الـ Pool">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">ملاحظات إضافية:</label>
-                        <input type="text" name="notes" id="editClientNotes" class="form-control" placeholder="ملاحظات حول الفرع أو الجهاز...">
+                        <label class="form-label fw-bold small">ملاحظات إضافية:</label>
+                        <input type="text" name="notes" id="editClientNotes" class="form-control form-control-sm" placeholder="ملاحظات حول الفرع...">
                     </div>
 
-                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                    <div class="form-check form-switch pt-2 border-top">
                         <input class="form-check-input" type="checkbox" name="enabled" id="editClientEnabled" value="1">
-                        <label class="form-check-label fw-bold" for="editClientEnabled">تفعيل الراوتر والسماح له بالاتصال</label>
+                        <label class="form-check-label fw-bold small" for="editClientEnabled">تفعيل الراوتر والسماح له بالاتصال</label>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning fw-bold text-dark">
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">
                         <i class="bi bi-check-lg me-1"></i> حفظ التعديلات
                     </button>
                 </div>
@@ -404,24 +402,24 @@
 <!-- Modal Add Static Route -->
 <div class="modal fade" id="addRouteModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-signpost-split me-1"></i> إضافة مسار توجيه ثابت جديد (Static Route)
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5">
+                <h6 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-signpost-split text-primary me-1"></i> إضافة مسار توجيه ثابت (Static Route)
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/sstp/routes/add">
-                <div class="modal-body p-4">
+                <div class="modal-body p-3">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">شبكة الأجهزة المستهدفة (Destination CIDR):</label>
-                        <input type="text" name="destination_cidr" class="form-control font-monospace form-control-lg fw-bold" placeholder="مثال: 192.168.100.0/24" required>
-                        <small class="text-muted">الرينج أو السابنت الخاص بالفرع (مثال: <code>192.168.100.0/24</code> أو <code>172.16.0.0/16</code>).</small>
+                        <label class="form-label fw-bold small">شبكة الأجهزة المستهدفة (Destination CIDR):</label>
+                        <input type="text" name="destination_cidr" class="form-control form-control-sm font-monospace fw-bold" placeholder="مثال: 192.168.100.0/24" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">الرينج أو السابنت الخاص بالفرع (مثال: <code>192.168.100.0/24</code>).</small>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اختيار الراوتر / الفرع المرتبط (اختياري):</label>
-                        <select id="addRouteClientSelect" class="form-select" onchange="onSelectRouteClient(this, 'addRouteGatewayInput')">
+                        <label class="form-label fw-bold small">اختيار الراوتر / الفرع المرتبط (اختياري):</label>
+                        <select id="addRouteClientSelect" class="form-select form-select-sm" onchange="onSelectRouteClient(this, 'addRouteGatewayInput')">
                             <option value="" data-id="0">-- اختر راوتر SSTP لملء الآي بي تلقائياً (أو اكتبه يدوياً) --</option>
                             {{ range .Clients }}
                             <option value="{{ .AssignedIP }}" data-id="{{ .ID }}">{{ .Name }} ({{ .Username }}) - {{ if .AssignedIP }}{{ .AssignedIP }}{{ else }}Pool{{ end }}</option>
@@ -431,24 +429,23 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">عبر بوابة نفق الـ VPN (Gateway IP):</label>
-                        <input type="text" name="gateway_ip" id="addRouteGatewayInput" class="form-control font-monospace fw-bold" placeholder="مثال: 10.171.171.2" required>
-                        <small class="text-muted">آي بي الراوتر داخل نفق الـ VPN (مثل <code>10.171.171.2</code>) الذي سيتم توجيه الترافيك من خلاله.</small>
+                        <label class="form-label fw-bold small">عبر بوابة نفق الـ VPN (Gateway IP):</label>
+                        <input type="text" name="gateway_ip" id="addRouteGatewayInput" class="form-control form-control-sm font-monospace fw-bold" placeholder="مثال: 10.171.171.2" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">البيان / الوصف:</label>
-                        <input type="text" name="description" class="form-control" placeholder="مثال: شبكة أجهزة كمبيوتر وطابعات فرع الهرم">
+                        <label class="form-label fw-bold small">البيان / الوصف:</label>
+                        <input type="text" name="description" class="form-control form-control-sm" placeholder="مثال: شبكة كمبيوتر وطابعات فرع الهرم">
                     </div>
 
-                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                    <div class="form-check form-switch pt-2 border-top">
                         <input class="form-check-input" type="checkbox" name="enabled" id="addRouteEnabled" value="1" checked>
-                        <label class="form-check-label fw-bold" for="addRouteEnabled">تفعيل وتطبيق المسار في كيرنل لينكس فوراً</label>
+                        <label class="form-check-label fw-bold small" for="addRouteEnabled">تفعيل وتطبيق المسار في كيرنل لينكس فوراً</label>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">
                         <i class="bi bi-check-circle me-1"></i> حفظ وتطبيق المسار
                     </button>
                 </div>
@@ -460,41 +457,41 @@
 <!-- Modal Edit Static Route -->
 <div class="modal fade" id="editRouteModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-pencil-square me-1"></i> تعديل مسار التوجيه الثابت
-                </h5>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5">
+                <h6 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-pencil-square text-primary me-1"></i> تعديل مسار التوجيه الثابت
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/sstp/routes/edit">
-                <div class="modal-body p-4">
+                <div class="modal-body p-3">
                     <input type="hidden" name="id" id="editRouteID">
                     <input type="hidden" name="client_id" id="editRouteClientID" value="0">
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">شبكة الأجهزة المستهدفة (Destination CIDR):</label>
-                        <input type="text" name="destination_cidr" id="editRouteDest" class="form-control font-monospace form-control-lg fw-bold" required>
+                        <label class="form-label fw-bold small">شبكة الأجهزة المستهدفة (Destination CIDR):</label>
+                        <input type="text" name="destination_cidr" id="editRouteDest" class="form-control form-control-sm font-monospace fw-bold" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">عبر بوابة نفق الـ VPN (Gateway IP):</label>
-                        <input type="text" name="gateway_ip" id="editRouteGateway" class="form-control font-monospace fw-bold" required>
+                        <label class="form-label fw-bold small">عبر بوابة نفق الـ VPN (Gateway IP):</label>
+                        <input type="text" name="gateway_ip" id="editRouteGateway" class="form-control form-control-sm font-monospace fw-bold" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">البيان / الوصف:</label>
-                        <input type="text" name="description" id="editRouteDesc" class="form-control">
+                        <label class="form-label fw-bold small">البيان / الوصف:</label>
+                        <input type="text" name="description" id="editRouteDesc" class="form-control form-control-sm">
                     </div>
 
-                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                    <div class="form-check form-switch pt-2 border-top">
                         <input class="form-check-input" type="checkbox" name="enabled" id="editRouteEnabled" value="1">
-                        <label class="form-check-label fw-bold" for="editRouteEnabled">تفعيل المسار وتطبيقه في لينكس</label>
+                        <label class="form-check-label fw-bold small" for="editRouteEnabled">تفعيل المسار وتطبيقه في لينكس</label>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning fw-bold text-dark">
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">
                         <i class="bi bi-check-lg me-1"></i> حفظ التعديلات
                     </button>
                 </div>
@@ -506,153 +503,152 @@
 <!-- Modal Server Settings -->
 <div class="modal fade" id="settingsModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title fw-bold text-dark">
-                    <i class="bi bi-gear me-1"></i> إعدادات سيرفر SSTP VPN
-                </h5>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5">
+                <h6 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-gear text-secondary me-1"></i> إعدادات سيرفر SSTP VPN
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/sstp/settings">
-                <div class="modal-body p-4">
+                <div class="modal-body p-3">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">منفذ الاتصال (SSTP Port):</label>
-                        <input type="number" name="port" class="form-control font-monospace" value="{{ .Settings.Port }}" required>
-                        <small class="text-muted">الافتراضي في نظام مايكروتك هو 4444 أو 443.</small>
+                        <label class="form-label fw-bold small">منفذ الاتصال (SSTP Port):</label>
+                        <input type="number" name="port" class="form-control form-control-sm font-monospace" value="{{ .Settings.Port }}" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">الافتراضي في نظام مايكروتك هو 4444 أو 443.</small>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">عنوان بوابة السيرفر (Gateway IP):</label>
-                        <input type="text" name="gateway_ip" class="form-control font-monospace" value="{{ .Settings.GatewayIP }}" required>
+                        <label class="form-label fw-bold small">عنوان بوابة السيرفر (Gateway IP):</label>
+                        <input type="text" name="gateway_ip" class="form-control form-control-sm font-monospace" value="{{ .Settings.GatewayIP }}" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">نطاق الآيبيهات للراوترات (IP Pool):</label>
-                        <input type="text" name="ip_pool" class="form-control font-monospace" value="{{ .Settings.IPPool }}" required>
-                        <small class="text-muted">مثال: 10.10.10.2-254</small>
+                        <label class="form-label fw-bold small">نطاق الآيبيهات للراوترات (IP Pool):</label>
+                        <input type="text" name="ip_pool" class="form-control form-control-sm font-monospace" value="{{ .Settings.IPPool }}" required>
+                        <small class="text-muted" style="font-size: 0.75rem;">مثال: 10.10.10.2-254</small>
                     </div>
 
-                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                    <div class="form-check form-switch pt-2 border-top">
                         <input class="form-check-input" type="checkbox" name="enabled" id="sstp_enabled" value="1" {{ if .Settings.Enabled }}checked{{ end }}>
-                        <label class="form-check-label fw-bold" for="sstp_enabled">تفعيل سيرفر SSTP على النظام</label>
+                        <label class="form-check-label fw-bold small" for="sstp_enabled">تفعيل سيرفر SSTP على النظام</label>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary fw-bold">حفظ وتطبيق الإعدادات</button>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold">حفظ وتطبيق الإعدادات</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
 <!-- Modal for MikroTik Terminal One-Time Script (.rsc) -->
 <div class="modal fade" id="routerScriptModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <div>
-                    <h5 class="modal-title fw-bold mb-1">
-                        <i class="bi bi-file-earmark-code-fill me-2 text-warning"></i> كود وملف ربط المايكروتك التلقائي (.rsc)
-                    </h5>
-                    <span class="badge bg-warning text-dark small fw-bold">
-                        <i class="bi bi-shield-lock-fill me-1"></i> رابط صالح لمرة واحدة (One-Time Link)
-                    </span>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-code text-primary fs-5"></i>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0">كود وملف ربط المايكروتك (.rsc)</h6>
+                        <span class="text-muted small" style="font-size: 0.75rem;">رابط مؤقت لمرة واحدة للاستيراد السريع</span>
+                    </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
+            <div class="modal-body p-3">
                 <!-- Router Details Summary -->
                 <div class="card bg-light border-0 mb-3">
                     <div class="card-body py-2 px-3">
-                        <div class="row g-2 align-items-center">
+                        <div class="row g-2 align-items-center small">
                             <div class="col-md-4">
-                                <span class="text-muted small d-block">اسم الراوتر / الفرع:</span>
+                                <span class="text-muted d-block" style="font-size: 0.75rem;">اسم الراوتر:</span>
                                 <strong class="text-dark" id="modalRouterName">-</strong>
                             </div>
                             <div class="col-md-4">
-                                <span class="text-muted small d-block">مستخدم SSTP:</span>
-                                <span class="badge bg-white text-primary border font-monospace px-2 py-1" id="modalRouterUser">-</span>
+                                <span class="text-muted d-block" style="font-size: 0.75rem;">مستخدم SSTP:</span>
+                                <span class="badge bg-white text-dark border font-monospace px-2 py-1" id="modalRouterUser">-</span>
                             </div>
                             <div class="col-md-4">
-                                <span class="text-muted small d-block">بروفايل ونفق المايكروتك:</span>
-                                <span class="badge bg-primary me-1">Radius-VPN</span>
-                                <span class="badge bg-success">Radius-Pro</span>
+                                <span class="text-muted d-block" style="font-size: 0.75rem;">البروفايل والنفق:</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">Radius-VPN</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Radius-Pro</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 1. Fastest: One-Line Terminal Command (Recommended) -->
-                <div class="card border-primary border-2 mb-3 shadow-sm">
-                    <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
-                        <span class="fw-bold small">
-                            <i class="bi bi-terminal-fill me-1"></i> الطريقة الأولى (الأسهل والأسرع): أمر التيرمينال بضغطة واحدة
+                <!-- 1. One-Line Terminal Command -->
+                <div class="card border mb-3">
+                    <div class="card-header bg-white py-2 px-3 d-flex justify-content-between align-items-center">
+                        <span class="fw-bold small text-dark">
+                            <i class="bi bi-terminal me-1 text-primary"></i> أمر التيرمينال المباشر (Terminal Command)
                         </span>
-                        <span class="badge bg-white text-primary fw-bold">موصى به</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">موصى به</span>
                     </div>
                     <div class="card-body p-3">
-                        <p class="text-muted small mb-2">انسخ السطر التالي وضعه في نافذة <b>Terminal</b> بمايكروتك واضغط <b>Enter</b>، سيتم استيراد البروفايل والنفق والمراقبة تلقائياً:</p>
-                        <div class="input-group mb-2">
+                        <p class="text-muted small mb-2">انسخ السطر التالي وضعه في نافذة <b>Terminal</b> بمايكروتك لتثبيت البروفايل والنفق فوراً:</p>
+                        <div class="input-group input-group-sm mb-2">
                             <input type="text" id="modalFetchCmd" class="form-control font-monospace bg-light fw-bold text-primary" readonly value="جاري توليد الرابط والكود...">
                             <button type="button" class="btn btn-primary fw-bold px-3" id="btnCopyFetchCmd" onclick="copyFetchCommand()">
-                                <i class="bi bi-clipboard-check me-1"></i> نسخ أمر التيرمينال
+                                <i class="bi bi-clipboard-check me-1"></i> نسخ الأمر
                             </button>
                         </div>
-                        <div class="small text-muted">
-                            <i class="bi bi-info-circle me-1"></i> يقوم الأمر بتحميل ملف <code>Radius-Pro.rsc</code> وتنفيذه فوراً ثم مسح الملف المؤقت من الراوتر.
+                        <div class="small text-muted" style="font-size: 0.75rem;">
+                            <i class="bi bi-info-circle me-1"></i> يقوم الأمر بتحميل ملف <code>Radius-Pro.rsc</code> وتنفيذه ثم مسح الملف المؤقت تلقائياً.
                         </div>
                     </div>
                 </div>
 
                 <!-- 2. Direct Download Link for .rsc File -->
                 <div class="card border-0 bg-light mb-3">
-                    <div class="card-body p-3">
-                        <label class="form-label fw-bold small text-dark mb-1">
-                            <i class="bi bi-link-45deg me-1"></i> الرابط المباشر لملف الكونفجريشن (.rsc):
+                    <div class="card-body p-2.5">
+                        <label class="form-label fw-bold text-dark mb-1 small">
+                            <i class="bi bi-link-45deg me-1"></i> الرابط المباشر لملف (.rsc):
                         </label>
-                        <div class="input-group mb-2">
-                            <input type="text" id="modalDirectUrl" class="form-control font-monospace form-control-sm bg-white" readonly value="جاري التوليد...">
-                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="copyDirectUrl()">
-                                <i class="bi bi-clipboard me-1"></i> نسخ الرابط
+                        <div class="input-group input-group-sm mb-1.5">
+                            <input type="text" id="modalDirectUrl" class="form-control font-monospace bg-white" readonly value="جاري التوليد...">
+                            <button type="button" class="btn btn-outline-secondary fw-bold" onclick="copyDirectUrl()">
+                                <i class="bi bi-clipboard me-1"></i> نسخ
                             </button>
-                            <a id="btnDownloadRsc" href="#" class="btn btn-outline-primary btn-sm fw-bold" target="_blank" download="Radius-Pro.rsc">
-                                <i class="bi bi-download me-1"></i> تحميل ملف .rsc
+                            <a id="btnDownloadRsc" href="#" class="btn btn-outline-primary fw-bold" target="_blank" download="Radius-Pro.rsc">
+                                <i class="bi bi-download me-1"></i> تحميل
                             </a>
                         </div>
-                        <div class="alert alert-warning py-1 px-2 small mb-0 d-flex align-items-center gap-1">
-                            <i class="bi bi-shield-exclamation text-warning fs-6"></i>
-                            <span><b>تنبيه أمان:</b> هذا الرابط يعمل <b>لمرة واحدة فقط</b>. بمجرد تحميله أو استيراده في الراوتر، تصبح صلاحيته منتهية تلقائياً.</span>
-                        </div>
+                        <span class="text-muted small d-block" style="font-size: 0.72rem;">
+                            <i class="bi bi-shield-lock me-1"></i> رابط صالح لمرة واحدة فقط لأسباب أمنية.
+                        </span>
                     </div>
                 </div>
 
-                <!-- 3. Full Script Content Preview & Netwatch Details -->
+                <!-- 3. Full Script Preview -->
                 <div class="accordion" id="rscAccordion">
                     <div class="accordion-item border">
                         <h2 class="accordion-header">
-                            <button class="accordion-button collapsed py-2 small fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseScript">
-                                <i class="bi bi-code-slash me-2 text-primary"></i> معاينة أوامر ملف الكونفجريشن ومراقبة Netwatch
+                            <button class="accordion-button collapsed py-2 px-3 small fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseScript">
+                                <i class="bi bi-code-slash me-2 text-primary"></i> معاينة أوامر ملف الكونفجريشن (.rsc)
                             </button>
                         </h2>
                         <div id="collapseScript" class="accordion-collapse collapse" data-bs-parent="#rscAccordion">
                             <div class="accordion-body p-2 bg-dark">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-muted small">محتوى ملف <code>Radius-Pro.rsc</code>:</span>
-                                    <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" onclick="copyRscContent()">
-                                        <i class="bi bi-clipboard"></i> نسخ الكود كاملاً
+                                    <span class="text-white-50 small" style="font-size: 0.75rem;">محتوى الكود:</span>
+                                    <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 0.75rem;" onclick="copyRscContent()">
+                                        <i class="bi bi-clipboard"></i> نسخ الكود
                                     </button>
                                 </div>
-                                <textarea id="modalRscContent" class="form-control font-monospace bg-dark text-info border-secondary p-2" rows="7" readonly style="font-size: 0.85rem; line-height: 1.4;"></textarea>
+                                <textarea id="modalRscContent" class="form-control font-monospace bg-dark text-info border-secondary p-2" rows="6" readonly style="font-size: 0.8rem; line-height: 1.4;"></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer bg-light d-flex justify-content-between">
-                <button type="button" class="btn btn-warning fw-bold text-dark" id="btnRegenerate" onclick="regenerateCurrentToken()">
-                    <i class="bi bi-arrow-repeat me-1"></i> توليد رابط جديد الآن
+            <div class="modal-footer bg-light py-2 d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="btnRegenerate" onclick="regenerateCurrentToken()">
+                    <i class="bi bi-arrow-repeat me-1"></i> توليد رابط جديد
                 </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
@@ -707,9 +703,13 @@ function loadOneTimeRsc() {
                 document.getElementById('modalRscContent').value = data.rsc_content;
 
                 // Automatically copy the 1-line terminal command for convenience
-                window.copyToClipboard(data.fetch_command, function() {
-                    window.showCopyToast('تم توليد الرابط ونسخ أمر التيرمينال بنجاح!');
-                });
+                if (window.copyToClipboard) {
+                    window.copyToClipboard(data.fetch_command, function() {
+                        if (window.showCopyToast) {
+                            window.showCopyToast('تم توليد الرابط ونسخ أمر التيرمينال بنجاح!');
+                        }
+                    });
+                }
             } else {
                 alert('حدث خطأ أثناء توليد الرابط: ' + (data.error || 'غير معروف'));
             }
@@ -721,7 +721,7 @@ function loadOneTimeRsc() {
         .finally(() => {
             if (btnRegen) {
                 btnRegen.disabled = false;
-                btnRegen.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> توليد رابط جديد الآن';
+                btnRegen.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> توليد رابط جديد';
             }
         });
 }
@@ -734,37 +734,49 @@ function copyFetchCommand() {
     const input = document.getElementById('modalFetchCmd');
     if (!input || !input.value) return;
     input.select();
-    window.copyToClipboard(input.value, function() {
-        const btn = document.getElementById('btnCopyFetchCmd');
-        if (btn) {
-            const orig = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ!';
-            btn.classList.replace('btn-primary', 'btn-success');
-            setTimeout(() => {
-                btn.innerHTML = orig;
-                btn.classList.replace('btn-success', 'btn-primary');
-            }, 2000);
-        }
-        window.showCopyToast('تم نسخ أمر التيرمينال للحافظة!');
-    });
+    if (window.copyToClipboard) {
+        window.copyToClipboard(input.value, function() {
+            const btn = document.getElementById('btnCopyFetchCmd');
+            if (btn) {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> تم النسخ!';
+                btn.classList.replace('btn-primary', 'btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.classList.replace('btn-success', 'btn-primary');
+                }, 2000);
+            }
+            if (window.showCopyToast) {
+                window.showCopyToast('تم نسخ أمر التيرمينال للحافظة!');
+            }
+        });
+    }
 }
 
 function copyDirectUrl() {
     const input = document.getElementById('modalDirectUrl');
     if (!input || !input.value) return;
     input.select();
-    window.copyToClipboard(input.value, function() {
-        window.showCopyToast('تم نسخ رابط التحميل المباشر!');
-    });
+    if (window.copyToClipboard) {
+        window.copyToClipboard(input.value, function() {
+            if (window.showCopyToast) {
+                window.showCopyToast('تم نسخ رابط التحميل المباشر!');
+            }
+        });
+    }
 }
 
 function copyRscContent() {
     const ta = document.getElementById('modalRscContent');
     if (!ta || !ta.value) return;
     ta.select();
-    window.copyToClipboard(ta.value, function() {
-        window.showCopyToast('تم نسخ كود الكونفجريشن بالكامل!');
-    });
+    if (window.copyToClipboard) {
+        window.copyToClipboard(ta.value, function() {
+            if (window.showCopyToast) {
+                window.showCopyToast('تم نسخ كود الكونفجريشن بالكامل!');
+            }
+        });
+    }
 }
 
 function openEditClientModal(id, name, user, pass, assignedIP, notes, enabled) {
