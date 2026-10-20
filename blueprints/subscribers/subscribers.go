@@ -25,22 +25,30 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 }
 
 type SubscriberItem struct {
-	ID             int64
-	ContractNo     string
-	FullName       string
-	Username       string
-	Password       string
-	Phone          string
-	Address        string
-	Debt           float64
-	Profile        string
-	IPAddress      string
-	QuotaBytes     int64
-	QuotaGB        float64
-	ExpirationDate string
-	Status         string
-	IsOnline       bool
-	OnlineIP       string
+	ID               int64
+	ContractNo       string
+	FullName         string
+	Username         string
+	Password         string
+	Phone            string
+	Address          string
+	Debt             float64
+	Profile          string
+	IPAddress        string
+	QuotaBytes       int64
+	QuotaGB          float64
+	QuotaDisplay     string
+	UsedBytes        int64
+	UsedGB           float64
+	UsedDisplay      string
+	RemainingBytes   int64
+	RemainingGB      float64
+	RemainingDisplay string
+	UsagePercent     float64
+	ExpirationDate   string
+	Status           string
+	IsOnline         bool
+	OnlineIP         string
 }
 
 func getPageNumbers(current, total int) []int {
@@ -155,7 +163,8 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		COALESCE(s.static_ip, COALESCE(rr.value, '')),
 		COALESCE(s.quota_bytes, 0),
 		s.expiration_date,
-		COALESCE(s.status, 'active')
+		COALESCE(s.status, 'active'),
+		s.last_renewed_at
 	FROM radcheck rc
 	LEFT JOIN subscribers s ON rc.username = s.username
 	LEFT JOIN radusergroup rug ON rc.username = rug.username
@@ -185,6 +194,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			var s SubscriberItem
 			var exp sql.NullTime
+			var lastRenewed sql.NullTime
 			if err := rows.Scan(
 				&s.ID,
 				&s.ContractNo,
@@ -199,10 +209,46 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				&s.QuotaBytes,
 				&exp,
 				&s.Status,
+				&lastRenewed,
 			); err == nil {
 				if s.QuotaBytes > 0 {
 					s.QuotaGB = float64(s.QuotaBytes) / (1024 * 1024 * 1024)
+					s.QuotaDisplay = database.FormatBytesHuman(s.QuotaBytes)
+				} else {
+					s.QuotaGB = 0
+					s.QuotaDisplay = "مفتوح ∞"
 				}
+
+				// Query traffic consumed from radacct
+				var usedBytes int64
+				if lastRenewed.Valid {
+					_ = bp.db.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ? AND acctstarttime >= ?`, s.Username, lastRenewed.Time).Scan(&usedBytes)
+				} else {
+					_ = bp.db.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ?`, s.Username).Scan(&usedBytes)
+				}
+				s.UsedBytes = usedBytes
+				s.UsedGB = float64(usedBytes) / (1024 * 1024 * 1024)
+				s.UsedDisplay = database.FormatBytesHuman(usedBytes)
+
+				if s.QuotaBytes > 0 {
+					remBytes := s.QuotaBytes - usedBytes
+					if remBytes < 0 {
+						remBytes = 0
+					}
+					s.RemainingBytes = remBytes
+					s.RemainingGB = float64(remBytes) / (1024 * 1024 * 1024)
+					s.RemainingDisplay = database.FormatBytesHuman(remBytes)
+					s.UsagePercent = (float64(usedBytes) / float64(s.QuotaBytes)) * 100.0
+					if s.UsagePercent > 100.0 {
+						s.UsagePercent = 100.0
+					}
+				} else {
+					s.RemainingBytes = -1
+					s.RemainingGB = -1
+					s.RemainingDisplay = "مفتوح ∞"
+					s.UsagePercent = 0.0
+				}
+
 				if exp.Valid {
 					s.ExpirationDate = exp.Time.Format("2006-01-02 15:04")
 				} else {

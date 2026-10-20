@@ -145,7 +145,15 @@
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-quota" data-column="col-quota" checked>
-                            <label class="form-check-label small" for="toggle-col-quota">الكوتة</label>
+                            <label class="form-check-label small" for="toggle-col-quota">الكوتة الكلية</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-quota-used" data-column="col-quota-used" checked>
+                            <label class="form-check-label small" for="toggle-col-quota-used">الكوتة المستهلكة</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-quota-rem" data-column="col-quota-rem" checked>
+                            <label class="form-check-label small" for="toggle-col-quota-rem">الكوتة المتبقية</label>
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-expiry" data-column="col-expiry" checked>
@@ -213,7 +221,9 @@
                     <th class="col-phone">رقم الموبايل</th>
                     <th class="col-profile">الباقة</th>
                     <th class="col-debt">المديونية</th>
-                    <th class="col-quota">الكوتة</th>
+                    <th class="col-quota">الكوتة الكلية</th>
+                    <th class="col-quota-used">الكوتة المستهلكة</th>
+                    <th class="col-quota-rem">الكوتة المتبقية</th>
                     <th class="col-expiry">تاريخ الانتهاء</th>
                     <th class="col-status">الحالة</th>
                 </tr>
@@ -282,10 +292,29 @@
                         {{ end }}
                     </td>
                     <td class="col-quota">
-                        {{ if gt .QuotaGB 0.0 }}
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ printf "%.1f" .QuotaGB }} GB</span>
+                        {{ if gt .QuotaBytes 0 }}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">{{ .QuotaDisplay }}</span>
                         {{ else }}
-                        <span class="text-muted">مفتوح ∞</span>
+                        <span class="badge bg-light text-muted border">مفتوح ∞</span>
+                        {{ end }}
+                    </td>
+                    <td class="col-quota-used">
+                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
+                            <i class="bi bi-arrow-down-up text-warning me-1"></i>{{ .UsedDisplay }}
+                        </span>
+                    </td>
+                    <td class="col-quota-rem">
+                        {{ if gt .QuotaBytes 0 }}
+                        <div>
+                            <span class="badge {{ if lt .RemainingGB 2.0 }}bg-danger-subtle text-danger border-danger-subtle{{ else }}bg-success-subtle text-success border-success-subtle{{ end }} border fw-bold">
+                                <i class="bi bi-pie-chart-fill me-1"></i>{{ .RemainingDisplay }}
+                            </span>
+                        </div>
+                        <div class="progress mt-1" style="height: 4px; min-width: 65px;" title="نسبة الاستهلاك: {{ printf "%.1f" .UsagePercent }}%">
+                            <div class="progress-bar {{ if gt .UsagePercent 90.0 }}bg-danger{{ else if gt .UsagePercent 75.0 }}bg-warning{{ else }}bg-success{{ end }}" style="width: {{ .UsagePercent }}%"></div>
+                        </div>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">مفتوح ∞</span>
                         {{ end }}
                     </td>
                     <td class="col-expiry">
@@ -301,7 +330,7 @@
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="11" class="text-center py-5 text-muted">
+                    <td colspan="13" class="text-center py-5 text-muted">
                         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
                         لا توجد بيانات مشتركين مطابقة
                     </td>
