@@ -6,7 +6,9 @@ After=network.target mariadb.service freeradius.service
 Type=simple
 User=root
 WorkingDirectory=/opt/radius-server
-Environment=WEB_ADDR=:5000
+Environment=WEB_ADDR=:443
+Environment=HTTP_REDIRECT_ADDR=:80
+Environment=ENABLE_HTTPS=true
 Environment=DB_DRIVER=mysql
 Environment=DB_DSN=radius:radiuspass@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4
 ExecStart=/opt/radius-server/radius-platform

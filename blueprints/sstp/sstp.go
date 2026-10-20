@@ -391,17 +391,12 @@ func (bp *Blueprint) GenerateTokenHandler(w http.ResponseWriter, r *http.Request
 		serverHost = "192.168.2.90"
 	}
 
-	hostWithPort := r.Host
-	if !strings.Contains(hostWithPort, ":") {
-		hostWithPort = serverHost + ":5000"
-	}
-
 	settings, err := bp.db.GetSSTPSettings()
 	if err != nil || settings == nil {
 		settings = &models.SSTPSettings{Enabled: true, Port: 4444, GatewayIP: "10.10.10.1", IPPool: "10.10.10.2-254"}
 	}
 
-	fetchURL := fmt.Sprintf("http://%s/sstp/script?token=%s", hostWithPort, token)
+	fetchURL := fmt.Sprintf("http://%s/sstp/script?token=%s", serverHost, token)
 	fetchCmd := fmt.Sprintf(`/tool fetch url="%s" mode=http dst-path=Radius-Pro.rsc; :delay 2s; /import Radius-Pro.rsc; /file remove Radius-Pro.rsc`, fetchURL)
 	rscScript := bp.generateRSCScript(serverHost, settings.Port, settings.GatewayIP, username, password)
 

@@ -5,17 +5,41 @@ import (
 )
 
 type Config struct {
-	WebAddr       string
-	DBDriver      string // "mysql" or "sqlite"
-	DBDSN         string
-	SessionSecret string
-	FreeRadiusDir string
+	WebAddr          string // Default ":443"
+	HTTPRedirectAddr string // Default ":80"
+	EnableHTTPS      bool   // Default true
+	TLSCertFile      string // Default "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+	TLSKeyFile       string // Default "/etc/ssl/private/ssl-cert-snakeoil.key"
+	DBDriver         string // "mysql" or "sqlite"
+	DBDSN            string
+	SessionSecret    string
+	FreeRadiusDir    string
 }
 
 func LoadConfig() *Config {
 	webAddr := os.Getenv("WEB_ADDR")
 	if webAddr == "" {
-		webAddr = ":5000" // Matching default in mikrotik_cards_system
+		webAddr = ":443"
+	}
+
+	httpRedirectAddr := os.Getenv("HTTP_REDIRECT_ADDR")
+	if httpRedirectAddr == "" {
+		httpRedirectAddr = ":80"
+	}
+
+	enableHTTPS := true
+	if os.Getenv("ENABLE_HTTPS") == "false" || os.Getenv("ENABLE_HTTPS") == "0" {
+		enableHTTPS = false
+	}
+
+	tlsCert := os.Getenv("TLS_CERT")
+	if tlsCert == "" {
+		tlsCert = "/etc/ssl/certs/ssl-cert-snakeoil.pem"
+	}
+
+	tlsKey := os.Getenv("TLS_KEY")
+	if tlsKey == "" {
+		tlsKey = "/etc/ssl/private/ssl-cert-snakeoil.key"
 	}
 
 	dbDriver := os.Getenv("DB_DRIVER")
@@ -34,10 +58,14 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		WebAddr:       webAddr,
-		DBDriver:      dbDriver,
-		DBDSN:         dbDSN,
-		SessionSecret: secret,
-		FreeRadiusDir: "/etc/freeradius/3.0",
+		WebAddr:          webAddr,
+		HTTPRedirectAddr: httpRedirectAddr,
+		EnableHTTPS:      enableHTTPS,
+		TLSCertFile:      tlsCert,
+		TLSKeyFile:       tlsKey,
+		DBDriver:         dbDriver,
+		DBDSN:            dbDSN,
+		SessionSecret:    secret,
+		FreeRadiusDir:    "/etc/freeradius/3.0",
 	}
 }

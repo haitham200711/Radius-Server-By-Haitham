@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,6 +25,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/cert"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
@@ -202,18 +204,110 @@ func main() {
 	// Wrap mux with Session Authentication middleware
 	handler := middleware.AuthMiddleware(cfg.SessionSecret)(mux)
 
-	// 4. Start HTTP Server
-	server := &http.Server{
-		Addr:    cfg.WebAddr,
-		Handler: handler,
+	// Determine public TLS port string if not default 443
+	targetPort := ""
+	if cfg.WebAddr != ":443" && cfg.WebAddr != "443" {
+		_, p, err := net.SplitHostPort(cfg.WebAddr)
+		if err == nil && p != "443" {
+			targetPort = ":" + p
+		} else if cfg.WebAddr != "" && cfg.WebAddr != ":443" {
+			targetPort = cfg.WebAddr
+		}
 	}
 
-	go func() {
-		log.Printf("[WEB] Enterprise Control-Plane listening on http://localhost%s", cfg.WebAddr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[FATAL] Web server error: %v", err)
+	var server *http.Server
+	var httpServer *http.Server
+	var legacyServer *http.Server
+
+	// 4. Start HTTP / HTTPS Server
+	if cfg.EnableHTTPS {
+		certFile, keyFile, err := cert.EnsureTLSCertificate(cfg.TLSCertFile, cfg.TLSKeyFile)
+		if err != nil {
+			log.Fatalf("[FATAL] Failed to configure TLS certificates: %v", err)
 		}
-	}()
+
+		// HTTPS Main Server (:443)
+		server = &http.Server{
+			Addr:    cfg.WebAddr,
+			Handler: handler,
+		}
+
+		go func() {
+			log.Printf("[HTTPS] Enterprise Control-Plane listening on https://0.0.0.0%s", cfg.WebAddr)
+			if err := server.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("[FATAL] HTTPS server error: %v", err)
+			}
+		}()
+
+		// HTTP Redirector (:80) with RouterOS /sstp/script bypass
+		if cfg.HTTPRedirectAddr != "" {
+			httpMux := http.NewServeMux()
+			// RouterOS script fetch compatibility over HTTP
+			httpMux.HandleFunc("/sstp/script", sstpBP.ScriptHandler)
+			httpMux.HandleFunc("/sstp/routes/hook-up", sstpBP.HookUpHandler)
+			// Redirect all other HTTP traffic to HTTPS
+			httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				host, _, err := net.SplitHostPort(r.Host)
+				if err != nil {
+					host = r.Host
+				}
+				target := "https://" + host + targetPort + r.RequestURI
+				http.Redirect(w, r, target, http.StatusMovedPermanently)
+			})
+
+			httpServer = &http.Server{
+				Addr:    cfg.HTTPRedirectAddr,
+				Handler: httpMux,
+			}
+
+			go func() {
+				log.Printf("[HTTP] Redirector (:80 -> :443) listening on http://0.0.0.0%s", cfg.HTTPRedirectAddr)
+				if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Printf("[WARN] HTTP redirector stopped or port occupied: %v", err)
+				}
+			}()
+		}
+
+		// Legacy Port 5000 Redirector (keeps old links/bookmarks alive)
+		if cfg.WebAddr != ":5000" && cfg.HTTPRedirectAddr != ":5000" {
+			legacyMux := http.NewServeMux()
+			legacyMux.HandleFunc("/sstp/script", sstpBP.ScriptHandler)
+			legacyMux.HandleFunc("/sstp/routes/hook-up", sstpBP.HookUpHandler)
+			legacyMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				host, _, err := net.SplitHostPort(r.Host)
+				if err != nil {
+					host = r.Host
+				}
+				target := "https://" + host + targetPort + r.RequestURI
+				http.Redirect(w, r, target, http.StatusMovedPermanently)
+			})
+
+			legacyServer = &http.Server{
+				Addr:    ":5000",
+				Handler: legacyMux,
+			}
+
+			go func() {
+				log.Printf("[HTTP] Legacy redirector (:5000 -> :443) listening on http://0.0.0.0:5000")
+				if err := legacyServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Printf("[WARN] Port 5000 redirector stopped: %v", err)
+				}
+			}()
+		}
+	} else {
+		// Plain HTTP Server
+		server = &http.Server{
+			Addr:    cfg.WebAddr,
+			Handler: handler,
+		}
+
+		go func() {
+			log.Printf("[WEB] Enterprise Control-Plane listening on http://0.0.0.0%s", cfg.WebAddr)
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("[FATAL] Web server error: %v", err)
+			}
+		}()
+	}
 
 	// Graceful shutdown handling
 	sigChan := make(chan os.Signal, 1)
@@ -221,7 +315,15 @@ func main() {
 	<-sigChan
 
 	log.Println("[SHUTDOWN] Stopping enterprise server...")
-	_ = server.Close()
+	if server != nil {
+		_ = server.Close()
+	}
+	if httpServer != nil {
+		_ = httpServer.Close()
+	}
+	if legacyServer != nil {
+		_ = legacyServer.Close()
+	}
 	_ = db.Close()
 	log.Println("[SHUTDOWN] Exited cleanly.")
 }

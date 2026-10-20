@@ -283,7 +283,7 @@ touch /etc/ppp/chap-secrets
 # SSTP Dynamic Hook Script
 cat << 'EOF' > /etc/ppp/ip-up
 #!/bin/bash
-curl -s "http://127.0.0.1:5000/sstp/routes/hook-up" >/dev/null 2>&1 || true
+curl -k -s "https://127.0.0.1/sstp/routes/hook-up" >/dev/null 2>&1 || curl -s "http://127.0.0.1/sstp/routes/hook-up" >/dev/null 2>&1 || true
 EOF
 chmod +x /etc/ppp/ip-up
 
@@ -440,7 +440,9 @@ After=network.target mariadb.service freeradius.service
 Type=simple
 User=root
 WorkingDirectory=/opt/radius-server
-Environment=WEB_ADDR=:5000
+Environment=WEB_ADDR=:443
+Environment=HTTP_REDIRECT_ADDR=:80
+Environment=ENABLE_HTTPS=true
 Environment=DB_DRIVER=mysql
 Environment=DB_DSN=radius:radiuspass@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4
 ExecStart=/opt/radius-server/radius-platform
@@ -459,7 +461,9 @@ systemctl restart radius-server
 # Open Firewall Ports if UFW is active
 if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
     echo -e "${CYAN}[INFO] Configuring UFW firewall rules...${NC}"
-    ufw allow 5000/tcp comment 'RADIUS Web Control-Plane'
+    ufw allow 443/tcp comment 'RADIUS Web Control-Plane HTTPS'
+    ufw allow 80/tcp comment 'RADIUS Web HTTP Redirect'
+    ufw allow 5000/tcp comment 'RADIUS Web Legacy Port'
     ufw allow 1812/udp comment 'FreeRADIUS Authentication'
     ufw allow 1813/udp comment 'FreeRADIUS Accounting'
     ufw allow 3799/udp comment 'FreeRADIUS CoA / Disconnect'
@@ -498,7 +502,9 @@ echo -e "${GREEN}${BOLD}      🎉 HAITHAM RADIUS ENTERPRISE INSTALLED SUCCESSFU
 echo -e "${GREEN}${BOLD}===================================================================${NC}"
 echo ""
 echo -e "${BOLD}📌 Web Control-Plane Dashboard:${NC}"
-echo -e "   URL:            ${CYAN}http://${SERVER_IP}:5000${NC}"
+echo -e "   HTTPS Portal:   ${CYAN}https://${SERVER_IP}${NC} (Port 443)"
+echo -e "   HTTP Redirect:  ${CYAN}http://${SERVER_IP}${NC} (Port 80 -> 443)"
+echo -e "   Legacy Port:    ${CYAN}http://${SERVER_IP}:5000${NC} (Port 5000 -> 443)"
 echo -e "   Default User:   ${YELLOW}admin${NC}"
 echo -e "   Default Pass:   ${YELLOW}admin123${NC}"
 echo ""

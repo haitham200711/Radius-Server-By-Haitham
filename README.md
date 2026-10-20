@@ -31,7 +31,8 @@ sudo bash install.sh
 ---
 
 ## 🚀 بيانات الدخول الافتراضية
-* **رابط لوحة التحكم:** `http://<SERVER_IP>:5000`
+* **رابط لوحة التحكم (HTTPS):** `https://<SERVER_IP>` (أو البورت `443`)
+* **تحويل تلقائي:** `http://<SERVER_IP>` (البورت `80` و `5000` يتم تحويلهما تلقائياً إلى `HTTPS`)
 * **اسم المستخدم:** `admin`
 * **كلمة المرور:** `admin123`
 
@@ -40,7 +41,9 @@ sudo bash install.sh
 ## 🔌 البورتات والخدمات المستخدمة (Default Ports)
 | الخدمة | البورت / البروتوكول | الوصف |
 | :--- | :--- | :--- |
-| **لوحة التحكم السحابية** | `5000 TCP` | Web Control-Plane UI |
+| **لوحة التحكم المشفرة (HTTPS)** | `443 TCP` | Web Control-Plane UI (SSL/TLS) |
+| **تحويل الويب التلقائي (HTTP)** | `80 TCP` | HTTP to HTTPS Redirect + MikroTik Script Fetch |
+| **البورت القديم (Legacy Port)** | `5000 TCP` | Port 5000 to HTTPS 443 Redirect |
 | **مصادقة الراديوس (Auth)** | `1812 UDP` | FreeRADIUS Authentication |
 | **محاسبة الراديوس (Acct)** | `1813 UDP` | FreeRADIUS Accounting |
 | **أوامر الفصل والتعديل (CoA)**| `3799 UDP` | Disconnect / Change of Auth |
