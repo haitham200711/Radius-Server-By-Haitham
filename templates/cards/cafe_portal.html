@@ -408,20 +408,8 @@
                 <input type="hidden" name="stop_on_quota_submitted" value="1">
 
                 <div class="modal-body p-4">
-                    {{ if .Routers }}
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-secondary">اختر الفرع / راوتر الكافيه (NAS) <span class="text-danger">*</span></label>
-                        <select name="nas_id" class="form-select font-monospace fw-bold" required>
-                            {{ range .Routers }}
-                            <option value="{{ .ID }}" {{ if eq .ID $.SelectedRouterID }}selected{{ end }}>
-                                {{ .ShortName }} ({{ .NASName }})
-                            </option>
-                            {{ end }}
-                        </select>
-                    </div>
-                    {{ else }}
-                    <input type="hidden" name="nas_id" value="{{ .SelectedRouterID }}">
-                    {{ end }}
+                    <input type="hidden" name="nas_id" value="{{ if .SelectedRouterID }}{{ .SelectedRouterID }}{{ else if .Routers }}{{ (index .Routers 0).ID }}{{ else }}0{{ end }}">
+
                     <!-- Batch Name -->
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-secondary">اسم الحزمة (Batch Name) <span class="text-danger">*</span></label>

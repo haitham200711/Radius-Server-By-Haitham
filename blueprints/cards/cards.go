@@ -368,6 +368,12 @@ func (bp *Blueprint) CafeGenerateHandler(w http.ResponseWriter, r *http.Request)
 
 	opts := parseGenerateOptions(r)
 	opts.CardType = "cafe"
+	if opts.NASID == 0 {
+		routers, _ := bp.db.GetCafeRouters()
+		if len(routers) > 0 {
+			opts.NASID = routers[0].ID
+		}
+	}
 
 	sendWhatsApp := r.FormValue("send_whatsapp") == "1"
 	cafePhone := strings.TrimSpace(r.FormValue("cafe_phone"))
