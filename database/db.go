@@ -4279,7 +4279,7 @@ func (d *DB) GenerateCafeBatch(count int, prefix string, charLen int, profileID 
 func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
-		return nil, fmt.Errorf("ظٹط±ط¬ظ‰ ط¥ط¯ط®ط§ظ„ ظƒظˆط¯ ط§ظ„ظƒط§ط±طھ")
+		return nil, fmt.Errorf("يرجى إدخال كود الكارت أو الماك أدرس")
 	}
 
 	// 1. Fetch card details
@@ -4308,7 +4308,7 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 		&profileName, &profileDisp, &rateLimit, &quotaBytes,
 		&c.OriginalCode, &c.IsMACConverted, &c.CallingMAC)
 	if err != nil {
-		return nil, fmt.Errorf("ط§ظ„ظƒط§ط±طھ '%s' ط؛ظٹط± ظ…ط³ط¬ظ„ ظپظٹ ط§ظ„ظ†ط¸ط§ظ…", code)
+		return nil, fmt.Errorf("الكارت أو الماك '%s' غير مسجل في النظام", code)
 	}
 
 	tracker := &models.CafeCardTracker{
@@ -4331,7 +4331,7 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	if quotaBytes > 0 {
 		tracker.QuotaDisplay = FormatBytesHuman(quotaBytes)
 	} else {
-		tracker.QuotaDisplay = "ط؛ظٹط± ظ…ط­ط¯ظˆط¯ (Open âˆ‍)"
+		tracker.QuotaDisplay = "غير محدود (Open ∞)"
 	}
 
 	// 2. Query Accounting consumption from radacct
@@ -4400,26 +4400,26 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 			tracker.UsagePercent = 100.0
 		}
 	} else {
-		tracker.RemainingDisplay = "ظ…ظپطھظˆط­ âˆ‍"
+		tracker.RemainingDisplay = "مفتوح ∞"
 		tracker.UsagePercent = 0.0
 	}
 
 	// 5. Diagnostics & Status
 	if tracker.IsOnline {
 		tracker.Status = "online"
-		tracker.StatusLabel = "ظ…طھطµظ„ ط§ظ„ط¢ظ† (Online)"
+		tracker.StatusLabel = "متصل الآن (Online)"
 		tracker.StatusBadgeClass = "bg-success text-white"
-		tracker.ExpireReason = "ط§ظ„ظƒط§ط±طھ ظٹط¹ظ…ظ„ ظˆظٹطھطµظ„ ط¨ط§ظ„ط´ط¨ظƒط© ط­ط§ظ„ظٹط§ظ‹ ط¨ط´ظƒظ„ ظ…ظ…طھط§ط²."
+		tracker.ExpireReason = "الكارت يعمل ويتصل بالشبكة حالياً بشكل ممتاز."
 	} else if tracker.TotalBytes == 0 && tracker.FirstLogin == "" {
 		tracker.Status = "available"
-		tracker.StatusLabel = "ظ…طھط§ط­ ظ„ظ„ط¨ظٹط¹ (ظ„ظ… ظٹط¨ط¯ط£ ط¨ط¹ط¯)"
+		tracker.StatusLabel = "متاح للبيع (لم يبدأ بعد)"
 		tracker.StatusBadgeClass = "bg-light text-secondary border"
-		tracker.ExpireReason = "ط§ظ„ظƒط§ط±طھ ط¬ط¯ظٹط¯ ظˆط¬ط§ظ‡ط² ظ„ظ„ط¨ظٹط¹طŒ ظ„ظ… ظٹط³ط¬ظ„ ط§ظ„ط¹ظ…ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ط¨ظ‡ ط­طھظ‰ ط§ظ„ط¢ظ†."
+		tracker.ExpireReason = "الكارت جديد وجاهز للبيع، لم يسجل العميل الدخول به حتى الآن."
 	} else if quotaBytes > 0 && tracker.TotalBytes >= quotaBytes {
 		tracker.Status = "expired"
-		tracker.StatusLabel = "ظ…ظ†طھظ‡ظٹ ط§ظ„ظƒظˆطھط© (Expired Quota)"
+		tracker.StatusLabel = "منتهي الكوتة (Expired Quota)"
 		tracker.StatusBadgeClass = "bg-danger text-white"
-		tracker.ExpireReason = "ط§ظ†طھظ‡طھ ظƒظˆطھط© ط§ظ„طھط­ظ…ظٹظ„ ط§ظ„ظ…ط®طµطµط© ظ„ظ„ظƒط§ط±طھ ط¨ط§ظ„ظƒط§ظ…ظ„ ظˆطھظ… ط¥ظٹظ‚ط§ظپ ط§ظ„ط®ط¯ظ…ط©."
+		tracker.ExpireReason = "انتهت كوتة التحميل المخصصة للكارت بالكامل وتم إيقاف الخدمة."
 	} else {
 		tracker.Status = "used"
 		tracker.StatusLabel = "مستهلك / غير متصل"
@@ -4581,7 +4581,7 @@ func (d *DB) DisconnectCard(code string) (bool, error) {
 		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, code).Scan(
 		&sessionID, &nasIP, &framedIPStr)
 	if err != nil || !sessionID.Valid {
-		return false, fmt.Errorf("ط§ظ„ظƒط§ط±طھ ط؛ظٹط± ظ…طھطµظ„ ط£ظˆظ†ظ„ط§ظٹظ† ط­ط§ظ„ظٹط§ظ‹")
+		return false, fmt.Errorf("الكارت غير متصل أونلاين حالياً")
 	}
 
 	var secret string
@@ -4620,7 +4620,7 @@ func (d *DB) StartCardSyncDaemon() {
 }
 
 func (d *DB) syncActiveCards() {
-	// 1. MAC Conversion After First Session (ط§ظ„طھط­ظˆظٹظ„ ظ„ظ…ط§ظƒ ط£ط¯ط±ط³ ط¨ط¹ط¯ ط§ظ†طھظ‡ط§ط، ط£ظˆظ„ ط¬ظ„ط³ط© ط¹ظ†ط¯ طھط³ط¬ظٹظ„ ط§ظ„ط®ط±ظˆط¬):
+	// 1. MAC Conversion After First Session (التحويل لماك أدرس بعد انتهاء أول جلسة عند تسجيل الخروج):
 	// For cards with convert_mac_after_session=1 and is_mac_converted=0,
 	// when the customer finished at least one session in radacct (acctstoptime IS NOT NULL)
 	// and currently has NO active session running (acctstoptime IS NULL).
