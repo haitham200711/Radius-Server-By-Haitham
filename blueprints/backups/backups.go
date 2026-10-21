@@ -35,38 +35,7 @@ func New(db *database.DB, r *web.Renderer, cfg *config.Config) *Blueprint {
 }
 
 func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	settings, err := bp.db.GetBackupSettings()
-	if err != nil {
-		settings = &models.BackupSettings{
-			Enabled:        true,
-			IntervalHours:  6,
-			RetentionCount: 10,
-			SendWhatsApp:   false,
-		}
-	}
-
-	backupsList, err := bp.db.ListBackups()
-	if err != nil {
-		backupsList = []models.BackupRecord{}
-	}
-
-	var totalBytes int64
-	for _, b := range backupsList {
-		totalBytes += b.SizeBytes
-	}
-
-	waStatus := whatsapp.GetWhatsAppStatus()
-
-	_ = bp.renderer.Render(w, "backups/index", map[string]interface{}{
-		"Title":          "النسخ الاحتياطي التلقائي واليدوي",
-		"ActiveMenu":     "backups",
-		"CurrentUser":    middleware.GetUser(r),
-		"Settings":       settings,
-		"Backups":        backupsList,
-		"TotalCount":     len(backupsList),
-		"TotalStorage":   database.FormatBytesHuman(totalBytes),
-		"WhatsAppStatus": waStatus,
-	})
+	http.Redirect(w, r, "/settings#backups", http.StatusFound)
 }
 
 func (bp *Blueprint) SaveSettingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +80,7 @@ func (bp *Blueprint) SaveSettingsHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	http.Redirect(w, r, "/backups?success=settings_saved", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?status=success&msg=تم+حفظ+إعدادات+النسخ+الاحتياطي+بنجاح#backups", http.StatusSeeOther)
 }
 
 func (bp *Blueprint) CreateNowHandler(w http.ResponseWriter, r *http.Request) {

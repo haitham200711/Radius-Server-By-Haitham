@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/adv"
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/sysinfo"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -86,8 +88,41 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	nasCount := 0
 	_ = bp.db.QueryRow("SELECT COUNT(*) FROM nas").Scan(&nasCount)
 
+	// Backups data
+	backupSettings, err := bp.db.GetBackupSettings()
+	if err != nil {
+		backupSettings = &models.BackupSettings{
+			Enabled:        true,
+			IntervalHours:  6,
+			RetentionCount: 10,
+			SendWhatsApp:   false,
+		}
+	}
+
+	backupsList, err := bp.db.ListBackups()
+	if err != nil {
+		backupsList = []models.BackupRecord{}
+	}
+
+	var totalBackupBytes int64
+	for _, b := range backupsList {
+		totalBackupBytes += b.SizeBytes
+	}
+	waStatus := whatsapp.GetWhatsAppStatus()
+
+	// ADV & SAS data
+	advAnalysis := adv.GetCurrentAnalysis()
+	advSuccessMsg := r.URL.Query().Get("adv_success")
+	if advSuccessMsg == "" {
+		advSuccessMsg = r.URL.Query().Get("success")
+	}
+	advErrorMsg := r.URL.Query().Get("adv_error")
+	if advErrorMsg == "" {
+		advErrorMsg = r.URL.Query().Get("error")
+	}
+
 	_ = bp.renderer.Render(w, "settings/index", map[string]interface{}{
-		"Title":               "إعدادات النظام وصيانة الخدمات",
+		"Title":               "إعدادات النظام والخدمات",
 		"ActiveMenu":          "settings",
 		"CurrentUser":         middleware.GetUser(r),
 		"ServerIP":            serverIP,
@@ -101,6 +136,18 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		"NasCount":            nasCount,
 		"FlashStatus":         status,
 		"FlashMsg":            msg,
+		"BackupSettings":      backupSettings,
+		"Backups":             backupsList,
+		"TotalBackupCount":    len(backupsList),
+		"TotalBackupStorage":  database.FormatBytesHuman(totalBackupBytes),
+		"WhatsAppStatus":      waStatus,
+		"AdvAnalysis":         advAnalysis,
+		"AdvSuccessMsg":       advSuccessMsg,
+		"AdvErrorMsg":         advErrorMsg,
+		"ImportedSubs":        r.URL.Query().Get("subs"),
+		"ImportedProfs":       r.URL.Query().Get("profs"),
+		"ImportedResellers":   r.URL.Query().Get("resellers"),
+		"ImportedSessions":    r.URL.Query().Get("sessions"),
 	})
 }
 

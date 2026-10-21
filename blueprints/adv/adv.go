@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
-	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -143,8 +142,8 @@ var (
 	lastBackupPath   string
 )
 
-// IndexHandler renders the ADV Migration Dashboard
-func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
+// GetCurrentAnalysis returns the parsed analysis from cache, or attempts to find server backup
+func GetCurrentAnalysis() *BackupAnalysis {
 	cachedAnalysisMu.Lock()
 	analysis := cachedAnalysis
 	cachedAnalysisMu.Unlock()
@@ -171,30 +170,18 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	return analysis
+}
 
-	successMsg := r.URL.Query().Get("success")
-	errorMsg := r.URL.Query().Get("error")
-
-	data := map[string]interface{}{
-		"Title":             "استرداد بيانات ADV / SAS4",
-		"ActiveMenu":        "adv",
-		"CurrentUser":       middleware.GetUser(r),
-		"Analysis":          analysis,
-		"SuccessMsg":        successMsg,
-		"ErrorMsg":          errorMsg,
-		"ImportedSubs":      r.URL.Query().Get("subs"),
-		"ImportedProfs":     r.URL.Query().Get("profs"),
-		"ImportedResellers": r.URL.Query().Get("resellers"),
-		"ImportedSessions":  r.URL.Query().Get("sessions"),
-	}
-
-	_ = bp.renderer.Render(w, "adv/index", data)
+// IndexHandler renders or redirects to Settings ADV tab
+func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/settings#adv", http.StatusFound)
 }
 
 // UploadHandler handles uploading an ADV backup .sql file
 func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/adv", http.StatusFound)
+		http.Redirect(w, r, "/settings#adv", http.StatusFound)
 		return
 	}
 
@@ -203,7 +190,7 @@ func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	file, header, err := r.FormFile("backup_file")
 	if err != nil {
-		http.Redirect(w, r, "/adv?error=يرجى+اختيار+ملف+SQL+صحيح", http.StatusFound)
+		http.Redirect(w, r, "/settings?adv_error=يرجى+اختيار+ملف+SQL+صحيح#adv", http.StatusFound)
 		return
 	}
 	defer file.Close()
@@ -214,20 +201,20 @@ func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	dst, err := os.Create(destPath)
 	if err != nil {
-		http.Redirect(w, r, "/adv?error=فشل+حفظ+الملف+على+السيرفر", http.StatusFound)
+		http.Redirect(w, r, "/settings?adv_error=فشل+حفظ+الملف+على+السيرفر#adv", http.StatusFound)
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
-		http.Redirect(w, r, "/adv?error=فشل+رفع+الملف", http.StatusFound)
+		http.Redirect(w, r, "/settings?adv_error=فشل+رفع+الملف#adv", http.StatusFound)
 		return
 	}
 
 	// Analyze the uploaded file
 	analysis, err := ParseAdvSQL(destPath)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/adv?error=فشل+تحليل+الملف:+%v", err), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/settings?adv_error=فشل+تحليل+الملف:+%v#adv", err), http.StatusFound)
 		return
 	}
 	analysis.FileName = header.Filename
@@ -237,7 +224,7 @@ func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	lastBackupPath = destPath
 	cachedAnalysisMu.Unlock()
 
-	http.Redirect(w, r, "/adv?success=تم+تحليل+ملف+الباك+أب+بنجاح", http.StatusFound)
+	http.Redirect(w, r, "/settings?adv_success=تم+تحليل+ملف+الباك+أب+بنجاح#adv", http.StatusFound)
 }
 
 // AnalyzeServerFileHandler analyzes the pre-existing server backup file
@@ -258,13 +245,13 @@ func (bp *Blueprint) AnalyzeServerFileHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if foundPath == "" {
-		http.Redirect(w, r, "/adv?error=لم+يتم+العثور+على+ملف+باك+أب+جاهز+على+السيرفر", http.StatusFound)
+		http.Redirect(w, r, "/settings?adv_error=لم+يتم+العثور+على+ملف+باك+أب+جاهز+على+السيرفر#adv", http.StatusFound)
 		return
 	}
 
 	analysis, err := ParseAdvSQL(foundPath)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/adv?error=فشل+تحليل+النسخة:+%v", err), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/settings?adv_error=فشل+تحليل+النسخة:+%v#adv", err), http.StatusFound)
 		return
 	}
 
@@ -273,13 +260,13 @@ func (bp *Blueprint) AnalyzeServerFileHandler(w http.ResponseWriter, r *http.Req
 	lastBackupPath = foundPath
 	cachedAnalysisMu.Unlock()
 
-	http.Redirect(w, r, "/adv?success=تم+فحص+وتحليل+النسخة+الموجودة+على+السيرفر+بنجاح", http.StatusFound)
+	http.Redirect(w, r, "/settings?adv_success=تم+فحص+وتحليل+النسخة+الموجودة+على+السيرفر+بنجاح#adv", http.StatusFound)
 }
 
 // ImportHandler executes the actual database migration into our system
 func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/adv", http.StatusFound)
+		http.Redirect(w, r, "/settings#adv", http.StatusFound)
 		return
 	}
 
@@ -288,7 +275,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	cachedAnalysisMu.Unlock()
 
 	if analysis == nil {
-		http.Redirect(w, r, "/adv?error=لا+توجد+بيانات+محللة+للاستيراد.+يرجى+تحليل+الملف+أولاً", http.StatusFound)
+		http.Redirect(w, r, "/settings?adv_error=لا+توجد+بيانات+محللة+للاستيراد.+يرجى+تحليل+الملف+أولاً#adv", http.StatusFound)
 		return
 	}
 
@@ -313,7 +300,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := bp.db.Begin()
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/adv?error=فشل+بدء+معاملة+قاعدة+البيانات:+%v", err), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/settings?adv_error=فشل+بدء+معاملة+قاعدة+البيانات:+%v#adv", err), http.StatusFound)
 		return
 	}
 	defer tx.Rollback()
@@ -537,13 +524,13 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := tx.Commit(); err != nil {
-		http.Redirect(w, r, fmt.Sprintf("/adv?error=فشل+تأكيد+البيانات+في+السيرفر:+%v", err), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/settings?adv_error=فشل+تأكيد+البيانات+في+السيرفر:+%v#adv", err), http.StatusFound)
 		return
 	}
 
 	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بنجاح!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع،+و+%d+جلسة+استهلاك+واكاونتنج.",
 		importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount)
-	http.Redirect(w, r, fmt.Sprintf("/adv?success=%s&subs=%d&profs=%d&resellers=%d&sessions=%d", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/settings?adv_success=%s&subs=%d&profs=%d&resellers=%d&sessions=%d#adv", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount), http.StatusFound)
 }
 
 // formatRateLimit formats up and down speeds from ADV into MikroTik "rx/tx" rate limit
