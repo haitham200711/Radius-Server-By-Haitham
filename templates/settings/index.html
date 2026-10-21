@@ -1,8 +1,8 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex align-items-center justify-content-between mb-3">
     <div>
-        <h3 class="fw-bold mb-1">إعدادات النظام والأمان</h3>
-        <p class="text-muted small mb-0">إدارة كلمة المرور، أمان المشرف، وإعدادات الربط بمايكروتك</p>
+        <h3 class="fw-bold mb-1">إعدادات النظام والخدمات</h3>
+        <p class="text-muted small mb-0">إدارة أمان المشرف، إعدادات الربط بمايكروتك، وتخصيص صلاحيات صفحة المشترك</p>
     </div>
 </div>
 
@@ -14,305 +14,334 @@
 </div>
 {{ end }}
 
-<div class="row g-4">
-    <!-- Security & Change Password Card -->
-    <div class="col-lg-5" id="change-password">
-        <div class="card h-100 shadow-sm border-0" style="border-radius: 14px;">
-            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
-                <div class="p-2 bg-primary-subtle rounded-3 text-primary">
-                    <i class="bi bi-shield-lock-fill fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-dark">تغيير كلمة المرور</h6>
-                    <small class="text-muted">تحديث كلمة سر الحساب الحالي ({{ .CurrentUser.Username }})</small>
+<!-- Navigation Tabs -->
+<ul class="nav nav-pills p-1.5 bg-white rounded-3 shadow-sm border mb-4 d-inline-flex gap-2 flex-wrap" id="settingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold px-3 py-2 d-flex align-items-center gap-2" id="system-tab" data-bs-toggle="pill" data-bs-target="#tab-system" type="button" role="tab" aria-controls="tab-system" aria-selected="true">
+            <i class="bi bi-shield-lock-fill fs-5"></i>
+            <span>إعدادات النظام والأمان</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-3 py-2 d-flex align-items-center gap-2" id="portal-tab" data-bs-toggle="pill" data-bs-target="#tab-portal" type="button" role="tab" aria-controls="tab-portal" aria-selected="false">
+            <i class="bi bi-person-workspace fs-5"></i>
+            <span>إعدادات وصلاحيات صفحة المشترك</span>
+            {{ if .PortalSettings.PortalEnabled }}
+            <span class="badge bg-success-subtle text-success border border-success-subtle ms-1 small">مفعلة</span>
+            {{ else }}
+            <span class="badge bg-secondary-subtle text-secondary border ms-1 small">معطلة</span>
+            {{ end }}
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content" id="settingsTabContent">
+    <!-- Tab 1: System & Security -->
+    <div class="tab-pane fade show active" id="tab-system" role="tabpanel" aria-labelledby="system-tab">
+        <div class="row g-4">
+            <!-- Security & Change Password Card -->
+            <div class="col-lg-5" id="change-password">
+                <div class="card h-100 shadow-sm border-0" style="border-radius: 14px;">
+                    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                        <div class="p-2 bg-primary-subtle rounded-3 text-primary">
+                            <i class="bi bi-shield-lock-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">تغيير كلمة المرور</h6>
+                            <small class="text-muted">تحديث كلمة سر الحساب الحالي ({{ .CurrentUser.Username }})</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div id="pwdAlertBox" style="display: none;"></div>
+
+                        <form id="changePasswordForm" method="POST" action="/settings/change-password">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-muted">اسم المستخدم:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-secondary"></i></span>
+                                    <input type="text" class="form-control bg-light border-start-0" value="{{ .CurrentUser.Username }} ({{ if eq .CurrentUser.Role "admin" }}مدير النظام{{ else }}موزع{{ end }})" readonly disabled>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">كلمة المرور الحالية: <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-key text-muted"></i></span>
+                                    <input type="password" name="old_password" id="old_password" class="form-control" required placeholder="أدخل كلمة المرور الحالية">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('old_password', this)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">كلمة المرور الجديدة: <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-lock text-muted"></i></span>
+                                    <input type="password" name="new_password" id="new_password" class="form-control" required placeholder="6 خانات أو أكثر">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('new_password', this)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold">تأكيد كلمة المرور الجديدة: <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-check2-circle text-muted"></i></span>
+                                    <input type="password" name="confirm_password" id="confirm_password" class="form-control" required placeholder="أعد إدخال كلمة المرور الجديدة">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('confirm_password', this)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="btnSavePwd" class="btn btn-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2">
+                                <i class="bi bi-check-circle-fill"></i> حفظ وتحديث كلمة المرور
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
-            <div class="card-body p-4">
-                <div id="pwdAlertBox" style="display: none;"></div>
 
-                <form id="changePasswordForm" method="POST" action="/settings/change-password">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">اسم المستخدم:</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-secondary"></i></span>
-                            <input type="text" class="form-control bg-light border-start-0" value="{{ .CurrentUser.Username }} ({{ if eq .CurrentUser.Role "admin" }}مدير النظام{{ else }}موزع{{ end }})" readonly disabled>
+            <!-- Server Info & MikroTik Script Card -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 mb-4" style="border-radius: 14px;">
+                    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                        <div class="p-2 bg-info-subtle rounded-3 text-info">
+                            <i class="bi bi-info-circle-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">بيانات ومعلومات الخادم</h6>
+                            <small class="text-muted">المنافذ وحالة محرك الراديوس وقاعدة البيانات</small>
                         </div>
                     </div>
+                    <div class="card-body p-3">
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <div class="p-2 border rounded-3 bg-light">
+                                    <span class="text-muted small d-block">لوحة التحكم المشفرة:</span>
+                                    <span class="fw-bold text-success"><i class="bi bi-lock-fill"></i> HTTPS (بورت 443)</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-2 border rounded-3 bg-light">
+                                    <span class="text-muted small d-block">بورت المصادقة (Auth UDP):</span>
+                                    <code class="fw-bold text-primary fs-6">1812</code>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-2 border rounded-3 bg-light">
+                                    <span class="text-muted small d-block">بورت المحاسبة (Acct UDP):</span>
+                                    <code class="fw-bold text-primary fs-6">1813</code>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-2 border rounded-3 bg-light">
+                                    <span class="text-muted small d-block">بورت الفصل الفوري (CoA UDP):</span>
+                                    <code class="fw-bold text-primary fs-6">3799</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">كلمة المرور الحالية: <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-key text-muted"></i></span>
-                            <input type="password" name="old_password" id="old_password" class="form-control" required placeholder="أدخل كلمة المرور الحالية">
-                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('old_password', this)">
-                                <i class="bi bi-eye"></i>
+                <div class="card shadow-sm border-0" style="border-radius: 14px;">
+                    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                        <div class="p-2 bg-secondary-subtle rounded-3 text-secondary">
+                            <i class="bi bi-terminal-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">كود إعداد راوتر المايكروتك (MikroTik Script)</h6>
+                            <small class="text-muted">انسخ الكود والصقه في New Terminal لتفعيل الراديوس</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="GET" action="/settings" class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">آيبي سيرفر الراديوس:</label>
+                                <input type="text" name="server_ip" class="form-control form-control-sm" value="{{ .ServerIP }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">كلمة السر (Secret):</label>
+                                <input type="text" name="secret" class="form-control form-control-sm" value="{{ .Secret }}">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-sm btn-secondary w-100">تحديث</button>
+                            </div>
+                        </form>
+
+                        <div class="position-relative">
+                            <textarea class="form-control font-monospace bg-dark text-info p-3" rows="8" readonly id="scriptBox">{{ .MikrotikScript }}</textarea>
+                            <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 fw-bold" onclick="window.copyToClipboard(document.getElementById('scriptBox').value, () => window.showCopyToast('تم نسخ كود إعداد المايكروتك بنجاح!'));">
+                                <i class="bi bi-clipboard"></i> نسخ الكود
                             </button>
                         </div>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">كلمة المرور الجديدة: <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-lock text-muted"></i></span>
-                            <input type="password" name="new_password" id="new_password" class="form-control" required placeholder="6 خانات أو أكثر">
-                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('new_password', this)">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label small fw-bold">تأكيد كلمة المرور الجديدة: <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-check2-circle text-muted"></i></span>
-                            <input type="password" name="confirm_password" id="confirm_password" class="form-control" required placeholder="أعد إدخال كلمة المرور الجديدة">
-                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassVisibility('confirm_password', this)">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <button type="submit" id="btnSavePwd" class="btn btn-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2">
-                        <i class="bi bi-check-circle-fill"></i> حفظ وتحديث كلمة المرور
-                    </button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Server Info & MikroTik Script Card -->
-    <div class="col-lg-7">
-        <div class="card shadow-sm border-0 mb-4" style="border-radius: 14px;">
-            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
-                <div class="p-2 bg-info-subtle rounded-3 text-info">
-                    <i class="bi bi-info-circle-fill fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-dark">بيانات ومعلومات الخادم</h6>
-                    <small class="text-muted">المنافذ وحالة محرك الراديوس وقاعدة البيانات</small>
-                </div>
-            </div>
-            <div class="card-body p-3">
-                <div class="row g-2">
-                    <div class="col-sm-6">
-                        <div class="p-2 border rounded-3 bg-light">
-                            <span class="text-muted small d-block">لوحة التحكم المشفرة:</span>
-                            <span class="fw-bold text-success"><i class="bi bi-lock-fill"></i> HTTPS (بورت 443)</span>
+    <!-- Tab 2: Subscriber Portal Permissions & Settings -->
+    <div class="tab-pane fade" id="tab-portal" role="tabpanel" aria-labelledby="portal-tab">
+        <div id="portal-settings">
+            <div class="card shadow-sm border-0" style="border-radius: 14px;">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 bg-success-subtle rounded-3 text-success">
+                            <i class="bi bi-person-workspace fs-5"></i>
                         </div>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="p-2 border rounded-3 bg-light">
-                            <span class="text-muted small d-block">بورت المصادقة (Auth UDP):</span>
-                            <code class="fw-bold text-primary fs-6">1812</code>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">صفحة المشترك (Subscriber Self-Care Portal)</h6>
+                            <small class="text-muted">التحكم في صلاحيات المشتركين وما يمكنهم رؤيته أو تنفيذه داخل صفحتهم الخاصة</small>
                         </div>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="p-2 border rounded-3 bg-light">
-                            <span class="text-muted small d-block">بورت المحاسبة (Acct UDP):</span>
-                            <code class="fw-bold text-primary fs-6">1813</code>
-                        </div>
-                    </div>
-                    <div class="col-sm-6">
-                        <div class="p-2 border rounded-3 bg-light">
-                            <span class="text-muted small d-block">بورت الفصل الفوري (CoA UDP):</span>
-                            <code class="fw-bold text-primary fs-6">3799</code>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm border-0" style="border-radius: 14px;">
-            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
-                <div class="p-2 bg-secondary-subtle rounded-3 text-secondary">
-                    <i class="bi bi-terminal-fill fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-dark">كود إعداد راوتر المايكروتك (MikroTik Script)</h6>
-                    <small class="text-muted">انسخ الكود والصقه في New Terminal لتفعيل الراديوس</small>
-                </div>
-            </div>
-            <div class="card-body p-4">
-                <form method="GET" action="/settings" class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-bold">آيبي سيرفر الراديوس:</label>
-                        <input type="text" name="server_ip" class="form-control form-control-sm" value="{{ .ServerIP }}">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold">كلمة السر (Secret):</label>
-                        <input type="text" name="secret" class="form-control form-control-sm" value="{{ .Secret }}">
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-sm btn-secondary w-100">تحديث</button>
-                    </div>
-                </form>
-
-                <div class="position-relative">
-                    <textarea class="form-control font-monospace bg-dark text-info p-3" rows="8" readonly id="scriptBox">{{ .MikrotikScript }}</textarea>
-                    <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 fw-bold" onclick="window.copyToClipboard(document.getElementById('scriptBox').value, () => window.showCopyToast('تم نسخ كود إعداد المايكروتك بنجاح!'));">
-                        <i class="bi bi-clipboard"></i> نسخ الكود
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Subscriber Portal Permissions & Settings Card -->
-    <div class="col-12" id="portal-settings">
-        <div class="card shadow-sm border-0" style="border-radius: 14px;">
-            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="p-2 bg-success-subtle rounded-3 text-success">
-                        <i class="bi bi-person-workspace fs-5"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold mb-0 text-dark">صفحة المشترك (Subscriber Self-Care Portal)</h6>
-                        <small class="text-muted">التحكم في صلاحيات المشتركين وما يمكنهم رؤيته أو تنفيذه داخل صفحتهم الخاصة</small>
+                        <a href="/portal" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> فتح صفحة المشترك للمعاينة
+                        </a>
                     </div>
                 </div>
-                <div>
-                    <a href="/portal" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> فتح صفحة المشترك للمعاينة
-                    </a>
+                <div class="card-body p-4">
+                    <form method="POST" action="/settings/portal">
+                        <!-- General Portal Status Switch -->
+                        <div class="p-3 bg-light rounded-3 border mb-4 d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="fw-bold mb-1 text-dark">تفعيل صفحة المشترك بالكامل (Portal Status)</h6>
+                                <p class="text-muted small mb-0">عند التعطيل، لن يتمكن المشتركون من تسجيل الدخول إلى صفحتهم الذاتية.</p>
+                            </div>
+                            <div class="form-check form-switch fs-4 mb-0">
+                                <input class="form-check-input" type="checkbox" name="portal_enabled" value="1" id="sw_portal_enabled" {{ if .PortalSettings.PortalEnabled }}checked{{ end }}>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="bi bi-ui-checks me-1 text-primary"></i> صلاحيات وخيارات ظهور البيانات للمشترك
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_allow_loan">
+                                            <i class="bi bi-clock-history text-warning me-1"></i> طلب سلفة فترة سماح
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="allow_loan_request" value="1" id="sw_allow_loan" {{ if .PortalSettings.AllowLoanRequest }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">إتاحة زر طلب السلفة الذاتية للمشتركين الذين تدعم باقتهم السلفة.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_show_quota">
+                                            <i class="bi bi-pie-chart-fill text-primary me-1"></i> متابعة الكوتة والاستهلاك
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="show_quota_usage" value="1" id="sw_show_quota" {{ if .PortalSettings.ShowQuotaUsage }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">إظهار الجيجات المستهلكة، والمتبقية، والنسبة المئوية وشريط التقدم.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_show_online">
+                                            <i class="bi bi-broadcast text-success me-1"></i> حالة الاتصال والأونلاين
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="show_online_status" value="1" id="sw_show_online" {{ if .PortalSettings.ShowOnlineStatus }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">إظهار هل العميل متصل حالياً (Online) مع عنوان الآيبي والماك.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_show_profile">
+                                            <i class="bi bi-speedometer2 text-info me-1"></i> تفاصيل وسعر الباقة
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="show_profile_details" value="1" id="sw_show_profile" {{ if .PortalSettings.ShowProfileDetails }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">عرض اسم الباقة، السرعة المحددة، سعر التجديد، وموعد الانتهاء.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_show_debt">
+                                            <i class="bi bi-cash-coin text-danger me-1"></i> إظهار المديونية المستحقة
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="show_debt" value="1" id="sw_show_debt" {{ if .PortalSettings.ShowDebt }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">عرض الرصيد المالي والديون المستحقة على المشترك إن وُجدت.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_allow_disconnect">
+                                            <i class="bi bi-arrow-clockwise text-secondary me-1"></i> إعادة تشغيل الجلسة (Reconnect)
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="allow_session_disconnect" value="1" id="sw_allow_disconnect" {{ if .PortalSettings.AllowSessionDisconnect }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">السماح للمشترك بفصل جلسته الحالية لإعادة الاتصال بالراوتر لحل مشاكل التعليق.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_allow_pass">
+                                            <i class="bi bi-key-fill text-dark me-1"></i> تغيير كلمة المرور
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="allow_password_change" value="1" id="sw_allow_pass" {{ if .PortalSettings.AllowPasswordChange }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">السماح للمشترك بتعديل باسورد اشتراكه ذاتياً من صفحته.</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-dark" for="sw_allow_phone_login">
+                                            <i class="bi bi-phone-fill text-primary me-1"></i> الدخول برقم الموبايل
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="allow_phone_login" value="1" id="sw_allow_phone_login" {{ if .PortalSettings.AllowPhoneLogin }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">السماح للمشترك بتسجيل الدخول برقم هاتفه المسجل بدلاً من اليوزر نيم.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="bi bi-megaphone me-1 text-primary"></i> بيانات الشبكة ورسائل الإعلانات في صفحة المشترك
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">اسم الشبكة / الشركة الظاهر بالصفحة:</label>
+                                <input type="text" name="company_name" class="form-control" value="{{ .PortalSettings.CompanyName }}" placeholder="مثال: شبكة الأمل لخدمات الإنترنت">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">رقم هاتف الدعم الفني / الواتساب:</label>
+                                <input type="text" name="company_phone" class="form-control" value="{{ .PortalSettings.CompanyPhone }}" placeholder="مثال: 01012345678">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold">رسالة تنبيهية أو إعلان يظهر أعلى صفحة المشترك (اختياري):</label>
+                                <textarea name="portal_announcement" class="form-control" rows="2" placeholder="اكتب رسالة ترحيبية أو إعلان بمواعيد الصيانة أو العروض الخاصة...">{{ .PortalSettings.PortalAnnouncement }}</textarea>
+                                <div class="form-text small">اترك الحقل فارغاً إذا كنت لا ترغب بإظهار إعلان في صفحة المشترك.</div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success fw-bold px-4 py-2">
+                            <i class="bi bi-check-circle-fill me-1"></i> حفظ إعدادات وصلاحيات صفحة المشترك
+                        </button>
+                    </form>
                 </div>
-            </div>
-            <div class="card-body p-4">
-                <form method="POST" action="/settings/portal">
-                    <!-- General Portal Status Switch -->
-                    <div class="p-3 bg-light rounded-3 border mb-4 d-flex align-items-center justify-content-between">
-                        <div>
-                            <h6 class="fw-bold mb-1 text-dark">تفعيل صفحة المشترك بالكامل (Portal Status)</h6>
-                            <p class="text-muted small mb-0">عند التعطيل، لن يتمكن المشتركون من تسجيل الدخول إلى صفحتهم الذاتية.</p>
-                        </div>
-                        <div class="form-check form-switch fs-4 mb-0">
-                            <input class="form-check-input" type="checkbox" name="portal_enabled" value="1" id="sw_portal_enabled" {{ if .PortalSettings.PortalEnabled }}checked{{ end }}>
-                        </div>
-                    </div>
-
-                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                        <i class="bi bi-ui-checks me-1 text-primary"></i> صلاحيات وخيارات ظهور البيانات للمشترك
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_loan">
-                                        <i class="bi bi-clock-history text-warning me-1"></i> طلب سلفة فترة سماح
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="allow_loan_request" value="1" id="sw_allow_loan" {{ if .PortalSettings.AllowLoanRequest }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">إتاحة زر طلب السلفة الذاتية للمشتركين الذين تدعم باقتهم السلفة.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_show_quota">
-                                        <i class="bi bi-pie-chart-fill text-primary me-1"></i> متابعة الكوتة والاستهلاك
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="show_quota_usage" value="1" id="sw_show_quota" {{ if .PortalSettings.ShowQuotaUsage }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">إظهار الجيجات المستهلكة، والمتبقية، والنسبة المئوية وشريط التقدم.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_show_online">
-                                        <i class="bi bi-broadcast text-success me-1"></i> حالة الاتصال والأونلاين
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="show_online_status" value="1" id="sw_show_online" {{ if .PortalSettings.ShowOnlineStatus }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">إظهار هل العميل متصل حالياً (Online) مع عنوان الآيبي والماك.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_show_profile">
-                                        <i class="bi bi-speedometer2 text-info me-1"></i> تفاصيل وسعر الباقة
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="show_profile_details" value="1" id="sw_show_profile" {{ if .PortalSettings.ShowProfileDetails }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">عرض اسم الباقة، السرعة المحددة، سعر التجديد، وموعد الانتهاء.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_show_debt">
-                                        <i class="bi bi-cash-coin text-danger me-1"></i> إظهار المديونية المستحقة
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="show_debt" value="1" id="sw_show_debt" {{ if .PortalSettings.ShowDebt }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">عرض الرصيد المالي والديون المستحقة على المشترك إن وُجدت.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_disconnect">
-                                        <i class="bi bi-arrow-clockwise text-secondary me-1"></i> إعادة تشغيل الجلسة (Reconnect)
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="allow_session_disconnect" value="1" id="sw_allow_disconnect" {{ if .PortalSettings.AllowSessionDisconnect }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">السماح للمشترك بفصل جلسته الحالية لإعادة الاتصال بالراوتر لحل مشاكل التعليق.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_pass">
-                                        <i class="bi bi-key-fill text-dark me-1"></i> تغيير كلمة المرور
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="allow_password_change" value="1" id="sw_allow_pass" {{ if .PortalSettings.AllowPasswordChange }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">السماح للمشترك بتعديل باسورد اشتراكه ذاتياً من صفحته.</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
-                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_phone_login">
-                                        <i class="bi bi-phone-fill text-primary me-1"></i> الدخول برقم الموبايل
-                                    </label>
-                                    <input class="form-check-input ms-0" type="checkbox" name="allow_phone_login" value="1" id="sw_allow_phone_login" {{ if .PortalSettings.AllowPhoneLogin }}checked{{ end }}>
-                                </div>
-                                <small class="text-muted d-block">السماح للمشترك بتسجيل الدخول برقم هاتفه المسجل بدلاً من اليوزر نيم.</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                        <i class="bi bi-megaphone me-1 text-primary"></i> بيانات الشبكة ورسائل الإعلانات في صفحة المشترك
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">اسم الشبكة / الشركة الظاهر بالصفحة:</label>
-                            <input type="text" name="company_name" class="form-control" value="{{ .PortalSettings.CompanyName }}" placeholder="مثال: شبكة الأمل لخدمات الإنترنت">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">رقم هاتف الدعم الفني / الواتساب:</label>
-                            <input type="text" name="company_phone" class="form-control" value="{{ .PortalSettings.CompanyPhone }}" placeholder="مثال: 01012345678">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label small fw-bold">رسالة تنبيهية أو إعلان يظهر أعلى صفحة المشترك (اختياري):</label>
-                            <textarea name="portal_announcement" class="form-control" rows="2" placeholder="اكتب رسالة ترحيبية أو إعلان بمواعيد الصيانة أو العروض الخاصة...">{{ .PortalSettings.PortalAnnouncement }}</textarea>
-                            <div class="form-text small">اترك الحقل فارغاً إذا كنت لا ترغب بإظهار إعلان في صفحة المشترك.</div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-success fw-bold px-4 py-2">
-                        <i class="bi bi-check-circle-fill me-1"></i> حفظ إعدادات وصلاحيات صفحة المشترك
-                    </button>
-                </form>
             </div>
         </div>
     </div>
@@ -402,5 +431,34 @@ document.getElementById('changePasswordForm').addEventListener('submit', functio
         alertBox.style.display = 'flex';
     });
 });
+
+// URL Hash and Tab State Management
+function activateTabFromHash() {
+    const hash = window.location.hash;
+    if (hash === '#portal-settings' || hash === '#portal' || hash === '#tab-portal') {
+        const portalTrigger = document.getElementById('portal-tab');
+        if (portalTrigger) {
+            bootstrap.Tab.getOrCreateInstance(portalTrigger).show();
+        }
+    } else if (hash === '#system' || hash === '#change-password' || hash === '#tab-system') {
+        const sysTrigger = document.getElementById('system-tab');
+        if (sysTrigger) {
+            bootstrap.Tab.getOrCreateInstance(sysTrigger).show();
+        }
+    }
+}
+
+document.querySelectorAll('#settingsTabs button[data-bs-toggle="pill"]').forEach(tabBtn => {
+    tabBtn.addEventListener('shown.bs.tab', function(e) {
+        if (e.target.id === 'portal-tab') {
+            history.replaceState(null, null, '#portal-settings');
+        } else if (e.target.id === 'system-tab') {
+            history.replaceState(null, null, '#system');
+        }
+    });
+});
+
+window.addEventListener('load', activateTabFromHash);
+window.addEventListener('hashchange', activateTabFromHash);
 </script>
 {{ end }}
