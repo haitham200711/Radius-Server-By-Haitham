@@ -59,7 +59,7 @@
 
 <!-- Status Filter Tabs -->
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
         <a href="/subscribers?limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "" }}btn-primary fw-bold{{ else }}btn-outline-secondary{{ end }}">
             <i class="bi bi-people-fill me-1"></i> جميع المشتركين
         </a>
@@ -70,12 +70,18 @@
         <a href="/subscribers?status=offline&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "offline" }}btn-secondary fw-bold{{ else }}btn-outline-secondary{{ end }}">
             <i class="bi bi-slash-circle me-1"></i> غير متصلين
         </a>
+        <a href="/subscribers?status=expired_time&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_time" }}btn-danger fw-bold{{ else }}btn-outline-danger{{ end }}">
+            <i class="bi bi-clock-history me-1"></i> منتهي اشتراك ({{ .ExpiredTimeCount }})
+        </a>
+        <a href="/subscribers?status=expired_quota&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_quota" }}btn-warning text-dark fw-bold{{ else }}btn-outline-warning text-dark{{ end }}">
+            <i class="bi bi-pie-chart-fill me-1"></i> منتهي كوتة ({{ .ExpiredQuotaCount }})
+        </a>
     </div>
 
     {{ if .FilterStatus }}
     <div>
         <a href="/subscribers?limit={{ .Limit }}" class="badge bg-light text-dark text-decoration-none border p-2">
-            إلغاء الفلتر: {{ if eq .FilterStatus "online" }}متصلين فقط{{ else }}غير متصلين{{ end }} <i class="bi bi-x-circle ms-1"></i>
+            إلغاء الفلتر: {{ if eq .FilterStatus "online" }}متصلين فقط{{ else if eq .FilterStatus "offline" }}غير متصلين{{ else if eq .FilterStatus "expired_time" }}منتهي اشتراك{{ else if eq .FilterStatus "expired_quota" }}منتهي كوتة{{ else }}{{ .FilterStatus }}{{ end }} <i class="bi bi-x-circle ms-1"></i>
         </a>
     </div>
     {{ end }}
@@ -174,7 +180,7 @@
                         </div>
                         <div class="form-check mb-0">
                             <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-status" data-column="col-status" checked>
-                            <label class="form-check-label small" for="toggle-col-status">الحالة (نشط/معطل)</label>
+                            <label class="form-check-label small" for="toggle-col-status">الحالة (نشط/منتهي/معطل)</label>
                         </div>
                     </div>
                 </div>
@@ -327,19 +333,19 @@
                     <td class="col-quota-rem">
                         {{ if gt .QuotaBytes 0 }}
                         <div>
-                            <span class="badge {{ if lt .RemainingGB 2.0 }}bg-danger-subtle text-danger border-danger-subtle{{ else }}bg-success-subtle text-success border-success-subtle{{ end }} border fw-bold">
+                            <span class="badge {{ if .IsQuotaExpired }}bg-danger text-white border-danger{{ else if lt .RemainingGB 2.0 }}bg-danger-subtle text-danger border-danger-subtle{{ else }}bg-success-subtle text-success border-success-subtle{{ end }} border fw-bold">
                                 <i class="bi bi-pie-chart-fill me-1"></i>{{ .RemainingDisplay }}
                             </span>
                         </div>
                         <div class="progress mt-1" style="height: 4px; min-width: 65px;" title="نسبة الاستهلاك: {{ printf "%.1f" .UsagePercent }}%">
-                            <div class="progress-bar {{ if gt .UsagePercent 90.0 }}bg-danger{{ else if gt .UsagePercent 75.0 }}bg-warning{{ else }}bg-success{{ end }}" style="width: {{ .UsagePercent }}%"></div>
+                            <div class="progress-bar {{ if or .IsQuotaExpired (gt .UsagePercent 90.0) }}bg-danger{{ else if gt .UsagePercent 75.0 }}bg-warning{{ else }}bg-success{{ end }}" style="width: {{ .UsagePercent }}%"></div>
                         </div>
                         {{ else }}
                         <span class="badge bg-light text-muted border">مفتوح ∞</span>
                         {{ end }}
                     </td>
                     <td class="col-expiry">
-                        <span class="small">{{ .ExpirationDate }}</span>
+                        <span class="small {{ if .IsTimeExpired }}text-danger fw-bold{{ end }}">{{ .ExpirationDate }}</span>
                         {{ if .LoanActive }}
                         <div>
                             <span class="badge bg-warning text-dark border border-warning shadow-sm mt-1" title="سلفة نشطة: {{ .LoanHours }} ساعة | سداد {{ if eq .LoanDeductionType "partial" }}جزئي{{ else }}كلي{{ end }}">
@@ -349,10 +355,31 @@
                         {{ end }}
                     </td>
                     <td class="col-status">
-                        {{ if eq .Status "active" }}
-                        <span class="badge bg-success">نشط</span>
+                        {{ if eq .StatusCode "expired_both" }}
+                        <div class="d-flex flex-column gap-1">
+                            <span class="badge bg-danger shadow-sm">
+                                <i class="bi bi-clock-history me-1"></i> منتهي اشتراك
+                            </span>
+                            <span class="badge bg-warning text-dark shadow-sm">
+                                <i class="bi bi-pie-chart-fill me-1"></i> منتهي كوتة
+                            </span>
+                        </div>
+                        {{ else if eq .StatusCode "expired_time" }}
+                        <span class="badge bg-danger shadow-sm">
+                            <i class="bi bi-clock-history me-1"></i> منتهي اشتراك
+                        </span>
+                        {{ else if eq .StatusCode "expired_quota" }}
+                        <span class="badge bg-warning text-dark shadow-sm">
+                            <i class="bi bi-pie-chart-fill me-1"></i> منتهي كوتة
+                        </span>
+                        {{ else if eq .StatusCode "disabled" }}
+                        <span class="badge bg-secondary shadow-sm">
+                            <i class="bi bi-slash-circle me-1"></i> معطل
+                        </span>
                         {{ else }}
-                        <span class="badge bg-secondary">{{ .Status }}</span>
+                        <span class="badge bg-success shadow-sm">
+                            <i class="bi bi-check-circle me-1"></i> نشط
+                        </span>
                         {{ end }}
                     </td>
                 </tr>

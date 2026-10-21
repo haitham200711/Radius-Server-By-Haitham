@@ -48,6 +48,10 @@ type SubscriberItem struct {
 	UsagePercent      float64
 	ExpirationDate    string
 	Status            string
+	StatusCode        string // "active", "disabled", "expired_time", "expired_quota", "expired_both"
+	StatusText        string
+	IsTimeExpired     bool
+	IsQuotaExpired    bool
 	IsOnline          bool
 	OnlineIP          string
 	ResellerID        int64
@@ -151,6 +155,10 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		countQuery += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	} else if statusFilter == "offline" {
 		countQuery += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+	} else if statusFilter == "expired_time" {
+		countQuery += " AND s.expiration_date IS NOT NULL AND s.expiration_date < NOW()"
+	} else if statusFilter == "expired_quota" {
+		countQuery += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
 	}
 
 	if resellerFilter > 0 {
@@ -214,6 +222,10 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		query += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	} else if statusFilter == "offline" {
 		query += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+	} else if statusFilter == "expired_time" {
+		query += " AND s.expiration_date IS NOT NULL AND s.expiration_date < NOW()"
+	} else if statusFilter == "expired_quota" {
+		query += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
 	}
 
 	if resellerFilter > 0 {
@@ -316,6 +328,34 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 					s.OnlineIP = liveIP
 				}
 
+				// Calculate exact real-time status: active, expired_time, expired_quota, expired_both, disabled
+				now := time.Now()
+				isTimeExpired := exp.Valid && now.After(exp.Time)
+				isQuotaExpired := s.QuotaBytes > 0 && s.RemainingBytes <= 0
+
+				s.IsTimeExpired = isTimeExpired
+				s.IsQuotaExpired = isQuotaExpired
+
+				if s.Status == "disabled" || s.Status == "suspended" {
+					s.StatusCode = "disabled"
+					s.StatusText = "معطل"
+				} else if isTimeExpired && isQuotaExpired {
+					s.StatusCode = "expired_both"
+					s.StatusText = "منتهي اشتراك وكوتة"
+				} else if isTimeExpired {
+					s.StatusCode = "expired_time"
+					s.StatusText = "منتهي اشتراك"
+				} else if isQuotaExpired {
+					s.StatusCode = "expired_quota"
+					s.StatusText = "منتهي كوتة"
+				} else if s.Status == "expired" {
+					s.StatusCode = "expired_time"
+					s.StatusText = "منتهي اشتراك"
+				} else {
+					s.StatusCode = "active"
+					s.StatusText = "نشط"
+				}
+
 				list = append(list, s)
 			}
 		}
@@ -331,17 +371,28 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	profiles, _ := bp.db.GetProfiles()
 	resellersList, _ := bp.db.GetResellers()
 
+	var expiredTimeCount, expiredQuotaCount int
+	if resellerFilter > 0 {
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.expiration_date IS NOT NULL AND s.expiration_date < NOW()`, resellerFilter).Scan(&expiredTimeCount)
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`, resellerFilter).Scan(&expiredQuotaCount)
+	} else {
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.expiration_date IS NOT NULL AND s.expiration_date < NOW()`).Scan(&expiredTimeCount)
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`).Scan(&expiredQuotaCount)
+	}
+
 	_ = bp.renderer.Render(w, "subscribers/list", map[string]interface{}{
-		"Title":            "إدارة المشتركين والعقود",
-		"ActiveMenu":       "subscribers",
-		"CurrentUser":      middleware.GetUser(r),
-		"Subscribers":      list,
-		"SearchQuery":      search,
-		"FilterStatus":     statusFilter,
-		"SelectedReseller": resellerFilter,
-		"Resellers":        resellersList,
-		"ResellerPerms":    resellerPerms,
-		"OnlineCount":      onlineCount,
+		"Title":             "إدارة المشتركين والعقود",
+		"ActiveMenu":        "subscribers",
+		"CurrentUser":       middleware.GetUser(r),
+		"Subscribers":       list,
+		"SearchQuery":       search,
+		"FilterStatus":      statusFilter,
+		"SelectedReseller":  resellerFilter,
+		"Resellers":         resellersList,
+		"ResellerPerms":     resellerPerms,
+		"OnlineCount":       onlineCount,
+		"ExpiredTimeCount":  expiredTimeCount,
+		"ExpiredQuotaCount": expiredQuotaCount,
 		"Page":             page,
 		"Limit":            limit,
 		"TotalCount":       totalCount,
