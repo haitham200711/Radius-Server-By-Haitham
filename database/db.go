@@ -254,6 +254,7 @@ func (d *DB) InitSchema() error {
 			phone VARCHAR(30) DEFAULT '',
 			address TEXT,
 			debt DECIMAL(10, 2) DEFAULT 0.00,
+			balance DECIMAL(10, 2) DEFAULT 0.00,
 			profile_name VARCHAR(64) DEFAULT '',
 			static_ip VARCHAR(32) DEFAULT '',
 			calling_mac VARCHAR(32) DEFAULT '',
@@ -565,6 +566,9 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_phone_login TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_ip_auto_login TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS portal_enabled TINYINT(1) DEFAULT 1;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS balance DECIMAL(10, 2) DEFAULT 0.00;`,
+		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS show_balance TINYINT(1) DEFAULT 1;`,
+		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_balance_renewal TINYINT(1) DEFAULT 1;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -623,6 +627,21 @@ func (d *DB) InitSchema() error {
 			key:  "loan_granted",
 			name: "منح سلفة فترة سماح",
 			text: "مرحباً {name}، تم منحك سلفة فترة سماح بنجاح! المدة الممنوحة: {loan_hours} ساعة، والكوتة: {loan_quota} جيجا. تنتهي السلفة بتاريخ {expiry_date}. يرجى التجديد قبل انتهاء المدة.",
+		},
+		{
+			key:  "balance_added",
+			name: "شحن رصيد بالمحفظة",
+			text: "مرحباً {name}، تم إيداع مبلغ {amount} ج.م في محفظتكم بنجاح. رصيدك الحالي: {balance} ج.م.",
+		},
+		{
+			key:  "renew_from_balance",
+			name: "تجديد الباقة من الرصيد",
+			text: "مرحباً {name}، تم تجديد اشتراككم بنجاح على باقة ({profile}) وخصم {amount} ج.م من رصيد محفظتكم. رصيدك المتبقي: {balance} ج.م. تاريخ الانتهاء الجديد: {expiry_date}.",
+		},
+		{
+			key:  "debt_settled_from_balance",
+			name: "سداد دين من رصيد المحفظة",
+			text: "مرحباً {name}، تم سداد مبلغ {amount} ج.م من مديونيتكم خصماً من رصيد المحفظة. المتبقي من الدين: {debt} ج.م. رصيدك المتبقي بالمحفظة: {balance} ج.م.",
 		},
 	}
 	for _, dt := range defaultTemplates {
@@ -834,10 +853,10 @@ func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 	}
 
 	// 1. Insert or update in subscribers table
-	query := `INSERT INTO subscribers (username, contract_no, full_name, phone, address, debt, profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status, reseller_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	query := `INSERT INTO subscribers (username, contract_no, full_name, phone, address, debt, balance, profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status, reseller_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE contract_no = VALUES(contract_no), full_name = VALUES(full_name), phone = VALUES(phone),
-		address = VALUES(address), debt = VALUES(debt), profile_name = VALUES(profile_name), static_ip = VALUES(static_ip),
+		address = VALUES(address), debt = VALUES(debt), balance = VALUES(balance), profile_name = VALUES(profile_name), static_ip = VALUES(static_ip),
 		calling_mac = VALUES(calling_mac), quota_bytes = VALUES(quota_bytes), expiration_date = VALUES(expiration_date), status = VALUES(status), reseller_id = VALUES(reseller_id)`
 
 	var expDate interface{}
@@ -845,7 +864,7 @@ func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 		expDate = sub.ExpirationDate.Time
 	}
 
-	_, err = tx.Exec(query, sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt,
+	_, err = tx.Exec(query, sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt, sub.Balance,
 		sub.ProfileName, sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status, sub.ResellerID)
 	if err != nil {
 		return err
@@ -2193,7 +2212,7 @@ func (d *DB) GetSubscriber(username string) (*models.Subscriber, error) {
 	var s models.Subscriber
 	var exp sql.NullTime
 	var loanGranted sql.NullTime
-	err := d.QueryRow(`SELECT s.id, s.username, s.contract_no, s.full_name, s.phone, s.address, s.debt,
+	err := d.QueryRow(`SELECT s.id, s.username, s.contract_no, s.full_name, s.phone, s.address, s.debt, COALESCE(s.balance, 0.00),
 		s.profile_name, s.static_ip, s.calling_mac, s.quota_bytes, s.expiration_date, s.status,
 		COALESCE(s.reseller_id, 0), COALESCE(r.name, ''),
 		COALESCE(s.loan_active, 0), s.loan_granted_at, COALESCE(s.loan_hours, 0), COALESCE(s.loan_quota_bytes, 0),
@@ -2202,7 +2221,7 @@ func (d *DB) GetSubscriber(username string) (*models.Subscriber, error) {
 		FROM subscribers s
 		LEFT JOIN resellers r ON s.reseller_id = r.id
 		WHERE s.username = ?`, username).Scan(
-		&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Address, &s.Debt,
+		&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Address, &s.Debt, &s.Balance,
 		&s.ProfileName, &s.StaticIP, &s.CallingMAC, &s.QuotaBytes, &exp, &s.Status,
 		&s.ResellerID, &s.ResellerName,
 		&s.LoanActive, &loanGranted, &s.LoanHours, &s.LoanQuotaBytes,
@@ -2263,14 +2282,15 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 	}
 
 	_, err = tx.Exec(`INSERT INTO subscribers (
-		username, contract_no, full_name, phone, address, debt, profile_name,
+		username, contract_no, full_name, phone, address, debt, balance, profile_name,
 		static_ip, calling_mac, quota_bytes, expiration_date, status, reseller_id, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 	ON DUPLICATE KEY UPDATE
 		full_name = VALUES(full_name),
 		phone = VALUES(phone),
 		address = VALUES(address),
 		debt = VALUES(debt),
+		balance = VALUES(balance),
 		profile_name = VALUES(profile_name),
 		static_ip = VALUES(static_ip),
 		calling_mac = VALUES(calling_mac),
@@ -2279,7 +2299,7 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 		status = VALUES(status),
 		reseller_id = VALUES(reseller_id),
 		updated_at = NOW()`,
-		sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt, sub.ProfileName,
+		sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt, sub.Balance, sub.ProfileName,
 		sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status, sub.ResellerID)
 	if err != nil {
 		return err
@@ -2963,7 +2983,7 @@ func (d *DB) BulkAddDebt(usernames []string, amount float64) error {
 
 // --- Billing & Financial Operations ---
 
-func (d *DB) RenewSubscriberBilling(username, profileName string, price float64, isPaid bool, method, notes, adminUser string) error {
+func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, price float64, paymentOption string, method, notes, adminUser string) error {
 	tx, err := d.Begin()
 	if err != nil {
 		return err
@@ -3019,34 +3039,66 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 	}
 
 	var contractNo, fullName string
-	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, '') FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName)
+	var currentDebt, currentBalance float64
+	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName, &currentDebt, &currentBalance)
 	if fullName == "" {
 		fullName = username
 	}
 
-	payStatus := "paid"
-	if !isPaid {
-		payStatus = "unpaid"
-		if price > 0 {
-			_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", price, username)
-		}
-	}
-
-	if method == "" {
-		method = "cash"
-	}
 	if adminUser == "" {
 		adminUser = "admin"
 	}
 
+	payStatus := "paid"
+	actualMethod := method
 	desc := fmt.Sprintf("تجديد باقة: %s", p.DisplayName)
 	if hadLoan {
 		desc += fmt.Sprintf(" (تسوية سلفة: خصم %.1f ساعة و %.2f جيجا)", deductedHours, float64(deductedQuotaBytes)/(1024*1024*1024))
 	}
+
+	var paidFromBalance float64
+	var addedDebt float64
+
+	switch paymentOption {
+	case "balance":
+		actualMethod = "balance"
+		if currentBalance >= price {
+			paidFromBalance = price
+			_, _ = tx.Exec("UPDATE subscribers SET balance = balance - ? WHERE username = ?", price, username)
+			payStatus = "paid"
+			desc += " (خصم كامل من رصيد المحفظة)"
+		} else if currentBalance > 0 {
+			paidFromBalance = currentBalance
+			addedDebt = price - currentBalance
+			_, _ = tx.Exec("UPDATE subscribers SET balance = 0, debt = debt + ? WHERE username = ?", addedDebt, username)
+			payStatus = "partial"
+			actualMethod = "balance+debt"
+			desc += fmt.Sprintf(" (خصم جزئي من الرصيد: %.2f ج.م، ومتبقي آجل: %.2f ج.م)", paidFromBalance, addedDebt)
+		} else {
+			addedDebt = price
+			_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", addedDebt, username)
+			payStatus = "unpaid"
+			actualMethod = "debt"
+			desc += " (آجل - لا يوجد رصيد)"
+		}
+	case "debt", "unpaid":
+		addedDebt = price
+		_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", addedDebt, username)
+		payStatus = "unpaid"
+		if actualMethod == "" {
+			actualMethod = "debt"
+		}
+	default: // cash / paid
+		payStatus = "paid"
+		if actualMethod == "" {
+			actualMethod = "cash"
+		}
+	}
+
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'renew', ?, ?, ?, ?, ?, ?)`,
-		username, contractNo, fullName, desc, price, payStatus, method, notes, adminUser)
+		username, contractNo, fullName, desc, price, payStatus, actualMethod, notes, adminUser)
 
 	if err := tx.Commit(); err != nil {
 		return err
@@ -3071,19 +3123,225 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 	go func() {
 		sub, err := d.GetSubscriber(username)
 		if err == nil && sub != nil {
-			_ = d.TriggerWhatsAppEvent("renew", sub, map[string]string{
-				"{amount}":  fmt.Sprintf("%.2f", price),
-				"{profile}": p.DisplayName,
-			})
-			if !isPaid && price > 0 {
+			if paymentOption == "balance" && paidFromBalance > 0 {
+				_ = d.TriggerWhatsAppEvent("renew_from_balance", sub, map[string]string{
+					"{amount}":  fmt.Sprintf("%.2f", paidFromBalance),
+					"{profile}": p.DisplayName,
+				})
+			} else {
+				_ = d.TriggerWhatsAppEvent("renew", sub, map[string]string{
+					"{amount}":  fmt.Sprintf("%.2f", price),
+					"{profile}": p.DisplayName,
+				})
+			}
+			if addedDebt > 0 {
 				_ = d.TriggerWhatsAppEvent("debt_added", sub, map[string]string{
-					"{amount}": fmt.Sprintf("%.2f", price),
+					"{amount}": fmt.Sprintf("%.2f", addedDebt),
 				})
 			}
 		}
 	}()
 
 	return nil
+}
+
+func (d *DB) RenewSubscriberBilling(username, profileName string, price float64, isPaid bool, method, notes, adminUser string) error {
+	opt := "cash"
+	if !isPaid {
+		opt = "debt"
+	}
+	return d.RenewSubscriberWithPaymentOption(username, profileName, price, opt, method, notes, adminUser)
+}
+
+// AddSubscriberBalance deposits amount to subscriber wallet.
+// If settleDebtFirst is true and subscriber has debt:
+// - If amount >= debt: settles debt to 0, deposits remainder to balance.
+// - If amount < debt: reduces debt by amount, balance unaffected.
+// Returns (newBalance, newDebt, settledDebt, error)
+func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes, adminUser string, settleDebtFirst bool) (float64, float64, float64, error) {
+	if amount <= 0 {
+		return 0, 0, 0, fmt.Errorf("مبلغ الشحن يجب أن يكون أكبر من الصفر")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	defer tx.Rollback()
+
+	var contractNo, fullName string
+	var currDebt, currBalance float64
+	err = tx.QueryRow(`SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
+		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&contractNo, &fullName, &currDebt, &currBalance)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("المشترك غير موجود: %w", err)
+	}
+	if fullName == "" {
+		fullName = username
+	}
+	if method == "" {
+		method = "cash"
+	}
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+
+	var settledDebt float64
+	var newDebt, newBalance float64
+
+	if settleDebtFirst && currDebt > 0 {
+		if amount >= currDebt {
+			settledDebt = currDebt
+			remDeposit := amount - currDebt
+			newDebt = 0
+			newBalance = currBalance + remDeposit
+
+			_, err = tx.Exec("UPDATE subscribers SET debt = 0, balance = ? WHERE username = ?", newBalance, username)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+
+			// 1. Transaction for settling debt
+			debtDesc := fmt.Sprintf("سداد كامل المديونية (%.2f ج.م) من عملية إيداع الرصيد", settledDebt)
+			_, _ = tx.Exec(`INSERT INTO billing_transactions (
+				username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+			) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
+				username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser)
+
+			// 2. Transaction for remaining deposit if > 0
+			if remDeposit > 0 {
+				depDesc := fmt.Sprintf("إيداع رصيد بالمحفظة (المتبقي بعد تصفير الدين - الرصيد الجديد: %.2f ج.م)", newBalance)
+				_, _ = tx.Exec(`INSERT INTO billing_transactions (
+					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+				) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', ?, ?, ?)`,
+					username, contractNo, fullName, depDesc, remDeposit, method, notes, adminUser)
+			}
+		} else { // amount < currDebt
+			settledDebt = amount
+			newDebt = currDebt - amount
+			newBalance = currBalance
+
+			_, err = tx.Exec("UPDATE subscribers SET debt = ? WHERE username = ?", newDebt, username)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+
+			debtDesc := fmt.Sprintf("سداد جزئي للمديونية من عملية شحن الرصيد (المتبقي من الدين: %.2f ج.م)", newDebt)
+			_, _ = tx.Exec(`INSERT INTO billing_transactions (
+				username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+			) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
+				username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser)
+		}
+	} else {
+		settledDebt = 0
+		newDebt = currDebt
+		newBalance = currBalance + amount
+
+		_, err = tx.Exec("UPDATE subscribers SET balance = ? WHERE username = ?", newBalance, username)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+
+		depDesc := fmt.Sprintf("شحن / إيداع رصيد بالمحفظة (الرصيد الجديد: %.2f ج.م)", newBalance)
+		_, _ = tx.Exec(`INSERT INTO billing_transactions (
+			username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+		) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', ?, ?, ?)`,
+			username, contractNo, fullName, depDesc, amount, method, notes, adminUser)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, 0, err
+	}
+
+	// Trigger notifications
+	go func() {
+		sub, err := d.GetSubscriber(username)
+		if err == nil && sub != nil {
+			if settledDebt > 0 {
+				_ = d.TriggerWhatsAppEvent("debt_paid", sub, map[string]string{
+					"{amount}": fmt.Sprintf("%.2f", settledDebt),
+					"{debt}":   fmt.Sprintf("%.2f", newDebt),
+				})
+			}
+			rem := amount - settledDebt
+			if rem > 0 {
+				_ = d.TriggerWhatsAppEvent("balance_added", sub, map[string]string{
+					"{amount}":  fmt.Sprintf("%.2f", rem),
+					"{balance}": fmt.Sprintf("%.2f", newBalance),
+				})
+			}
+		}
+	}()
+
+	return newBalance, newDebt, settledDebt, nil
+}
+
+// SettleDebtFromBalance pays off existing subscriber debt using available wallet balance
+func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser string) (float64, float64, error) {
+	tx, err := d.Begin()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+
+	var contractNo, fullName string
+	var currDebt, currBalance float64
+	err = tx.QueryRow(`SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
+		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&contractNo, &fullName, &currDebt, &currBalance)
+	if err != nil {
+		return 0, 0, fmt.Errorf("المشترك غير موجود: %w", err)
+	}
+	if fullName == "" {
+		fullName = username
+	}
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+
+	if currBalance <= 0 {
+		return currBalance, currDebt, fmt.Errorf("رصيد المحفظة صفر - لا يمكن السداد من الرصيد")
+	}
+	if currDebt <= 0 {
+		return currBalance, currDebt, fmt.Errorf("لا توجد مديونية مسجلة على المشترك")
+	}
+
+	if amount <= 0 || amount > currBalance {
+		amount = currBalance
+	}
+	if amount > currDebt {
+		amount = currDebt
+	}
+
+	newBalance := currBalance - amount
+	newDebt := currDebt - amount
+
+	_, err = tx.Exec("UPDATE subscribers SET balance = ?, debt = ? WHERE username = ?", newBalance, newDebt, username)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	desc := fmt.Sprintf("سداد مديونية خصماً من رصيد المحفظة (متبقي الدين: %.2f ج.م، متبقي الرصيد: %.2f ج.م)", newDebt, newBalance)
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', 'balance', 'سداد من رصيد المحفظة', ?)`,
+		username, contractNo, fullName, desc, amount, adminUser)
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
+	}
+
+	go func() {
+		sub, err := d.GetSubscriber(username)
+		if err == nil && sub != nil {
+			_ = d.TriggerWhatsAppEvent("debt_settled_from_balance", sub, map[string]string{
+				"{amount}":  fmt.Sprintf("%.2f", amount),
+				"{debt}":    fmt.Sprintf("%.2f", newDebt),
+				"{balance}": fmt.Sprintf("%.2f", newBalance),
+			})
+		}
+	}()
+
+	return newBalance, newDebt, nil
 }
 
 func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, isPaid bool, method, notes, adminUser string) error {
@@ -3136,7 +3394,7 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 		adminUser = "admin"
 	}
 
-	desc := fmt.Sprintf("ط¥ط¶ط§ظپط© ظƒظˆطھط© ط±طµظٹط¯: %.1f GB", quotaGB)
+	desc := fmt.Sprintf("إضافة كوتة رصيد: %.1f GB", quotaGB)
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'quota', ?, ?, ?, ?, ?, ?)`,
@@ -6132,13 +6390,15 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 	var s models.SubscriberPortalSettings
 	var announcement sql.NullString
 	err := d.QueryRow(`SELECT id, COALESCE(portal_enabled, 1), COALESCE(allow_loan_request, 1),
-		COALESCE(show_quota_usage, 1), COALESCE(show_debt, 1), COALESCE(show_profile_details, 1),
+		COALESCE(show_quota_usage, 1), COALESCE(show_debt, 1), COALESCE(show_balance, 1), COALESCE(allow_balance_renewal, 1),
+		COALESCE(show_profile_details, 1),
 		COALESCE(show_online_status, 1), COALESCE(allow_password_change, 0), COALESCE(allow_phone_login, 0),
 		COALESCE(allow_ip_auto_login, 0), COALESCE(allow_session_disconnect, 1),
 		COALESCE(company_name, 'شبكتنا لخدمات الإنترنت'), COALESCE(company_phone, ''), portal_announcement, updated_at
 		FROM subscriber_portal_settings WHERE id = 1`).Scan(
 		&s.ID, &s.PortalEnabled, &s.AllowLoanRequest,
-		&s.ShowQuotaUsage, &s.ShowDebt, &s.ShowProfileDetails,
+		&s.ShowQuotaUsage, &s.ShowDebt, &s.ShowBalance, &s.AllowBalanceRenewal,
+		&s.ShowProfileDetails,
 		&s.ShowOnlineStatus, &s.AllowPasswordChange, &s.AllowPhoneLogin,
 		&s.AllowIPAutoLogin, &s.AllowSessionDisconnect,
 		&s.CompanyName, &s.CompanyPhone, &announcement, &s.UpdatedAt,
@@ -6151,6 +6411,8 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 				AllowLoanRequest:       true,
 				ShowQuotaUsage:         true,
 				ShowDebt:               true,
+				ShowBalance:            true,
+				AllowBalanceRenewal:    true,
 				ShowProfileDetails:     true,
 				ShowOnlineStatus:       true,
 				AllowPasswordChange:    false,
@@ -6170,15 +6432,17 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 
 func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) error {
 	_, err := d.Exec(`INSERT INTO subscriber_portal_settings (
-		id, portal_enabled, allow_loan_request, show_quota_usage, show_debt,
+		id, portal_enabled, allow_loan_request, show_quota_usage, show_debt, show_balance, allow_balance_renewal,
 		show_profile_details, show_online_status, allow_password_change, allow_phone_login, allow_ip_auto_login, allow_session_disconnect,
 		company_name, company_phone, portal_announcement
-	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON DUPLICATE KEY UPDATE
 		portal_enabled = VALUES(portal_enabled),
 		allow_loan_request = VALUES(allow_loan_request),
 		show_quota_usage = VALUES(show_quota_usage),
 		show_debt = VALUES(show_debt),
+		show_balance = VALUES(show_balance),
+		allow_balance_renewal = VALUES(allow_balance_renewal),
 		show_profile_details = VALUES(show_profile_details),
 		show_online_status = VALUES(show_online_status),
 		allow_password_change = VALUES(allow_password_change),
@@ -6188,7 +6452,7 @@ func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) er
 		company_name = VALUES(company_name),
 		company_phone = VALUES(company_phone),
 		portal_announcement = VALUES(portal_announcement)`,
-		s.PortalEnabled, s.AllowLoanRequest, s.ShowQuotaUsage, s.ShowDebt,
+		s.PortalEnabled, s.AllowLoanRequest, s.ShowQuotaUsage, s.ShowDebt, s.ShowBalance, s.AllowBalanceRenewal,
 		s.ShowProfileDetails, s.ShowOnlineStatus, s.AllowPasswordChange, s.AllowPhoneLogin, s.AllowIPAutoLogin, s.AllowSessionDisconnect,
 		s.CompanyName, s.CompanyPhone, s.PortalAnnouncement)
 	return err

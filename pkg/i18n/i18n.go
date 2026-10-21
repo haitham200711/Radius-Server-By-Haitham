@@ -220,6 +220,30 @@ var translations = map[string]map[string]string{
 		"ar": "الرصيد",
 		"en": "Balance",
 	},
+	"الرصيد المتاح": {
+		"ar": "الرصيد المتاح",
+		"en": "Available Balance",
+	},
+	"رصيد المحفظة": {
+		"ar": "رصيد المحفظة",
+		"en": "Wallet Balance",
+	},
+	"المديونية": {
+		"ar": "المديونية",
+		"en": "Debt",
+	},
+	"شحن رصيد": {
+		"ar": "شحن رصيد",
+		"en": "Add Balance",
+	},
+	"شحن / إيداع رصيد بالمحفظة": {
+		"ar": "شحن / إيداع رصيد بالمحفظة",
+		"en": "Deposit to Wallet",
+	},
+	"سداد / تسوية مديونية": {
+		"ar": "سداد / تسوية مديونية",
+		"en": "Pay / Settle Debt",
+	},
 	"الكوتة": {
 		"ar": "الكوتة",
 		"en": "Quota",

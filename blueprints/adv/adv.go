@@ -130,6 +130,7 @@ type BackupAnalysis struct {
 	ActiveSubsCount     int
 	ExpSubsCount        int
 	TotalDebt           float64
+	TotalMoney          float64
 	TotalSubSessions    int
 	TotalTrafficBytes   int64
 	TotalTrafficDisplay string
@@ -444,14 +445,15 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			_, err := tx.Exec(`INSERT INTO subscribers (
-				username, contract_no, full_name, phone, address, debt, profile_name,
+				username, contract_no, full_name, phone, address, debt, balance, profile_name,
 				calling_mac, static_ip, quota_bytes, expiration_date, status, reseller_id,
 				created_at, last_renewed_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON DUPLICATE KEY UPDATE
 				full_name = VALUES(full_name),
 				phone = VALUES(phone),
 				debt = VALUES(debt),
+				balance = VALUES(balance),
 				profile_name = VALUES(profile_name),
 				calling_mac = VALUES(calling_mac),
 				static_ip = VALUES(static_ip),
@@ -461,7 +463,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				reseller_id = VALUES(reseller_id),
 				created_at = VALUES(created_at),
 				last_renewed_at = VALUES(last_renewed_at)`,
-				s.Username, s.Username, s.FullName, s.Phone, s.Address, s.TotalUnpaid, s.ProfileName,
+				s.Username, s.Username, s.FullName, s.Phone, s.Address, s.TotalUnpaid, s.Money, s.ProfileName,
 				s.LastMAC, s.LastIP, quotaBytes, expDate, status, ourResellerID,
 				createdAt, lastRenewedAt)
 			if err != nil {
@@ -475,6 +477,14 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 				) VALUES (?, ?, ?, 'debt', ?, ?, 'pending', 'system', 'رصيد مديونية مرحل من نظام ADV القديم', 'admin')`,
 					s.Username, s.Username, s.FullName, fmt.Sprintf("مديونية سابقة مرحلة من ADV: %.2f ج.م", s.TotalUnpaid), s.TotalUnpaid)
+			}
+
+			// If subscriber has wallet balance/money from ADV, record initial transaction
+			if s.Money > 0 {
+				_, _ = tx.Exec(`INSERT INTO billing_transactions (
+					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+				) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', 'system', 'رصيد محفظة مرحل من نظام ADV القديم', 'admin')`,
+					s.Username, s.Username, s.FullName, fmt.Sprintf("رصيد محفظة مرحل من ADV: %.2f ج.م", s.Money), s.Money)
 			}
 
 			// Update FreeRADIUS radcheck, radusergroup, radreply
@@ -803,7 +813,7 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 	now := time.Now()
 	nowUnix := now.Unix()
 	var activeCount, expCount int
-	var totalDebt float64
+	var totalDebt, totalMoney float64
 	var totalTraffic int64
 	var totalSubSessions int
 
@@ -844,6 +854,7 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 		}
 
 		totalDebt += sub.TotalUnpaid
+		totalMoney += sub.Money
 
 		// Calculate Traffic / Sessions from parsed radacct
 		userSessions := sessionsByUser[uname]
@@ -938,6 +949,7 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 		ActiveSubsCount:     activeCount,
 		ExpSubsCount:        expCount,
 		TotalDebt:           totalDebt,
+		TotalMoney:          totalMoney,
 		TotalSubSessions:    totalSubSessions,
 		TotalTrafficBytes:   totalTraffic,
 		TotalTrafficDisplay: database.FormatBytesHuman(totalTraffic),

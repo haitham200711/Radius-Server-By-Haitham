@@ -190,6 +190,8 @@ func main() {
 	mux.HandleFunc("/subscribers/change-profile", middleware.RequireAuth(subBP.ChangeProfileHandler))
 	mux.HandleFunc("/subscribers/add-quota", middleware.RequireAuth(subBP.AddQuotaHandler))
 	mux.HandleFunc("/subscribers/pay-debt", middleware.RequireAuth(subBP.PayDebtHandler))
+	mux.HandleFunc("/subscribers/add-balance", middleware.RequireAuth(subBP.AddBalanceHandler))
+	mux.HandleFunc("/subscribers/settle-debt-balance", middleware.RequireAuth(subBP.SettleDebtBalanceHandler))
 	mux.HandleFunc("/subscribers/bulk", middleware.RequireAuth(subBP.BulkHandler))
 	mux.HandleFunc("/subscribers/live-traffic", middleware.RequireAuth(subBP.LiveTrafficHandler))
 	mux.HandleFunc("/subscribers/disconnect-session", middleware.RequireAuth(subBP.DisconnectSessionHandler))
@@ -298,6 +300,7 @@ func main() {
 	mux.HandleFunc("/portal", middleware.RequireSubscriberAuth(portalBP.IndexHandler))
 	mux.HandleFunc("/portal/request-loan", middleware.RequireSubscriberAuth(portalBP.RequestLoanHandler))
 	mux.HandleFunc("/portal/disconnect", middleware.RequireSubscriberAuth(portalBP.DisconnectHandler))
+	mux.HandleFunc("/portal/renew-balance", middleware.RequireSubscriberAuth(portalBP.RenewFromBalanceHandler))
 	mux.HandleFunc("/portal/change-password", middleware.RequireSubscriberAuth(portalBP.ChangePasswordHandler))
 
 	// WhatsApp Blueprint

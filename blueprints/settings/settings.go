@@ -270,6 +270,8 @@ func (bp *Blueprint) SavePortalSettingsHandler(w http.ResponseWriter, r *http.Re
 	allowLoan := r.FormValue("allow_loan_request") == "1" || r.FormValue("allow_loan_request") == "on" || r.FormValue("allow_loan_request") == "true"
 	showQuota := r.FormValue("show_quota_usage") == "1" || r.FormValue("show_quota_usage") == "on" || r.FormValue("show_quota_usage") == "true"
 	showDebt := r.FormValue("show_debt") == "1" || r.FormValue("show_debt") == "on" || r.FormValue("show_debt") == "true"
+	showBalance := r.FormValue("show_balance") == "1" || r.FormValue("show_balance") == "on" || r.FormValue("show_balance") == "true"
+	allowBalanceRenewal := r.FormValue("allow_balance_renewal") == "1" || r.FormValue("allow_balance_renewal") == "on" || r.FormValue("allow_balance_renewal") == "true"
 	showProfile := r.FormValue("show_profile_details") == "1" || r.FormValue("show_profile_details") == "on" || r.FormValue("show_profile_details") == "true"
 	showOnline := r.FormValue("show_online_status") == "1" || r.FormValue("show_online_status") == "on" || r.FormValue("show_online_status") == "true"
 	allowPass := r.FormValue("allow_password_change") == "1" || r.FormValue("allow_password_change") == "on" || r.FormValue("allow_password_change") == "true"
@@ -289,6 +291,8 @@ func (bp *Blueprint) SavePortalSettingsHandler(w http.ResponseWriter, r *http.Re
 		AllowLoanRequest:       allowLoan,
 		ShowQuotaUsage:         showQuota,
 		ShowDebt:               showDebt,
+		ShowBalance:            showBalance,
+		AllowBalanceRenewal:    allowBalanceRenewal,
 		ShowProfileDetails:     showProfile,
 		ShowOnlineStatus:       showOnline,
 		AllowPasswordChange:    allowPass,

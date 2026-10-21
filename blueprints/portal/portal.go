@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -376,4 +377,49 @@ func (bp *Blueprint) ChangePasswordHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	http.Redirect(w, r, "/portal?success="+url.QueryEscape("تم تغيير كلمة المرور بنجاح!"), http.StatusFound)
+}
+
+// RenewFromBalanceHandler handles subscriber self-service renewal using wallet balance
+func (bp *Blueprint) RenewFromBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/portal", http.StatusSeeOther)
+		return
+	}
+
+	user := middleware.GetUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/portal/login", http.StatusFound)
+		return
+	}
+
+	settings, _ := bp.db.GetSubscriberPortalSettings()
+	if settings != nil && !settings.AllowBalanceRenewal {
+		http.Redirect(w, r, "/portal?error="+url.QueryEscape("التجديد الذاتي من الرصيد غير مفعل حالياً"), http.StatusFound)
+		return
+	}
+
+	sub, err := bp.db.GetSubscriber(user.Username)
+	if err != nil || sub == nil {
+		http.Redirect(w, r, "/portal?error="+url.QueryEscape("تعذر العثور على بيانات المشترك"), http.StatusFound)
+		return
+	}
+
+	prof, err := bp.db.GetProfileByName(sub.ProfileName)
+	if err != nil || prof == nil {
+		http.Redirect(w, r, "/portal?error="+url.QueryEscape("تعذر العثور على الباقة المحددة"), http.StatusFound)
+		return
+	}
+
+	if sub.Balance < prof.Price {
+		http.Redirect(w, r, "/portal?error="+url.QueryEscape(fmt.Sprintf("رصيد المحفظة الحالي (%.2f ج.م) غير كافٍ لتجديد الباقة (سعر الباقة: %.2f ج.م)", sub.Balance, prof.Price)), http.StatusFound)
+		return
+	}
+
+	err = bp.db.RenewSubscriberWithPaymentOption(sub.Username, prof.Name, prof.Price, "balance", "balance", "تجديد ذاتي من رصيد المحفظة عبر بوابة المشترك", user.Username)
+	if err != nil {
+		http.Redirect(w, r, "/portal?error="+url.QueryEscape("فشل تجديد الاشتراك: "+err.Error()), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, "/portal?success="+url.QueryEscape("تم تجديد باقتك بنجاح وخصم قيمة الاشتراك من رصيد محفظتك!"), http.StatusFound)
 }

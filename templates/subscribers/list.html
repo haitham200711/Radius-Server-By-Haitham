@@ -67,6 +67,12 @@
                     </a>
                 </li>
                 <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('balance')">
+                        <i class="bi bi-wallet2 text-success fs-5"></i>
+                        <span class="fw-bold">شحن / إيداع رصيد بالمحفظة</span>
+                    </a>
+                </li>
+                <li>
                     <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('debt')">
                         <i class="bi bi-cash-stack text-warning fs-5"></i>
                         <span>سداد / تسوية مديونية</span>
@@ -217,6 +223,10 @@
                             <label class="form-check-label small" for="toggle-col-debt">المديونية</label>
                         </div>
                         <div class="form-check mb-2">
+                            <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-balance" data-column="col-balance" checked>
+                            <label class="form-check-label small" for="toggle-col-balance">الرصيد المتاح</label>
+                        </div>
+                        <div class="form-check mb-2">
                             <input class="form-check-input col-toggle" type="checkbox" id="toggle-col-quota" data-column="col-quota" checked>
                             <label class="form-check-label small" for="toggle-col-quota">الكوتة الكلية</label>
                         </div>
@@ -305,6 +315,7 @@
                     <th class="col-username">اسم المستخدم / المرور</th>
                     <th class="col-phone">رقم الموبايل</th>
                     <th class="col-profile">الباقة</th>
+                    <th class="col-balance">الرصيد المتاح</th>
                     <th class="col-debt">المديونية</th>
                     <th class="col-quota">الكوتة الكلية</th>
                     <th class="col-quota-used">الكوتة المستهلكة</th>
@@ -317,11 +328,12 @@
                 {{ range .Subscribers }}
                 <tr id="row-{{ .Username }}"
                     class="subscriber-row {{ if .LoanActive }}table-warning-subtle{{ end }}"
-                    onclick="handleRowClick('{{ .Username }}', '{{ .FullName }}', '{{ .Profile }}', '{{ printf "%.2f" .Debt }}', '{{ printf "%.1f" .QuotaGB }}', '{{ if .LoanActive }}1{{ else }}0{{ end }}', event)"
+                    onclick="handleRowClick('{{ .Username }}', '{{ .FullName }}', '{{ .Profile }}', '{{ printf "%.2f" .Debt }}', '{{ printf "%.2f" .Balance }}', '{{ printf "%.1f" .QuotaGB }}', '{{ if .LoanActive }}1{{ else }}0{{ end }}', event)"
                     data-username="{{ .Username }}"
                     data-fullname="{{ .FullName }}"
                     data-profile="{{ .Profile }}"
                     data-debt="{{ printf "%.2f" .Debt }}"
+                    data-balance="{{ printf "%.2f" .Balance }}"
                     data-quota="{{ printf "%.1f" .QuotaGB }}"
                     data-loanactive="{{ if .LoanActive }}1{{ else }}0{{ end }}"
                     data-loanhours="{{ .LoanHours }}"
@@ -375,6 +387,15 @@
                         {{ end }}
                     </td>
                     <td class="col-profile"><span class="badge bg-info text-dark">{{ .Profile }}</span></td>
+                    <td class="col-balance">
+                        {{ if gt .Balance 0.0 }}
+                        <span class="badge bg-success-subtle text-success fw-bold border border-success-subtle">
+                            <i class="bi bi-wallet2 me-1"></i>{{ printf "%.2f" .Balance }} ج.م
+                        </span>
+                        {{ else }}
+                        <span class="text-muted small">0.00 ج.م</span>
+                        {{ end }}
+                    </td>
                     <td class="col-debt">
                         {{ if gt .Debt 0.0 }}
                         <span class="badge bg-danger-subtle text-danger fw-bold border border-danger-subtle">
@@ -819,9 +840,13 @@
                                 <span class="text-muted">اسم المستخدم:</span>
                                 <span class="font-monospace fw-bold text-success" id="singleRenewUserDisplay">-</span>
                             </div>
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex justify-content-between mb-1">
                                 <span class="text-muted">الباقة الحالية:</span>
                                 <span class="badge bg-secondary" id="singleRenewCurrentProfile">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">رصيد المحفظة المتاح:</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace fw-bold" id="singleRenewBalanceDisplay">0.00 ج.م</span>
                             </div>
                         </div>
                     </div>
@@ -838,20 +863,25 @@
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">سعر التجديد (ج.م):</label>
-                            <input type="number" step="0.5" min="0" name="price" id="singleRenewPrice" class="form-control font-monospace fw-bold" required>
+                            <input type="number" step="0.5" min="0" name="price" id="singleRenewPrice" class="form-control font-monospace fw-bold" oninput="onRenewPaymentOptionChange()" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">حالة الدفع:</label>
-                            <select name="payment_status" id="singleRenewPayStatus" class="form-select fw-bold">
-                                <option value="paid" class="text-success" selected>✅ مدفوع (تم استلام المبلغ)</option>
-                                <option value="unpaid" class="text-danger">⏳ غير مدفوع (تسجيل كدين على العميل)</option>
+                            <label class="form-label fw-bold">طريقة تسوية الدفع:</label>
+                            <select name="payment_option" id="singleRenewPaymentOption" class="form-select fw-bold" onchange="onRenewPaymentOptionChange()">
+                                <option value="cash" class="text-success" selected>✅ دفع نقدي مسدد (Cash / تحويل)</option>
+                                <option value="balance" class="text-primary">💰 خصم من رصيد المحفظة المتاح</option>
+                                <option value="debt" class="text-danger">⏳ آجل - غير مسدد (تسجيل كدين على العميل)</option>
                             </select>
                         </div>
                     </div>
 
+                    <div id="singleRenewBalanceHint" class="alert alert-info small mb-2 py-2 d-none">
+                        <i class="bi bi-wallet2 me-1"></i> <span id="singleRenewBalanceHintText"></span>
+                    </div>
+
                     <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">طريقة الدفع:</label>
+                        <div class="col-md-6" id="singleRenewPayMethodWrapper">
+                            <label class="form-label fw-bold">طريقة الاستلام النقدي:</label>
                             <select name="payment_method" class="form-select">
                                 <option value="cash" selected>نقداً (Cash)</option>
                                 <option value="vodafone_cash">فودافون كاش / محافظ إلكترونية</option>
@@ -1137,9 +1167,13 @@
                                 <span class="text-muted">اسم المستخدم:</span>
                                 <span class="font-monospace fw-bold text-primary" id="payDebtUserDisplay">-</span>
                             </div>
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex justify-content-between mb-1">
                                 <span class="text-muted">إجمالي المديونية الحالية:</span>
                                 <span class="badge bg-danger fs-6" id="payDebtCurrentDisplay">0.00 ج.م</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">الرصيد المتاح بالمحفظة:</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace fw-bold fs-6" id="payDebtBalanceDisplay">0.00 ج.م</span>
                             </div>
                         </div>
                     </div>
@@ -1156,8 +1190,9 @@
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">طريقة السداد:</label>
-                            <select name="payment_method" class="form-select">
+                            <select name="payment_method" id="payDebtMethodSelect" class="form-select">
                                 <option value="cash" selected>نقداً (Cash)</option>
+                                <option value="balance" id="payDebtMethodBalanceOpt" class="text-primary fw-bold">💰 خصم من رصيد المحفظة المتوفر</option>
                                 <option value="vodafone_cash">فودافون كاش / محفظة</option>
                                 <option value="instapay">انستا باي (InstaPay)</option>
                                 <option value="bank">تحويل بنكي</option>
@@ -1178,6 +1213,95 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-warning fw-bold text-dark">
                         <i class="bi bi-check-lg me-1"></i> تسجيل السداد والخصم
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 8. Single Subscriber Add Balance Modal (شحن رصيد المحفظة) -->
+<div class="modal fade" id="addBalanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-wallet2 me-2"></i> شحن وإيداع رصيد بالمحفظة
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/add-balance">
+                <div class="modal-body">
+                    <input type="hidden" name="username" id="addBalanceUsername">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم العميل:</span>
+                                <span class="fw-bold text-dark" id="addBalanceFullName">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم المستخدم:</span>
+                                <span class="font-monospace fw-bold text-primary" id="addBalanceUserDisplay">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">الرصيد الحالي بالمحفظة:</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace fs-6" id="addBalanceCurrentDisplay">0.00 ج.م</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">المديونية الحالية:</span>
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace fs-6" id="addBalanceDebtDisplay">0.00 ج.م</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">مبلغ الشحن الإجمالي (ج.م):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.5" min="1" name="amount" id="addBalanceAmountInput" class="form-control form-control-lg font-monospace fw-bold text-success" placeholder="أدخل المبلغ..." required>
+                            <span class="input-group-text fw-bold">ج.م</span>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-3 p-3 bg-light rounded border" id="settleDebtFirstWrapper">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" name="settle_debt_first" value="1" id="settleDebtFirstCheckbox" checked>
+                        <label class="form-check-label fw-bold text-dark" for="settleDebtFirstCheckbox">
+                            سداد المديونية المستحقة أولاً من هذا المبلغ
+                        </label>
+                        <div class="small text-muted mt-1">
+                            إذا كان العميل مديناً، سيتم تسوية المديونية أولاً وإيداع الباقي في محفظة رصيده تلقائياً.
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">طريقة الاستلام:</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="cash" selected>نقداً (Cash)</option>
+                                <option value="vodafone_cash">فودافون كاش / محافظ إلكترونية</option>
+                                <option value="instapay">انستا باي (InstaPay)</option>
+                                <option value="bank">تحويل بنكي</option>
+                                <option value="other">أخرى</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ملاحظات الإيداع:</label>
+                            <input type="text" name="notes" class="form-control" placeholder="رقم الإيصال أو ملاحظة...">
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info small mb-0 py-2">
+                        <i class="bi bi-info-circle me-1"></i> يتم تسجيل حركة إيداع رسمية في تقارير الحسابات المالية وإرسال إشعار واتساب للمشترك برصيده الجديد.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> تأكيد إيداع الرصيد
                     </button>
                 </div>
             </form>
@@ -1736,7 +1860,7 @@ const profilesDataMap = {
     {{ end }}
 };
 
-function handleRowClick(username, fullName, profile, debt, quota, loanActive, event) {
+function handleRowClick(username, fullName, profile, debt, balance, quota, loanActive, event) {
     // If clicked on input, link, or button, let their default handlers run
     if (event.target.tagName === 'INPUT' || event.target.tagName === 'A' || event.target.tagName === 'BUTTON' || event.target.closest('a') || event.target.closest('button')) {
         return;
@@ -1752,6 +1876,7 @@ function handleRowClick(username, fullName, profile, debt, quota, loanActive, ev
         fullName: fullName,
         profile: profile,
         debt: debt,
+        balance: balance,
         quota: quota,
         loanActive: loanActive === '1'
     });
@@ -1771,6 +1896,7 @@ function toolbarAction(action) {
                     fullName: row.dataset.fullname,
                     profile: row.dataset.profile,
                     debt: row.dataset.debt,
+                    balance: row.dataset.balance,
                     quota: row.dataset.quota,
                     loanActive: row.dataset.loanactive === '1'
                 };
@@ -1826,6 +1952,8 @@ function toolbarAction(action) {
             return;
         }
         openAddQuotaModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.quota);
+    } else if (action === 'balance') {
+        openAddBalanceModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.balance, activeSubscriber.debt);
     } else if (action === 'debt') {
         const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
         if (checked.length > 1) {
@@ -1838,7 +1966,7 @@ function toolbarAction(action) {
             alert('المشترك (' + activeSubscriber.username + ') ليس لديه أي مديونية مستحقة.');
             return;
         }
-        openPayDebtModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.debt);
+        openPayDebtModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.debt, activeSubscriber.balance);
     } else if (action === 'delete') {
         const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
         if (checked.length > 1) {
@@ -1910,6 +2038,7 @@ function updateSelectionState() {
                 fullName: row.dataset.fullname,
                 profile: row.dataset.profile,
                 debt: row.dataset.debt,
+                balance: row.dataset.balance,
                 quota: row.dataset.quota,
                 loanActive: row.dataset.loanactive === '1'
             });
@@ -1958,19 +2087,61 @@ function openAddQuotaModal(username, fullName, currentQuotaGB) {
     modal.show();
 }
 
-// 3. Renew & Debt Payment Modal Helpers
+// 3. Renew & Debt Payment & Wallet Modal Helpers
 let currentSubDebt = 0;
+let currentRenewSubBalance = 0;
 
-function openPayDebtModal(username, fullName, debt) {
+function openPayDebtModal(username, fullName, debt, balance) {
     document.getElementById('payDebtUsername').value = username;
     document.getElementById('payDebtUserDisplay').textContent = username;
     document.getElementById('payDebtFullName').textContent = fullName;
     document.getElementById('payDebtCurrentDisplay').textContent = debt + ' ج.م';
+    
+    const balVal = parseFloat(balance) || 0;
+    const balBadge = document.getElementById('payDebtBalanceDisplay');
+    if (balBadge) balBadge.textContent = balVal.toFixed(2) + ' ج.م';
+    
+    const balOpt = document.getElementById('payDebtMethodBalanceOpt');
+    if (balOpt) {
+        if (balVal > 0) {
+            balOpt.disabled = false;
+            balOpt.textContent = '💰 خصم من رصيد المحفظة المتوفر (' + balVal.toFixed(2) + ' ج.م)';
+        } else {
+            balOpt.disabled = true;
+            balOpt.textContent = '💰 خصم من المحفظة (الرصيد: 0.00 ج.م - غير متاح)';
+        }
+    }
+    
     currentSubDebt = parseFloat(debt) || 0;
     const amountInput = document.getElementById('payDebtAmountInput');
     amountInput.value = currentSubDebt;
     amountInput.max = currentSubDebt;
     const modal = new bootstrap.Modal(document.getElementById('payDebtModal'));
+    modal.show();
+}
+
+function openAddBalanceModal(username, fullName, balance, debt) {
+    document.getElementById('addBalanceUsername').value = username;
+    document.getElementById('addBalanceUserDisplay').textContent = username;
+    document.getElementById('addBalanceFullName').textContent = fullName;
+    document.getElementById('addBalanceCurrentDisplay').textContent = (parseFloat(balance) || 0).toFixed(2) + ' ج.م';
+    
+    const debtVal = parseFloat(debt) || 0;
+    document.getElementById('addBalanceDebtDisplay').textContent = debtVal.toFixed(2) + ' ج.م';
+    
+    const debtWrap = document.getElementById('settleDebtFirstWrapper');
+    const debtCheck = document.getElementById('settleDebtFirstCheckbox');
+    if (debtWrap && debtCheck) {
+        if (debtVal > 0) {
+            debtWrap.classList.remove('d-none');
+            debtCheck.checked = true;
+        } else {
+            debtWrap.classList.add('d-none');
+            debtCheck.checked = false;
+        }
+    }
+    document.getElementById('addBalanceAmountInput').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('addBalanceModal'));
     modal.show();
 }
 
@@ -1986,6 +2157,13 @@ function openRenewModal(username, fullName, currentProfile) {
 
     const row = document.getElementById('row-' + username);
     const hasActiveLoan = (row && row.dataset.loanactive === '1');
+    currentRenewSubBalance = (row && row.dataset.balance) ? (parseFloat(row.dataset.balance) || 0) : 0;
+    
+    const balDisplay = document.getElementById('singleRenewBalanceDisplay');
+    if (balDisplay) {
+        balDisplay.textContent = currentRenewSubBalance.toFixed(2) + ' ج.م';
+    }
+
     const loanNotice = document.getElementById('singleRenewLoanNotice');
     if (loanNotice) {
         if (hasActiveLoan) loanNotice.classList.remove('d-none');
@@ -2006,6 +2184,37 @@ function openRenewModal(username, fullName, currentProfile) {
     }
     const modal = new bootstrap.Modal(document.getElementById('singleRenewModal'));
     modal.show();
+}
+
+function onRenewPaymentOptionChange() {
+    const optEl = document.getElementById('singleRenewPaymentOption');
+    if (!optEl) return;
+    const opt = optEl.value;
+    const price = parseFloat(document.getElementById('singleRenewPrice').value) || 0;
+    const hint = document.getElementById('singleRenewBalanceHint');
+    const hintText = document.getElementById('singleRenewBalanceHintText');
+    const payMethodWrapper = document.getElementById('singleRenewPayMethodWrapper');
+
+    if (opt === 'balance') {
+        if (payMethodWrapper) payMethodWrapper.classList.add('d-none');
+        if (hint && hintText) {
+            hint.classList.remove('d-none');
+            if (currentRenewSubBalance >= price) {
+                hint.className = 'alert alert-success small mb-2 py-2';
+                hintText.innerHTML = `<b>رصيد المحفظة كافٍ:</b> سيتم خصم كامل سعر الباقة (<b>${price.toFixed(2)} ج.م</b>) من الرصيد المتوفر (${currentRenewSubBalance.toFixed(2)} ج.م). متبقي الرصيد بعد التجديد: <b>${(currentRenewSubBalance - price).toFixed(2)} ج.م</b>.`;
+            } else if (currentRenewSubBalance > 0) {
+                hint.className = 'alert alert-warning small mb-2 py-2';
+                const deficit = price - currentRenewSubBalance;
+                hintText.innerHTML = `<b>رصيد جزئي:</b> سيتم خصم كامل الرصيد المتاح (<b>${currentRenewSubBalance.toFixed(2)} ج.م</b>)، والمتبقي (<b>${deficit.toFixed(2)} ج.م</b>) يسجل تلقائياً كدين على حساب المشترك.`;
+            } else {
+                hint.className = 'alert alert-danger small mb-2 py-2';
+                hintText.innerHTML = `<b>لا يوجد رصيد بالمحفظة (0.00 ج.م):</b> سيتم تسجيل كامل سعر الباقة (${price.toFixed(2)} ج.م) كدين على العميل.`;
+            }
+        }
+    } else {
+        if (payMethodWrapper) payMethodWrapper.classList.remove('d-none');
+        if (hint) hint.classList.add('d-none');
+    }
 }
 
 function openLoanModal(username, fullName, profile, loanActive) {
@@ -2104,6 +2313,7 @@ function onRenewProfileChange() {
     if (opt && opt.dataset.price) {
         document.getElementById('singleRenewPrice').value = opt.dataset.price;
     }
+    onRenewPaymentOptionChange();
 }
 
 function openTerminateModal(username, fullName) {

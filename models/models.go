@@ -532,6 +532,7 @@ type Subscriber struct {
 	Phone          string       `json:"phone"`
 	Address        string       `json:"address"`
 	Debt           float64      `json:"debt"`
+	Balance        float64      `json:"balance"`
 	ProfileName    string       `json:"profile_name"`
 	StaticIP       string       `json:"static_ip"`
 	CallingMAC     string       `json:"calling_mac"`
@@ -792,6 +793,8 @@ type SubscriberPortalSettings struct {
 	AllowLoanRequest       bool      `json:"allow_loan_request"`
 	ShowQuotaUsage         bool      `json:"show_quota_usage"`
 	ShowDebt               bool      `json:"show_debt"`
+	ShowBalance            bool      `json:"show_balance"`
+	AllowBalanceRenewal    bool      `json:"allow_balance_renewal"`
 	ShowProfileDetails     bool      `json:"show_profile_details"`
 	ShowOnlineStatus       bool      `json:"show_online_status"`
 	AllowPasswordChange    bool      `json:"allow_password_change"`

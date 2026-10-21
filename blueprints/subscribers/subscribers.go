@@ -34,6 +34,7 @@ type SubscriberItem struct {
 	Phone             string
 	Address           string
 	Debt              float64
+	Balance           float64
 	Profile           string
 	IPAddress         string
 	QuotaBytes        int64
@@ -193,6 +194,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		COALESCE(s.phone, '-'),
 		COALESCE(s.address, '-'),
 		COALESCE(s.debt, 0.00),
+		COALESCE(s.balance, 0.00),
 		COALESCE(s.profile_name, COALESCE(rug.groupname, '')),
 		COALESCE(s.static_ip, COALESCE(rr.value, '')),
 		COALESCE(s.quota_bytes, 0),
@@ -258,6 +260,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				&s.Phone,
 				&s.Address,
 				&s.Debt,
+				&s.Balance,
 				&s.Profile,
 				&s.IPAddress,
 				&s.QuotaBytes,
@@ -666,6 +669,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	staticIP := strings.TrimSpace(r.FormValue("static_ip"))
 	callingMAC := strings.TrimSpace(r.FormValue("calling_mac"))
 	debtStr := strings.TrimSpace(r.FormValue("debt"))
+	balanceStr := strings.TrimSpace(r.FormValue("balance"))
 	quotaGBStr := strings.TrimSpace(r.FormValue("quota_gb"))
 	expStr := strings.TrimSpace(r.FormValue("expiration_date"))
 	resellerID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("reseller_id")), 10, 64)
@@ -696,6 +700,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	debt, _ := strconv.ParseFloat(debtStr, 64)
+	balance, _ := strconv.ParseFloat(balanceStr, 64)
 	quotaGB, _ := strconv.ParseFloat(quotaGBStr, 64)
 	var quotaBytes int64
 	if quotaGB > 0 {
@@ -721,6 +726,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 		Phone:          phone,
 		Address:        address,
 		Debt:           debt,
+		Balance:        balance,
 		ProfileName:    profile,
 		StaticIP:       staticIP,
 		CallingMAC:     callingMAC,
@@ -757,7 +763,15 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 
 	priceStr := strings.TrimSpace(r.FormValue("price"))
 	price, _ := strconv.ParseFloat(priceStr, 64)
-	isPaid := r.FormValue("payment_status") != "unpaid"
+	paymentOption := strings.TrimSpace(r.FormValue("payment_option"))
+	if paymentOption == "" {
+		if r.FormValue("payment_status") == "unpaid" {
+			paymentOption = "debt"
+		} else {
+			paymentOption = "cash"
+		}
+	}
+	isPaid := paymentOption != "debt"
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
@@ -782,10 +796,80 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
-			if err := bp.db.RenewSubscriberBilling(username, profile, price, isPaid, paymentMethod, notes, adminUser); err != nil {
+			if err := bp.db.RenewSubscriberWithPaymentOption(username, profile, price, paymentOption, paymentMethod, notes, adminUser); err != nil {
 				fmt.Printf("[Subscribers] Error renewing subscriber %s: %v\n", username, err)
 			}
 		}
+	}
+
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
+	notes := strings.TrimSpace(r.FormValue("notes"))
+	settleDebtFirst := r.FormValue("settle_debt_first") == "1" || r.FormValue("settle_debt_first") == "on" || r.FormValue("settle_debt_first") == "true"
+
+	currentUser := middleware.GetUser(r)
+	adminUser := "admin"
+	if currentUser != nil {
+		adminUser = currentUser.Username
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	status := r.FormValue("status")
+
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+
+	if username != "" && amount > 0 {
+		newBal, newDebt, settled, err := bp.db.AddSubscriberBalance(username, amount, paymentMethod, notes, adminUser, settleDebtFirst)
+		if err != nil {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+			return
+		}
+		var msg string
+		if settled > 0 {
+			msg = fmt.Sprintf("تم إيداع الرصيد بنجاح! تم سداد %.2f ج.م من المديونية (متبقي الدين: %.2f ج.م، رصيد المحفظة الجديد: %.2f ج.م)", settled, newDebt, newBal)
+		} else {
+			msg = fmt.Sprintf("تم شحن الرصيد بنجاح! رصيد المحفظة الحالي: %.2f ج.م", newBal)
+		}
+		http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(msg), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+
+	currentUser := middleware.GetUser(r)
+	adminUser := "admin"
+	if currentUser != nil {
+		adminUser = currentUser.Username
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	status := r.FormValue("status")
+
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+
+	if username != "" {
+		newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser)
+		if err != nil {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+			return
+		}
+		msg := fmt.Sprintf("تم سداد المديونية من رصيد المحفظة بنجاح! (متبقي الدين: %.2f ج.م، رصيد المحفظة المتبقي: %.2f ج.م)", newDebt, newBal)
+		http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(msg), http.StatusFound)
+		return
 	}
 
 	http.Redirect(w, r, redirectURL, http.StatusFound)
@@ -833,11 +917,20 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.FormValue("q")
 	status := r.FormValue("status")
 
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+
 	if username != "" && amount > 0 {
-		_ = bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser)
+		if paymentMethod == "balance" {
+			_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser)
+			if err != nil {
+				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+				return
+			}
+		} else {
+			_ = bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser)
+		}
 	}
 
-	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
@@ -888,6 +981,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	staticIP := strings.TrimSpace(r.FormValue("static_ip"))
 	callingMAC := strings.TrimSpace(r.FormValue("calling_mac"))
 	debtStr := strings.TrimSpace(r.FormValue("debt"))
+	balanceStr := strings.TrimSpace(r.FormValue("balance"))
 	quotaGBStr := strings.TrimSpace(r.FormValue("quota_gb"))
 	expStr := strings.TrimSpace(r.FormValue("expiration_date"))
 	status := strings.TrimSpace(r.FormValue("status"))
@@ -914,6 +1008,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	debt, _ := strconv.ParseFloat(debtStr, 64)
+	balance, _ := strconv.ParseFloat(balanceStr, 64)
 	quotaGB, _ := strconv.ParseFloat(quotaGBStr, 64)
 	var quotaBytes int64
 	if quotaGB > 0 {
@@ -937,6 +1032,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		Phone:          phone,
 		Address:        address,
 		Debt:           debt,
+		Balance:        balance,
 		ProfileName:    profile,
 		StaticIP:       staticIP,
 		CallingMAC:     callingMAC,
