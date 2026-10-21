@@ -3985,30 +3985,72 @@ func (d *DB) DisconnectAllActiveSessions() (int, error) {
 		sessions = append(sessions, s)
 	}
 
-	count := 0
-	for _, s := range sessions {
-		var secret string
-		var coaPort int
-		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
-		if secret == "" {
-			secret = "radius123"
+	nasMap := make(map[string]struct {
+		secret  string
+		coaPort int
+	})
+	nasRows, _ := d.Query("SELECT nasname, secret, coa_port FROM nas")
+	if nasRows != nil {
+		for nasRows.Next() {
+			var nName, sec string
+			var cp int
+			if err := nasRows.Scan(&nName, &sec, &cp); err == nil {
+				if sec == "" {
+					sec = "radius123"
+				}
+				if cp <= 0 {
+					cp = 3799
+				}
+				nasMap[nName] = struct {
+					secret  string
+					coaPort int
+				}{sec, cp}
+			}
 		}
-		if coaPort <= 0 {
-			coaPort = 3799
-		}
-
-		var fIP net.IP
-		if s.framedIP != "" {
-			fIP = net.ParseIP(s.framedIP)
-		}
-
-		_, _ = radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, fIP)
-		_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
-			WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, s.sessionID, s.nasIP)
-		count++
+		nasRows.Close()
 	}
 
-	return count, nil
+	var wg sync.WaitGroup
+	for _, s := range sessions {
+		wg.Add(1)
+		go func(sess sess) {
+			defer wg.Done()
+			nasInfo, ok := nasMap[sess.nasIP]
+			secret := "radius123"
+			coaPort := 3799
+			if ok {
+				secret = nasInfo.secret
+				coaPort = nasInfo.coaPort
+			}
+
+			var fIP net.IP
+			if sess.framedIP != "" {
+				fIP = net.ParseIP(sess.framedIP)
+			}
+
+			_, _ = radius.SendDisconnectRequest(sess.nasIP, coaPort, []byte(secret), sess.username, sess.sessionID, fIP)
+		}(s)
+	}
+
+	// Update all active sessions in radacct to terminated
+	_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset' WHERE acctstoptime IS NULL`)
+
+	subTrafficMu.Lock()
+	subTrafficHistory = make(map[string]*subTrafficPoint)
+	subTrafficMu.Unlock()
+
+	// Wait up to 3 seconds for CoA UDP packets to transmit
+	c := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
+	select {
+	case <-c:
+	case <-time.After(3 * time.Second):
+	}
+
+	return len(sessions), nil
 }
 
 func parseTimeHM(hm string) int {

@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/sysinfo"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -60,16 +63,44 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	portalSettings, _ := bp.db.GetSubscriberPortalSettings()
 
+	// System resources for maintenance overview
+	systemRes := sysinfo.GetResources()
+
+	// Check FreeRADIUS service status
+	freeRadiusStatus := "unknown"
+	if out, err := exec.Command("systemctl", "is-active", "freeradius").Output(); err == nil {
+		freeRadiusStatus = strings.TrimSpace(string(out))
+	}
+
+	// Check radius-server platform service status
+	platformStatus := "active"
+	if out, err := exec.Command("systemctl", "is-active", "radius-server").Output(); err == nil {
+		platformStatus = strings.TrimSpace(string(out))
+	}
+
+	// Active online sessions count
+	activeSessionsCount := 0
+	_ = bp.db.QueryRow("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL").Scan(&activeSessionsCount)
+
+	// Routers / NAS count
+	nasCount := 0
+	_ = bp.db.QueryRow("SELECT COUNT(*) FROM nas").Scan(&nasCount)
+
 	_ = bp.renderer.Render(w, "settings/index", map[string]interface{}{
-		"Title":          "إعدادات النظام وتغيير كلمة المرور",
-		"ActiveMenu":     "settings",
-		"CurrentUser":    middleware.GetUser(r),
-		"ServerIP":       serverIP,
-		"Secret":         secret,
-		"MikrotikScript": mikrotikScript,
-		"PortalSettings": portalSettings,
-		"FlashStatus":    status,
-		"FlashMsg":       msg,
+		"Title":               "إعدادات النظام وصيانة الخدمات",
+		"ActiveMenu":          "settings",
+		"CurrentUser":         middleware.GetUser(r),
+		"ServerIP":            serverIP,
+		"Secret":              secret,
+		"MikrotikScript":      mikrotikScript,
+		"PortalSettings":      portalSettings,
+		"System":              systemRes,
+		"FreeRadiusStatus":    freeRadiusStatus,
+		"PlatformStatus":      platformStatus,
+		"ActiveSessionsCount": activeSessionsCount,
+		"NasCount":            nasCount,
+		"FlashStatus":         status,
+		"FlashMsg":            msg,
 	})
 }
 
@@ -90,7 +121,7 @@ func (bp *Blueprint) ChangePasswordHandler(w http.ResponseWriter, r *http.Reques
 	confirmPass := strings.TrimSpace(r.FormValue("confirm_password"))
 
 	respond := func(status, msg string, httpCode int) {
-		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" || strings.Contains(r.Header.Get("Accept"), "application/json") {
+		if isAjax(r) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(httpCode)
 			_ = json.NewEncoder(w).Encode(map[string]string{
@@ -228,4 +259,128 @@ func (bp *Blueprint) SavePortalSettingsHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	http.Redirect(w, r, "/settings?status=success&msg="+url.QueryEscape("تم حفظ إعدادات وصلاحيات صفحة المشترك بنجاح!")+"#portal-settings", http.StatusSeeOther)
+}
+
+// RebootOSHandler executes a full reboot of the host Linux operating system
+func (bp *Blueprint) RebootOSHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/settings#tab-maintenance", http.StatusSeeOther)
+		return
+	}
+
+	user := middleware.GetUser(r)
+	if user == nil || user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admins Only", http.StatusForbidden)
+		return
+	}
+
+	// Schedule reboot shortly to allow HTTP response to flush cleanly to browser
+	go func() {
+		time.Sleep(1500 * time.Millisecond)
+		cmd := exec.Command("systemctl", "reboot")
+		if err := cmd.Run(); err != nil {
+			_ = exec.Command("shutdown", "-r", "now").Run()
+		}
+	}()
+
+	msg := "تم إرسال أمر إعادة تشغيل السيرفر ولينكس بالكامل بنجاح! جاري إعادة إقلاع النظام، يرجى الانتظار دقيقة حتى يكتمل الإقلاع..."
+	if isAjax(r) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "warning",
+			"message": msg,
+		})
+		return
+	}
+
+	http.Redirect(w, r, "/settings?status=warning&msg="+url.QueryEscape(msg)+"#tab-maintenance", http.StatusSeeOther)
+}
+
+// RestartRadiusHandler restarts FreeRADIUS service
+func (bp *Blueprint) RestartRadiusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/settings#tab-maintenance", http.StatusSeeOther)
+		return
+	}
+
+	user := middleware.GetUser(r)
+	if user == nil || user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admins Only", http.StatusForbidden)
+		return
+	}
+
+	// Restart FreeRADIUS service
+	cmd := exec.Command("systemctl", "restart", "freeradius")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		cmdSudo := exec.Command("sudo", "systemctl", "restart", "freeradius")
+		output, err = cmdSudo.CombinedOutput()
+	}
+
+	status := "success"
+	msg := "تمت إعادة تشغيل خدمة الراديوس (FreeRADIUS) بنجاح، وتفريغ الكاش وإعادة تهيئة منافذ المصادقة والمحاسبة!"
+	if err != nil {
+		status = "danger"
+		msg = fmt.Sprintf("فشل إعادة تشغيل خدمة FreeRADIUS: %v (%s)", err, strings.TrimSpace(string(output)))
+	}
+
+	if isAjax(r) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  status,
+			"message": msg,
+		})
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/settings?status=%s&msg=%s#tab-maintenance", status, url.QueryEscape(msg)), http.StatusSeeOther)
+}
+
+// DisconnectAllSessionsHandler disconnects all active sessions on NAS routers and resets radacct
+func (bp *Blueprint) DisconnectAllSessionsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/settings#tab-maintenance", http.StatusSeeOther)
+		return
+	}
+
+	user := middleware.GetUser(r)
+	if user == nil || user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admins Only", http.StatusForbidden)
+		return
+	}
+
+	count, err := bp.db.DisconnectAllActiveSessions()
+	restartRadius := r.FormValue("restart_radius") == "1" || r.FormValue("restart_radius") == "true"
+
+	status := "success"
+	msg := fmt.Sprintf("تم إرسال أوامر فصل وطرد جميع الجلسات النشطة (%d جلسة) بنجاح، وتحديث وإغلاق كافة الجلسات المعلقة!", count)
+
+	if restartRadius {
+		cmd := exec.Command("systemctl", "restart", "freeradius")
+		if errR := cmd.Run(); errR != nil {
+			_ = exec.Command("sudo", "systemctl", "restart", "freeradius").Run()
+		}
+		msg += " وتمت إعادة تشغيل خدمة الراديوس بنظافة تامة."
+	}
+
+	if err != nil {
+		status = "danger"
+		msg = fmt.Sprintf("حدث خطأ أثناء فصل الجلسات: %v", err)
+	}
+
+	if isAjax(r) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  status,
+			"message": msg,
+			"count":   count,
+		})
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/settings?status=%s&msg=%s#tab-maintenance", status, url.QueryEscape(msg)), http.StatusSeeOther)
+}
+
+func isAjax(r *http.Request) bool {
+	return r.Header.Get("X-Requested-With") == "XMLHttpRequest" || strings.Contains(r.Header.Get("Accept"), "application/json")
 }

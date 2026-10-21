@@ -33,6 +33,13 @@
             {{ end }}
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold px-3 py-2 d-flex align-items-center gap-2" id="maintenance-tab" data-bs-toggle="pill" data-bs-target="#tab-maintenance" type="button" role="tab" aria-controls="tab-maintenance" aria-selected="false">
+            <i class="bi bi-tools fs-5 text-warning"></i>
+            <span>صيانة النظام والخدمات</span>
+            <span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-1 small">تحكم متقدم</span>
+        </button>
+    </li>
 </ul>
 
 <!-- Tab Content -->
@@ -357,7 +364,291 @@
             </div>
         </div>
     </div>
+
+    <!-- Tab 3: System Maintenance -->
+    <div class="tab-pane fade" id="tab-maintenance" role="tabpanel" aria-labelledby="maintenance-tab">
+        <!-- Live System Status Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="p-3 bg-primary-subtle text-primary rounded-3">
+                            <i class="bi bi-ubuntu fs-3"></i>
+                        </div>
+                        <div>
+                            <span class="text-muted small d-block">نظام التشغيل (Host OS)</span>
+                            <h6 class="fw-bold mb-0 text-dark">{{ .System.Hostname }}</h6>
+                            <span class="small text-muted font-monospace">{{ .System.OS }} ({{ .System.Kernel }})</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="p-3 bg-info-subtle text-info rounded-3">
+                            <i class="bi bi-clock-history fs-3"></i>
+                        </div>
+                        <div>
+                            <span class="text-muted small d-block">مدة تشغيل السيرفر (Uptime)</span>
+                            <h6 class="fw-bold mb-0 text-dark font-monospace">{{ .System.Uptime }}</h6>
+                            <span class="small text-muted font-monospace">Load: {{ .System.LoadAverage }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="p-3 bg-success-subtle text-success rounded-3">
+                            <i class="bi bi-cpu-fill fs-3"></i>
+                        </div>
+                        <div>
+                            <span class="text-muted small d-block">المعالج والذاكرة (RAM / CPU)</span>
+                            <h6 class="fw-bold mb-0 text-dark">CPU {{ printf "%.1f" .System.CPUUsage }}% | RAM {{ printf "%.1f" .System.MemUsage }}%</h6>
+                            <span class="small text-muted">{{ .System.MemFormatted }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="p-3 bg-warning-subtle text-warning rounded-3">
+                            <i class="bi bi-broadcast fs-3"></i>
+                        </div>
+                        <div>
+                            <span class="text-muted small d-block">حالة FreeRADIUS والجلسات</span>
+                            <h6 class="fw-bold mb-0">
+                                {{ if eq .FreeRadiusStatus "active" }}
+                                <span class="badge bg-success shadow-sm"><i class="bi bi-check-circle-fill me-1"></i> يعمل (Active)</span>
+                                {{ else }}
+                                <span class="badge bg-danger shadow-sm"><i class="bi bi-x-circle-fill me-1"></i> متوقف (Inactive)</span>
+                                {{ end }}
+                            </h6>
+                            <span class="small text-primary fw-semibold">{{ .ActiveSessionsCount }} جلسة متصلة أونلاين</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Maintenance Action Cards -->
+        <div class="row g-4 mb-4">
+            <!-- 1. FreeRADIUS Service Restart Card -->
+            <div class="col-lg-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px;">
+                    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                        <div class="p-2 bg-primary-subtle text-primary rounded-3">
+                            <i class="bi bi-arrow-repeat fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">إعادة تشغيل خدمة الراديوس</h6>
+                            <small class="text-muted">Restart FreeRADIUS Service</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            <p class="text-muted small mb-3">
+                                تقوم هذه العملية بإعادة تشغيل سيرفيس FreeRADIUS فوراً لتطبيق أي تعديلات، تفريغ الذاكرة المؤقتة (Cache)، وإعادة تهيئة منافذ المصادقة والمحاسبة (1812 / 1813).
+                            </p>
+                            <div class="alert alert-info py-2 px-3 small border-0 mb-4">
+                                <i class="bi bi-info-circle-fill me-1"></i> <strong>آمنة وسريعة:</strong> تستغرق ثانيتين فقط ولا تؤثر على تشغيل نظام لينكس أو السيرفر.
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showRestartRadiusModal()">
+                            <i class="bi bi-arrow-repeat fs-5"></i>
+                            <span>إعادة تشغيل خدمة الراديوس الآن</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Disconnect Sessions & RADIUS Reset Card -->
+            <div class="col-lg-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px;">
+                    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+                        <div class="p-2 bg-warning-subtle text-warning rounded-3">
+                            <i class="bi bi-person-x-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">فصل الجلسات والراديوس</h6>
+                            <small class="text-muted">Disconnect Sessions & Reset</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            <p class="text-muted small mb-3">
+                                إرسال أمر فصل فوري (Disconnect-Request CoA) لجميع رواتر مايكروتك ({{ .NasCount }} راوتر) لطرد كافة الجلسات النشطة حالياً ({{ .ActiveSessionsCount }} جلسة)، وتصفير الجلسات العالقة في قاعدة البيانات، لإجبار أجهزة العملاء على إعادة الاتصال مجدداً.
+                            </p>
+                            <div class="alert alert-warning py-2 px-3 small border-0 mb-4">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> سيتم قطع الاتصال عن جميع المتصلين حالياً ليعاودوا الاتصال فوراً.
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column gap-2">
+                            <button type="button" class="btn btn-outline-warning text-dark w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showDisconnectModal(false)">
+                                <i class="bi bi-person-dash fs-5"></i>
+                                <span>فصل كافة الجلسات النشطة فقط (CoA)</span>
+                            </button>
+                            <button type="button" class="btn btn-warning w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showDisconnectModal(true)">
+                                <i class="bi bi-lightning-charge-fill fs-5"></i>
+                                <span>فصل الجلسات + إعادة تشغيل الراديوس</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Full Linux OS Reboot Card -->
+            <div class="col-lg-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px; border: 1.5px solid rgba(220, 53, 69, 0.3) !important;">
+                    <div class="card-header bg-danger-subtle py-3 border-bottom border-danger-subtle d-flex align-items-center gap-2">
+                        <div class="p-2 bg-danger text-white rounded-3">
+                            <i class="bi bi-power fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-danger">إعادة تشغيل لينكس بالكامل</h6>
+                            <small class="text-muted">Full Linux OS Reboot</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            <p class="text-muted small mb-3">
+                                عمل إعادة تشغيل كاملة (Full Reboot) لسيرفر ونظام تشغيل لينكس (Linux OS). يتم إيقاف كافة الخدمات وإعادة إقلاع السيرفر من الصفر.
+                            </p>
+                            <div class="alert alert-danger py-2 px-3 small border-0 mb-4">
+                                <i class="bi bi-exclamation-octagon-fill me-1"></i> <strong>تنبيه هام:</strong> سيتوقف السيرفر واللوحة والاتصال مؤقتاً لمدة 60 إلى 90 ثانية لحين اكتمال إقلاع النظام.
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-danger w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showRebootModal()">
+                            <i class="bi bi-power fs-5"></i>
+                            <span>إعادة تشغيل السيرفر ولينكس الآن</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Modal 1: Restart FreeRADIUS Confirmation -->
+<div class="modal fade" id="restartRadiusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-repeat text-primary"></i>
+                    <span>تأكيد إعادة تشغيل خدمة الراديوس</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/settings/maintenance/restart-radius" method="POST" id="restartRadiusForm">
+                <div class="modal-body p-4">
+                    <p class="mb-3">هل أنت متأكد من رغبتك في إعادة تشغيل خدمة <b>FreeRADIUS</b> الآن؟</p>
+                    <div class="alert alert-info small mb-0 border-0">
+                        <i class="bi bi-info-circle me-1"></i> سيتم تطبيق كافة التغييرات على الفور وإعادة فتح منافذ المحاسبة والمصادقة دون إغلاق المتصفح أو التأثير على سيرفر لينكس.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4" id="btnConfirmRestartRadius">
+                        <i class="bi bi-check-circle-fill me-1"></i> نعم، إعادة تشغيل الراديوس
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Disconnect Sessions Confirmation -->
+<div class="modal fade" id="disconnectSessionsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                    <span>تأكيد فصل الجلسات النشطة والراديوس</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/settings/maintenance/disconnect-all" method="POST" id="disconnectSessionsForm">
+                <div class="modal-body p-4">
+                    <p class="mb-3">أنت على وشك إرسال أمر فصل فوري لطرد جميع الجلسات النشطة على الرواتر (<b class="text-danger fs-6">{{ .ActiveSessionsCount }} جلسة</b>).</p>
+                    
+                    <div class="form-check form-switch p-3 bg-light rounded-3 mb-3 border">
+                        <input class="form-check-input" type="checkbox" name="restart_radius" value="1" id="chkModalRestartRadius" checked>
+                        <label class="form-check-label fw-bold text-dark" for="chkModalRestartRadius">
+                            إعادة تشغيل خدمة FreeRADIUS أيضاً بعد فصل الجلسات (موصى به لضبط نظيف)
+                        </label>
+                    </div>
+
+                    <div class="alert alert-warning small mb-0 border-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i> سيتم تحديث جدول المحاسبة `radacct` وإغلاق أي جلسات معلقة بنجاح.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning fw-bold px-4" id="btnConfirmDisconnect">
+                        <i class="bi bi-lightning-charge-fill me-1"></i> نعم، تأكيد فصل الجلسات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Linux Reboot Confirmation -->
+<div class="modal fade" id="rebootOSModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-bottom">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-octagon-fill"></i>
+                    <span>تحذير: إعادة تشغيل سيرفر لينكس بالكامل (Reboot)</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/settings/maintenance/reboot" method="POST" id="rebootOSForm">
+                <div class="modal-body p-4">
+                    <p class="mb-3 fw-bold text-dark">هل أنت متأكد تماماً من رغبتك في إعادة تشغيل السيرفر بالكامل الآن؟</p>
+                    <div class="alert alert-danger small mb-3">
+                        <ul class="mb-0 pe-3">
+                            <li>سيتم إيقاف تشغيل كافة الخدمات مؤقتاً (راديوس، قاعدة البيانات، والويب).</li>
+                            <li>سيفقد المتصفح الاتصال باللوحة لمدة تتراوح بين <b>60 إلى 90 ثانية</b> حتى يعود السيرفر للعمل.</li>
+                        </ul>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkRebootConfirm" required>
+                        <label class="form-check-label small fw-bold text-danger" for="chkRebootConfirm">
+                            أقر بأنني على علم بانقطاع الاتصال المؤقت وأوافق على إعادة تشغيل السيرفر الآن
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger fw-bold px-4" id="btnConfirmReboot">
+                        <i class="bi bi-power me-1"></i> تأكيد إعادة تشغيل السيرفر
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reboot Progress Screen Overlay (Initially Hidden) -->
+<div id="rebootOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); z-index: 999999; color: white; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;">
+    <div class="spinner-border text-danger mb-4" role="status" style="width: 4rem; height: 4rem;"></div>
+    <h3 class="fw-bold mb-2">جاري إعادة تشغيل السيرفر ونظام لينكس...</h3>
+    <p class="text-white-50 mb-4" style="max-width: 500px;">
+        تم إرسال أمر إعادة التشغيل بنجاح. يقوم السيرفر حالياً بإنهاء العمليات وإعادة الإقلاع. سيتم فحص الاتصال وتحديث الصفحة تلقائياً فور عودة السيرفر للعمل.
+    </p>
+    <div class="badge bg-danger fs-5 px-4 py-2 font-monospace mb-3" id="rebootCountdown">يرجى الانتظار: 60 ثانية</div>
+    <div class="small text-muted">لا تقم بإغلاق المتصفح</div>
+</div>
+
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
@@ -457,6 +748,11 @@ function activateTabFromHash() {
         if (sysTrigger) {
             bootstrap.Tab.getOrCreateInstance(sysTrigger).show();
         }
+    } else if (hash === '#maintenance' || hash === '#tab-maintenance') {
+        const maintTrigger = document.getElementById('maintenance-tab');
+        if (maintTrigger) {
+            bootstrap.Tab.getOrCreateInstance(maintTrigger).show();
+        }
     }
 }
 
@@ -466,11 +762,163 @@ document.querySelectorAll('#settingsTabs button[data-bs-toggle="pill"]').forEach
             history.replaceState(null, null, '#portal-settings');
         } else if (e.target.id === 'system-tab') {
             history.replaceState(null, null, '#system');
+        } else if (e.target.id === 'maintenance-tab') {
+            history.replaceState(null, null, '#maintenance');
         }
     });
 });
 
 window.addEventListener('load', activateTabFromHash);
 window.addEventListener('hashchange', activateTabFromHash);
+
+// Maintenance Modals & Actions
+function showRestartRadiusModal() {
+    const modalEl = document.getElementById('restartRadiusModal');
+    if (modalEl) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+function showDisconnectModal(withRestart) {
+    const chk = document.getElementById('chkModalRestartRadius');
+    if (chk) {
+        chk.checked = !!withRestart;
+    }
+    const modalEl = document.getElementById('disconnectSessionsModal');
+    if (modalEl) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+function showRebootModal() {
+    const chk = document.getElementById('chkRebootConfirm');
+    if (chk) {
+        chk.checked = false;
+    }
+    const modalEl = document.getElementById('rebootOSModal');
+    if (modalEl) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+// Handling Reboot Form with Live Countdown Overlay
+document.getElementById('rebootOSForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnConfirmReboot');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري إرسال الأمر...';
+
+    fetch('/settings/maintenance/reboot', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .finally(() => {
+        const modalEl = document.getElementById('rebootOSModal');
+        if (modalEl) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+
+        const overlay = document.getElementById('rebootOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+
+        let secondsLeft = 60;
+        const countdownEl = document.getElementById('rebootCountdown');
+        const timer = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft > 0) {
+                if (countdownEl) countdownEl.innerText = `يرجى الانتظار: ${secondsLeft} ثانية`;
+            } else {
+                clearInterval(timer);
+                if (countdownEl) countdownEl.innerText = 'جاري محاولة الاتصال بالسيرفر...';
+                const pollInterval = setInterval(() => {
+                    fetch('/auth/login', { cache: 'no-store' })
+                        .then(() => {
+                            clearInterval(pollInterval);
+                            window.location.href = '/settings#tab-maintenance';
+                        })
+                        .catch(() => {});
+                }, 3000);
+            }
+        }, 1000);
+    });
+});
+
+// Handling Restart Radius via AJAX for instant feedback
+document.getElementById('restartRadiusForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnConfirmRestartRadius');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري إعادة التشغيل...';
+
+    fetch('/settings/maintenance/restart-radius', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const modalEl = document.getElementById('restartRadiusModal');
+        if (modalEl) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> نعم، إعادة تشغيل الراديوس';
+        if (window.showCopyToast) {
+            window.showCopyToast(data.message || 'تمت إعادة تشغيل خدمة الراديوس بنجاح!');
+        }
+        setTimeout(() => {
+            window.location.href = '/settings?status=' + (data.status || 'success') + '&msg=' + encodeURIComponent(data.message || 'تمت إعادة تشغيل خدمة الراديوس بنجاح!') + '#tab-maintenance';
+            window.location.reload();
+        }, 1200);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> نعم، إعادة تشغيل الراديوس';
+        alert('حدث خطأ: ' + err.message);
+    });
+});
+
+// Handling Disconnect Sessions via AJAX
+document.getElementById('disconnectSessionsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnConfirmDisconnect');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري فصل الجلسات...';
+
+    const formData = new FormData(this);
+    fetch('/settings/maintenance/disconnect-all', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams(formData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        const modalEl = document.getElementById('disconnectSessionsModal');
+        if (modalEl) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i> نعم، تأكيد فصل الجلسات';
+        if (window.showCopyToast) {
+            window.showCopyToast(data.message || 'تم فصل الجلسات بنجاح!');
+        }
+        setTimeout(() => {
+            window.location.href = '/settings?status=' + (data.status || 'success') + '&msg=' + encodeURIComponent(data.message || 'تم فصل الجلسات بنجاح!') + '#tab-maintenance';
+            window.location.reload();
+        }, 1200);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i> نعم، تأكيد فصل الجلسات';
+        alert('حدث خطأ: ' + err.message);
+    });
+});
 </script>
 {{ end }}

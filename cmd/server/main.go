@@ -243,6 +243,9 @@ func main() {
 	mux.HandleFunc("/settings", middleware.RequireAuth(settBP.IndexHandler))
 	mux.HandleFunc("/settings/change-password", middleware.RequireAuth(settBP.ChangePasswordHandler))
 	mux.HandleFunc("/settings/portal", middleware.RequireAdmin(settBP.SavePortalSettingsHandler))
+	mux.HandleFunc("/settings/maintenance/reboot", middleware.RequireAdmin(settBP.RebootOSHandler))
+	mux.HandleFunc("/settings/maintenance/restart-radius", middleware.RequireAdmin(settBP.RestartRadiusHandler))
+	mux.HandleFunc("/settings/maintenance/disconnect-all", middleware.RequireAdmin(settBP.DisconnectAllSessionsHandler))
 
 	// Subscriber Self-Care Portal Blueprint
 	portalBP := portal.New(db, renderer, cfg.SessionSecret)
