@@ -75,27 +75,47 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	onTimeProfile := strings.TrimSpace(r.FormValue("on_time_profile"))
 	onTimePool := strings.TrimSpace(r.FormValue("on_time_pool"))
 
+	// Loan (Grace Period) settings
+	loanEnabled := r.FormValue("loan_enabled") == "1" || r.FormValue("loan_enabled") == "on" || r.FormValue("loan_enabled") == "true"
+	loanHours, _ := strconv.Atoi(r.FormValue("loan_hours"))
+	if loanHours <= 0 {
+		loanHours = 48
+	}
+	loanQuotaGB, _ := strconv.ParseFloat(r.FormValue("loan_quota_gb"), 64)
+	var loanQuotaBytes int64
+	if loanQuotaGB > 0 {
+		loanQuotaBytes = int64(loanQuotaGB * 1024 * 1024 * 1024)
+	}
+	loanDeductionType := strings.TrimSpace(r.FormValue("loan_deduction_type"))
+	if loanDeductionType != "partial" {
+		loanDeductionType = "full"
+	}
+
 	if name != "" && rateLimit != "" {
 		if displayName == "" {
 			displayName = name
 		}
 		p := &models.Profile{
-			Name:           name,
-			DisplayName:    displayName,
-			RateLimit:      rateLimit,
-			PoolName:       poolName,
-			QuotaBytes:     quotaBytes,
-			ValidityValue:  valVal,
-			ValidityUnit:   valUnit,
-			CostPrice:      costPrice,
-			Price:          price,
-			SharedUsers:    1,
-			OnQuotaAction:  onQuotaAction,
-			OnQuotaProfile: onQuotaProfile,
-			OnQuotaPool:    onQuotaPool,
-			OnTimeAction:   onTimeAction,
-			OnTimeProfile:  onTimeProfile,
-			OnTimePool:     onTimePool,
+			Name:              name,
+			DisplayName:       displayName,
+			RateLimit:         rateLimit,
+			PoolName:          poolName,
+			QuotaBytes:        quotaBytes,
+			ValidityValue:     valVal,
+			ValidityUnit:      valUnit,
+			CostPrice:         costPrice,
+			Price:             price,
+			SharedUsers:       1,
+			OnQuotaAction:     onQuotaAction,
+			OnQuotaProfile:    onQuotaProfile,
+			OnQuotaPool:       onQuotaPool,
+			OnTimeAction:      onTimeAction,
+			OnTimeProfile:     onTimeProfile,
+			OnTimePool:        onTimePool,
+			LoanEnabled:       loanEnabled,
+			LoanHours:         loanHours,
+			LoanQuotaBytes:    loanQuotaBytes,
+			LoanDeductionType: loanDeductionType,
 		}
 		_ = bp.db.SaveProfile(p)
 	}
@@ -154,6 +174,26 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		p.OnTimeAction = strings.TrimSpace(r.FormValue("on_time_action"))
 		p.OnTimeProfile = strings.TrimSpace(r.FormValue("on_time_profile"))
 		p.OnTimePool = strings.TrimSpace(r.FormValue("on_time_pool"))
+
+		p.LoanEnabled = r.FormValue("loan_enabled") == "1" || r.FormValue("loan_enabled") == "on" || r.FormValue("loan_enabled") == "true"
+		loanHours, _ := strconv.Atoi(r.FormValue("loan_hours"))
+		if loanHours <= 0 {
+			loanHours = 48
+		}
+		p.LoanHours = loanHours
+
+		loanQuotaGB, _ := strconv.ParseFloat(r.FormValue("loan_quota_gb"), 64)
+		if loanQuotaGB > 0 {
+			p.LoanQuotaBytes = int64(loanQuotaGB * 1024 * 1024 * 1024)
+		} else {
+			p.LoanQuotaBytes = 0
+		}
+
+		loanDeductionType := strings.TrimSpace(r.FormValue("loan_deduction_type"))
+		if loanDeductionType != "partial" {
+			loanDeductionType = "full"
+		}
+		p.LoanDeductionType = loanDeductionType
 
 		_ = bp.db.SaveProfile(p)
 	}

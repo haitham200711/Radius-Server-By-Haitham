@@ -34,6 +34,9 @@
             <button type="button" class="btn btn-outline-success fw-bold" onclick="toolbarAction('renew')" title="تجديد اشتراك العميل المحدد">
                 <i class="bi bi-arrow-repeat me-1"></i> تجديد
             </button>
+            <button type="button" class="btn btn-outline-warning text-dark fw-bold" onclick="toolbarAction('loan')" title="منح سلفة فترة سماح للعميل المحدد">
+                <i class="bi bi-clock-history me-1"></i> سلفة
+            </button>
             <button type="button" class="btn btn-outline-primary fw-bold" onclick="toolbarAction('edit')" title="تعديل بيانات المشترك المحدد">
                 <i class="bi bi-pencil-square me-1"></i> تعديل
             </button>
@@ -241,13 +244,18 @@
             <tbody>
                 {{ range .Subscribers }}
                 <tr id="row-{{ .Username }}"
-                    class="subscriber-row"
-                    onclick="handleRowClick('{{ .Username }}', '{{ .FullName }}', '{{ .Profile }}', '{{ printf "%.2f" .Debt }}', '{{ printf "%.1f" .QuotaGB }}', event)"
+                    class="subscriber-row {{ if .LoanActive }}table-warning-subtle{{ end }}"
+                    onclick="handleRowClick('{{ .Username }}', '{{ .FullName }}', '{{ .Profile }}', '{{ printf "%.2f" .Debt }}', '{{ printf "%.1f" .QuotaGB }}', '{{ if .LoanActive }}1{{ else }}0{{ end }}', event)"
                     data-username="{{ .Username }}"
                     data-fullname="{{ .FullName }}"
                     data-profile="{{ .Profile }}"
                     data-debt="{{ printf "%.2f" .Debt }}"
-                    data-quota="{{ printf "%.1f" .QuotaGB }}">
+                    data-quota="{{ printf "%.1f" .QuotaGB }}"
+                    data-loanactive="{{ if .LoanActive }}1{{ else }}0{{ end }}"
+                    data-loanhours="{{ .LoanHours }}"
+                    data-loanquota="{{ printf "%.1f" .LoanQuotaGB }}"
+                    data-loandeduction="{{ .LoanDeductionType }}"
+                    data-loangranted="{{ .LoanGrantedAt }}">
                     <td class="text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="form-check-input sub-checkbox" value="{{ .Username }}" onchange="updateSelectionState()">
                     </td>
@@ -332,6 +340,13 @@
                     </td>
                     <td class="col-expiry">
                         <span class="small">{{ .ExpirationDate }}</span>
+                        {{ if .LoanActive }}
+                        <div>
+                            <span class="badge bg-warning text-dark border border-warning shadow-sm mt-1" title="سلفة نشطة: {{ .LoanHours }} ساعة | سداد {{ if eq .LoanDeductionType "partial" }}جزئي{{ else }}كلي{{ end }}">
+                                <i class="bi bi-clock-history me-1"></i> سلفة مفعلة ({{ .LoanHours }}h)
+                            </span>
+                        </div>
+                        {{ end }}
                     </td>
                     <td class="col-status">
                         {{ if eq .Status "active" }}
@@ -758,6 +773,10 @@
                         </div>
                     </div>
 
+                    <div id="singleRenewLoanNotice" class="alert alert-warning small mb-2 py-2 d-none">
+                        <i class="bi bi-clock-history me-1"></i> <b>تنبيه تسوية السلفة:</b> المشترك لديه سلفة نشطة حالياً. سيتم خصم وقت وكوتة السلفة من هذا التجديد تلقائياً وفقاً لنظام الباقة (جزئي / كلي).
+                    </div>
+
                     <div class="alert alert-info small mb-0 py-2">
                         <i class="bi bi-info-circle me-1"></i> عند اختيار <b>غير مدفوع</b>، يضاف المبلغ تلقائياً لمديونية العميل مع تسجيل العملية بالتقارير المالية.
                     </div>
@@ -766,6 +785,84 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-success fw-bold">
                         <i class="bi bi-arrow-repeat me-1"></i> تنفيذ التجديد
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 7. Single Subscriber Loan Modal -->
+<div class="modal fade" id="singleLoanModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-clock-history me-2"></i> منح سلفة فترة سماح (Grace Period Loan)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/grant-loan">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="username" id="loanUsername">
+                    <input type="hidden" name="limit" value="{{ .Limit }}">
+                    <input type="hidden" name="page" value="{{ .Page }}">
+                    <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                    <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                    <div class="card bg-light border-0 p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">المشترك:</span>
+                            <span class="fw-bold text-dark fs-6" id="loanFullName">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">اسم المستخدم:</span>
+                            <span class="badge bg-white text-primary border font-monospace fs-6" id="loanUsernameBadge">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted">الباقة الحالية:</span>
+                            <span class="badge bg-info text-dark" id="loanProfileBadge">-</span>
+                        </div>
+                    </div>
+
+                    <div id="loanActiveAlert" class="alert alert-danger d-none small mb-3">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> المشترك لديه سلفة نشطة بالفعل تم منحها سابقاً ولم يتم تسديدها بعد! لا يمكن منح سلفة ثانية حتى يتم التجديد.
+                    </div>
+
+                    <div id="loanDisabledAlert" class="alert alert-danger d-none small mb-3">
+                        <i class="bi bi-slash-circle me-1"></i> نظام السلفة غير مفعل لهذه الباقة. يمكنك تفعيله من قائمة <b>باقات السرعات</b> أولاً.
+                    </div>
+
+                    <div id="loanEligibilityCard" class="card border-primary-subtle bg-primary-subtle p-3 mb-3">
+                        <h6 class="fw-bold text-primary mb-2">
+                            <i class="bi bi-gift-fill me-1"></i> تفاصيل السلفة المتاحة لهذه الباقة:
+                        </h6>
+                        <div class="row g-2 text-dark small">
+                            <div class="col-6">
+                                <i class="bi bi-clock me-1 text-primary"></i> المدة الممنوحة: <b id="loanDetailHours">48</b> ساعة
+                            </div>
+                            <div class="col-6">
+                                <i class="bi bi-hdd-network me-1 text-primary"></i> كوتة إضافية: <b id="loanDetailQuota">5</b> GB
+                            </div>
+                            <div class="col-12 mt-2">
+                                <i class="bi bi-shield-check me-1 text-primary"></i> نظام السداد عند التجديد: <b id="loanDetailDeduction">سداد كلي</b>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info small mb-0">
+                        <i class="bi bi-info-circle-fill me-1"></i> عند تأكيد منح السلفة:
+                        <ul class="mb-0 ps-3 mt-1">
+                            <li>سيتم تمديد الصلاحية فوراً وإعادة تشغيل اتصال المشترك (CoA Kick) وفك الحظر عنه تلقائياً.</li>
+                            <li>يتم قفل تغيير العرض/الباقة للمشترك والموزعين حتى يتم سداد السلفة مع التجديد.</li>
+                            <li>تغيير الباقة أثناء السلفة متاح فقط لمدير النظام (Admin).</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" id="loanSubmitBtn" class="btn btn-warning fw-bold text-dark">
+                        <i class="bi bi-check-circle-fill me-1"></i> تأكيد منح السلفة فوراً
                     </button>
                 </div>
             </form>
@@ -1187,7 +1284,20 @@ function clearActiveSubscriber(e) {
     deselectAll();
 }
 
-function handleRowClick(username, fullName, profile, debt, quota, event) {
+const profilesDataMap = {
+    {{ range .Profiles }}
+    "{{ .Name }}": {
+        name: "{{ .Name }}",
+        display: "{{ .DisplayName }}",
+        loanEnabled: {{ if .LoanEnabled }}true{{ else }}false{{ end }},
+        loanHours: {{ .LoanHours }},
+        loanQuotaGB: {{ printf "%.1f" .LoanQuotaGB }},
+        loanDeduction: "{{ .LoanDeductionType }}"
+    },
+    {{ end }}
+};
+
+function handleRowClick(username, fullName, profile, debt, quota, loanActive, event) {
     // If clicked on input, link, or button, let their default handlers run
     if (event.target.tagName === 'INPUT' || event.target.tagName === 'A' || event.target.tagName === 'BUTTON' || event.target.closest('a') || event.target.closest('button')) {
         return;
@@ -1203,7 +1313,8 @@ function handleRowClick(username, fullName, profile, debt, quota, event) {
         fullName: fullName,
         profile: profile,
         debt: debt,
-        quota: quota
+        quota: quota,
+        loanActive: loanActive === '1'
     });
 
     updateSelectionState();
@@ -1221,7 +1332,8 @@ function toolbarAction(action) {
                     fullName: row.dataset.fullname,
                     profile: row.dataset.profile,
                     debt: row.dataset.debt,
-                    quota: row.dataset.quota
+                    quota: row.dataset.quota,
+                    loanActive: row.dataset.loanactive === '1'
                 };
             }
         }
@@ -1243,6 +1355,8 @@ function toolbarAction(action) {
 
     if (action === 'renew') {
         openRenewModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.profile);
+    } else if (action === 'loan') {
+        openLoanModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.profile, activeSubscriber.loanActive);
     } else if (action === 'edit') {
         window.location.href = '/subscribers/edit?username=' + encodeURIComponent(activeSubscriber.username);
     } else if (action === 'quota') {
@@ -1306,7 +1420,8 @@ function updateSelectionState() {
                 fullName: row.dataset.fullname,
                 profile: row.dataset.profile,
                 debt: row.dataset.debt,
-                quota: row.dataset.quota
+                quota: row.dataset.quota,
+                loanActive: row.dataset.loanactive === '1'
             });
         }
     } else {
@@ -1379,6 +1494,14 @@ function openRenewModal(username, fullName, currentProfile) {
     document.getElementById('singleRenewFullName').textContent = fullName;
     document.getElementById('singleRenewCurrentProfile').textContent = currentProfile || 'غير محدد';
 
+    const row = document.getElementById('row-' + username);
+    const hasActiveLoan = (row && row.dataset.loanactive === '1');
+    const loanNotice = document.getElementById('singleRenewLoanNotice');
+    if (loanNotice) {
+        if (hasActiveLoan) loanNotice.classList.remove('d-none');
+        else loanNotice.classList.add('d-none');
+    }
+
     const select = document.getElementById('singleRenewProfileSelect');
     if (select) {
         if (currentProfile) {
@@ -1392,6 +1515,44 @@ function openRenewModal(username, fullName, currentProfile) {
         onRenewProfileChange();
     }
     const modal = new bootstrap.Modal(document.getElementById('singleRenewModal'));
+    modal.show();
+}
+
+function openLoanModal(username, fullName, profile, loanActive) {
+    document.getElementById('loanUsername').value = username;
+    document.getElementById('loanFullName').textContent = fullName;
+    document.getElementById('loanUsernameBadge').textContent = username;
+    document.getElementById('loanProfileBadge').textContent = profile || 'غير محدد';
+
+    const activeAlert = document.getElementById('loanActiveAlert');
+    const disabledAlert = document.getElementById('loanDisabledAlert');
+    const eligCard = document.getElementById('loanEligibilityCard');
+    const submitBtn = document.getElementById('loanSubmitBtn');
+
+    if (loanActive) {
+        activeAlert.classList.remove('d-none');
+        disabledAlert.classList.add('d-none');
+        eligCard.classList.add('d-none');
+        submitBtn.disabled = true;
+    } else {
+        activeAlert.classList.add('d-none');
+        const prof = profilesDataMap[profile];
+        if (!prof || !prof.loanEnabled) {
+            disabledAlert.classList.remove('d-none');
+            eligCard.classList.add('d-none');
+            submitBtn.disabled = true;
+        } else {
+            disabledAlert.classList.add('d-none');
+            eligCard.classList.remove('d-none');
+            submitBtn.disabled = false;
+
+            document.getElementById('loanDetailHours').textContent = prof.loanHours;
+            document.getElementById('loanDetailQuota').textContent = prof.loanQuotaGB;
+            document.getElementById('loanDetailDeduction').textContent = (prof.loanDeduction === 'partial') ? 'سداد جزئي (خصم المستهلك فقط)' : 'سداد كلي (خصم كامل وقت وكوتة السلفة)';
+        }
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('singleLoanModal'));
     modal.show();
 }
 

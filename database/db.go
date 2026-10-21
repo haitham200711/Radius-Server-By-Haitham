@@ -534,6 +534,16 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE resellers ADD COLUMN IF NOT EXISTS commission_percent DECIMAL(5, 2) DEFAULT 0.00;`,
 		`ALTER TABLE resellers ADD COLUMN IF NOT EXISTS permissions LONGTEXT;`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS reseller_id INT DEFAULT 0;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS loan_enabled TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS loan_hours INT DEFAULT 48;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS loan_quota_bytes BIGINT DEFAULT 0;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS loan_deduction_type VARCHAR(20) DEFAULT 'full';`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_active TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_granted_at DATETIME NULL;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_hours INT DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_quota_bytes BIGINT DEFAULT 0;`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_deduction_type VARCHAR(20) DEFAULT 'full';`,
+		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_initial_used_bytes BIGINT DEFAULT 0;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -585,8 +595,13 @@ func (d *DB) InitSchema() error {
 		},
 		{
 			key:  "debt_reminder",
-			name: "ط§ظ„طھط°ظƒظٹط± ط§ظ„ط¯ظˆط±ظٹ ط¨ط§ظ„ط¯ظٹظˆظ† ط§ظ„ظ…ط³طھط­ظ‚ط©",
-			text: "ط¹ط²ظٹط²ظٹ ط§ظ„ظ…ط´طھط±ظƒ {name}طŒ ظ†ظˆط¯ طھط°ظƒظٹط±ظƒظ… ط¨ظˆط¬ظˆط¯ ظ…ط¯ظٹظˆظ†ظٹط© ظ…ط³طھط­ظ‚ط© ط¨ظ‚ظٹظ…ط© {debt} ط¬.ظ… ط¹ظ„ظ‰ ط§ط´طھط±ط§ظƒظƒظ… ط±ظ‚ظ… ({contract_no}). ظٹط±ط¬ظ‰ ط³ط±ط¹ط© ط§ظ„ط³ط¯ط§ط¯ ظ„طھظپط§ط¯ظٹ طھظˆظ‚ظپ ط§ظ„ط®ط¯ظ…ط©.",
+			name: "التذكير الدوري بالديون المستحقة",
+			text: "عزيزي المشترك {name}، نود تذكيركم بوجود مديونية مستحقة بقيمة {debt} ج.م على اشتراككم رقم ({contract_no}). يرجى سرعة السداد لتفادي توقف الخدمة.",
+		},
+		{
+			key:  "loan_granted",
+			name: "منح سلفة فترة سماح",
+			text: "مرحباً {name}، تم منحك سلفة فترة سماح بنجاح! المدة الممنوحة: {loan_hours} ساعة، والكوتة: {loan_quota} جيجا. تنتهي السلفة بتاريخ {expiry_date}. يرجى التجديد قبل انتهاء المدة.",
 		},
 	}
 	for _, dt := range defaultTemplates {
@@ -1399,7 +1414,8 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 	var subResellerID int64
 	var subID int64
 	var currentProf string
-	err = d.QueryRow("SELECT id, reseller_id, profile_name FROM subscribers WHERE username = ?", username).Scan(&subID, &subResellerID, &currentProf)
+	var loanActive bool
+	err = d.QueryRow("SELECT id, reseller_id, profile_name, COALESCE(loan_active, 0) FROM subscribers WHERE username = ?", username).Scan(&subID, &subResellerID, &currentProf, &loanActive)
 	if err != nil {
 		return fmt.Errorf("المشترك غير موجود")
 	}
@@ -1409,6 +1425,10 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 
 	if profileName == "" {
 		profileName = currentProf
+	}
+
+	if loanActive && profileName != currentProf {
+		return fmt.Errorf("لا يمكن تغيير باقة المشترك لوجود سلفة نشطة غير مسددة. يجب سداد السلفة أو تجديد نفس الباقة أولاً")
 	}
 
 	var prof models.Profile
@@ -1462,7 +1482,9 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 	rows, err := d.Query(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
 		validity_value, validity_unit, COALESCE(cost_price, 0.00), price, shared_users, mikrotik_address_list,
 		on_quota_action, on_quota_profile, on_quota_pool,
-		on_time_action, on_time_profile, on_time_pool, created_at
+		on_time_action, on_time_profile, on_time_pool,
+		COALESCE(loan_enabled, 0), COALESCE(loan_hours, 48), COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'),
+		created_at
 		FROM profiles ORDER BY id ASC`)
 	if err != nil {
 		return nil, err
@@ -1476,11 +1498,16 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 			&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
 			&p.ValidityValue, &p.ValidityUnit, &p.CostPrice, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
 			&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
-			&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
+			&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool,
+			&p.LoanEnabled, &p.LoanHours, &p.LoanQuotaBytes, &p.LoanDeductionType,
+			&p.CreatedAt,
 		)
 		if err == nil {
 			if p.QuotaBytes > 0 {
 				p.QuotaGB = float64(p.QuotaBytes) / (1024 * 1024 * 1024)
+			}
+			if p.LoanQuotaBytes > 0 {
+				p.LoanQuotaGB = float64(p.LoanQuotaBytes) / (1024 * 1024 * 1024)
 			}
 			list = append(list, p)
 		}
@@ -1493,18 +1520,25 @@ func (d *DB) GetProfile(id int64) (*models.Profile, error) {
 	err := d.QueryRow(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
 		validity_value, validity_unit, COALESCE(cost_price, 0.00), price, shared_users, mikrotik_address_list,
 		on_quota_action, on_quota_profile, on_quota_pool,
-		on_time_action, on_time_profile, on_time_pool, created_at
+		on_time_action, on_time_profile, on_time_pool,
+		COALESCE(loan_enabled, 0), COALESCE(loan_hours, 48), COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'),
+		created_at
 		FROM profiles WHERE id = ?`, id).Scan(
 		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
 		&p.ValidityValue, &p.ValidityUnit, &p.CostPrice, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
 		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
-		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
+		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool,
+		&p.LoanEnabled, &p.LoanHours, &p.LoanQuotaBytes, &p.LoanDeductionType,
+		&p.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if p.QuotaBytes > 0 {
 		p.QuotaGB = float64(p.QuotaBytes) / (1024 * 1024 * 1024)
+	}
+	if p.LoanQuotaBytes > 0 {
+		p.LoanQuotaGB = float64(p.LoanQuotaBytes) / (1024 * 1024 * 1024)
 	}
 	return &p, nil
 }
@@ -1514,18 +1548,25 @@ func (d *DB) GetProfileByName(name string) (*models.Profile, error) {
 	err := d.QueryRow(`SELECT id, name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
 		validity_value, validity_unit, COALESCE(cost_price, 0.00), price, shared_users, mikrotik_address_list,
 		on_quota_action, on_quota_profile, on_quota_pool,
-		on_time_action, on_time_profile, on_time_pool, created_at
+		on_time_action, on_time_profile, on_time_pool,
+		COALESCE(loan_enabled, 0), COALESCE(loan_hours, 48), COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'),
+		created_at
 		FROM profiles WHERE name = ?`, name).Scan(
 		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
 		&p.ValidityValue, &p.ValidityUnit, &p.CostPrice, &p.Price, &p.SharedUsers, &p.MikrotikAddressList,
 		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
-		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool, &p.CreatedAt,
+		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool,
+		&p.LoanEnabled, &p.LoanHours, &p.LoanQuotaBytes, &p.LoanDeductionType,
+		&p.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if p.QuotaBytes > 0 {
 		p.QuotaGB = float64(p.QuotaBytes) / (1024 * 1024 * 1024)
+	}
+	if p.LoanQuotaBytes > 0 {
+		p.LoanQuotaGB = float64(p.LoanQuotaBytes) / (1024 * 1024 * 1024)
 	}
 	return &p, nil
 }
@@ -1549,17 +1590,25 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 	if p.OnTimeAction == "" {
 		p.OnTimeAction = "disconnect"
 	}
+	if p.LoanHours <= 0 {
+		p.LoanHours = 48
+	}
+	if p.LoanDeductionType == "" {
+		p.LoanDeductionType = "full"
+	}
 
 	if p.ID == 0 {
 		res, err := tx.Exec(`INSERT INTO profiles (name, display_name, rate_limit, pool_name, quota_bytes, uptime_seconds,
 			validity_value, validity_unit, cost_price, price, shared_users, mikrotik_address_list,
 			on_quota_action, on_quota_profile, on_quota_pool,
-			on_time_action, on_time_profile, on_time_pool)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			on_time_action, on_time_profile, on_time_pool,
+			loan_enabled, loan_hours, loan_quota_bytes, loan_deduction_type)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
 			p.ValidityValue, p.ValidityUnit, p.CostPrice, p.Price, p.SharedUsers, p.MikrotikAddressList,
 			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
-			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool)
+			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool,
+			p.LoanEnabled, p.LoanHours, p.LoanQuotaBytes, p.LoanDeductionType)
 		if err != nil {
 			return err
 		}
@@ -1569,12 +1618,14 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 			name = ?, display_name = ?, rate_limit = ?, pool_name = ?, quota_bytes = ?, uptime_seconds = ?,
 			validity_value = ?, validity_unit = ?, cost_price = ?, price = ?, shared_users = ?, mikrotik_address_list = ?,
 			on_quota_action = ?, on_quota_profile = ?, on_quota_pool = ?,
-			on_time_action = ?, on_time_profile = ?, on_time_pool = ?
+			on_time_action = ?, on_time_profile = ?, on_time_pool = ?,
+			loan_enabled = ?, loan_hours = ?, loan_quota_bytes = ?, loan_deduction_type = ?
 			WHERE id = ?`,
 			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
 			p.ValidityValue, p.ValidityUnit, p.CostPrice, p.Price, p.SharedUsers, p.MikrotikAddressList,
 			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
-			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool, p.ID)
+			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool,
+			p.LoanEnabled, p.LoanHours, p.LoanQuotaBytes, p.LoanDeductionType, p.ID)
 		if err != nil {
 			return err
 		}
@@ -1603,6 +1654,82 @@ func (d *DB) DeleteProfile(id int64) error {
 	return nil
 }
 
+// CalculateLoanDeductionTx calculates time and quota to deduct when renewing an active loan
+func (d *DB) CalculateLoanDeductionTx(tx *sql.Tx, username string, p *models.Profile) (time.Time, int64, float64, int64, bool) {
+	var (
+		loanActive           bool
+		loanGrantedAt        sql.NullTime
+		loanHours            int
+		loanQuotaBytes       int64
+		loanDeductionType    string
+		loanInitialUsedBytes int64
+	)
+
+	_ = tx.QueryRow(`SELECT COALESCE(loan_active, 0), loan_granted_at, COALESCE(loan_hours, 0), 
+		COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'), COALESCE(loan_initial_used_bytes, 0)
+		FROM subscribers WHERE username = ?`, username).Scan(
+		&loanActive, &loanGrantedAt, &loanHours, &loanQuotaBytes, &loanDeductionType, &loanInitialUsedBytes)
+
+	newExp := p.CalculateExpiration(time.Now())
+	finalQuota := p.QuotaBytes
+
+	if !loanActive {
+		return newExp, finalQuota, 0, 0, false
+	}
+
+	var deductedHours float64 = 0
+	var deductedQuotaBytes int64 = 0
+
+	if loanDeductionType == "partial" {
+		// 1. Partial time deduction: only elapsed time since loan grant
+		if loanGrantedAt.Valid {
+			elapsed := time.Since(loanGrantedAt.Time).Hours()
+			if elapsed > float64(loanHours) {
+				elapsed = float64(loanHours)
+			}
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			deductedHours = elapsed
+		} else {
+			deductedHours = float64(loanHours)
+		}
+
+		// 2. Partial quota deduction: only traffic consumed since loan grant
+		if loanGrantedAt.Valid {
+			var usedDuringLoan int64
+			_ = tx.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+				FROM radacct WHERE username = ? AND acctstarttime >= ?`, username, loanGrantedAt.Time).Scan(&usedDuringLoan)
+			if usedDuringLoan > loanQuotaBytes {
+				usedDuringLoan = loanQuotaBytes
+			}
+			if usedDuringLoan < 0 {
+				usedDuringLoan = 0
+			}
+			deductedQuotaBytes = usedDuringLoan
+		} else {
+			deductedQuotaBytes = loanQuotaBytes
+		}
+	} else {
+		// Full deduction: deduct the entire loan hours and quota regardless of usage
+		deductedHours = float64(loanHours)
+		deductedQuotaBytes = loanQuotaBytes
+	}
+
+	// Apply time deduction
+	newExp = newExp.Add(-time.Duration(deductedHours * float64(time.Hour)))
+
+	// Apply quota deduction
+	if finalQuota > 0 {
+		finalQuota = finalQuota - deductedQuotaBytes
+		if finalQuota < 0 {
+			finalQuota = 0
+		}
+	}
+
+	return newExp, finalQuota, deductedHours, deductedQuotaBytes, true
+}
+
 func (d *DB) RenewSubscriber(username, profileName string) error {
 	tx, err := d.Begin()
 	if err != nil {
@@ -1623,16 +1750,22 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 		return fmt.Errorf("profile %s not found: %w", profileName, err)
 	}
 
-	// Calculate new expiration date: from now
-	newExp := p.CalculateExpiration(time.Now())
+	// Calculate new expiration and quota taking into account any active loan
+	newExp, finalQuota, _, _, _ := d.CalculateLoanDeductionTx(tx, username, &p)
 
-	// Update subscribers table
+	// Update subscribers table and reset loan flags
 	_, err = tx.Exec(`UPDATE subscribers SET
 		profile_name = ?,
 		quota_bytes = ?,
 		expiration_date = ?,
-		status = 'active'
-		WHERE username = ?`, p.Name, p.QuotaBytes, newExp, username)
+		status = 'active',
+		loan_active = 0,
+		loan_granted_at = NULL,
+		loan_hours = 0,
+		loan_quota_bytes = 0,
+		loan_deduction_type = 'full',
+		loan_initial_used_bytes = 0
+		WHERE username = ?`, p.Name, finalQuota, newExp, username)
 	if err != nil {
 		return err
 	}
@@ -1648,11 +1781,141 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 
 	// Update radreply Mikrotik-Total-Limit
 	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
-	if p.QuotaBytes > 0 {
-		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", p.QuotaBytes))
+	if finalQuota > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", finalQuota))
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	_ = d.DisconnectSubscriberSession(username)
+	return nil
+}
+
+// GrantSubscriberLoan grants a grace period loan (time and quota) to a subscriber based on profile settings
+func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	sub, err := d.GetSubscriber(username)
+	if err != nil {
+		return nil, fmt.Errorf("المشترك غير موجود: %w", err)
+	}
+
+	if sub.LoanActive {
+		grantDate := "سابقاً"
+		if sub.LoanGrantedAt.Valid {
+			grantDate = sub.LoanGrantedAt.Time.Format("2006-01-02 15:04")
+		}
+		return nil, fmt.Errorf("المشترك لديه سلفة نشطة بالفعل تم منحها بتاريخ %s ولم يتم تسديدها بعد", grantDate)
+	}
+
+	if sub.ProfileName == "" {
+		return nil, fmt.Errorf("المشترك ليس لديه باقة محددة")
+	}
+
+	prof, err := d.GetProfileByName(sub.ProfileName)
+	if err != nil {
+		return nil, fmt.Errorf("باقة المشترك غير موجودة: %w", err)
+	}
+
+	if !prof.LoanEnabled {
+		return nil, fmt.Errorf("نظام السلفة غير مفعل لهذه الباقة (%s)", prof.DisplayName)
+	}
+
+	loanHours := prof.LoanHours
+	if loanHours <= 0 {
+		loanHours = 48
+	}
+	loanQuotaBytes := prof.LoanQuotaBytes
+	loanDeductionType := prof.LoanDeductionType
+	if loanDeductionType == "" {
+		loanDeductionType = "full"
+	}
+
+	// Calculate initial used bytes from radacct so far as baseline for partial quota
+	var currentUsedBytes int64
+	_ = d.QueryRow("SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ?", username).Scan(&currentUsedBytes)
+
+	now := time.Now()
+	newExp := now.Add(time.Duration(loanHours) * time.Hour)
+
+	tx, err := d.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// Update subscribers table
+	_, err = tx.Exec(`UPDATE subscribers SET
+		loan_active = 1,
+		loan_granted_at = ?,
+		loan_hours = ?,
+		loan_quota_bytes = ?,
+		loan_deduction_type = ?,
+		loan_initial_used_bytes = ?,
+		expiration_date = ?,
+		status = 'active',
+		updated_at = NOW()
+		WHERE username = ?`,
+		now, loanHours, loanQuotaBytes, loanDeductionType, currentUsedBytes, newExp, username)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update FreeRADIUS radcheck Expiration
+	expStr := newExp.Format("02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
+	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, expStr)
+
+	// Update radreply Mikrotik-Total-Limit
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+	if loanQuotaBytes > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", loanQuotaBytes))
+	}
+
+	deductionText := "سداد كلي كامل"
+	if loanDeductionType == "partial" {
+		deductionText = "سداد جزئي حسب الاستهلاك"
+	}
+	desc := fmt.Sprintf("منح سلفة فترة سماح (%d ساعة - %.2f جيجا - %s)",
+		loanHours, float64(loanQuotaBytes)/(1024*1024*1024), deductionText)
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'loan', ?, 0.00, 'paid', 'loan', ?, ?)`,
+		sub.Username, sub.ContractNo, sub.FullName, desc, desc, adminUser)
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Disconnect active session via CoA to apply new expiration/quota immediately
+	_ = d.DisconnectSubscriberSession(username)
+
+	// Trigger WhatsApp notification asynchronously
+	go func() {
+		_ = d.TriggerWhatsAppEvent("loan_granted", sub, map[string]string{
+			"{loan_hours}":  fmt.Sprintf("%d", loanHours),
+			"{loan_quota}":  fmt.Sprintf("%.2f", float64(loanQuotaBytes)/(1024*1024*1024)),
+			"{expiry_date}": newExp.Format("2006-01-02 15:04"),
+		})
+	}()
+
+	sub.LoanActive = true
+	sub.LoanGrantedAt = sql.NullTime{Time: now, Valid: true}
+	sub.LoanHours = loanHours
+	sub.LoanQuotaBytes = loanQuotaBytes
+	sub.LoanDeductionType = loanDeductionType
+	sub.ExpirationDate = sql.NullTime{Time: newExp, Valid: true}
+	sub.Status = "active"
+
+	return sub, nil
 }
 
 // --- Subscriber CRM Edit Methods ---
@@ -1660,15 +1923,22 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 func (d *DB) GetSubscriber(username string) (*models.Subscriber, error) {
 	var s models.Subscriber
 	var exp sql.NullTime
+	var loanGranted sql.NullTime
 	err := d.QueryRow(`SELECT s.id, s.username, s.contract_no, s.full_name, s.phone, s.address, s.debt,
 		s.profile_name, s.static_ip, s.calling_mac, s.quota_bytes, s.expiration_date, s.status,
-		COALESCE(s.reseller_id, 0), COALESCE(r.name, ''), s.created_at, s.updated_at
+		COALESCE(s.reseller_id, 0), COALESCE(r.name, ''),
+		COALESCE(s.loan_active, 0), s.loan_granted_at, COALESCE(s.loan_hours, 0), COALESCE(s.loan_quota_bytes, 0),
+		COALESCE(s.loan_deduction_type, 'full'), COALESCE(s.loan_initial_used_bytes, 0),
+		s.created_at, s.updated_at
 		FROM subscribers s
 		LEFT JOIN resellers r ON s.reseller_id = r.id
 		WHERE s.username = ?`, username).Scan(
 		&s.ID, &s.Username, &s.ContractNo, &s.FullName, &s.Phone, &s.Address, &s.Debt,
 		&s.ProfileName, &s.StaticIP, &s.CallingMAC, &s.QuotaBytes, &exp, &s.Status,
-		&s.ResellerID, &s.ResellerName, &s.CreatedAt, &s.UpdatedAt,
+		&s.ResellerID, &s.ResellerName,
+		&s.LoanActive, &loanGranted, &s.LoanHours, &s.LoanQuotaBytes,
+		&s.LoanDeductionType, &s.LoanInitialUsedBytes,
+		&s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -1702,6 +1972,7 @@ func (d *DB) GetSubscriber(username string) (*models.Subscriber, error) {
 		return nil, err
 	}
 	s.ExpirationDate = exp
+	s.LoanGrantedAt = loanGranted
 	_ = d.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", username).Scan(&s.Password)
 	return &s, nil
 }
@@ -2446,14 +2717,20 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 		price = p.Price
 	}
 
-	newExp := p.CalculateExpiration(time.Now())
+	newExp, finalQuota, deductedHours, deductedQuotaBytes, hadLoan := d.CalculateLoanDeductionTx(tx, username, &p)
 
 	_, err = tx.Exec(`UPDATE subscribers SET
 		profile_name = ?,
 		quota_bytes = ?,
 		expiration_date = ?,
-		status = 'active'
-		WHERE username = ?`, p.Name, p.QuotaBytes, newExp, username)
+		status = 'active',
+		loan_active = 0,
+		loan_granted_at = NULL,
+		loan_hours = 0,
+		loan_quota_bytes = 0,
+		loan_deduction_type = 'full',
+		loan_initial_used_bytes = 0
+		WHERE username = ?`, p.Name, finalQuota, newExp, username)
 	if err != nil {
 		return err
 	}
@@ -2466,8 +2743,8 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 	_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", username, p.Name)
 
 	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
-	if p.QuotaBytes > 0 {
-		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", p.QuotaBytes))
+	if finalQuota > 0 {
+		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", finalQuota))
 	}
 
 	var contractNo, fullName string
@@ -2491,7 +2768,10 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 		adminUser = "admin"
 	}
 
-	desc := fmt.Sprintf("طھط¬ط¯ظٹط¯ ط¨ط§ظ‚ط©: %s", p.DisplayName)
+	desc := fmt.Sprintf("تجديد باقة: %s", p.DisplayName)
+	if hadLoan {
+		desc += fmt.Sprintf(" (تسوية سلفة: خصم %.1f ساعة و %.2f جيجا)", deductedHours, float64(deductedQuotaBytes)/(1024*1024*1024))
+	}
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'renew', ?, ?, ?, ?, ?, ?)`,
@@ -2500,6 +2780,8 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+
+	_ = d.DisconnectSubscriberSession(username)
 
 	// Reset notification flags and cycle start for the new period
 	_, _ = d.Exec(`UPDATE subscribers SET

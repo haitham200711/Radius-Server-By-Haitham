@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -25,32 +26,38 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 }
 
 type SubscriberItem struct {
-	ID               int64
-	ContractNo       string
-	FullName         string
-	Username         string
-	Password         string
-	Phone            string
-	Address          string
-	Debt             float64
-	Profile          string
-	IPAddress        string
-	QuotaBytes       int64
-	QuotaGB          float64
-	QuotaDisplay     string
-	UsedBytes        int64
-	UsedGB           float64
-	UsedDisplay      string
-	RemainingBytes   int64
-	RemainingGB      float64
-	RemainingDisplay string
-	UsagePercent     float64
-	ExpirationDate   string
-	Status           string
-	IsOnline         bool
-	OnlineIP         string
-	ResellerID       int64
-	ResellerName     string
+	ID                int64
+	ContractNo        string
+	FullName          string
+	Username          string
+	Password          string
+	Phone             string
+	Address           string
+	Debt              float64
+	Profile           string
+	IPAddress         string
+	QuotaBytes        int64
+	QuotaGB           float64
+	QuotaDisplay      string
+	UsedBytes         int64
+	UsedGB            float64
+	UsedDisplay       string
+	RemainingBytes    int64
+	RemainingGB       float64
+	RemainingDisplay  string
+	UsagePercent      float64
+	ExpirationDate    string
+	Status            string
+	IsOnline          bool
+	OnlineIP          string
+	ResellerID        int64
+	ResellerName      string
+	LoanActive        bool
+	LoanGrantedAt     string
+	LoanHours         int
+	LoanQuotaBytes    int64
+	LoanQuotaGB       float64
+	LoanDeductionType string
 }
 
 func getPageNumbers(current, total int) []int {
@@ -181,9 +188,14 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		COALESCE(s.quota_bytes, 0),
 		s.expiration_date,
 		COALESCE(s.status, 'active'),
-		s.last_renewed_at,
+		COALESCE(s.last_renewed_at, s.created_at),
 		COALESCE(s.reseller_id, 0),
-		COALESCE(res.name, '')
+		COALESCE(res.name, ''),
+		COALESCE(s.loan_active, 0),
+		s.loan_granted_at,
+		COALESCE(s.loan_hours, 0),
+		COALESCE(s.loan_quota_bytes, 0),
+		COALESCE(s.loan_deduction_type, 'full')
 	FROM radcheck rc
 	LEFT JOIN subscribers s ON rc.username = s.username
 	LEFT JOIN resellers res ON s.reseller_id = res.id
@@ -220,6 +232,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 			var s SubscriberItem
 			var exp sql.NullTime
 			var lastRenewed sql.NullTime
+			var loanGrantedAt sql.NullTime
 			if err := rows.Scan(
 				&s.ID,
 				&s.ContractNo,
@@ -237,7 +250,18 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				&lastRenewed,
 				&s.ResellerID,
 				&s.ResellerName,
+				&s.LoanActive,
+				&loanGrantedAt,
+				&s.LoanHours,
+				&s.LoanQuotaBytes,
+				&s.LoanDeductionType,
 			); err == nil {
+				if loanGrantedAt.Valid {
+					s.LoanGrantedAt = loanGrantedAt.Time.Format("2006-01-02 15:04")
+				}
+				if s.LoanQuotaBytes > 0 {
+					s.LoanQuotaGB = float64(s.LoanQuotaBytes) / (1024 * 1024 * 1024)
+				}
 				if resellerPerms != nil && !resellerPerms.CanViewPasswords {
 					s.Password = "••••••"
 				}
@@ -433,6 +457,17 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser := middleware.GetUser(r)
 	if currentUser != nil && currentUser.Role == "reseller" {
 		resellerID = currentUser.ID
+	}
+
+	// Check if subscriber exists and if loan is active, block profile modification for non-admins
+	currentSub, err := bp.db.GetSubscriber(username)
+	if err == nil && currentSub != nil {
+		if currentSub.LoanActive && profile != currentSub.ProfileName {
+			if currentUser == nil || currentUser.Role != "admin" {
+				http.Redirect(w, r, "/subscribers?error="+url.QueryEscape("لا يمكن تغيير باقة المشترك أثناء فترة السلفة النشطة إلا بواسطة مدير النظام (Admin)"), http.StatusFound)
+				return
+			}
+		}
 	}
 
 	if username == "" || password == "" {
@@ -647,6 +682,17 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		resellerID = currentUser.ID
 	}
 
+	// Check if subscriber exists and if loan is active, block profile modification for non-admins
+	currentSub, err := bp.db.GetSubscriber(username)
+	if err == nil && currentSub != nil {
+		if currentSub.LoanActive && profile != currentSub.ProfileName {
+			if currentUser == nil || currentUser.Role != "admin" {
+				http.Redirect(w, r, "/subscribers?error="+url.QueryEscape("لا يمكن تغيير باقة المشترك أثناء فترة السلفة النشطة إلا بواسطة مدير النظام (Admin)"), http.StatusFound)
+				return
+			}
+		}
+	}
+
 	if status == "" {
 		status = "active"
 	}
@@ -686,6 +732,47 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 
 	_ = bp.db.UpdateSubscriberCRM(sub, password)
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
+}
+
+func (bp *Blueprint) GrantLoanHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+
+	username := strings.TrimSpace(r.FormValue("username"))
+	currentUser := middleware.GetUser(r)
+	adminUser := "admin"
+	if currentUser != nil {
+		adminUser = currentUser.Username
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	status := r.FormValue("status")
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+
+	if username == "" {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك مطلوب"), http.StatusFound)
+		return
+	}
+
+	if currentUser != nil && currentUser.Role == "reseller" {
+		sub, err := bp.db.GetSubscriber(username)
+		if err != nil || sub.ResellerID != currentUser.ID {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("ليس لديك صلاحية منح سلفة لهذا المشترك"), http.StatusFound)
+			return
+		}
+	}
+
+	_, err := bp.db.GrantSubscriberLoan(username, adminUser)
+	if err != nil {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(fmt.Sprintf("تم منح السلفة للمشترك (%s) بنجاح وتفعيل الخدمة وفك الحظر فوراً", username)), http.StatusFound)
 }
 
 func (bp *Blueprint) LiveTrafficHandler(w http.ResponseWriter, r *http.Request) {

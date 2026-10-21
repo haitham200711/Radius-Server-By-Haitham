@@ -172,6 +172,11 @@ type Profile struct {
 	OnTimeAction        string    `json:"on_time_action"`   // "disconnect", "profile", "pool"
 	OnTimeProfile       string    `json:"on_time_profile"`  // fallback profile
 	OnTimePool          string    `json:"on_time_pool"`     // fallback IP pool
+	LoanEnabled         bool      `json:"loan_enabled"`        // هل السلفة مسموحة لهذه الباقة؟
+	LoanHours           int       `json:"loan_hours"`          // مدة السلفة بالساعات
+	LoanQuotaBytes      int64     `json:"loan_quota_bytes"`    // كوتة السلفة بالبايت
+	LoanQuotaGB         float64   `json:"loan_quota_gb"`       // كوتة السلفة بالجيجا
+	LoanDeductionType   string    `json:"loan_deduction_type"` // "partial" (جزئي) أو "full" (كلي)
 	CreatedAt           time.Time `json:"created_at"`
 }
 
@@ -486,9 +491,15 @@ type Subscriber struct {
 	QuotaBytes     int64        `json:"quota_bytes"` // in bytes (0 = unlimited)
 	ExpirationDate sql.NullTime `json:"expiration_date"`
 	Status         string       `json:"status"` // "active", "disabled", "expired"
-	ResellerID     int64        `json:"reseller_id"`
-	ResellerName   string       `json:"reseller_name,omitempty"`
-	CreatedAt      time.Time    `json:"created_at"`
+	ResellerID           int64        `json:"reseller_id"`
+	ResellerName         string       `json:"reseller_name,omitempty"`
+	LoanActive           bool         `json:"loan_active"`
+	LoanGrantedAt        sql.NullTime `json:"loan_granted_at"`
+	LoanHours            int          `json:"loan_hours"`
+	LoanQuotaBytes       int64        `json:"loan_quota_bytes"`
+	LoanDeductionType    string       `json:"loan_deduction_type"`
+	LoanInitialUsedBytes int64        `json:"loan_initial_used_bytes"`
+	CreatedAt            time.Time    `json:"created_at"`
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
 

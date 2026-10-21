@@ -49,6 +49,15 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
+		"bytesToGB": func(b int64) float64 {
+			return float64(b) / (1024 * 1024 * 1024)
+		},
+		"formatGB": func(b int64) string {
+			if b <= 0 {
+				return "0"
+			}
+			return fmt.Sprintf("%.1f", float64(b)/(1024*1024*1024))
+		},
 	}
 
 	for key, files := range pages {
