@@ -439,7 +439,7 @@
         <!-- Maintenance Action Cards -->
         <div class="row g-4 mb-4">
             <!-- 1. FreeRADIUS Service Restart Card -->
-            <div class="col-lg-4">
+            <div class="col-lg-6 col-xl-3">
                 <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px;">
                     <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
                         <div class="p-2 bg-primary-subtle text-primary rounded-3">
@@ -447,28 +447,57 @@
                         </div>
                         <div>
                             <h6 class="fw-bold mb-0 text-dark">إعادة تشغيل خدمة الراديوس</h6>
-                            <small class="text-muted">Restart FreeRADIUS Service</small>
+                            <small class="text-muted">Restart FreeRADIUS</small>
                         </div>
                     </div>
                     <div class="card-body p-4 d-flex flex-column justify-content-between">
                         <div>
                             <p class="text-muted small mb-3">
-                                تقوم هذه العملية بإعادة تشغيل سيرفيس FreeRADIUS فوراً لتطبيق أي تعديلات، تفريغ الذاكرة المؤقتة (Cache)، وإعادة تهيئة منافذ المصادقة والمحاسبة (1812 / 1813).
+                                إعادة تشغيل سيرفيس FreeRADIUS فوراً لتطبيق التغييرات وتفريغ الكاش وإعادة تهيئة منافذ المصادقة والمحاسبة (1812 / 1813).
                             </p>
                             <div class="alert alert-info py-2 px-3 small border-0 mb-4">
-                                <i class="bi bi-info-circle-fill me-1"></i> <strong>آمنة وسريعة:</strong> تستغرق ثانيتين فقط ولا تؤثر على تشغيل نظام لينكس أو السيرفر.
+                                <i class="bi bi-info-circle-fill me-1"></i> <strong>آمن وسريع:</strong> يستغرق ثانيتين فقط ولا يؤثر على نظام لينكس أو السيرفر.
                             </div>
                         </div>
                         <button type="button" class="btn btn-outline-primary w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showRestartRadiusModal()">
                             <i class="bi bi-arrow-repeat fs-5"></i>
-                            <span>إعادة تشغيل خدمة الراديوس الآن</span>
+                            <span>إعادة تشغيل الراديوس الآن</span>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. Disconnect Sessions & RADIUS Reset Card -->
-            <div class="col-lg-4">
+            <!-- 2. Close Stale Database Sessions (Fix 'User Already Logged In') -->
+            <div class="col-lg-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px; border: 1.5px solid rgba(13, 202, 240, 0.3) !important;">
+                    <div class="card-header bg-info-subtle py-3 border-bottom border-info-subtle d-flex align-items-center gap-2">
+                        <div class="p-2 bg-info text-dark rounded-3">
+                            <i class="bi bi-person-check-fill fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">إغلاق الجلسات المعلقة</h6>
+                            <small class="text-muted">Fix 'User Already Logged In'</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            <p class="text-muted small mb-3">
+                                سيؤدي هذا إلى إغلاق كل الجلسات الحالية. هذا لن يقوم بإخراج المشتركين. استخدم هذا الزر عند حصولك على رسالة 'User Already Logged In'.
+                            </p>
+                            <div class="alert alert-success py-2 px-3 small border-0 mb-4">
+                                <i class="bi bi-shield-check me-1"></i> <strong>بدون فصل المشتركين:</strong> يغلق السجلات في قاعدة البيانات فقط، ويحل مشكلة الجلسات العالقة بعد انقطاع الكهرباء أو إعادة تشغيل الراوتر.
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-info text-dark w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showCloseSessionsModal()">
+                            <i class="bi bi-person-check fs-5"></i>
+                            <span>إغلاق الجلسات المعلقة الآن</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Disconnect Sessions & RADIUS Reset Card -->
+            <div class="col-lg-6 col-xl-3">
                 <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px;">
                     <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
                         <div class="p-2 bg-warning-subtle text-warning rounded-3">
@@ -476,13 +505,13 @@
                         </div>
                         <div>
                             <h6 class="fw-bold mb-0 text-dark">فصل الجلسات والراديوس</h6>
-                            <small class="text-muted">Disconnect Sessions & Reset</small>
+                            <small class="text-muted">Disconnect Sessions (CoA)</small>
                         </div>
                     </div>
                     <div class="card-body p-4 d-flex flex-column justify-content-between">
                         <div>
                             <p class="text-muted small mb-3">
-                                إرسال أمر فصل فوري (Disconnect-Request CoA) لجميع رواتر مايكروتك ({{ .NasCount }} راوتر) لطرد كافة الجلسات النشطة حالياً ({{ .ActiveSessionsCount }} جلسة)، وتصفير الجلسات العالقة في قاعدة البيانات، لإجبار أجهزة العملاء على إعادة الاتصال مجدداً.
+                                إرسال أمر فصل فوري (CoA) لجميع الرواتر لطرد كافة الجلسات النشطة حالياً، وتحديث الجلسات، لإجبار المشتركين على إعادة الاتصال.
                             </p>
                             <div class="alert alert-warning py-2 px-3 small border-0 mb-4">
                                 <i class="bi bi-exclamation-triangle-fill me-1"></i> سيتم قطع الاتصال عن جميع المتصلين حالياً ليعاودوا الاتصال فوراً.
@@ -491,26 +520,26 @@
                         <div class="d-flex flex-column gap-2">
                             <button type="button" class="btn btn-outline-warning text-dark w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showDisconnectModal(false)">
                                 <i class="bi bi-person-dash fs-5"></i>
-                                <span>فصل كافة الجلسات النشطة فقط (CoA)</span>
+                                <span>فصل كافة الجلسات فقط (CoA)</span>
                             </button>
                             <button type="button" class="btn btn-warning w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showDisconnectModal(true)">
                                 <i class="bi bi-lightning-charge-fill fs-5"></i>
-                                <span>فصل الجلسات + إعادة تشغيل الراديوس</span>
+                                <span>فصل الجلسات + إعادة الراديوس</span>
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. Full Linux OS Reboot Card -->
-            <div class="col-lg-4">
+            <!-- 4. Full Linux OS Reboot Card -->
+            <div class="col-lg-6 col-xl-3">
                 <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px; border: 1.5px solid rgba(220, 53, 69, 0.3) !important;">
                     <div class="card-header bg-danger-subtle py-3 border-bottom border-danger-subtle d-flex align-items-center gap-2">
                         <div class="p-2 bg-danger text-white rounded-3">
                             <i class="bi bi-power fs-5"></i>
                         </div>
                         <div>
-                            <h6 class="fw-bold mb-0 text-danger">إعادة تشغيل لينكس بالكامل</h6>
+                            <h6 class="fw-bold mb-0 text-danger">ريستارت لينكس بالكامل</h6>
                             <small class="text-muted">Full Linux OS Reboot</small>
                         </div>
                     </div>
@@ -520,12 +549,12 @@
                                 عمل إعادة تشغيل كاملة (Full Reboot) لسيرفر ونظام تشغيل لينكس (Linux OS). يتم إيقاف كافة الخدمات وإعادة إقلاع السيرفر من الصفر.
                             </p>
                             <div class="alert alert-danger py-2 px-3 small border-0 mb-4">
-                                <i class="bi bi-exclamation-octagon-fill me-1"></i> <strong>تنبيه هام:</strong> سيتوقف السيرفر واللوحة والاتصال مؤقتاً لمدة 60 إلى 90 ثانية لحين اكتمال إقلاع النظام.
+                                <i class="bi bi-exclamation-octagon-fill me-1"></i> <strong>تنبيه هام:</strong> سيتوقف السيرفر مؤقتاً لمدة 60 إلى 90 ثانية لحين اكتمال إقلاع النظام.
                             </div>
                         </div>
                         <button type="button" class="btn btn-danger w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showRebootModal()">
                             <i class="bi bi-power fs-5"></i>
-                            <span>إعادة تشغيل السيرفر ولينكس الآن</span>
+                            <span>إعادة تشغيل السيرفر بالكامل</span>
                         </button>
                     </div>
                 </div>
@@ -563,7 +592,39 @@
     </div>
 </div>
 
-<!-- Modal 2: Disconnect Sessions Confirmation -->
+<!-- Modal 2: Close Database Stale Sessions (Fix 'User Already Logged In') -->
+<div class="modal fade" id="closeSessionsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <i class="bi bi-person-check-fill text-info"></i>
+                    <span>إغلاق الجلسات المعلقة (قاعدة البيانات فقط)</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/settings/maintenance/close-sessions" method="POST" id="closeSessionsForm">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        <strong>سيؤدي هذا الى إغلاق كل الجلسات الحالية . هذا لن يقوم بإخراج المشتركين . استخدم هذا الزر عند حصولك على رسالة 'User Already Logged In'</strong>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        يقوم هذا الإجراء بتحديث جدول <code>radacct</code> لإغلاق الجلسات المفتوحة التي تسببت في تعليق الحسابات عند انقطاع الكهرباء أو فقدان الاتصال بالراوتر، دون قطع اتصال المشتركين الفعليين المتصلين حالياً.
+                    </p>
+                </div>
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-info text-dark fw-bold px-4" id="btnConfirmCloseSessions">
+                        <i class="bi bi-check2-circle me-1"></i> نعم، إغلاق الجلسات المعلقة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Disconnect Sessions Confirmation -->
 <div class="modal fade" id="disconnectSessionsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -779,6 +840,13 @@ function showRestartRadiusModal() {
     }
 }
 
+function showCloseSessionsModal() {
+    const modalEl = document.getElementById('closeSessionsModal');
+    if (modalEl) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
 function showDisconnectModal(withRestart) {
     const chk = document.getElementById('chkModalRestartRadius');
     if (chk) {
@@ -917,6 +985,42 @@ document.getElementById('disconnectSessionsForm').addEventListener('submit', fun
     .catch(err => {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i> نعم، تأكيد فصل الجلسات';
+        alert('حدث خطأ: ' + err.message);
+    });
+});
+
+// Handling Close Sessions via AJAX (Fix 'User Already Logged In')
+document.getElementById('closeSessionsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnConfirmCloseSessions');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> جاري إغلاق الجلسات المعلقة...';
+
+    fetch('/settings/maintenance/close-sessions', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const modalEl = document.getElementById('closeSessionsModal');
+        if (modalEl) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> نعم، إغلاق الجلسات المعلقة';
+        if (window.showCopyToast) {
+            window.showCopyToast(data.message || 'تم إغلاق الجلسات المعلقة بنجاح!');
+        }
+        setTimeout(() => {
+            window.location.href = '/settings?status=' + (data.status || 'success') + '&msg=' + encodeURIComponent(data.message || 'تم إغلاق الجلسات المعلقة بنجاح!') + '#tab-maintenance';
+            window.location.reload();
+        }, 1200);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> نعم، إغلاق الجلسات المعلقة';
         alert('حدث خطأ: ' + err.message);
     });
 });

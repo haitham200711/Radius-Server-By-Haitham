@@ -4053,6 +4053,22 @@ func (d *DB) DisconnectAllActiveSessions() (int, error) {
 	return len(sessions), nil
 }
 
+// CloseAllDatabaseSessions marks all active sessions as closed in radacct WITHOUT kicking out users from NAS routers.
+// This is used to resolve 'User Already Logged In' errors caused by stale/ghost accounting sessions in the database.
+func (d *DB) CloseAllDatabaseSessions() (int64, error) {
+	res, err := d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Cleared-Stale' WHERE acctstoptime IS NULL`)
+	if err != nil {
+		return 0, err
+	}
+
+	subTrafficMu.Lock()
+	subTrafficHistory = make(map[string]*subTrafficPoint)
+	subTrafficMu.Unlock()
+
+	rows, _ := res.RowsAffected()
+	return rows, nil
+}
+
 func parseTimeHM(hm string) int {
 	parts := strings.Split(strings.TrimSpace(hm), ":")
 	if len(parts) != 2 {

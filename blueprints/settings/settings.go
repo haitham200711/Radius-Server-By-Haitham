@@ -381,6 +381,41 @@ func (bp *Blueprint) DisconnectAllSessionsHandler(w http.ResponseWriter, r *http
 	http.Redirect(w, r, fmt.Sprintf("/settings?status=%s&msg=%s#tab-maintenance", status, url.QueryEscape(msg)), http.StatusSeeOther)
 }
 
+// CloseAllDatabaseSessionsHandler marks all active sessions in radacct as closed WITHOUT disconnecting subscribers from NAS routers
+func (bp *Blueprint) CloseAllDatabaseSessionsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/settings#tab-maintenance", http.StatusSeeOther)
+		return
+	}
+
+	user := middleware.GetUser(r)
+	if user == nil || user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admins Only", http.StatusForbidden)
+		return
+	}
+
+	count, err := bp.db.CloseAllDatabaseSessions()
+	status := "success"
+	msg := fmt.Sprintf("تم إغلاق وتصفير كافة الجلسات العالقة في قاعدة البيانات بنجاح (%d جلسة) دون إخراج المشتركين، وتم حل مشكلة 'User Already Logged In'!", count)
+
+	if err != nil {
+		status = "danger"
+		msg = fmt.Sprintf("حدث خطأ أثناء إغلاق الجلسات في قاعدة البيانات: %v", err)
+	}
+
+	if isAjax(r) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  status,
+			"message": msg,
+			"count":   count,
+		})
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/settings?status=%s&msg=%s#tab-maintenance", status, url.QueryEscape(msg)), http.StatusSeeOther)
+}
+
 func isAjax(r *http.Request) bool {
 	return r.Header.Get("X-Requested-With") == "XMLHttpRequest" || strings.Contains(r.Header.Get("Accept"), "application/json")
 }

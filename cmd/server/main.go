@@ -246,6 +246,7 @@ func main() {
 	mux.HandleFunc("/settings/maintenance/reboot", middleware.RequireAdmin(settBP.RebootOSHandler))
 	mux.HandleFunc("/settings/maintenance/restart-radius", middleware.RequireAdmin(settBP.RestartRadiusHandler))
 	mux.HandleFunc("/settings/maintenance/disconnect-all", middleware.RequireAdmin(settBP.DisconnectAllSessionsHandler))
+	mux.HandleFunc("/settings/maintenance/close-sessions", middleware.RequireAdmin(settBP.CloseAllDatabaseSessionsHandler))
 
 	// Subscriber Self-Care Portal Blueprint
 	portalBP := portal.New(db, renderer, cfg.SessionSecret)
