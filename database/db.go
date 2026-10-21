@@ -581,38 +581,38 @@ func (d *DB) InitSchema() error {
 	}{
 		{
 			key:  "time_expired",
-			name: "ط§ظ†طھظ‡ط§ط، ظˆظ‚طھ ظˆط§ط´طھط±ط§ظƒ ط§ظ„ط¹ظ…ظٹظ„",
-			text: "ط¹ط²ظٹط²ظٹ ط§ظ„ظ…ط´طھط±ظƒ {name}طŒ ظ†ظˆط¯ ط¥ط¹ظ„ط§ظ…ظƒظ… ط¨ط£ظ† ط§ط´طھط±ط§ظƒظƒظ… ط±ظ‚ظ… ({contract_no}) ظ‚ط¯ ط§ظ†طھظ‡ظ‰ ط¨طھط§ط±ظٹط® {expiry_date}. ظٹط±ط¬ظ‰ ط³ط±ط¹ط© ط§ظ„طھط¬ط¯ظٹط¯ ظ„ط¶ظ…ط§ظ† ط§ط³طھظ…ط±ط§ط± ط§ظ„ط®ط¯ظ…ط©.",
+			name: "انتهاء وقت واشتراك العميل",
+			text: "عزيزي المشترك {name}، نود إعلامكم بأن اشتراككم رقم ({contract_no}) قد انتهى بتاريخ {expiry_date}. يرجى سرعة التجديد لضمان استمرار الخدمة.",
 		},
 		{
 			key:  "quota_50",
-			name: "ط§ط³طھظ‡ظ„ط§ظƒ 50% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¹ظ…ظٹظ„",
-			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ ظ„ظ‚ط¯ طھظ… ط§ط³طھظ‡ظ„ط§ظƒ 50% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¥ظ†طھط±ظ†طھ ط§ظ„ط®ط§طµط© ط¨ظƒ ({quota_used} ط¬ظٹط¬ط§ ظ…ظ† ط¥ط¬ظ…ط§ظ„ظٹ {quota_total} ط¬ظٹط¬ط§). ط§ظ„ظ…طھط¨ظ‚ظٹ: {quota_remaining} ط¬ظٹط¬ط§.",
+			name: "استهلاك 50% من كوتة العميل",
+			text: "مرحباً {name}، لقد تم استهلاك 50% من كوتة الإنترنت الخاصة بك ({quota_used} جيجا من إجمالي {quota_total} جيجا). المتبقي: {quota_remaining} جيجا.",
 		},
 		{
 			key:  "quota_75",
-			name: "ط§ط³طھظ‡ظ„ط§ظƒ 75% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¹ظ…ظٹظ„",
-			text: "طھظ†ط¨ظٹظ‡: ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ ظ„ظ‚ط¯ ط§ط³طھظ‡ظ„ظƒطھ 75% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¥ظ†طھط±ظ†طھ. ط§ظ„ظ…طھط¨ظ‚ظٹ ظ„ط¯ظٹظƒ: {quota_remaining} ط¬ظٹط¬ط§. طھط§ط±ظٹط® ط§ظ„ط§ظ†طھظ‡ط§ط،: {expiry_date}.",
+			name: "استهلاك 75% من كوتة العميل",
+			text: "تنبيه: مرحباً {name}، لقد استهلكت 75% من كوتة الإنترنت. المتبقي لديك: {quota_remaining} جيجا. تاريخ الانتهاء: {expiry_date}.",
 		},
 		{
 			key:  "quota_100",
-			name: "ط§ط³طھظ‡ظ„ط§ظƒ 100% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¹ظ…ظٹظ„",
-			text: "طھظ†ط¨ظٹظ‡ ظ‡ط§ظ…: ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ ظ„ظ‚ط¯ طھظ… ط§ط³طھظ‡ظ„ط§ظƒ 100% ظ…ظ† ظƒظˆطھط© ط§ظ„ط¥ظ†طھط±ظ†طھ ط¨ط§ظ„ظƒط§ظ…ظ„. ظٹط±ط¬ظ‰ ط´ط­ظ† ظƒظˆطھط© ط¥ط¶ط§ظپظٹط© ط£ظˆ طھط¬ط¯ظٹط¯ ط§ظ„ط¨ط§ظ‚ط© ظ„ط§ط³طھط¹ط§ط¯ط© ط§ظ„ط³ط±ط¹ط© ط§ظ„ظƒط§ظ…ظ„ط©.",
+			name: "استهلاك 100% من كوتة العميل",
+			text: "تنبيه هام: مرحباً {name}، لقد تم استهلاك 100% من كوتة الإنترنت بالكامل. يرجى شحن كوتة إضافية أو تجديد الباقة لاستعادة السرعة الكاملة.",
 		},
 		{
 			key:  "renew",
-			name: "طھط¬ط¯ظٹط¯ ط§ط´طھط±ط§ظƒ ط§ظ„ط¹ظ…ظٹظ„",
-			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ طھظ… طھط¬ط¯ظٹط¯ ط§ط´طھط±ط§ظƒظƒظ… ط¨ظ†ط¬ط§ط­ ط¹ظ„ظ‰ ط¨ط§ظ‚ط© ({profile}). طھط§ط±ظٹط® ط§ظ„ط§ظ†طھظ‡ط§ط، ط§ظ„ط¬ط¯ظٹط¯: {expiry_date}. ط´ظƒط±ط§ظ‹ ظ„ط«ظ‚طھظƒظ… ط¨ظ†ط§.",
+			name: "تجديد اشتراك العميل",
+			text: "مرحباً {name}، تم تجديد اشتراككم بنجاح على باقة ({profile}). تاريخ الانتهاء الجديد: {expiry_date}. شكراً لثقتكم بنا.",
 		},
 		{
 			key:  "debt_added",
-			name: "طھط³ط¬ظٹظ„ ط£ظˆ ط¥ط¶ط§ظپط© ظ…ط¯ظٹظˆظ†ظٹط© ط¬ط¯ظٹط¯ط©",
-			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ طھظ… طھط³ط¬ظٹظ„ ظ…ط¯ظٹظˆظ†ظٹط© ط¹ظ„ظ‰ ط­ط³ط§ط¨ظƒظ… ط¨ظ…ط¨ظ„ط؛ {amount} ط¬.ظ…. ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط¯ظٹظ† ط§ظ„ظ…ط³طھط­ظ‚ ط§ظ„ط­ط§ظ„ظٹ: {debt} ط¬.ظ….",
+			name: "تسجيل أو إضافة مديونية جديدة",
+			text: "مرحباً {name}، تم تسجيل مديونية على حسابكم بمبلغ {amount} ج.م. إجمالي الدين المستحق الحالي: {debt} ج.م.",
 		},
 		{
 			key:  "debt_paid",
-			name: "ط³ط¯ط§ط¯ ط¯ظپط¹ط© ظ…ظ† ط§ظ„ط¯ظٹظ†",
-			text: "ظ…ط±ط­ط¨ط§ظ‹ {name}طŒ طھظ… ط§ط³طھظ„ط§ظ… ط³ط¯ط§ط¯ ط¨ظ…ط¨ظ„ط؛ {amount} ط¬.ظ… ط¨ظ†ط¬ط§ط­. ط§ظ„ظ…طھط¨ظ‚ظٹ ظ…ظ† ط§ظ„ط¯ظٹظ†: {debt} ط¬.ظ…. ط´ظƒط±ط§ظ‹ ظ„طھط¹ط§ظ…ظ„ظƒظ… ط§ظ„ط±ط§ظ‚ظٹ ظ…ط¹ظ†ط§.",
+			name: "سداد دفعة من الدين",
+			text: "مرحباً {name}، تم استلام سداد بمبلغ {amount} ج.م بنجاح. المتبقي من الدين: {debt} ج.م. شكراً لتعاملكم الراقي معنا.",
 		},
 		{
 			key:  "debt_reminder",
@@ -733,10 +733,10 @@ func (d *DB) InitSchema() error {
 </div>`
 
 		_, _ = d.Exec(`INSERT INTO card_templates (name, is_default, header_title, footer_text, theme_color, html_content, card_width, card_height, cols, ` + "`rows`" + `, card_gap) VALUES
-			('ط§ظ„ظ‚ط§ظ„ط¨ ط§ظ„ط£ط²ط±ظ‚ ط§ظ„ط­ط¯ظٹط« (ط§ظپطھط±ط§ط¶ظٹ)', 1, 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ', 'ط£ظ‡ظ„ط§ظ‹ ط¨ظƒظ… - ظ†طھظ…ظ†ظ‰ ظ„ظƒظ… ظˆظ‚طھط§ظ‹ ظ…ظ…طھط¹ط§ظ‹', '#0d6efd', ?, '240px', '140px', 3, 7, '2mm'),
-			('ظ‚ط§ظ„ط¨ ظƒط§ظپظٹظ‡ ظپط®ظ… (ط°ظ‡ط¨ظٹ ط¯ط§ظƒظ†)', 0, 'VIP Wi-Fi Voucher', 'Welcome to our cafe - Enjoy high speed internet', '#d4af37', ?, '240px', '140px', 3, 7, '2mm'),
-			('ظ‚ط§ظ„ط¨ ط±ظˆظ„ ظƒط§ط´ظٹط± (ط­ط±ط§ط±ظٹ POS)', 0, 'ط¥ظٹطµط§ظ„ ط´ط¨ظƒط© ظˆط§ظٹ ظپط§ظٹ', 'ظٹط±ط¬ظ‰ ط§ظ„ط§ط­طھظپط§ط¸ ط¨ط§ظ„ظƒظˆط¯ ظ„ط­ظٹظ† ط§ظ†طھظ‡ط§ط، ط§ظ„ط¬ظ„ط³ط©', '#212529', ?, '240px', '140px', 3, 7, '2mm'),
-			('ظ‚ط§ظ„ط¨ ظ…ظٹظ†ظٹ ط§ظ‚طھطµط§ط¯ظٹ (ط£ط®ط¶ط± ط®ظپظٹظپ)', 0, 'ظƒط§ط±طھ ط¥ظ†طھط±ظ†طھ ط³ط±ظٹط¹', 'ط´ظƒط±ط§ظ‹ ظ„ط²ظٹط§ط±طھظƒظ…', '#198754', ?, '240px', '140px', 3, 7, '2mm')
+			('القالب الأزرق الحديث (افتراضي)', 1, 'كارت إنترنت', 'أهلاً بكم - نتمنى لكم وقتاً ممتعاً', '#0d6efd', ?, '240px', '140px', 3, 7, '2mm'),
+			('قالب كافيه فخم (ذهبي داكن)', 0, 'VIP Wi-Fi Voucher', 'Welcome to our cafe - Enjoy high speed internet', '#d4af37', ?, '240px', '140px', 3, 7, '2mm'),
+			('قالب رول كاشير (حراري POS)', 0, 'إيصال شبكة واي فاي', 'يرجى الاحتفاظ بالكود لحين انتهاء الجلسة', '#212529', ?, '240px', '140px', 3, 7, '2mm'),
+			('قالب ميني اقتصادي (أخضر خفيف)', 0, 'كارت إنترنت سريع', 'شكراً لزيارتكم', '#198754', ?, '240px', '140px', 3, 7, '2mm')
 			ON DUPLICATE KEY UPDATE html_content = VALUES(html_content)`, defaultHtml, luxuryHtml, thermalHtml, miniHtml)
 	}
 
@@ -977,7 +977,7 @@ func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, in
 	}
 	batchCode := fmt.Sprintf("%s%d-%s", prefixLetter, time.Now().Unix(), randomLetters(4))
 	if opts.BatchName == "" {
-		opts.BatchName = fmt.Sprintf("ط¯ظپط¹ط© %s", batchCode)
+		opts.BatchName = fmt.Sprintf("دفعة %s", batchCode)
 	}
 	totalPrice := float64(opts.Count) * opts.PricePerCard
 	totalCostPrice := float64(opts.Count) * opts.CostPricePerCard
@@ -3199,7 +3199,7 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 		adminUser = "admin"
 	}
 
-	desc := fmt.Sprintf("ط³ط¯ط§ط¯ ظ†ظ‚ط¯ظٹ ظ…ظ† ط§ظ„ظ…ط¯ظٹظˆظ†ظٹط© (ظ…طھط¨ظ‚ظٹ: %.2f ط¬.ظ…)", newDebt)
+	desc := fmt.Sprintf("سداد نقدي من المديونية (متبقي: %.2f ج.م)", newDebt)
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
@@ -3408,7 +3408,7 @@ func (d *DB) TriggerWhatsAppEvent(eventKey string, sub *models.Subscriber, extra
 	if sub.ExpirationDate.Valid {
 		vars["{expiry_date}"] = sub.ExpirationDate.Time.Format("2006-01-02")
 	} else {
-		vars["{expiry_date}"] = "ط؛ظٹط± ظ…ط­ط¯ط¯"
+		vars["{expiry_date}"] = "غير محدد"
 	}
 
 	for k, v := range extraVars {
@@ -3427,7 +3427,7 @@ func (d *DB) TriggerWhatsAppEvent(eventKey string, sub *models.Subscriber, extra
 	} else if waSettings.APIEndpoint != "" {
 		sendErr = whatsapp.SendWhatsAppExternalFallback(waSettings.APIEndpoint, waSettings.APIToken, waSettings.InstanceID, sub.Phone, text)
 	} else {
-		sendErr = fmt.Errorf("ط®ط¯ظ…ط© ظˆط§طھط³ط§ط¨ ط؛ظٹط± ظ…ظ‚طھط±ظ†ط©")
+		sendErr = fmt.Errorf("خدمة واتساب غير مقترنة")
 	}
 
 	logStatus := "sent"
@@ -4129,7 +4129,7 @@ func (d *DB) CheckSpeedControlSchedule() error {
 }
 
 // ============================================================================
-// Cafe Hotspot Cards Management (ظ…ظ†ط¸ظˆظ…ط© ظƒط±ظˆطھ ط§ظ„ظƒط§ظپظٹظ‡ط§طھ ط¹ظ„ظ‰ ط§ظ„ط±ط§ط¯ظٹظˆط³)
+// Cafe Hotspot Cards Management (منظومة كروت الكافيهات على الراديوس)
 // ============================================================================
 
 func FormatBytesHuman(b int64) string {
@@ -4152,18 +4152,18 @@ func FormatBytesHuman(b int64) string {
 
 func FormatDurationHuman(sec int64) string {
 	if sec <= 0 {
-		return "0 ط¯ظ‚ظٹظ‚ط©"
+		return "0 دقيقة"
 	}
 	hours := sec / 3600
 	mins := (sec % 3600) / 60
 	secs := sec % 60
 	if hours > 0 {
-		return fmt.Sprintf("%d ط³ط§ط¹ط© ظˆ %d ط¯ظ‚ظٹظ‚ط©", hours, mins)
+		return fmt.Sprintf("%d ساعة و %d دقيقة", hours, mins)
 	}
 	if mins > 0 {
-		return fmt.Sprintf("%d ط¯ظ‚ظٹظ‚ط© ظˆ %d ط«ط§ظ†ظٹط©", mins, secs)
+		return fmt.Sprintf("%d دقيقة و %d ثانية", mins, secs)
 	}
-	return fmt.Sprintf("%d ط«ط§ظ†ظٹط©", secs)
+	return fmt.Sprintf("%d ثانية", secs)
 }
 
 func (d *DB) GetCafeRouters() ([]models.NAS, error) {
