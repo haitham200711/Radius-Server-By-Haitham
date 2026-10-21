@@ -346,9 +346,9 @@
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <span class="badge bg-danger fs-6 px-3 py-1 fw-bold">
                             {{ if and .Data.IsTimeExpired .Data.IsQuotaExpired }}
-                            <i class="bi bi-exclamation-octagon-fill me-1"></i> منتهي اشتراك وكوتة
+                            <i class="bi bi-exclamation-octagon-fill me-1"></i> منتهي وقت وكوتة
                             {{ else if .Data.IsTimeExpired }}
-                            <i class="bi bi-clock-history me-1"></i> منتهي اشتراك
+                            <i class="bi bi-clock-history me-1"></i> منتهي وقت
                             {{ else }}
                             <i class="bi bi-pie-chart-fill me-1"></i> منتهي كوتة
                             {{ end }}

@@ -1891,7 +1891,7 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 		loan_deduction_type = ?,
 		loan_initial_used_bytes = ?,
 		expiration_date = ?,
-		status = 'active',
+		status = 'expired',
 		updated_at = NOW()
 		WHERE username = ?`,
 		now, loanHours, loanQuotaBytes, loanDeductionType, currentUsedBytes, newExp, username)

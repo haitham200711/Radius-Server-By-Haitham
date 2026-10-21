@@ -156,7 +156,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	} else if statusFilter == "offline" {
 		countQuery += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	} else if statusFilter == "expired_time" {
-		countQuery += " AND s.expiration_date IS NOT NULL AND s.expiration_date < NOW()"
+		countQuery += " AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)"
 	} else if statusFilter == "expired_quota" {
 		countQuery += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
 	}
@@ -223,7 +223,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	} else if statusFilter == "offline" {
 		query += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
 	} else if statusFilter == "expired_time" {
-		query += " AND s.expiration_date IS NOT NULL AND s.expiration_date < NOW()"
+		query += " AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)"
 	} else if statusFilter == "expired_quota" {
 		query += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
 	}
@@ -330,7 +330,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 
 				// Calculate exact real-time status: active, expired_time, expired_quota, expired_both, disabled
 				now := time.Now()
-				isTimeExpired := exp.Valid && now.After(exp.Time)
+				isTimeExpired := (exp.Valid && now.After(exp.Time)) || s.LoanActive
 				isQuotaExpired := s.QuotaBytes > 0 && s.RemainingBytes <= 0
 
 				s.IsTimeExpired = isTimeExpired
@@ -339,18 +339,22 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 				if s.Status == "disabled" || s.Status == "suspended" {
 					s.StatusCode = "disabled"
 					s.StatusText = "معطل"
+				} else if s.LoanActive {
+					// Subscribers on active loan are expired subscribers granted emergency grace period
+					s.StatusCode = "expired_time"
+					s.StatusText = "منتهي وقت"
 				} else if isTimeExpired && isQuotaExpired {
 					s.StatusCode = "expired_both"
-					s.StatusText = "منتهي اشتراك وكوتة"
+					s.StatusText = "منتهي وقت وكوتة"
 				} else if isTimeExpired {
 					s.StatusCode = "expired_time"
-					s.StatusText = "منتهي اشتراك"
+					s.StatusText = "منتهي وقت"
 				} else if isQuotaExpired {
 					s.StatusCode = "expired_quota"
 					s.StatusText = "منتهي كوتة"
 				} else if s.Status == "expired" {
 					s.StatusCode = "expired_time"
-					s.StatusText = "منتهي اشتراك"
+					s.StatusText = "منتهي وقت"
 				} else {
 					s.StatusCode = "active"
 					s.StatusText = "نشط"
@@ -373,10 +377,10 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 
 	var expiredTimeCount, expiredQuotaCount int
 	if resellerFilter > 0 {
-		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.expiration_date IS NOT NULL AND s.expiration_date < NOW()`, resellerFilter).Scan(&expiredTimeCount)
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)`, resellerFilter).Scan(&expiredTimeCount)
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`, resellerFilter).Scan(&expiredQuotaCount)
 	} else {
-		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.expiration_date IS NOT NULL AND s.expiration_date < NOW()`).Scan(&expiredTimeCount)
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE (s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1`).Scan(&expiredTimeCount)
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`).Scan(&expiredQuotaCount)
 	}
 
