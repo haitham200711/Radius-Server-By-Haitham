@@ -1160,7 +1160,9 @@ func (d *DB) GetResellers() ([]models.Reseller, error) {
 		r.id, r.name, r.username, r.phone, r.balance, r.credit_limit, 
 		COALESCE(r.debt, 0.00), COALESCE(r.commission_percent, 0.00), 
 		COALESCE(r.permissions, ''), r.notes, r.is_active, r.created_at,
-		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count,
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id AND s.debt > 0) AS debtors_count,
+		(SELECT COALESCE(SUM(s.debt), 0.00) FROM subscribers s WHERE s.reseller_id = r.id AND s.debt > 0) AS subs_debt
 	FROM resellers r
 	ORDER BY r.id DESC`
 
@@ -1177,7 +1179,7 @@ func (d *DB) GetResellers() ([]models.Reseller, error) {
 		if err := rows.Scan(
 			&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit,
 			&res.Debt, &res.CommissionPercent, &permsJSON, &res.Notes, &res.IsActive, &res.CreatedAt,
-			&res.SubscribersCount,
+			&res.SubscribersCount, &res.DebtorsCount, &res.SubscribersDebt,
 		); err == nil {
 			res.PermissionsJSON = permsJSON
 			res.Permissions = models.ParseResellerPermissions(permsJSON)
@@ -1192,7 +1194,9 @@ func (d *DB) GetReseller(id int64) (*models.Reseller, error) {
 		r.id, r.name, r.username, r.phone, r.balance, r.credit_limit, 
 		COALESCE(r.debt, 0.00), COALESCE(r.commission_percent, 0.00), 
 		COALESCE(r.permissions, ''), r.notes, r.is_active, r.created_at,
-		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count,
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id AND s.debt > 0) AS debtors_count,
+		(SELECT COALESCE(SUM(s.debt), 0.00) FROM subscribers s WHERE s.reseller_id = r.id AND s.debt > 0) AS subs_debt
 	FROM resellers r
 	WHERE r.id = ?`
 
@@ -1201,7 +1205,7 @@ func (d *DB) GetReseller(id int64) (*models.Reseller, error) {
 	err := d.QueryRow(query, id).Scan(
 		&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit,
 		&res.Debt, &res.CommissionPercent, &permsJSON, &res.Notes, &res.IsActive, &res.CreatedAt,
-		&res.SubscribersCount,
+		&res.SubscribersCount, &res.DebtorsCount, &res.SubscribersDebt,
 	)
 	if err != nil {
 		return nil, err
@@ -1216,7 +1220,9 @@ func (d *DB) GetResellerByUsername(username string) (*models.Reseller, error) {
 		r.id, r.name, r.username, r.phone, r.balance, r.credit_limit, 
 		COALESCE(r.debt, 0.00), COALESCE(r.commission_percent, 0.00), 
 		COALESCE(r.permissions, ''), r.notes, r.is_active, r.created_at,
-		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id) AS subs_count,
+		(SELECT COUNT(*) FROM subscribers s WHERE s.reseller_id = r.id AND s.debt > 0) AS debtors_count,
+		(SELECT COALESCE(SUM(s.debt), 0.00) FROM subscribers s WHERE s.reseller_id = r.id AND s.debt > 0) AS subs_debt
 	FROM resellers r
 	WHERE r.username = ?`
 
@@ -1225,7 +1231,7 @@ func (d *DB) GetResellerByUsername(username string) (*models.Reseller, error) {
 	err := d.QueryRow(query, username).Scan(
 		&res.ID, &res.Name, &res.Username, &res.Phone, &res.Balance, &res.CreditLimit,
 		&res.Debt, &res.CommissionPercent, &permsJSON, &res.Notes, &res.IsActive, &res.CreatedAt,
-		&res.SubscribersCount,
+		&res.SubscribersCount, &res.DebtorsCount, &res.SubscribersDebt,
 	)
 	if err != nil {
 		return nil, err
@@ -1501,6 +1507,10 @@ func (d *DB) GetResellerFinancialSummary() (map[string]interface{}, error) {
 	_ = d.QueryRow("SELECT COUNT(*) FROM resellers WHERE is_active = 1").Scan(&activeResellers)
 	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE reseller_id > 0").Scan(&totalSubs)
 
+	var totalSubsDebt float64
+	var totalDebtors int
+	_ = d.QueryRow("SELECT COUNT(*), COALESCE(SUM(debt), 0.00) FROM subscribers WHERE reseller_id > 0 AND debt > 0").Scan(&totalDebtors, &totalSubsDebt)
+
 	var todayTxCount int
 	var todayTxAmount float64
 	_ = d.QueryRow("SELECT COUNT(*), COALESCE(SUM(amount), 0.00) FROM reseller_transactions WHERE DATE(created_at) = CURDATE()").Scan(&todayTxCount, &todayTxAmount)
@@ -1510,10 +1520,119 @@ func (d *DB) GetResellerFinancialSummary() (map[string]interface{}, error) {
 	summary["TotalBalance"] = totalBalance
 	summary["TotalDebt"] = totalDebt
 	summary["TotalSubscribers"] = totalSubs
+	summary["TotalSubscribersDebt"] = totalSubsDebt
+	summary["TotalDebtors"] = totalDebtors
 	summary["TodayTxCount"] = todayTxCount
 	summary["TodayTxAmount"] = todayTxAmount
 
 	return summary, nil
+}
+
+// GetResellersDebtSummary returns aggregated debtor subscriber stats grouped by reseller
+func (d *DB) GetResellersDebtSummary() ([]models.ResellerDebtSummary, float64, int, error) {
+	query := `SELECT 
+		r.id, 
+		r.name, 
+		COALESCE(r.phone, ''), 
+		COALESCE(r.balance, 0.00), 
+		COALESCE(r.debt, 0.00),
+		COUNT(s.id) as debtors_count,
+		COALESCE(SUM(s.debt), 0.00) as total_debt
+	FROM resellers r
+	JOIN subscribers s ON s.reseller_id = r.id
+	WHERE s.debt > 0
+	GROUP BY r.id, r.name, r.phone, r.balance, r.debt
+	ORDER BY total_debt DESC`
+
+	rows, err := d.Query(query)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer rows.Close()
+
+	var list []models.ResellerDebtSummary
+	var grandTotalDebt float64
+	var grandTotalDebtors int
+
+	for rows.Next() {
+		var item models.ResellerDebtSummary
+		if err := rows.Scan(
+			&item.ResellerID, &item.ResellerName, &item.ResellerPhone,
+			&item.ResellerBalance, &item.ResellerDebt,
+			&item.DebtorsCount, &item.TotalDebt,
+		); err == nil {
+			list = append(list, item)
+			grandTotalDebt += item.TotalDebt
+			grandTotalDebtors += item.DebtorsCount
+		}
+	}
+	return list, grandTotalDebt, grandTotalDebtors, nil
+}
+
+// GetResellerIndebtedSubscribers retrieves subscribers with outstanding debt filtered by reseller and search
+func (d *DB) GetResellerIndebtedSubscribers(resellerID int64, search string, limit, offset int) ([]models.ResellerSubscriberDebt, int, float64, error) {
+	baseWhere := "WHERE s.debt > 0"
+	var args []interface{}
+	var countArgs []interface{}
+
+	if resellerID > 0 {
+		baseWhere += " AND s.reseller_id = ?"
+		args = append(args, resellerID)
+		countArgs = append(countArgs, resellerID)
+	}
+	if search != "" {
+		baseWhere += " AND (s.username LIKE ? OR s.full_name LIKE ? OR s.phone LIKE ? OR s.contract_no LIKE ?)"
+		sArg := "%" + search + "%"
+		args = append(args, sArg, sArg, sArg, sArg)
+		countArgs = append(countArgs, sArg, sArg, sArg, sArg)
+	}
+
+	var totalCount int
+	var totalDebt float64
+	countQuery := "SELECT COUNT(*), COALESCE(SUM(s.debt), 0.00) FROM subscribers s " + baseWhere
+	_ = d.QueryRow(countQuery, countArgs...).Scan(&totalCount, &totalDebt)
+
+	query := `SELECT 
+		s.id, 
+		s.username, 
+		s.full_name, 
+		COALESCE(s.phone, ''), 
+		COALESCE(s.contract_no, ''), 
+		COALESCE(s.profile_name, ''), 
+		COALESCE(p.display_name, s.profile_name),
+		s.debt, 
+		COALESCE(s.balance, 0.00), 
+		COALESCE(s.reseller_id, 0), 
+		COALESCE(r.name, 'بدون موزع'), 
+		s.expiration_date, 
+		s.last_renewed_at, 
+		COALESCE(s.status, 'active')
+	FROM subscribers s
+	LEFT JOIN resellers r ON s.reseller_id = r.id
+	LEFT JOIN profiles p ON s.profile_name = p.name ` +
+		baseWhere + ` ORDER BY s.debt DESC, s.id DESC LIMIT ? OFFSET ?`
+
+	args = append(args, limit, offset)
+
+	rows, err := d.Query(query, args...)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer rows.Close()
+
+	var list []models.ResellerSubscriberDebt
+	for rows.Next() {
+		var item models.ResellerSubscriberDebt
+		if err := rows.Scan(
+			&item.ID, &item.Username, &item.FullName, &item.Phone,
+			&item.ContractNo, &item.ProfileName, &item.ProfileDisplay,
+			&item.Debt, &item.Balance, &item.ResellerID, &item.ResellerName,
+			&item.ExpirationDate, &item.LastRenewedAt, &item.Status,
+		); err == nil {
+			list = append(list, item)
+		}
+	}
+	return list, totalCount, totalDebt, nil
 }
 
 func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName string, isCustomerPaid bool, adminUser string) error {
@@ -3592,7 +3711,7 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 }
 
 // SettleDebtFromBalance pays off existing subscriber debt using available wallet balance
-func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser string) (float64, float64, error) {
+func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser string, creditReseller bool) (float64, float64, error) {
 	tx, err := d.Begin()
 	if err != nil {
 		return 0, 0, err
@@ -3601,8 +3720,9 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 
 	var contractNo, fullName string
 	var currDebt, currBalance float64
-	err = tx.QueryRow(`SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
-		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&contractNo, &fullName, &currDebt, &currBalance)
+	var subID, resellerID int64
+	err = tx.QueryRow(`SELECT id, COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00), COALESCE(reseller_id, 0) 
+		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&subID, &contractNo, &fullName, &currDebt, &currBalance, &resellerID)
 	if err != nil {
 		return 0, 0, fmt.Errorf("المشترك غير موجود: %w", err)
 	}
@@ -3636,6 +3756,42 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 	}
 
 	desc := fmt.Sprintf("سداد مديونية خصماً من رصيد المحفظة (متبقي الدين: %.2f ج.م، متبقي الرصيد: %.2f ج.م)", newDebt, newBalance)
+
+	// Smart settlement with reseller if applicable
+	if creditReseller && resellerID > 0 {
+		var resName string
+		var resBalance, resDebt float64
+		err = tx.QueryRow("SELECT name, balance, COALESCE(debt, 0.00) FROM resellers WHERE id = ? FOR UPDATE", resellerID).Scan(&resName, &resBalance, &resDebt)
+		if err == nil {
+			newResBalance := resBalance
+			newResDebt := resDebt
+			var noteSettlement string
+
+			if resDebt > 0 {
+				if resDebt >= amount {
+					newResDebt = resDebt - amount
+					noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s خصماً من محفظته بقيمة %.2f ج.م تم خصمها من مديونية الموزع", fullName, amount)
+				} else {
+					rem := amount - resDebt
+					newResDebt = 0
+					newResBalance = resBalance + rem
+					noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s بقيمة %.2f ج.م تم تصفير دين الموزع وإيداع المتبقي (%.2f ج.م) بمحفظته", fullName, amount, rem)
+				}
+			} else {
+				newResBalance = resBalance + amount
+				noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s بقيمة %.2f ج.م خصماً من محفظته وتم إيداعها بمحفظة الموزع", fullName, amount)
+			}
+
+			_, _ = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID)
+			_, _ = tx.Exec(`INSERT INTO reseller_transactions 
+				(reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
+				VALUES (?, 'subscriber_debt_settlement', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				resellerID, amount, resBalance, newResBalance, resDebt, newResDebt, subID, fullName, noteSettlement, adminUser)
+
+			desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resName)
+		}
+	}
+
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', 'balance', 'سداد من رصيد المحفظة', ?)`,
@@ -3737,22 +3893,30 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 	return nil
 }
 
-func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, adminUser string) error {
+func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, adminUser string, creditReseller bool) (bool, string, error) {
 	if amount <= 0 {
-		return fmt.Errorf("invalid amount")
+		return false, "", fmt.Errorf("المبلغ يجب أن يكون أكبر من صفر")
 	}
 
 	tx, err := d.Begin()
 	if err != nil {
-		return err
+		return false, "", err
 	}
 	defer tx.Rollback()
 
 	var contractNo, fullName string
 	var currentDebt float64
-	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00) FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName, &currentDebt)
+	var subID, resellerID int64
+	err = tx.QueryRow(`SELECT id, COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(reseller_id, 0) 
+		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&subID, &contractNo, &fullName, &currentDebt, &resellerID)
+	if err != nil {
+		return false, "", fmt.Errorf("المشترك غير موجود")
+	}
 	if fullName == "" {
 		fullName = username
+	}
+	if amount > currentDebt {
+		amount = currentDebt
 	}
 
 	newDebt := currentDebt - amount
@@ -3762,7 +3926,7 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 
 	_, err = tx.Exec("UPDATE subscribers SET debt = ? WHERE username = ?", newDebt, username)
 	if err != nil {
-		return err
+		return false, "", err
 	}
 
 	if method == "" {
@@ -3773,13 +3937,62 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 	}
 
 	desc := fmt.Sprintf("سداد نقدي من المديونية (متبقي: %.2f ج.م)", newDebt)
+	resellerCredited := false
+	successMsg := fmt.Sprintf("تم سداد مبلغ %.2f ج.م من مديونية المشترك %s بنجاح", amount, fullName)
+
+	// Smart Debt Settlement with Reseller
+	if creditReseller && resellerID > 0 {
+		var resName string
+		var resBalance, resDebt float64
+		err = tx.QueryRow("SELECT name, balance, COALESCE(debt, 0.00) FROM resellers WHERE id = ? FOR UPDATE", resellerID).Scan(&resName, &resBalance, &resDebt)
+		if err == nil {
+			resellerCredited = true
+			newResBalance := resBalance
+			newResDebt := resDebt
+			var noteSettlement string
+
+			if resDebt > 0 {
+				if resDebt >= amount {
+					newResDebt = resDebt - amount
+					noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s (%s) بقيمة %.2f ج.م تم خصمها من مديونية الموزع طرف الإدارة (متبقي دين الموزع: %.2f ج.م)", fullName, username, amount, newResDebt)
+					successMsg = fmt.Sprintf("تم سداد مديونية المشترك %.2f ج.م وتخفيض مديونية الموزع %s طرف الإدارة", amount, resName)
+				} else {
+					rem := amount - resDebt
+					newResDebt = 0
+					newResBalance = resBalance + rem
+					noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s (%s) بقيمة %.2f ج.م تم تصفير دين الموزع وإيداع المتبقي (%.2f ج.م) في محفظته", fullName, username, amount, rem)
+					successMsg = fmt.Sprintf("تم سداد مديونية المشترك %.2f ج.م وتصفير دين الموزع %s وإيداع المتبقي (%.2f ج.م) بمحفظته", amount, resName, rem)
+				}
+			} else {
+				newResBalance = resBalance + amount
+				noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s (%s) بقيمة %.2f ج.م طرف الإدارة وتم إيداعها في محفظة الموزع", fullName, username, amount)
+				successMsg = fmt.Sprintf("تم سداد مديونية المشترك %.2f ج.م وإيداعها مباشرة في محفظة الموزع %s", amount, resName)
+			}
+
+			_, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID)
+			if err != nil {
+				return false, "", err
+			}
+
+			_, err = tx.Exec(`INSERT INTO reseller_transactions 
+				(reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
+				VALUES (?, 'subscriber_debt_settlement', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				resellerID, amount, resBalance, newResBalance, resDebt, newResDebt, subID, fullName, noteSettlement, adminUser)
+			if err != nil {
+				return false, "", err
+			}
+
+			desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resName)
+		}
+	}
+
 	_, _ = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
 		username, contractNo, fullName, desc, amount, method, notes, adminUser)
 
 	if err := tx.Commit(); err != nil {
-		return err
+		return false, "", err
 	}
 
 	// Trigger WhatsApp notification for debt payment
@@ -3793,7 +4006,7 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 		}
 	}()
 
-	return nil
+	return resellerCredited, successMsg, nil
 }
 
 func (d *DB) GetBillingTransactions(search, typeFilter, statusFilter string, limit, offset int) ([]models.BillingTransaction, int, error) {

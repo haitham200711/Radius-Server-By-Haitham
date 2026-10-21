@@ -115,6 +115,8 @@ type Reseller struct {
 	Notes             string              `json:"notes"`
 	IsActive          bool                `json:"is_active"`
 	SubscribersCount  int                 `json:"subscribers_count"`
+	DebtorsCount      int                 `json:"debtors_count"`
+	SubscribersDebt   float64             `json:"subscribers_debt"`
 	CreatedAt         time.Time           `json:"created_at"`
 }
 
@@ -148,6 +150,35 @@ type ResellerTransaction struct {
 	Notes          string    `json:"notes"`
 	CreatedBy      string    `json:"created_by"`
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+// ResellerSubscriberDebt represents an indebted subscriber belonging to a reseller
+type ResellerSubscriberDebt struct {
+	ID             int64        `json:"id"`
+	Username       string       `json:"username"`
+	FullName       string       `json:"full_name"`
+	Phone          string       `json:"phone"`
+	ContractNo     string       `json:"contract_no"`
+	ProfileName    string       `json:"profile_name"`
+	ProfileDisplay string       `json:"profile_display"`
+	Debt           float64      `json:"debt"`
+	Balance        float64      `json:"balance"`
+	ResellerID     int64        `json:"reseller_id"`
+	ResellerName   string       `json:"reseller_name"`
+	ExpirationDate sql.NullTime `json:"expiration_date"`
+	LastRenewedAt  sql.NullTime `json:"last_renewed_at"`
+	Status         string       `json:"status"`
+}
+
+// ResellerDebtSummary summarizes debts per reseller
+type ResellerDebtSummary struct {
+	ResellerID      int64   `json:"reseller_id"`
+	ResellerName    string  `json:"reseller_name"`
+	ResellerPhone   string  `json:"reseller_phone"`
+	ResellerBalance float64 `json:"reseller_balance"`
+	ResellerDebt    float64 `json:"reseller_debt"`
+	DebtorsCount    int     `json:"debtors_count"`
+	TotalDebt       float64 `json:"total_debt"`
 }
 
 // Profile represents service plans (Speed limits, Quotas, Pricing)

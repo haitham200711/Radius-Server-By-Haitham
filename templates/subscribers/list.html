@@ -339,7 +339,9 @@
                     data-loanhours="{{ .LoanHours }}"
                     data-loanquota="{{ printf "%.1f" .LoanQuotaGB }}"
                     data-loandeduction="{{ .LoanDeductionType }}"
-                    data-loangranted="{{ .LoanGrantedAt }}">
+                    data-loangranted="{{ .LoanGrantedAt }}"
+                    data-resellerid="{{ .ResellerID }}"
+                    data-resellername="{{ .ResellerName }}">
                     <td class="text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="form-check-input sub-checkbox" value="{{ .Username }}" onchange="updateSelectionState()">
                     </td>
@@ -1205,6 +1207,26 @@
                         </div>
                     </div>
 
+                    <!-- Smart Reseller Settlement Box -->
+                    <div id="payDebtResellerBox" class="alert alert-info py-2.5 px-3 mb-3 border-info-subtle d-none">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div>
+                                <i class="bi bi-shop me-1 text-primary"></i> <span class="text-muted small">الموزع التابع له المشترك:</span>
+                                <strong class="text-dark" id="payDebtResellerName">-</strong>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">موزع معتمد</span>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" name="credit_reseller" id="payDebtCreditReseller" value="1" checked>
+                            <label class="form-check-label fw-bold small text-dark" for="payDebtCreditReseller">
+                                ⚡ تسوية ذكية: تحويل المبلغ فوراً إلى محفظة الموزع (إيداع رصيد أو خصم دين)
+                            </label>
+                        </div>
+                        <div class="small text-muted mt-1" style="font-size: 0.76rem;">
+                            سيتم إضافة المبلغ المسدد كرصيد للموزع (أو تصفير دينه طرف الإدارة)، ويتم شطبه فوراً من قائمة المديونين لديه.
+                        </div>
+                    </div>
+
                     <div class="alert alert-success small mb-0 py-2">
                         <i class="bi bi-check-circle me-1"></i> سيتم خصم هذا المبلغ فوراً من ديون العميل وتسجيل سند مالي في التقارير.
                     </div>
@@ -1871,6 +1893,10 @@ function handleRowClick(username, fullName, profile, debt, balance, quota, loanA
         cb.checked = (cb.value === username);
     });
 
+    const rowEl = document.getElementById('row-' + username);
+    const resellerId = rowEl ? (rowEl.dataset.resellerid || 0) : 0;
+    const resellerName = rowEl ? (rowEl.dataset.resellername || '') : '';
+
     setActiveSubscriber({
         username: username,
         fullName: fullName,
@@ -1878,7 +1904,9 @@ function handleRowClick(username, fullName, profile, debt, balance, quota, loanA
         debt: debt,
         balance: balance,
         quota: quota,
-        loanActive: loanActive === '1'
+        loanActive: loanActive === '1',
+        resellerId: resellerId,
+        resellerName: resellerName
     });
 
     updateSelectionState();
@@ -1898,7 +1926,9 @@ function toolbarAction(action) {
                     debt: row.dataset.debt,
                     balance: row.dataset.balance,
                     quota: row.dataset.quota,
-                    loanActive: row.dataset.loanactive === '1'
+                    loanActive: row.dataset.loanactive === '1',
+                    resellerId: row.dataset.resellerid || 0,
+                    resellerName: row.dataset.resellername || ''
                 };
             }
         }
@@ -1966,7 +1996,7 @@ function toolbarAction(action) {
             alert('المشترك (' + activeSubscriber.username + ') ليس لديه أي مديونية مستحقة.');
             return;
         }
-        openPayDebtModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.debt, activeSubscriber.balance);
+        openPayDebtModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.debt, activeSubscriber.balance, activeSubscriber.resellerId, activeSubscriber.resellerName);
     } else if (action === 'delete') {
         const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
         if (checked.length > 1) {
@@ -2091,7 +2121,7 @@ function openAddQuotaModal(username, fullName, currentQuotaGB) {
 let currentSubDebt = 0;
 let currentRenewSubBalance = 0;
 
-function openPayDebtModal(username, fullName, debt, balance) {
+function openPayDebtModal(username, fullName, debt, balance, resellerId, resellerName) {
     document.getElementById('payDebtUsername').value = username;
     document.getElementById('payDebtUserDisplay').textContent = username;
     document.getElementById('payDebtFullName').textContent = fullName;
@@ -2110,6 +2140,19 @@ function openPayDebtModal(username, fullName, debt, balance) {
             balOpt.disabled = true;
             balOpt.textContent = '💰 خصم من المحفظة (الرصيد: 0.00 ج.م - غير متاح)';
         }
+    }
+
+    const resBox = document.getElementById('payDebtResellerBox');
+    const resNameEl = document.getElementById('payDebtResellerName');
+    const resSwitch = document.getElementById('payDebtCreditReseller');
+    const rId = parseInt(resellerId) || 0;
+    if (rId > 0 && resBox) {
+        resBox.classList.remove('d-none');
+        if (resNameEl) resNameEl.textContent = resellerName || ('موزع #' + rId);
+        if (resSwitch) resSwitch.checked = true;
+    } else if (resBox) {
+        resBox.classList.add('d-none');
+        if (resSwitch) resSwitch.checked = false;
     }
     
     currentSubDebt = parseFloat(debt) || 0;

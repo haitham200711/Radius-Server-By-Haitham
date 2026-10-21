@@ -877,8 +877,10 @@ func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Req
 
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 
+	creditReseller := r.FormValue("credit_reseller") == "1" || r.FormValue("credit_reseller") == "true" || r.FormValue("credit_reseller") == "on" || (currentUser != nil && currentUser.Role == "admin")
+
 	if username != "" {
-		newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser)
+		newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -932,6 +934,7 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
+	creditReseller := r.FormValue("credit_reseller") == "1" || r.FormValue("credit_reseller") == "true" || r.FormValue("credit_reseller") == "on"
 
 	adminUser := "admin"
 	if u := middleware.GetUser(r); u != nil {
@@ -942,18 +945,36 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	page := r.FormValue("page")
 	q := r.FormValue("q")
 	status := r.FormValue("status")
+	redirectURL := strings.TrimSpace(r.FormValue("redirect_url"))
 
-	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+	if redirectURL == "" {
+		redirectURL = fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+	}
+
+	sep := "?"
+	if strings.Contains(redirectURL, "?") {
+		sep = "&"
+	}
 
 	if username != "" && amount > 0 {
 		if paymentMethod == "balance" {
-			_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser)
+			_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller)
 			if err != nil {
-				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+				http.Redirect(w, r, redirectURL+sep+"error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
 			}
+			http.Redirect(w, r, redirectURL+sep+"success="+url.QueryEscape(fmt.Sprintf("تم سداد مبلغ %.2f ج.م من مديونية المشترك بنجاح", amount)), http.StatusFound)
+			return
 		} else {
-			_ = bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser)
+			_, msg, err := bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser, creditReseller)
+			if err != nil {
+				http.Redirect(w, r, redirectURL+sep+"error="+url.QueryEscape(err.Error()), http.StatusFound)
+				return
+			}
+			if msg != "" {
+				http.Redirect(w, r, redirectURL+sep+"success="+url.QueryEscape(msg), http.StatusFound)
+				return
+			}
 		}
 	}
 

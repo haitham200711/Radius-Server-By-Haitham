@@ -145,6 +145,61 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 1.1 Handle CSV Export for Reseller Subscriber Debts
+	resellerFilter, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("reseller_id")), 10, 64)
+	currUser := middleware.GetUser(r)
+	if currUser != nil && currUser.Role == "reseller" {
+		resellerFilter = currUser.ID
+	}
+
+	if tab == "reseller_debts" && r.URL.Query().Get("export") == "csv" {
+		debts, _, _, err := bp.db.GetResellerIndebtedSubscribers(resellerFilter, search, 5000, 0)
+		if err == nil {
+			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=reseller_subscribers_debt_%s.csv", now.Format("20060102_1504")))
+
+			// UTF-8 BOM for Excel Arabic compatibility
+			_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+			writer := csv.NewWriter(w)
+
+			_ = writer.Write([]string{
+				"رقم المشترك",
+				"اسم العميل",
+				"اسم المستخدم",
+				"رقم الهاتف",
+				"رقم العقد",
+				"الموزع التابع له",
+				"الباقة",
+				"قيمة المديونية (ج.م)",
+				"الرصيد المتاح (ج.م)",
+				"تاريخ الانتهاء",
+				"الحالة",
+			})
+
+			for _, d := range debts {
+				exp := ""
+				if d.ExpirationDate.Valid {
+					exp = d.ExpirationDate.Time.Format("2006-01-02 15:04")
+				}
+				_ = writer.Write([]string{
+					fmt.Sprintf("%d", d.ID),
+					d.FullName,
+					d.Username,
+					d.Phone,
+					d.ContractNo,
+					d.ResellerName,
+					d.ProfileDisplay,
+					fmt.Sprintf("%.2f", d.Debt),
+					fmt.Sprintf("%.2f", d.Balance),
+					exp,
+					d.Status,
+				})
+			}
+			writer.Flush()
+			return
+		}
+	}
+
 	// 2. Pagination for Logins Tab
 	limit := 50
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
@@ -184,9 +239,19 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	totalPages := (totalLogins + limit - 1) / limit
-	if totalPages < 1 {
-		totalPages = 1
+	totalPages := 1
+	fromIndex := 0
+	toIndex := 0
+
+	if tab == "logins" {
+		totalPages = (totalLogins + limit - 1) / limit
+		if totalPages < 1 {
+			totalPages = 1
+		}
+		if totalLogins > 0 {
+			fromIndex = offset + 1
+			toIndex = offset + len(loginSessions)
+		}
 	}
 
 	// 3. Billing & Financial Transactions Tab Data
@@ -199,7 +264,33 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		billingSummary, _ = bp.db.GetBillingFinancialSummary()
 	}
 
-	// 4. Raw RADIUS Logs Tab Data
+	// 4. Reseller Indebted Subscribers Tab Data (Smart Debt Settlement)
+	var resellerDebts []models.ResellerSubscriberDebt
+	var totalDebtCount int
+	var totalDebtSum float64
+	var resellersDebtSummary []models.ResellerDebtSummary
+	var grandTotalDebt float64
+	var grandTotalDebtors int
+	var allResellers []models.Reseller
+
+	if tab == "reseller_debts" {
+		resellerDebts, totalDebtCount, totalDebtSum, _ = bp.db.GetResellerIndebtedSubscribers(resellerFilter, search, limit, offset)
+		resellersDebtSummary, grandTotalDebt, grandTotalDebtors, _ = bp.db.GetResellersDebtSummary()
+		allResellers, _ = bp.db.GetResellers()
+
+		totalPages = (totalDebtCount + limit - 1) / limit
+		if totalPages < 1 {
+			totalPages = 1
+		}
+		fromIndex = offset + 1
+		toIndex = offset + len(resellerDebts)
+		if totalDebtCount == 0 {
+			fromIndex = 0
+			toIndex = 0
+		}
+	}
+
+	// 5. Raw RADIUS Logs Tab Data
 	var rawLogs []models.RadAcct
 	if tab == "radius" {
 		query := `SELECT radacctid, acctsessionid, username, nasipaddress, acctstarttime, acctstoptime,
@@ -225,43 +316,53 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fromIndex := offset + 1
-	toIndex := offset + len(loginSessions)
-	if totalLogins == 0 {
-		fromIndex = 0
-		toIndex = 0
+	pageTitle := "تقارير وسجلات النظام"
+	if tab == "reseller_debts" {
+		pageTitle = "تقرير ديون مشتركي الموزعين والتسوية الذكية"
+	} else if tab == "billing" {
+		pageTitle = "سجل المعاملات المالية والديون"
 	}
 
 	_ = bp.renderer.Render(w, r, "reports/index", map[string]interface{}{
-		"Title":          "تقرير حالات تسجيل دخول وجلسات المشتركين",
-		"ActiveMenu":     "reports",
-		"ActiveTab":      tab,
-		"CurrentUser":    middleware.GetUser(r),
-		"LoginSessions":  loginSessions,
-		"TotalLogins":    totalLogins,
-		"LoginSummary":   loginSummary,
-		"RoutersList":    routersList,
-		"BillingList":    billingList,
-		"TotalBilling":   totalBilling,
-		"BillingSummary": billingSummary,
-		"RawLogs":        rawLogs,
-		"SearchQuery":    search,
-		"StatusFilter":   statusFilter,
-		"NASFilter":      nasFilter,
-		"FromDate":       fromDate,
-		"ToDate":         toDate,
-		"DatePreset":     datePreset,
-		"TypeFilter":     typeFilter,
-		"Page":           page,
-		"Limit":          limit,
-		"TotalPages":     totalPages,
-		"HasPrev":        page > 1,
-		"HasNext":        page < totalPages,
-		"PrevPage":       page - 1,
-		"NextPage":       page + 1,
-		"FromIndex":      fromIndex,
-		"ToIndex":        toIndex,
-		"PageNumbers":    getPageNumbers(page, totalPages),
+		"Title":                pageTitle,
+		"ActiveMenu":           "reports",
+		"ActiveTab":            tab,
+		"CurrentUser":          middleware.GetUser(r),
+		"LoginSessions":        loginSessions,
+		"TotalLogins":          totalLogins,
+		"LoginSummary":         loginSummary,
+		"RoutersList":          routersList,
+		"BillingList":          billingList,
+		"TotalBilling":         totalBilling,
+		"BillingSummary":       billingSummary,
+		"ResellerDebts":        resellerDebts,
+		"TotalDebtCount":       totalDebtCount,
+		"TotalDebtSum":         totalDebtSum,
+		"ResellersDebtSummary": resellersDebtSummary,
+		"GrandTotalDebt":       grandTotalDebt,
+		"GrandTotalDebtors":    grandTotalDebtors,
+		"AllResellers":         allResellers,
+		"ResellerFilter":       resellerFilter,
+		"RawLogs":              rawLogs,
+		"SearchQuery":          search,
+		"StatusFilter":         statusFilter,
+		"NASFilter":            nasFilter,
+		"FromDate":             fromDate,
+		"ToDate":               toDate,
+		"DatePreset":           datePreset,
+		"TypeFilter":           typeFilter,
+		"Page":                 page,
+		"Limit":                limit,
+		"TotalPages":           totalPages,
+		"HasPrev":              page > 1,
+		"HasNext":              page < totalPages,
+		"PrevPage":             page - 1,
+		"NextPage":             page + 1,
+		"FromIndex":            fromIndex,
+		"ToIndex":              toIndex,
+		"PageNumbers":          getPageNumbers(page, totalPages),
+		"Success":              r.URL.Query().Get("success"),
+		"Error":                r.URL.Query().Get("error"),
 	})
 }
 

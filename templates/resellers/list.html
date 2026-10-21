@@ -90,7 +90,7 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
-                    <span class="text-muted small fw-bold d-block mb-1">إجمالي مديونيات الموزعين</span>
+                    <span class="text-muted small fw-bold d-block mb-1">مديونيات الموزعين للإدارة</span>
                     <h3 class="fw-bold mb-0 text-danger">{{ printf "%.2f" (index .Summary "TotalDebt") }} <small class="fs-6 text-muted">ج.م</small></h3>
                     <small class="text-muted">مستحقات واجبة التحصيل</small>
                 </div>
@@ -116,6 +116,27 @@
         </div>
     </div>
 </div>
+
+{{ if gt (index .Summary "TotalDebtors") 0 }}
+<div class="alert alert-danger border-danger-subtle d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 shadow-sm rounded-3">
+    <div class="d-flex align-items-center gap-3">
+        <span class="p-2.5 bg-danger text-white rounded-circle fs-5 d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+            <i class="bi bi-person-exclamation"></i>
+        </span>
+        <div>
+            <h6 class="fw-bold mb-1 text-danger">تنبيه ديون مشتركي شبكة الموزعين</h6>
+            <div class="small text-muted">
+                يوجد حالياً <strong class="text-danger font-monospace">{{ index .Summary "TotalDebtors" }} مشترك مديون</strong> لموزعين بإجمالي مستحقات <strong class="text-danger font-monospace fs-6">{{ printf "%.2f" (index .Summary "TotalSubscribersDebt") }} ج.م</strong>.
+            </div>
+        </div>
+    </div>
+    <div class="mt-2 mt-md-0">
+        <a href="/reports?tab=reseller_debts" class="btn btn-sm btn-danger fw-bold shadow-sm">
+            <i class="bi bi-cash-stack me-1"></i> فتح كشف ديون المشتركين والتسوية الذكية
+        </a>
+    </div>
+</div>
+{{ end }}
 
 <!-- Resellers Main Table -->
 <div class="card border-0 shadow-sm mb-4">
@@ -188,6 +209,17 @@
                         <a href="/subscribers?reseller_id={{ $res.ID }}" class="btn btn-sm btn-outline-primary fw-bold" title="عرض مشتركي هذا الموزع">
                             <i class="bi bi-people me-1"></i> {{ $res.SubscribersCount }} مشترك
                         </a>
+                        {{ if gt $res.DebtorsCount 0 }}
+                        <div class="mt-1">
+                            <a href="/reports?tab=reseller_debts&reseller_id={{ $res.ID }}" class="badge bg-danger-subtle text-danger border border-danger-subtle text-decoration-none fw-bold" title="عرض المشتركين المديونين لهذا الموزع">
+                                <i class="bi bi-person-exclamation me-1"></i>{{ $res.DebtorsCount }} مدين ({{ printf "%.2f" $res.SubscribersDebt }} ج.م)
+                            </a>
+                        </div>
+                        {{ else }}
+                        <div class="mt-1">
+                            <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">لا ديون للمشتركين</span>
+                        </div>
+                        {{ end }}
                     </td>
                     <td>
                         {{ if gt $res.CommissionPercent 0.0 }}
@@ -233,6 +265,9 @@
                             <button type="button" class="btn btn-outline-secondary" title="كشف حساب المعاملات" onclick="viewStatement({{ $res.ID }}, '{{ $res.Name }}')">
                                 <i class="bi bi-receipt"></i>
                             </button>
+                            <a href="/reports?tab=reseller_debts&reseller_id={{ $res.ID }}" class="btn btn-outline-danger" title="كشف ديون مشتركي هذا الموزع">
+                                <i class="bi bi-person-exclamation"></i>
+                            </a>
                             <button type="button" class="btn btn-outline-primary" title="تعديل البيانات" onclick="editReseller({{ $res.ID }})">
                                 <i class="bi bi-pencil"></i>
                             </button>

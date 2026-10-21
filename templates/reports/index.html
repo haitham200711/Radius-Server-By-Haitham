@@ -17,6 +17,13 @@
         <button type="button" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" onclick="window.print()" title="طباعة التقرير">
             <i class="bi bi-printer me-1"></i> طباعة
         </button>
+        {{ else if eq .ActiveTab "reseller_debts" }}
+        <a href="/reports?tab=reseller_debts&export=csv&reseller_id={{ .ResellerFilter }}&q={{ .SearchQuery }}" class="btn btn-sm btn-outline-success fw-bold shadow-sm" title="تصدير كشف ديون مشتركي الموزعين إلى ملف Excel">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> تصدير Excel (CSV)
+        </a>
+        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" onclick="window.print()" title="طباعة كشف الديون">
+            <i class="bi bi-printer me-1"></i> طباعة
+        </button>
         {{ end }}
         <a href="/subscribers" class="btn btn-sm btn-primary fw-bold shadow-sm">
             <i class="bi bi-people me-1"></i> إدارة المشتركين
@@ -34,6 +41,14 @@
     <li class="nav-item">
         <a class="nav-link fw-bold py-1.5 px-3 {{ if eq .ActiveTab "billing" }}active{{ end }}" href="/reports?tab=billing">
             <i class="bi bi-cash-stack me-1"></i> العمليات المالية والديون
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold py-1.5 px-3 {{ if eq .ActiveTab "reseller_debts" }}active bg-danger text-white{{ end }}" href="/reports?tab=reseller_debts">
+            <i class="bi bi-person-exclamation me-1"></i> ديون مشتركي الموزعين (Smart Debt)
+            {{ if gt .GrandTotalDebtors 0 }}
+            <span class="badge {{ if eq .ActiveTab "reseller_debts" }}bg-white text-danger{{ else }}bg-danger text-white{{ end }} ms-1 fw-bold">{{ .GrandTotalDebtors }}</span>
+            {{ end }}
         </a>
     </li>
     <li class="nav-item">
@@ -555,6 +570,461 @@
         </table>
     </div>
 </div>
+
+{{ else if eq .ActiveTab "reseller_debts" }}
+<!-- ==================================================== -->
+<!-- 3. Reseller Indebted Subscribers & Smart Settlement  -->
+<!-- ==================================================== -->
+
+{{ if .Success }}
+<div class="alert alert-success alert-dismissible fade show py-2.5 px-3 shadow-sm mb-3 d-flex align-items-center gap-2">
+    <i class="bi bi-check-circle-fill fs-5 text-success"></i>
+    <div class="flex-grow-1 fw-bold">{{ .Success }}</div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
+{{ if .Error }}
+<div class="alert alert-danger alert-dismissible fade show py-2.5 px-3 shadow-sm mb-3 d-flex align-items-center gap-2">
+    <i class="bi bi-exclamation-triangle-fill fs-5 text-danger"></i>
+    <div class="flex-grow-1 fw-bold">{{ .Error }}</div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{ end }}
+
+<!-- KPI Debt Summary Ribbon -->
+<div class="row g-2 mb-3">
+    <!-- Grand Total Subscribers Debt -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-danger border-4 h-100">
+            <div class="card-body p-2.5">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-0.5" style="font-size: 0.78rem;">إجمالي ديون المشتركين للموزعين</span>
+                        <h4 class="fw-bold text-danger mb-0 font-monospace">
+                            {{ printf "%.2f" .GrandTotalDebt }} <small class="fs-6 text-muted">ج.م</small>
+                        </h4>
+                    </div>
+                    <div class="bg-danger-subtle text-danger p-2.5 rounded-circle">
+                        <i class="bi bi-cash-stack fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Indebted Subscribers -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-warning border-4 h-100">
+            <div class="card-body p-2.5">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-0.5" style="font-size: 0.78rem;">إجمالي المشتركين المديونين</span>
+                        <h4 class="fw-bold text-warning-emphasis mb-0 font-monospace">
+                            {{ .GrandTotalDebtors }} <small class="fs-6 text-muted">مشترك</small>
+                        </h4>
+                    </div>
+                    <div class="bg-warning-subtle text-warning-emphasis p-2.5 rounded-circle">
+                        <i class="bi bi-people-fill fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resellers Affected -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-primary border-4 h-100">
+            <div class="card-body p-2.5">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-0.5" style="font-size: 0.78rem;">الموزعون الذين لديهم ديون</span>
+                        <h4 class="fw-bold text-primary mb-0 font-monospace">
+                            {{ len .ResellersDebtSummary }} <small class="fs-6 text-muted">موزع</small>
+                        </h4>
+                    </div>
+                    <div class="bg-primary-subtle text-primary p-2.5 rounded-circle">
+                        <i class="bi bi-shop fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtered Total Debt -->
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-info border-4 h-100">
+            <div class="card-body p-2.5">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted small fw-bold d-block mb-0.5" style="font-size: 0.78rem;">إجمالي الديون المعروضة حالياً</span>
+                        <h4 class="fw-bold text-info-emphasis mb-0 font-monospace">
+                            {{ printf "%.2f" .TotalDebtSum }} <small class="fs-6 text-muted">ج.م</small>
+                        </h4>
+                    </div>
+                    <div class="bg-info-subtle text-info p-2.5 rounded-circle">
+                        <i class="bi bi-funnel-fill fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resellers Quick Filter Ribbon (Chips) -->
+{{ if gt (len .ResellersDebtSummary) 0 }}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="text-muted small fw-bold me-1"><i class="bi bi-tag me-1"></i> فلترة سريعة بالموزع:</span>
+            <a href="/reports?tab=reseller_debts" class="btn btn-sm {{ if eq .ResellerFilter 0 }}btn-secondary{{ else }}btn-outline-secondary{{ end }} py-1 px-2.5 rounded-pill small">
+                كافة الموزعين <span class="badge bg-light text-dark ms-1">{{ .GrandTotalDebtors }}</span>
+            </a>
+            {{ range .ResellersDebtSummary }}
+            <a href="/reports?tab=reseller_debts&reseller_id={{ .ResellerID }}" class="btn btn-sm {{ if eq .ResellerID $.ResellerFilter }}btn-danger{{ else }}btn-outline-danger{{ end }} py-1 px-2.5 rounded-pill small d-inline-flex align-items-center gap-1.5">
+                <span>{{ .ResellerName }}</span>
+                <span class="badge {{ if eq .ResellerID $.ResellerFilter }}bg-white text-danger{{ else }}bg-danger text-white{{ end }} font-monospace">{{ printf "%.2f" .TotalDebt }} ج.م</span>
+                <span class="badge bg-danger-subtle text-danger">{{ .DebtorsCount }}</span>
+            </a>
+            {{ end }}
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<!-- Filter & Search Toolbar -->
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-2.5">
+        <form method="GET" action="/reports" class="row g-2 align-items-center">
+            <input type="hidden" name="tab" value="reseller_debts">
+
+            <div class="col-md-4 col-sm-6">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="bi bi-shop text-primary"></i></span>
+                    <select name="reseller_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="0">-- كافة الموزعين والوكلاء --</option>
+                        {{ range .AllResellers }}
+                        <option value="{{ .ID }}" {{ if eq .ID $.ResellerFilter }}selected{{ end }}>
+                            {{ .Name }} {{ if gt .DebtorsCount 0 }}({{ .DebtorsCount }} مدين - {{ printf "%.2f" .SubscribersDebt }} ج.م){{ else }}(لا ديون){{ end }}
+                        </option>
+                        {{ end }}
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-md-5 col-sm-6">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" value="{{ .SearchQuery }}" class="form-control form-control-sm" placeholder="بحث باسم المشترك، اليوزر، الهاتف، أو رقم العقد...">
+                </div>
+            </div>
+
+            <div class="col-md-3 col-sm-12 d-flex gap-2 justify-content-end">
+                <button type="submit" class="btn btn-sm btn-primary fw-bold flex-grow-1">
+                    <i class="bi bi-funnel me-1"></i> تطبيق الفلتر
+                </button>
+                {{ if or (gt .ResellerFilter 0) .SearchQuery }}
+                <a href="/reports?tab=reseller_debts" class="btn btn-sm btn-outline-secondary" title="إعادة ضبط الفلاتر">
+                    <i class="bi bi-x-circle"></i>
+                </a>
+                {{ end }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Indebted Subscribers Table -->
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+            <i class="bi bi-people-fill text-danger"></i>
+            <span>قائمة المشتركين المديونين للموزعين</span>
+            {{ if gt .ResellerFilter 0 }}
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle small fw-normal">فلترة خاصة بموزع محدد</span>
+            {{ end }}
+        </h6>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle small">
+                {{ .TotalDebtCount }} مشترك مديون
+            </span>
+            <span class="badge bg-light text-dark border small font-monospace">
+                المجموع: {{ printf "%.2f" .TotalDebtSum }} ج.م
+            </span>
+        </div>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light small">
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>العميل / المشترك</th>
+                    <th>الموزع التابع له</th>
+                    <th>الباقة الحالية</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th>الهاتف والتواصل</th>
+                    <th>رصيد المحفظة</th>
+                    <th class="text-danger fw-bold">المديونية المستحقة</th>
+                    <th class="text-end" style="min-width: 170px;">الإجراء وسداد الدين</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                {{ range $idx, $sub := .ResellerDebts }}
+                <tr>
+                    <td class="font-monospace text-muted">{{ $sub.ID }}</td>
+                    <td>
+                        <strong class="text-dark fs-6">{{ $sub.FullName }}</strong>
+                        <div class="d-flex align-items-center gap-1.5 mt-0.5">
+                            <span class="badge bg-primary-subtle text-primary font-monospace">@{{ $sub.Username }}</span>
+                            {{ if $sub.ContractNo }}
+                            <span class="badge bg-light text-dark border font-monospace">عقد: {{ $sub.ContractNo }}</span>
+                            {{ end }}
+                        </div>
+                    </td>
+                    <td>
+                        <a href="/reports?tab=reseller_debts&reseller_id={{ $sub.ResellerID }}" class="badge bg-info-subtle text-info-emphasis border border-info-subtle text-decoration-none fw-bold" title="انقر لفلترة ديون هذا الموزع">
+                            <i class="bi bi-shop me-1"></i>{{ $sub.ResellerName }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">{{ if $sub.ProfileDisplay }}{{ $sub.ProfileDisplay }}{{ else }}{{ $sub.ProfileName }}{{ end }}</span>
+                    </td>
+                    <td class="font-monospace text-muted">
+                        {{ if $sub.ExpirationDate.Valid }}
+                            {{ $sub.ExpirationDate.Time.Format "2006-01-02 15:04" }}
+                        {{ else }}
+                            <span class="text-muted">-</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if $sub.Phone }}
+                        <div class="d-flex align-items-center gap-1">
+                            <a href="tel:{{ $sub.Phone }}" class="text-decoration-none text-dark font-monospace fw-bold">
+                                <i class="bi bi-telephone text-primary me-1"></i>{{ $sub.Phone }}
+                            </a>
+                            <a href="https://wa.me/{{ $sub.Phone }}" target="_blank" class="btn btn-sm btn-outline-success py-0 px-1.5" title="مراسلة واتساب">
+                                <i class="bi bi-whatsapp"></i>
+                            </a>
+                        </div>
+                        {{ else }}
+                        <span class="text-muted">-</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if gt $sub.Balance 0.0 }}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace fw-bold">
+                            {{ printf "%.2f" $sub.Balance }} ج.م
+                        </span>
+                        {{ else }}
+                        <span class="text-muted font-monospace">0.00 ج.م</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <span class="badge bg-danger fs-6 font-monospace fw-bold px-2 py-1 shadow-xs">
+                            {{ printf "%.2f" $sub.Debt }} ج.م
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="openSmartSettleModal('{{ $sub.Username }}', '{{ $sub.FullName }}', {{ $sub.Debt }}, {{ $sub.Balance }}, {{ $sub.ResellerID }}, '{{ $sub.ResellerName }}')">
+                            <i class="bi bi-lightning-charge-fill text-dark"></i>
+                            <span>سداد وتسوية ذكية</span>
+                        </button>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="bi bi-check-circle-fill fs-1 d-block mb-3 text-success opacity-75"></i>
+                        <h5 class="fw-bold text-dark">رائع! لا توجد أي مديونيات متأخرة على المشتركين</h5>
+                        <p class="small text-muted mb-0">جميع المشتركين التابعين للموزعين مسددون بالكامل أو تم سداد وتسوية حساباتهم بنجاح.</p>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white py-2 px-3 border-top d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <small class="text-muted">عرض من <strong>{{ .FromIndex }}</strong> إلى <strong>{{ .ToIndex }}</strong> من إجمالي <strong>{{ .TotalDebtCount }}</strong> مشترك</small>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                    <a class="page-link" href="/reports?tab=reseller_debts&reseller_id={{ .ResellerFilter }}&q={{ .SearchQuery }}&page={{ .PrevPage }}&limit={{ .Limit }}">السابق</a>
+                </li>
+                {{ range .PageNumbers }}
+                <li class="page-item {{ if eq . $.Page }}active{{ end }}">
+                    <a class="page-link" href="/reports?tab=reseller_debts&reseller_id={{ $.ResellerFilter }}&q={{ $.SearchQuery }}&page={{ . }}&limit={{ $.Limit }}">{{ . }}</a>
+                </li>
+                {{ end }}
+                <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                    <a class="page-link" href="/reports?tab=reseller_debts&reseller_id={{ .ResellerFilter }}&q={{ .SearchQuery }}&page={{ .NextPage }}&limit={{ .Limit }}">التالي</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {{ end }}
+</div>
+
+<!-- ======================================================= -->
+<!-- Smart Debt Settlement Modal (سداد مديونية وتسوية موزع) -->
+<!-- ======================================================= -->
+<div class="modal fade" id="smartSettleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark py-2.5 px-3">
+                <h5 class="modal-title fw-bold fs-6 d-flex align-items-center gap-2">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                    <span>سداد مديونية مشترك والتسوية الذكية للموزع</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/pay-debt">
+                <div class="modal-body p-3">
+                    <input type="hidden" name="username" id="smartSettleUsername">
+                    <input type="hidden" name="redirect_url" value="/reports?tab=reseller_debts&reseller_id={{ .ResellerFilter }}&q={{ .SearchQuery }}&page={{ .Page }}">
+
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body p-2.5">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">اسم العميل:</span>
+                                <span class="fw-bold text-dark" id="smartSettleFullName">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">اسم المستخدم:</span>
+                                <span class="font-monospace fw-bold text-primary" id="smartSettleUserDisplay">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">إجمالي المديونية المستحقة:</span>
+                                <span class="badge bg-danger fs-6 font-monospace" id="smartSettleDebtDisplay">0.00 ج.م</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted small">رصيد محفظة العميل:</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace fw-bold" id="smartSettleBalanceDisplay">0.00 ج.م</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Smart Reseller Settlement Highlight Box -->
+                    <div id="smartSettleResellerBox" class="alert alert-info py-2.5 px-3 mb-3 border-info-subtle">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div>
+                                <i class="bi bi-shop me-1 text-primary"></i> <span class="text-muted small">الموزع التابع له:</span>
+                                <strong class="text-dark" id="smartSettleResellerName">-</strong>
+                            </div>
+                            <span class="badge bg-primary">موزع معتمد</span>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" name="credit_reseller" id="smartSettleCreditReseller" value="1" checked>
+                            <label class="form-check-label fw-bold small text-dark" for="smartSettleCreditReseller">
+                                ⚡ تسوية ذكية: تحويل المبلغ فوراً لمحفظة الموزع (إيداع رصيد أو خصم دين)
+                            </label>
+                        </div>
+                        <div class="small text-muted mt-1" style="font-size: 0.76rem;">
+                            عند السداد، يتم تصفير مديونية العميل وإيداع المبلغ فوراً بحساب الموزع، <strong>ويتم حذف العميل تلقائياً من قائمة المديونين</strong>.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">المبلغ المراد سداده (ج.م):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.5" min="0.1" name="amount" id="smartSettleAmountInput" class="form-control form-control-lg font-monospace fw-bold text-success" required>
+                            <span class="input-group-text fw-bold">ج.م</span>
+                            <button type="button" class="btn btn-outline-secondary" onclick="fillSmartFullDebt()">سداد كامل الدين</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">طريقة السداد:</label>
+                            <select name="payment_method" id="smartSettleMethodSelect" class="form-select form-select-sm">
+                                <option value="cash" selected>نقداً (Cash)</option>
+                                <option value="balance" id="smartSettleMethodBalanceOpt">💰 خصم من رصيد المحفظة</option>
+                                <option value="vodafone_cash">فودافون كاش / محفظة</option>
+                                <option value="instapay">انستا باي (InstaPay)</option>
+                                <option value="bank">تحويل بنكي</option>
+                                <option value="other">أخرى</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small">ملاحظات السداد:</label>
+                            <input type="text" name="notes" id="smartSettleNotes" class="form-control form-control-sm" placeholder="سداد مديونية وتسوية موزع...">
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success small mb-0 py-2">
+                        <i class="bi bi-check-circle me-1"></i> ستظهر هذه العملية فوراً في كشف حساب الموزع وسجل المعاملات المالية للإدارة.
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark">
+                        <i class="bi bi-check-lg me-1"></i> تأكيد السداد والتسوية الذكية
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let smartCurrentDebt = 0;
+
+function openSmartSettleModal(username, fullName, debt, balance, resellerId, resellerName) {
+    document.getElementById('smartSettleUsername').value = username;
+    document.getElementById('smartSettleUserDisplay').textContent = username;
+    document.getElementById('smartSettleFullName').textContent = fullName || username;
+    
+    smartCurrentDebt = parseFloat(debt) || 0;
+    document.getElementById('smartSettleDebtDisplay').textContent = smartCurrentDebt.toFixed(2) + ' ج.م';
+    
+    const balVal = parseFloat(balance) || 0;
+    document.getElementById('smartSettleBalanceDisplay').textContent = balVal.toFixed(2) + ' ج.م';
+    
+    const balOpt = document.getElementById('smartSettleMethodBalanceOpt');
+    if (balOpt) {
+        if (balVal > 0) {
+            balOpt.disabled = false;
+            balOpt.textContent = '💰 خصم من المحفظة (' + balVal.toFixed(2) + ' ج.م)';
+        } else {
+            balOpt.disabled = true;
+            balOpt.textContent = '💰 خصم من المحفظة (لا يوجد رصيد)';
+        }
+    }
+    
+    const amountInput = document.getElementById('smartSettleAmountInput');
+    amountInput.value = smartCurrentDebt;
+    amountInput.max = smartCurrentDebt;
+    
+    const resBox = document.getElementById('smartSettleResellerBox');
+    const resNameEl = document.getElementById('smartSettleResellerName');
+    const resSwitch = document.getElementById('smartSettleCreditReseller');
+    const rId = parseInt(resellerId) || 0;
+    if (rId > 0 && resBox) {
+        resBox.classList.remove('d-none');
+        if (resNameEl) resNameEl.textContent = resellerName || ('موزع #' + rId);
+        if (resSwitch) resSwitch.checked = true;
+    } else if (resBox) {
+        resBox.classList.add('d-none');
+        if (resSwitch) resSwitch.checked = false;
+    }
+    
+    const notesInput = document.getElementById('smartSettleNotes');
+    if (notesInput) {
+        notesInput.value = 'سداد مديونية المشترك طرف الإدارة وتسويتها مع الموزع ' + (resellerName || '');
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('smartSettleModal'));
+    modal.show();
+}
+
+function fillSmartFullDebt() {
+    const amountInput = document.getElementById('smartSettleAmountInput');
+    if (amountInput) {
+        amountInput.value = smartCurrentDebt;
+    }
+}
+</script>
 
 {{ else }}
 <!-- ========================================== -->
