@@ -1,15 +1,15 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">لوحة التحكم والمراقبة</h3>
-        <p class="text-muted small mb-0">نظام راديوس مايكروتك الاحترافي مع إدارة الموزعين والكروت</p>
+        <h3 class="fw-bold mb-1">{{ tr .Lang "لوحة التحكم والمراقبة" "Dashboard & Live Monitoring" }}</h3>
+        <p class="text-muted small mb-0">{{ tr .Lang "نظام راديوس مايكروتك الاحترافي مع إدارة الموزعين والكروت" "MikroTik RADIUS Enterprise Platform & Reseller Management" }}</p>
     </div>
     <div class="d-flex gap-2">
         <a href="/cards/generate" class="btn btn-primary fw-bold">
-            <i class="bi bi-plus-circle me-1"></i> توليد كروت جديدة
+            <i class="bi bi-plus-circle me-1"></i> {{ tr .Lang "توليد كروت جديدة" "Generate Cards" }}
         </a>
         <a href="/subscribers/add" class="btn btn-outline-primary fw-bold">
-            <i class="bi bi-person-plus me-1"></i> إضافة مشترك
+            <i class="bi bi-person-plus me-1"></i> {{ tr .Lang "إضافة مشترك" "Add Subscriber" }}
         </a>
     </div>
 </div>
@@ -19,7 +19,7 @@
     <div class="col-md-4 col-lg-2">
         <div class="stat-card bg-grad-blue">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">المشتركين</span>
+                <span class="stat-label">{{ tr .Lang "المشتركين" "Subscribers" }}</span>
                 <i class="bi bi-people-fill"></i>
             </div>
             <div class="stat-value">{{ .Metrics.TotalSubscribers }}</div>
@@ -29,7 +29,7 @@
     <div class="col-md-4 col-lg-2">
         <div class="stat-card bg-grad-green">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">الكروت المتاحة</span>
+                <span class="stat-label">{{ tr .Lang "الكروت المتاحة" "Available Cards" }}</span>
                 <i class="bi bi-credit-card-2-front"></i>
             </div>
             <div class="stat-value">{{ .Metrics.ActiveCards }}</div>
@@ -39,7 +39,7 @@
     <div class="col-md-4 col-lg-2">
         <div class="stat-card bg-grad-orange">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">المتصلين الآن</span>
+                <span class="stat-label">{{ tr .Lang "المتصلين الآن" "Online Users" }}</span>
                 <i class="bi bi-activity"></i>
             </div>
             <div class="stat-value">{{ .Metrics.OnlineSessions }}</div>
@@ -49,7 +49,7 @@
     <div class="col-md-4 col-lg-2">
         <div class="stat-card bg-grad-purple">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">الراوترات NAS</span>
+                <span class="stat-label">{{ tr .Lang "الراوترات NAS" "NAS Routers" }}</span>
                 <i class="bi bi-hdd-network"></i>
             </div>
             <div class="stat-value">{{ .Metrics.TotalRouters }}</div>
@@ -59,7 +59,7 @@
     <div class="col-md-4 col-lg-2">
         <div class="stat-card bg-grad-cyan">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">الموزعين</span>
+                <span class="stat-label">{{ tr .Lang "الموزعين" "Resellers" }}</span>
                 <i class="bi bi-shop"></i>
             </div>
             <div class="stat-value">{{ .Metrics.TotalResellers }}</div>
@@ -69,10 +69,10 @@
     <div class="col-md-4 col-lg-2">
         <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #047857);">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">المبيعات</span>
+                <span class="stat-label">{{ tr .Lang "المبيعات" "Revenue" }}</span>
                 <i class="bi bi-cash-stack"></i>
             </div>
-            <div class="stat-value">{{ printf "%.1f" .Metrics.TotalRevenue }} ج.م</div>
+            <div class="stat-value">{{ printf "%.1f" .Metrics.TotalRevenue }} {{ tr .Lang "ج.م" "EGP" }}</div>
         </div>
     </div>
 </div>
@@ -85,8 +85,8 @@
                 <i class="bi bi-cpu-fill fs-5"></i>
             </span>
             <div>
-                <h5 class="fw-bold mb-0 text-dark">موارد السيرفر والخادم (Host System Resources)</h5>
-                <small class="text-muted">مراقبة حية لاستهلاك المعالج والرام والمساحة وحالة الخادم المضيف</small>
+                <h5 class="fw-bold mb-0 text-dark">{{ tr .Lang "موارد السيرفر والخادم" "Host System Resources" }}</h5>
+                <small class="text-muted">{{ tr .Lang "مراقبة حية لاستهلاك المعالج والرام والمساحة وحالة الخادم المضيف" "Live monitoring of CPU, RAM, Disk, and host status" }}</small>
             </div>
         </div>
         <div class="d-flex align-items-center flex-wrap gap-2">
@@ -98,7 +98,7 @@
             </span>
             <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 d-flex align-items-center gap-1">
                 <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
-                <span>تحديث مباشر</span>
+                <span>{{ tr .Lang "تحديث مباشر" "Live" }}</span>
             </span>
         </div>
     </div>
@@ -109,7 +109,7 @@
                 <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> استهلاك المعالج (CPU)</span>
+                            <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> {{ tr .Lang "استهلاك المعالج (CPU)" "CPU Usage" }}</span>
                             <span class="badge bg-white text-dark border font-monospace small" id="cpuCores">{{ .System.CPUCores }} Cores</span>
                         </div>
                         <div class="d-flex align-items-baseline gap-2 mb-2">
@@ -132,7 +132,7 @@
                 <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> الذاكرة العشوائية (RAM)</span>
+                            <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> {{ tr .Lang "الذاكرة العشوائية (RAM)" "RAM Usage" }}</span>
                             <span class="badge bg-white text-info border font-monospace small" id="memUsageValBadge">{{ printf "%.1f" .System.MemUsage }}%</span>
                         </div>
                         <div class="d-flex align-items-baseline gap-2 mb-2">
@@ -145,7 +145,7 @@
                         </div>
                     </div>
                     <div class="d-flex justify-content-between small text-muted mt-2 pt-2 border-top">
-                        <span>المتبقي الشاغر:</span>
+                        <span>{{ tr .Lang "المتبقي الشاغر:" "Free Memory:" }}</span>
                         <b class="text-success font-monospace" id="memFree">{{ .System.MemFreeFormatted }}</b>
                     </div>
                 </div>
@@ -156,7 +156,7 @@
                 <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> مساحة التخزين (Root /)</span>
+                            <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> {{ tr .Lang "مساحة التخزين (Root /)" "Disk Usage (Root /)" }}</span>
                             <span class="badge bg-white text-warning border font-monospace small" id="diskUsageValBadge">{{ printf "%.1f" .System.DiskUsage }}%</span>
                         </div>
                         <div class="d-flex align-items-baseline gap-2 mb-2">
@@ -169,7 +169,7 @@
                         </div>
                     </div>
                     <div class="d-flex justify-content-between small text-muted mt-2 pt-2 border-top">
-                        <span>المساحة الحرة:</span>
+                        <span>{{ tr .Lang "المساحة الحرة:" "Free Disk:" }}</span>
                         <b class="text-primary font-monospace" id="diskFree">{{ .System.DiskFreeFormatted }}</b>
                     </div>
                 </div>
@@ -180,8 +180,8 @@
                 <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> وقت تشغيل النظام</span>
-                            <span class="badge bg-success-subtle text-success border border-success-subtle small">نشط ومستقر</span>
+                            <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> {{ tr .Lang "وقت تشغيل النظام" "System Uptime" }}</span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle small">{{ tr .Lang "نشط ومستقر" "Active & Healthy" }}</span>
                         </div>
                         <div class="mb-2">
                             <span class="fs-5 fw-bold text-success d-block" id="uptimeVal">{{ .System.Uptime }}</span>
@@ -189,11 +189,11 @@
                     </div>
                     <div class="small text-muted mt-2 pt-2 border-top">
                         <div class="d-flex justify-content-between mb-1">
-                            <span>النواة (Kernel):</span>
+                            <span>{{ tr .Lang "النواة (Kernel):" "Kernel:" }}</span>
                             <b class="text-dark font-monospace small" id="sysKernel">{{ .System.Kernel }}</b>
                         </div>
                         <div class="d-flex justify-content-between">
-                            <span>توقيت السيرفر:</span>
+                            <span>{{ tr .Lang "توقيت السيرفر:" "Server Time:" }}</span>
                             <b class="text-dark font-monospace small" id="serverTime">{{ .System.ServerTime }}</b>
                         </div>
                     </div>
@@ -208,19 +208,19 @@
     <div class="col-lg-8">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-activity me-1 text-primary"></i> الجلسات النشطة حالياً على المايكروتك</span>
-                <a href="/sessions" class="btn btn-sm btn-outline-primary">عرض الكل</a>
+                <span><i class="bi bi-activity me-1 text-primary"></i> {{ tr .Lang "الجلسات النشطة حالياً على المايكروتك" "Active Online MikroTik Sessions" }}</span>
+                <a href="/sessions" class="btn btn-sm btn-outline-primary">{{ tr .Lang "عرض الكل" "View All" }}</a>
             </div>
             <div class="card-body p-0 table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>المشترك</th>
-                            <th>IP المشترك</th>
-                            <th>MAC الجهاز</th>
-                            <th>راوتر NAS</th>
-                            <th>التحميل</th>
-                            <th>الرفع</th>
+                            <th>{{ tr .Lang "المشترك" "Subscriber" }}</th>
+                            <th>{{ tr .Lang "IP المشترك" "Framed IP" }}</th>
+                            <th>{{ tr .Lang "MAC الجهاز" "Calling MAC" }}</th>
+                            <th>{{ tr .Lang "راوتر NAS" "NAS Router" }}</th>
+                            <th>{{ tr .Lang "التحميل" "Download" }}</th>
+                            <th>{{ tr .Lang "الرفع" "Upload" }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -235,7 +235,7 @@
                         </tr>
                         {{ else }}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">لا يوجد جلسات نشطة حالياً</td>
+                            <td colspan="6" class="text-center py-4 text-muted">{{ tr .Lang "لا يوجد جلسات نشطة حالياً" "No active sessions currently" }}</td>
                         </tr>
                         {{ end }}
                     </tbody>
@@ -248,8 +248,8 @@
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-clock-history me-1 text-primary"></i> آخر دفعات الكروت</span>
-                <a href="/cards" class="btn btn-sm btn-outline-primary">عرض الكل</a>
+                <span><i class="bi bi-clock-history me-1 text-primary"></i> {{ tr .Lang "آخر دفعات الكروت" "Recent Card Batches" }}</span>
+                <a href="/cards" class="btn btn-sm btn-outline-primary">{{ tr .Lang "عرض الكل" "View All" }}</a>
             </div>
             <div class="card-body p-0">
                 <ul class="list-group list-group-flush">
@@ -257,17 +257,17 @@
                     <li class="list-group-item d-flex justify-content-between align-items-center py-3">
                         <div>
                             <strong class="d-block">{{ .BatchCode }}</strong>
-                            <small class="text-muted">{{ .ProfileName }} ({{ .Count }} كارت)</small>
+                            <small class="text-muted">{{ .ProfileName }} ({{ .Count }} {{ tr $.Lang "كارت" "cards" }})</small>
                         </div>
                         <div class="text-end">
-                            <span class="badge bg-success">{{ printf "%.2f" .TotalPrice }} ج.م</span>
+                            <span class="badge bg-success">{{ printf "%.2f" .TotalPrice }} {{ tr $.Lang "ج.م" "EGP" }}</span>
                             <a href="/cards/print?batch={{ .BatchCode }}" class="btn btn-sm btn-outline-secondary d-block mt-1" target="_blank">
-                                <i class="bi bi-printer"></i> طباعة
+                                <i class="bi bi-printer"></i> {{ tr $.Lang "طباعة" "Print" }}
                             </a>
                         </div>
                     </li>
                     {{ else }}
-                    <li class="list-group-item text-center py-4 text-muted">لم يتم توليد أي دفعات بعد</li>
+                    <li class="list-group-item text-center py-4 text-muted">{{ tr .Lang "لم يتم توليد أي دفعات بعد" "No card batches generated yet" }}</li>
                     {{ end }}
                 </ul>
             </div>

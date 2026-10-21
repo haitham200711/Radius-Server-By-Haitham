@@ -1,28 +1,28 @@
 {{ define "content" }}
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-        <h3 class="fw-bold mb-1">المتصلين الآن (Live Sessions & CoA)</h3>
-        <p class="text-muted small mb-0">الجلسات المتصلة حالياً على راوترات المايكروتك (PPPoE / Hotspot)</p>
+        <h3 class="fw-bold mb-1">{{ tr .Lang "المتصلين الآن (Live Sessions & CoA)" "Online Users (Live Sessions & CoA)" }}</h3>
+        <p class="text-muted small mb-0">{{ tr .Lang "الجلسات المتصلة حالياً على راوترات المايكروتك (PPPoE / Hotspot)" "Currently active user sessions on MikroTik routers (PPPoE / Hotspot)" }}</p>
     </div>
     <a href="/sessions" class="btn btn-outline-primary fw-bold">
-        <i class="bi bi-arrow-clockwise me-1"></i> تحديث الجلسات
+        <i class="bi bi-arrow-clockwise me-1"></i> {{ tr .Lang "تحديث الجلسات" "Refresh Sessions" }}
     </a>
 </div>
 
-<div class="card">
+<div class="card shadow-sm border-0">
     <div class="card-body p-0 table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>اسم المشترك</th>
-                    <th>معرف الجلسة (Session ID)</th>
-                    <th>عنوان IP</th>
-                    <th>MAC الجهاز</th>
-                    <th>راوتر NAS</th>
-                    <th>مدة الاتصال</th>
-                    <th>التحميل</th>
-                    <th>الرفع</th>
-                    <th class="text-end">قطع الاتصال</th>
+                    <th>{{ tr .Lang "اسم المشترك" "Username" }}</th>
+                    <th>{{ tr .Lang "معرف الجلسة (Session ID)" "Session ID" }}</th>
+                    <th>{{ tr .Lang "عنوان IP" "Framed IP" }}</th>
+                    <th>{{ tr .Lang "MAC الجهاز" "Calling MAC" }}</th>
+                    <th>{{ tr .Lang "راوتر NAS" "NAS Router" }}</th>
+                    <th>{{ tr .Lang "مدة الاتصال" "Session Time" }}</th>
+                    <th>{{ tr .Lang "التحميل" "Download" }}</th>
+                    <th>{{ tr .Lang "الرفع" "Upload" }}</th>
+                    <th class="text-end">{{ tr .Lang "قطع الاتصال" "Action" }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -33,20 +33,20 @@
                     <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
                     <td><code>{{ .CallingStationID }}</code></td>
                     <td>{{ .NASIPAddress }}</td>
-                    <td>{{ .AcctSessionTime }} ثانية</td>
+                    <td>{{ .AcctSessionTime }} {{ tr $.Lang "ثانية" "sec" }}</td>
                     <td>{{ .AcctInputOctets }} B</td>
                     <td>{{ .AcctOutputOctets }} B</td>
                     <td class="text-end">
                         <a href="/sessions/disconnect?username={{ .UserName }}&session={{ .AcctSessionID }}&nas={{ .NASIPAddress }}&ip={{ .FramedIPAddress }}" 
                            class="btn btn-sm btn-danger fw-bold" 
-                           onclick="return confirm('هل أنت متأكد من قطع اتصال المشترك وإرسال أمر Disconnect (PoD) للمايكروتك فوراً؟');">
-                            <i class="bi bi-power"></i> فصل (PoD)
+                           onclick="return confirm('{{ tr $.Lang "هل أنت متأكد من قطع اتصال المشترك وإرسال أمر Disconnect (PoD) للمايكروتك فوراً؟" "Are you sure you want to send Disconnect (PoD) request to MikroTik router?" }}');">
+                            <i class="bi bi-power"></i> {{ tr $.Lang "فصل (PoD)" "Disconnect" }}
                         </a>
                     </td>
                 </tr>
                 {{ else }}
                 <tr>
-                    <td colspan="9" class="text-center py-5 text-muted">لا يوجد جلسات نشطة حالياً على الراوترات</td>
+                    <td colspan="9" class="text-center py-5 text-muted">{{ tr .Lang "لا يوجد جلسات نشطة حالياً على الراوترات" "No active sessions on routers currently" }}</td>
                 </tr>
                 {{ end }}
             </tbody>
