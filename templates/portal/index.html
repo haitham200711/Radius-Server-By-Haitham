@@ -94,6 +94,12 @@
             </div>
 
             <div class="d-flex align-items-center gap-2">
+                {{ if .ClientIP }}
+                <span class="badge bg-white bg-opacity-10 text-white font-monospace border border-white border-opacity-25 py-2 px-2.5 small" title="عنوان IP اتصالك الحالي">
+                    <i class="bi bi-broadcast me-1 text-info"></i>{{ .ClientIP }}
+                </span>
+                {{ end }}
+
                 {{ if .Settings.AllowPasswordChange }}
                 <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#changePassModal">
                     <i class="bi bi-key me-1"></i> تغيير كلمة المرور

@@ -562,6 +562,7 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_deduction_type VARCHAR(20) DEFAULT 'full';`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_initial_used_bytes BIGINT DEFAULT 0;`,
 		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_phone_login TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_ip_auto_login TINYINT(1) DEFAULT 0;`,
 		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS portal_enabled TINYINT(1) DEFAULT 1;`,
 	}
 	for _, m := range migrations {
@@ -5494,12 +5495,14 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 	var announcement sql.NullString
 	err := d.QueryRow(`SELECT id, COALESCE(portal_enabled, 1), COALESCE(allow_loan_request, 1),
 		COALESCE(show_quota_usage, 1), COALESCE(show_debt, 1), COALESCE(show_profile_details, 1),
-		COALESCE(show_online_status, 1), COALESCE(allow_password_change, 0), COALESCE(allow_phone_login, 0), COALESCE(allow_session_disconnect, 1),
+		COALESCE(show_online_status, 1), COALESCE(allow_password_change, 0), COALESCE(allow_phone_login, 0),
+		COALESCE(allow_ip_auto_login, 0), COALESCE(allow_session_disconnect, 1),
 		COALESCE(company_name, 'شبكتنا لخدمات الإنترنت'), COALESCE(company_phone, ''), portal_announcement, updated_at
 		FROM subscriber_portal_settings WHERE id = 1`).Scan(
 		&s.ID, &s.PortalEnabled, &s.AllowLoanRequest,
 		&s.ShowQuotaUsage, &s.ShowDebt, &s.ShowProfileDetails,
-		&s.ShowOnlineStatus, &s.AllowPasswordChange, &s.AllowPhoneLogin, &s.AllowSessionDisconnect,
+		&s.ShowOnlineStatus, &s.AllowPasswordChange, &s.AllowPhoneLogin,
+		&s.AllowIPAutoLogin, &s.AllowSessionDisconnect,
 		&s.CompanyName, &s.CompanyPhone, &announcement, &s.UpdatedAt,
 	)
 	if err != nil {
@@ -5514,6 +5517,7 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 				ShowOnlineStatus:       true,
 				AllowPasswordChange:    false,
 				AllowPhoneLogin:        false,
+				AllowIPAutoLogin:       false,
 				AllowSessionDisconnect: true,
 				CompanyName:            "شبكتنا لخدمات الإنترنت",
 			}, nil
@@ -5529,9 +5533,9 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) error {
 	_, err := d.Exec(`INSERT INTO subscriber_portal_settings (
 		id, portal_enabled, allow_loan_request, show_quota_usage, show_debt,
-		show_profile_details, show_online_status, allow_password_change, allow_phone_login, allow_session_disconnect,
+		show_profile_details, show_online_status, allow_password_change, allow_phone_login, allow_ip_auto_login, allow_session_disconnect,
 		company_name, company_phone, portal_announcement
-	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON DUPLICATE KEY UPDATE
 		portal_enabled = VALUES(portal_enabled),
 		allow_loan_request = VALUES(allow_loan_request),
@@ -5541,14 +5545,33 @@ func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) er
 		show_online_status = VALUES(show_online_status),
 		allow_password_change = VALUES(allow_password_change),
 		allow_phone_login = VALUES(allow_phone_login),
+		allow_ip_auto_login = VALUES(allow_ip_auto_login),
 		allow_session_disconnect = VALUES(allow_session_disconnect),
 		company_name = VALUES(company_name),
 		company_phone = VALUES(company_phone),
 		portal_announcement = VALUES(portal_announcement)`,
 		s.PortalEnabled, s.AllowLoanRequest, s.ShowQuotaUsage, s.ShowDebt,
-		s.ShowProfileDetails, s.ShowOnlineStatus, s.AllowPasswordChange, s.AllowPhoneLogin, s.AllowSessionDisconnect,
+		s.ShowProfileDetails, s.ShowOnlineStatus, s.AllowPasswordChange, s.AllowPhoneLogin, s.AllowIPAutoLogin, s.AllowSessionDisconnect,
 		s.CompanyName, s.CompanyPhone, s.PortalAnnouncement)
 	return err
+}
+
+// FindActiveSubscriberByIP finds an active online subscriber associated with the given IP in radacct
+func (d *DB) FindActiveSubscriberByIP(ip string) (*models.Subscriber, error) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+		return nil, sql.ErrNoRows
+	}
+
+	var username string
+	err := d.QueryRow(`SELECT username FROM radacct 
+		WHERE framedipaddress = ? AND acctstoptime IS NULL 
+		ORDER BY radacctid DESC LIMIT 1`, ip).Scan(&username)
+	if err != nil {
+		return nil, err
+	}
+
+	return d.GetSubscriber(username)
 }
 
 func (d *DB) GetSubscriberPortalData(username string) (*models.SubscriberPortalView, error) {

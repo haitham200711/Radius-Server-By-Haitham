@@ -196,6 +196,7 @@ func (bp *Blueprint) SavePortalSettingsHandler(w http.ResponseWriter, r *http.Re
 	showOnline := r.FormValue("show_online_status") == "1" || r.FormValue("show_online_status") == "on" || r.FormValue("show_online_status") == "true"
 	allowPass := r.FormValue("allow_password_change") == "1" || r.FormValue("allow_password_change") == "on" || r.FormValue("allow_password_change") == "true"
 	allowPhoneLogin := r.FormValue("allow_phone_login") == "1" || r.FormValue("allow_phone_login") == "on" || r.FormValue("allow_phone_login") == "true"
+	allowIPAutoLogin := r.FormValue("allow_ip_auto_login") == "1" || r.FormValue("allow_ip_auto_login") == "on" || r.FormValue("allow_ip_auto_login") == "true"
 	allowDisconnect := r.FormValue("allow_session_disconnect") == "1" || r.FormValue("allow_session_disconnect") == "on" || r.FormValue("allow_session_disconnect") == "true"
 
 	companyName := strings.TrimSpace(r.FormValue("company_name"))
@@ -214,6 +215,7 @@ func (bp *Blueprint) SavePortalSettingsHandler(w http.ResponseWriter, r *http.Re
 		ShowOnlineStatus:       showOnline,
 		AllowPasswordChange:    allowPass,
 		AllowPhoneLogin:        allowPhoneLogin,
+		AllowIPAutoLogin:       allowIPAutoLogin,
 		AllowSessionDisconnect: allowDisconnect,
 		CompanyName:            companyName,
 		CompanyPhone:           companyPhone,

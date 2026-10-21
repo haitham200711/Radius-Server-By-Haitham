@@ -316,6 +316,18 @@
                                     <small class="text-muted d-block">السماح للمشترك بتسجيل الدخول برقم هاتفه المسجل بدلاً من اليوزر نيم.</small>
                                 </div>
                             </div>
+
+                            <div class="col-md-6 col-lg-4">
+                                <div class="border rounded-3 p-3 h-100 bg-white shadow-sm border-primary">
+                                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                        <label class="form-check-label fw-bold text-primary" for="sw_allow_ip_auto_login">
+                                            <i class="bi bi-box-arrow-in-right me-1"></i> الدخول التلقائي (Auto Login)
+                                        </label>
+                                        <input class="form-check-input ms-0" type="checkbox" name="allow_ip_auto_login" value="1" id="sw_allow_ip_auto_login" {{ if .PortalSettings.AllowIPAutoLogin }}checked{{ end }}>
+                                    </div>
+                                    <small class="text-muted d-block">التعرف على المشترك تلقائياً من عنوان IP جلسته النشطة وتسجيل دخوله فوراً بدون كلمة سر.</small>
+                                </div>
+                            </div>
                         </div>
 
                         <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">

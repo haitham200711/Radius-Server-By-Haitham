@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
+	"github.com/haitham200711/Radius-Server-By-Haitham/models"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -19,6 +21,28 @@ type Blueprint struct {
 
 func New(db *database.DB, r *web.Renderer, secret string) *Blueprint {
 	return &Blueprint{db: db, renderer: r, secret: secret}
+}
+
+// extractClientIP retrieves the real client IP address from proxy headers or RemoteAddr
+func extractClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		ip := strings.TrimSpace(parts[0])
+		if ip != "" {
+			return ip
+		}
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		ip := strings.TrimSpace(xri)
+		if ip != "" {
+			return ip
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return strings.TrimSpace(r.RemoteAddr)
 }
 
 // LoginHandler renders and handles subscriber portal login
@@ -37,12 +61,50 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	clientIP := extractClientIP(r)
+	isLogout := (r.URL.Query().Get("logout") == "1")
+	forceAuto := (r.URL.Query().Get("autologin") == "1")
+
+	var detectedSub *models.Subscriber
+	if settings != nil && settings.AllowIPAutoLogin && clientIP != "" {
+		sub, err := bp.db.FindActiveSubscriberByIP(clientIP)
+		if err == nil && sub != nil {
+			prof, _ := bp.db.GetProfileByName(sub.ProfileName)
+			if prof == nil || prof.PortalEnabled {
+				detectedSub = sub
+			}
+		}
+	}
+
+	// Auto-login: If not an explicit logout action, and Auto Login is enabled with active detected user
+	if detectedSub != nil && (forceAuto || (!isLogout && r.Method == http.MethodGet)) {
+		token := middleware.GenerateToken(middleware.SessionUser{
+			ID:       detectedSub.ID,
+			Username: detectedSub.Username,
+			Role:     "subscriber",
+		}, bp.secret)
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     middleware.CookieName,
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			Expires:  time.Now().Add(7 * 24 * time.Hour),
+		})
+
+		http.Redirect(w, r, "/portal?autologin=1", http.StatusFound)
+		return
+	}
+
 	if r.Method == http.MethodGet {
 		errorMsg := r.URL.Query().Get("error")
 		_ = bp.renderer.Render(w, "portal/login", map[string]interface{}{
-			"Title":    "تسجيل دخول المشترك",
-			"Settings": settings,
-			"Error":    errorMsg,
+			"Title":        "تسجيل دخول المشترك",
+			"Settings":     settings,
+			"Error":        errorMsg,
+			"ClientIP":     clientIP,
+			"DetectedUser": detectedSub,
+			"IsLogout":     isLogout,
 		})
 		return
 	}
@@ -118,12 +180,44 @@ func (bp *Blueprint) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 	})
-	http.Redirect(w, r, "/portal/login", http.StatusFound)
+	http.Redirect(w, r, "/portal/login?logout=1", http.StatusFound)
 }
 
 // IndexHandler renders the full self-care portal
 func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r)
+	clientIP := extractClientIP(r)
+
+	// If no active session, check if Auto Login by active IP is permitted
+	if user == nil {
+		settings, _ := bp.db.GetSubscriberPortalSettings()
+		if settings != nil && settings.PortalEnabled && settings.AllowIPAutoLogin && clientIP != "" {
+			sub, err := bp.db.FindActiveSubscriberByIP(clientIP)
+			if err == nil && sub != nil {
+				prof, _ := bp.db.GetProfileByName(sub.ProfileName)
+				if prof == nil || prof.PortalEnabled {
+					token := middleware.GenerateToken(middleware.SessionUser{
+						ID:       sub.ID,
+						Username: sub.Username,
+						Role:     "subscriber",
+					}, bp.secret)
+					http.SetCookie(w, &http.Cookie{
+						Name:     middleware.CookieName,
+						Value:    token,
+						Path:     "/",
+						HttpOnly: true,
+						Expires:  time.Now().Add(7 * 24 * time.Hour),
+					})
+					user = &middleware.SessionUser{
+						ID:       sub.ID,
+						Username: sub.Username,
+						Role:     "subscriber",
+					}
+				}
+			}
+		}
+	}
+
 	if user == nil {
 		http.Redirect(w, r, "/portal/login", http.StatusFound)
 		return
@@ -155,6 +249,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	flashSuccess := r.URL.Query().Get("success")
+	if r.URL.Query().Get("autologin") == "1" && flashSuccess == "" {
+		flashSuccess = "تم تسجيل الدخول التلقائي بنجاح بحساب (" + username + ") بناءً على عنوان الآيبي الخاص بك (" + clientIP + ")"
+	}
 	flashError := r.URL.Query().Get("error")
 
 	_ = bp.renderer.Render(w, "portal/index", map[string]interface{}{
@@ -162,6 +259,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		"Data":         data,
 		"Settings":     data.Settings,
 		"CurrentUser":  user,
+		"ClientIP":     clientIP,
 		"FlashSuccess": flashSuccess,
 		"FlashError":   flashError,
 	})

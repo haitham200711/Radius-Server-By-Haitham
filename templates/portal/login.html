@@ -94,6 +94,26 @@
         </div>
         {{ end }}
 
+        {{ if .DetectedUser }}
+        <div class="card bg-primary bg-opacity-10 border border-primary border-opacity-50 p-3 rounded-4 mb-4 text-center">
+            <div class="d-flex align-items-center justify-content-center gap-1 text-info small fw-bold mb-1">
+                <span class="spinner-grow spinner-grow-sm text-info" style="width: 0.5rem; height: 0.5rem;"></span>
+                <span>تم التعرف على اتصالك تلقائياً ({{ .ClientIP }})</span>
+            </div>
+            <div class="fw-bold text-white fs-6 mb-1">{{ .DetectedUser.FullName }}</div>
+            <div class="font-monospace text-info small mb-3">@{{ .DetectedUser.Username }}</div>
+            <a href="/portal/login?autologin=1" class="btn btn-sm btn-primary fw-bold py-2 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-box-arrow-in-right fs-5"></i>
+                <span>الدخول السريع فوراً (Auto Login)</span>
+            </a>
+        </div>
+        <div class="d-flex align-items-center my-3 text-muted">
+            <hr class="flex-grow-1 border-white border-opacity-10 my-0">
+            <span class="px-2 small text-light opacity-50">أو تسجيل الدخول اليدوي</span>
+            <hr class="flex-grow-1 border-white border-opacity-10 my-0">
+        </div>
+        {{ end }}
+
         <form method="POST" action="/portal/login">
             <div class="mb-3">
                 <label class="form-label small fw-bold text-light">
