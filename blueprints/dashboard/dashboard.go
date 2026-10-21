@@ -66,7 +66,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = bp.renderer.Render(w, "dashboard/index", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "dashboard/index", map[string]interface{}{
 		"Title":          "لوحة التحكم الإحصائية ومراقبة السيرفر",
 		"ActiveMenu":     "dashboard",
 		"CurrentUser":    user,

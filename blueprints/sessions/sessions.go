@@ -37,7 +37,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = bp.renderer.Render(w, "sessions/list", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "sessions/list", map[string]interface{}{
 		"Title":       "المتصلين الآن (Live Sessions & CoA)",
 		"ActiveMenu":  "sessions",
 		"CurrentUser": middleware.GetUser(r),

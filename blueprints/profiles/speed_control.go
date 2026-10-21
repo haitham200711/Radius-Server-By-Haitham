@@ -60,7 +60,7 @@ func (bp *Blueprint) SpeedControlHandler(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	_ = bp.renderer.Render(w, "profiles/speed_control", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "profiles/speed_control", map[string]interface{}{
 		"Title":            "التحكم بالسرعات",
 		"ActiveMenu":       "speed_control",
 		"CurrentUser":      middleware.GetUser(r),

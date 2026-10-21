@@ -98,7 +98,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		errorMsg := r.URL.Query().Get("error")
-		_ = bp.renderer.Render(w, "portal/login", map[string]interface{}{
+		_ = bp.renderer.Render(w, r, "portal/login", map[string]interface{}{
 			"Title":        "تسجيل دخول المشترك",
 			"Settings":     settings,
 			"Error":        errorMsg,
@@ -254,7 +254,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	flashError := r.URL.Query().Get("error")
 
-	_ = bp.renderer.Render(w, "portal/index", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "portal/index", map[string]interface{}{
 		"Title":        "صفحة المشترك - " + data.Subscriber.FullName,
 		"Data":         data,
 		"Settings":     data.Settings,

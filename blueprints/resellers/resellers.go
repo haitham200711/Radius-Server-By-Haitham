@@ -32,7 +32,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		summary = make(map[string]interface{})
 	}
 
-	_ = bp.renderer.Render(w, "resellers/list", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "resellers/list", map[string]interface{}{
 		"Title":       "إدارة الموزعين والوكلاء",
 		"ActiveMenu":  "resellers",
 		"CurrentUser": middleware.GetUser(r),

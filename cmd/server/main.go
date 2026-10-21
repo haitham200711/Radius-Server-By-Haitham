@@ -123,6 +123,49 @@ func main() {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	})
 
+	// Language switcher (Bilingual AR / EN)
+	mux.HandleFunc("/set-lang", func(w http.ResponseWriter, r *http.Request) {
+		targetLang := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("lang")))
+		if targetLang != "en" {
+			targetLang = "ar"
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "radius_lang",
+			Value:    targetLang,
+			Path:     "/",
+			HttpOnly: false,
+			MaxAge:   365 * 24 * 3600,
+			SameSite: http.SameSiteLaxMode,
+		})
+		ref := r.Referer()
+		if ref == "" {
+			ref = "/dashboard"
+		}
+		http.Redirect(w, r, ref, http.StatusFound)
+	})
+	mux.HandleFunc("/lang", func(w http.ResponseWriter, r *http.Request) {
+		targetLang := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("set")))
+		if targetLang == "" {
+			targetLang = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("lang")))
+		}
+		if targetLang != "en" {
+			targetLang = "ar"
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "radius_lang",
+			Value:    targetLang,
+			Path:     "/",
+			HttpOnly: false,
+			MaxAge:   365 * 24 * 3600,
+			SameSite: http.SameSiteLaxMode,
+		})
+		ref := r.Referer()
+		if ref == "" {
+			ref = "/dashboard"
+		}
+		http.Redirect(w, r, ref, http.StatusFound)
+	})
+
 	// Auth Blueprint
 	authBP := auth.New(db, renderer, cfg.SessionSecret)
 	mux.HandleFunc("/auth/login", authBP.LoginHandler)

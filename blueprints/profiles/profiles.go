@@ -27,7 +27,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		profilesList = []models.Profile{}
 	}
 
-	_ = bp.renderer.Render(w, "profiles/list", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "profiles/list", map[string]interface{}{
 		"Title":       "باقات السرعات والخدمات",
 		"ActiveMenu":  "profiles",
 		"CurrentUser": middleware.GetUser(r),

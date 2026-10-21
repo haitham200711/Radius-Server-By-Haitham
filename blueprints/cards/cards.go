@@ -69,7 +69,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 
-	_ = bp.renderer.Render(w, "cards/list", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "cards/list", map[string]interface{}{
 		"Title":       pageTitle,
 		"ActiveMenu":  activeMenu,
 		"CardType":    cardType,
@@ -218,7 +218,7 @@ func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		_ = bp.renderer.Render(w, "cards/generate", map[string]interface{}{
+		_ = bp.renderer.Render(w, r, "cards/generate", map[string]interface{}{
 			"Title":       pageTitle,
 			"ActiveMenu":  activeMenu,
 			"CardType":    cardType,
@@ -282,7 +282,7 @@ func (bp *Blueprint) PrintHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = bp.renderer.Render(w, "cards/print", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "cards/print", map[string]interface{}{
 		"BatchCode": batchCode,
 		"Cards":     cardList,
 	})
@@ -339,7 +339,7 @@ func (bp *Blueprint) CafePortalHandler(w http.ResponseWriter, r *http.Request) {
 	// 6. Profiles list for modal generator
 	profilesList, _ := bp.db.GetProfiles()
 
-	_ = bp.renderer.Render(w, "cards/cafe_portal", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "cards/cafe_portal", map[string]interface{}{
 		"Title":            "منظومة كروت الكافيهات على الراديوس",
 		"ActiveMenu":       "cafe_cards",
 		"CurrentUser":      u,

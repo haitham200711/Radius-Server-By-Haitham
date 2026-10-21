@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/i18n"
 )
 
 type Renderer struct {
@@ -68,6 +71,15 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 			}
 			return fmt.Sprintf("%.1f", float64(b)/(1024*1024*1024))
 		},
+		"t": func(lang, key string) string {
+			return i18n.T(lang, key)
+		},
+		"tr": func(lang, ar, en string) string {
+			return i18n.TR(lang, ar, en)
+		},
+		"isRTL": func(lang string) bool {
+			return strings.ToLower(strings.TrimSpace(lang)) != "en"
+		},
 	}
 
 	for key, files := range pages {
@@ -85,7 +97,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 	return r, nil
 }
 
-func (r *Renderer) Render(w http.ResponseWriter, name string, data interface{}) error {
+func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, name string, data interface{}) error {
 	tmpl, ok := r.templates[name]
 	if !ok {
 		err := fmt.Errorf("template '%s' not registered in Renderer", name)
@@ -93,6 +105,37 @@ func (r *Renderer) Render(w http.ResponseWriter, name string, data interface{}) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
+
+	lang := "ar"
+	if req != nil {
+		if c, err := req.Cookie("radius_lang"); err == nil && strings.ToLower(c.Value) == "en" {
+			lang = "en"
+		}
+	}
+	dir := "rtl"
+	if lang == "en" {
+		dir = "ltr"
+	}
+
+	if m, ok := data.(map[string]interface{}); ok {
+		if _, exists := m["Lang"]; !exists {
+			m["Lang"] = lang
+		}
+		if _, exists := m["Dir"]; !exists {
+			m["Dir"] = dir
+		}
+		if _, exists := m["IsRTL"]; !exists {
+			m["IsRTL"] = (lang != "en")
+		}
+		if req != nil {
+			if _, exists := m["CurrentUser"]; !exists {
+				if u := middleware.GetUser(req); u != nil {
+					m["CurrentUser"] = u
+				}
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if name == "cards/print" || strings.HasPrefix(name, "portal/") {
 		return tmpl.Execute(w, data)

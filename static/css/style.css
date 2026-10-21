@@ -796,3 +796,53 @@ code.card-username {
         width: 100% !important;
     }
 }
+
+/* ==========================================================================
+   Bilingual / LTR Support for English Mode
+   ========================================================================== */
+html[dir="ltr"] body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: normal;
+}
+
+html[dir="ltr"] .app-sidebar {
+    border-left: none;
+    border-right: 1px solid var(--border-color);
+}
+
+html[dir="ltr"] .sidebar-nav-link.active {
+    border-right: none;
+    border-left: 3px solid var(--primary);
+}
+
+html[dir="ltr"] .sidebar-submenu {
+    margin-right: 0;
+    margin-left: 20px;
+    padding-right: 0;
+    padding-left: 12px;
+    border-right: none;
+    border-left: 2px solid #e2e8f0;
+}
+
+html[dir="ltr"] .sidebar-sub-link:hover {
+    padding-right: 12px;
+    padding-left: 15px;
+}
+
+html[dir="ltr"] .sidebar-sub-link.active {
+    border-right: none;
+    border-left: 3px solid #0d6efd;
+    margin-right: 0;
+    margin-left: -14px;
+    padding-right: 12px;
+    padding-left: 11px;
+}
+
+html[dir="ltr"] .submenu-arrow {
+    transform: rotate(0deg);
+}
+
+html[dir="ltr"] .sidebar-nav-link[aria-expanded="true"] .submenu-arrow {
+    transform: rotate(180deg);
+}
+

@@ -173,7 +173,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	randPass := randomAlpha(8)
 	nextIP := bp.db.GetNextSequentialSSTPIP()
 
-	_ = bp.renderer.Render(w, "sstp/index", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "sstp/index", map[string]interface{}{
 		"Title":          "إدارة سيرفر SSTP VPN للمايكروتك",
 		"ActiveMenu":     "sstp",
 		"CurrentUser":    middleware.GetUser(r),

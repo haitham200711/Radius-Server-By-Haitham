@@ -232,7 +232,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		toIndex = 0
 	}
 
-	_ = bp.renderer.Render(w, "reports/index", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "reports/index", map[string]interface{}{
 		"Title":          "تقرير حالات تسجيل دخول وجلسات المشتركين",
 		"ActiveMenu":     "reports",
 		"ActiveTab":      tab,

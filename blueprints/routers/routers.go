@@ -99,7 +99,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_ = bp.renderer.Render(w, "routers/list", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "routers/list", map[string]interface{}{
 		"Title":       "راوترات وسيرفرات المايكروتك (NAS)",
 		"ActiveMenu":  "routers",
 		"CurrentUser": middleware.GetUser(r),

@@ -50,7 +50,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		flashType = "danger"
 	}
 
-	_ = bp.renderer.Render(w, "whatsapp/index", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "whatsapp/index", map[string]interface{}{
 		"Title":          "ربط وإشعارات واتساب (WhatsApp)",
 		"ActiveMenu":     "whatsapp",
 		"CurrentUser":    user,

@@ -155,7 +155,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"Error":          r.URL.Query().Get("err"),
 	}
 
-	_ = bp.renderer.Render(w, "card_templates/list", data)
+	_ = bp.renderer.Render(w, r, "card_templates/list", data)
 }
 
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {

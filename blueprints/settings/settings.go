@@ -121,7 +121,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		advErrorMsg = r.URL.Query().Get("error")
 	}
 
-	_ = bp.renderer.Render(w, "settings/index", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "settings/index", map[string]interface{}{
 		"Title":               "إعدادات النظام والخدمات",
 		"ActiveMenu":          "settings",
 		"CurrentUser":         middleware.GetUser(r),

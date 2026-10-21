@@ -390,7 +390,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.loan_active = 1`).Scan(&loanActiveCount)
 	}
 
-	_ = bp.renderer.Render(w, "subscribers/list", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "subscribers/list", map[string]interface{}{
 		"Title":             "إدارة المشتركين والعقود",
 		"ActiveMenu":        "subscribers",
 		"CurrentUser":       middleware.GetUser(r),
@@ -646,7 +646,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 		profiles, _ := bp.db.GetProfiles()
 		resellersList, _ := bp.db.GetResellers()
 
-		_ = bp.renderer.Render(w, "subscribers/add", map[string]interface{}{
+		_ = bp.renderer.Render(w, r, "subscribers/add", map[string]interface{}{
 			"Title":       "إضافة مشترك جديد",
 			"ActiveMenu":  "subscribers",
 			"CurrentUser": middleware.GetUser(r),
@@ -867,7 +867,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 			expStr = sub.ExpirationDate.Time.Format("2006-01-02T15:04")
 		}
 
-		_ = bp.renderer.Render(w, "subscribers/edit", map[string]interface{}{
+		_ = bp.renderer.Render(w, r, "subscribers/edit", map[string]interface{}{
 			"Title":          "تعديل بيانات المشترك: " + sub.FullName,
 			"ActiveMenu":     "subscribers",
 			"CurrentUser":    middleware.GetUser(r),

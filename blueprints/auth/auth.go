@@ -27,7 +27,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodGet {
-		_ = bp.renderer.Render(w, "auth/login", map[string]interface{}{
+		_ = bp.renderer.Render(w, r, "auth/login", map[string]interface{}{
 			"Title": "تسجيل الدخول",
 		})
 		return
@@ -114,7 +114,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Invalid credentials
-	_ = bp.renderer.Render(w, "auth/login", map[string]interface{}{
+	_ = bp.renderer.Render(w, r, "auth/login", map[string]interface{}{
 		"Title": "تسجيل الدخول",
 		"Error": "اسم المستخدم أو كلمة المرور غير صحيحة",
 	})
