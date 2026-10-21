@@ -181,6 +181,99 @@ type ResellerDebtSummary struct {
 	TotalDebt       float64 `json:"total_debt"`
 }
 
+// SubscriberMonthlyTraffic represents aggregated monthly usage
+type SubscriberMonthlyTraffic struct {
+	Year            int     `json:"year"`
+	Month           int     `json:"month"`
+	MonthName       string  `json:"month_name"`
+	MonthNameAr     string  `json:"month_name_ar"`
+	UploadBytes     int64   `json:"upload_bytes"`
+	DownloadBytes   int64   `json:"download_bytes"`
+	TotalBytes      int64   `json:"total_bytes"`
+	UploadGB        float64 `json:"upload_gb"`
+	DownloadGB      float64 `json:"download_gb"`
+	TotalGB         float64 `json:"total_gb"`
+	TotalDisplay    string  `json:"total_display"`
+	UploadDisplay   string  `json:"upload_display"`
+	DownloadDisplay string  `json:"download_display"`
+	SessionCount    int     `json:"session_count"`
+	TotalTimeSec    int64   `json:"total_time_sec"`
+	DurationString  string  `json:"duration_string"`
+	PercentOfPeak   float64 `json:"percent_of_peak"`
+}
+
+// SubscriberDailyTraffic represents aggregated daily usage for a selected month
+type SubscriberDailyTraffic struct {
+	Date            string  `json:"date"`
+	DayNum          int     `json:"day_num"`
+	DayNameAr       string  `json:"day_name_ar"`
+	UploadBytes     int64   `json:"upload_bytes"`
+	DownloadBytes   int64   `json:"download_bytes"`
+	TotalBytes      int64   `json:"total_bytes"`
+	UploadGB        float64 `json:"upload_gb"`
+	DownloadGB      float64 `json:"download_gb"`
+	TotalGB         float64 `json:"total_gb"`
+	TotalDisplay    string  `json:"total_display"`
+	UploadDisplay   string  `json:"upload_display"`
+	DownloadDisplay string  `json:"download_display"`
+	SessionCount    int     `json:"session_count"`
+	TotalTimeSec    int64   `json:"total_time_sec"`
+	DurationString  string  `json:"duration_string"`
+	PercentOfPeak   float64 `json:"percent_of_peak"`
+}
+
+// TopConsumerItem represents a top consuming user in the selected period
+type TopConsumerItem struct {
+	Username     string  `json:"username"`
+	FullName     string  `json:"full_name"`
+	ContractNo   string  `json:"contract_no"`
+	ProfileName  string  `json:"profile_name"`
+	ResellerName string  `json:"reseller_name"`
+	TotalBytes   int64   `json:"total_bytes"`
+	TotalGB      float64 `json:"total_gb"`
+	TotalDisplay string  `json:"total_display"`
+	UploadGB     float64 `json:"upload_gb"`
+	DownloadGB   float64 `json:"download_gb"`
+	SessionCount int     `json:"session_count"`
+	IsOnline     bool    `json:"is_online"`
+}
+
+// SubscriberTrafficReport holds full report context
+type SubscriberTrafficReport struct {
+	Username          string                     `json:"username"`
+	FullName          string                     `json:"full_name"`
+	ContractNo        string                     `json:"contract_no"`
+	Phone             string                     `json:"phone"`
+	ProfileName       string                     `json:"profile_name"`
+	ProfileDisplay    string                     `json:"profile_display"`
+	ResellerName      string                     `json:"reseller_name"`
+	IsOnline          bool                       `json:"is_online"`
+	OnlineIP          string                     `json:"online_ip"`
+	AvailableYears    []int                      `json:"available_years"`
+	SelectedYear      int                        `json:"selected_year"`
+	SelectedMonth     int                        `json:"selected_month"`
+	SelectedMonthName string                     `json:"selected_month_name"`
+	YearTotalBytes    int64                      `json:"year_total_bytes"`
+	YearTotalGB       float64                    `json:"year_total_gb"`
+	YearTotalUploadGB float64                    `json:"year_total_upload_gb"`
+	YearTotalDownGB   float64                    `json:"year_total_down_gb"`
+	YearTotalSessions int                        `json:"year_total_sessions"`
+	YearTotalDuration string                     `json:"year_total_duration"`
+	YearPeakMonth     string                     `json:"year_peak_month"`
+	YearPeakMonthGB   float64                    `json:"year_peak_month_gb"`
+	MonthTotalBytes   int64                      `json:"month_total_bytes"`
+	MonthTotalGB      float64                    `json:"month_total_gb"`
+	MonthTotalUpload  float64                    `json:"month_total_upload"`
+	MonthTotalDown    float64                    `json:"month_total_down"`
+	MonthSessions     int                        `json:"month_sessions"`
+	MonthDuration     string                     `json:"month_duration"`
+	MonthPeakDay      string                     `json:"month_peak_day"`
+	MonthPeakDayGB    float64                    `json:"month_peak_day_gb"`
+	MonthDailyAvgGB   float64                    `json:"month_daily_avg_gb"`
+	MonthlyList       []SubscriberMonthlyTraffic `json:"monthly_list"`
+	DailyList         []SubscriberDailyTraffic   `json:"daily_list"`
+}
+
 // Profile represents service plans (Speed limits, Quotas, Pricing)
 type Profile struct {
 	ID                  int64     `json:"id"`

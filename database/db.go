@@ -7201,6 +7201,389 @@ func (d *DB) UpdateSubscriberPassword(username, newPass string) error {
 	return nil
 }
 
+// -----------------------------------------------------------------------------
+// Subscriber Traffic Consumption Report (الاستهلاك الشهري واليومي)
+// -----------------------------------------------------------------------------
+
+var arabicMonthNamesFull = []string{
+	"",
+	"يناير (January)",
+	"فبراير (February)",
+	"مارس (March)",
+	"أبريل (April)",
+	"مايو (May)",
+	"يونيو (June)",
+	"يوليو (July)",
+	"أغسطس (August)",
+	"سبتمبر (September)",
+	"أكتوبر (October)",
+	"نوفمبر (November)",
+	"ديسمبر (December)",
+}
+
+var arabicDayNames = map[time.Weekday]string{
+	time.Sunday:    "الأحد",
+	time.Monday:    "الاثنين",
+	time.Tuesday:   "الثلاثاء",
+	time.Wednesday: "الأربعاء",
+	time.Thursday:  "الخميس",
+	time.Friday:    "الجمعة",
+	time.Saturday:  "السبت",
+}
+
+func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*models.SubscriberTrafficReport, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("اسم المشترك مطلوب")
+	}
+
+	now := time.Now()
+	if year < 2000 || year > now.Year()+2 {
+		year = now.Year()
+	}
+	if month < 1 || month > 12 {
+		month = int(now.Month())
+	}
+
+	report := &models.SubscriberTrafficReport{
+		Username:          username,
+		FullName:          username,
+		SelectedYear:      year,
+		SelectedMonth:     month,
+		SelectedMonthName: arabicMonthNamesFull[month],
+	}
+
+	// 1. Fetch Subscriber Details
+	_ = d.QueryRow(`SELECT 
+		COALESCE(s.full_name, s.username),
+		COALESCE(s.contract_no, ''),
+		COALESCE(s.phone, ''),
+		COALESCE(s.profile_name, ''),
+		COALESCE(p.display_name, s.profile_name),
+		COALESCE(r.name, 'المركز الرئيسي')
+	FROM subscribers s
+	LEFT JOIN profiles p ON s.profile_name = p.name
+	LEFT JOIN resellers r ON s.reseller_id = r.id
+	WHERE s.username = ?`, username).Scan(
+		&report.FullName, &report.ContractNo, &report.Phone,
+		&report.ProfileName, &report.ProfileDisplay, &report.ResellerName,
+	)
+
+	// 2. Online status check
+	var onlineIP string
+	errOnline := d.QueryRow("SELECT framedipaddress FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1", username).Scan(&onlineIP)
+	if errOnline == nil {
+		report.IsOnline = true
+		report.OnlineIP = onlineIP
+	}
+
+	// 3. Available Years for this Subscriber
+	yearRows, err := d.Query("SELECT DISTINCT YEAR(acctstarttime) as yr FROM radacct WHERE username = ? AND acctstarttime IS NOT NULL ORDER BY yr DESC", username)
+	if err == nil {
+		defer yearRows.Close()
+		hasSelectedYear := false
+		for yearRows.Next() {
+			var yr int
+			if err := yearRows.Scan(&yr); err == nil && yr > 2000 {
+				report.AvailableYears = append(report.AvailableYears, yr)
+				if yr == year {
+					hasSelectedYear = true
+				}
+			}
+		}
+		if !hasSelectedYear {
+			report.AvailableYears = append([]int{year}, report.AvailableYears...)
+		}
+	}
+	if len(report.AvailableYears) == 0 {
+		report.AvailableYears = []int{year}
+	}
+
+	// 4. Monthly Usage for Selected Year
+	type monthData struct {
+		upBytes   int64
+		downBytes int64
+		totBytes  int64
+		sessions  int
+		duration  int64
+	}
+	monthMap := make(map[int]monthData)
+
+	mRows, err := d.Query(`SELECT 
+		MONTH(acctstarttime) as m,
+		COALESCE(SUM(acctinputoctets), 0),
+		COALESCE(SUM(acctoutputoctets), 0),
+		COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
+		COUNT(*),
+		COALESCE(SUM(acctsessiontime), 0)
+	FROM radacct
+	WHERE username = ? AND YEAR(acctstarttime) = ?
+	GROUP BY MONTH(acctstarttime)`, username, year)
+
+	if err == nil {
+		defer mRows.Close()
+		for mRows.Next() {
+			var m int
+			var md monthData
+			if err := mRows.Scan(&m, &md.upBytes, &md.downBytes, &md.totBytes, &md.sessions, &md.duration); err == nil {
+				monthMap[m] = md
+			}
+		}
+	}
+
+	// Find max monthly bytes for relative percentage visualization
+	var maxMonthBytes int64
+	var peakMonthNum int
+	for m := 1; m <= 12; m++ {
+		if md, ok := monthMap[m]; ok {
+			report.YearTotalBytes += md.totBytes
+			report.YearTotalSessions += md.sessions
+			if md.totBytes > maxMonthBytes {
+				maxMonthBytes = md.totBytes
+				peakMonthNum = m
+			}
+		}
+	}
+	if maxMonthBytes > 0 {
+		report.YearPeakMonth = arabicMonthNamesFull[peakMonthNum]
+		report.YearPeakMonthGB = float64(maxMonthBytes) / (1024 * 1024 * 1024)
+	}
+
+	var yearTotalUp int64
+	var yearTotalDown int64
+	var yearTotalDurationSec int64
+
+	// Build 12-month array
+	for m := 1; m <= 12; m++ {
+		md := monthMap[m]
+		upGB := float64(md.upBytes) / (1024 * 1024 * 1024)
+		downGB := float64(md.downBytes) / (1024 * 1024 * 1024)
+		totGB := float64(md.totBytes) / (1024 * 1024 * 1024)
+
+		yearTotalUp += md.upBytes
+		yearTotalDown += md.downBytes
+		yearTotalDurationSec += md.duration
+
+		var pct float64
+		if maxMonthBytes > 0 {
+			pct = (float64(md.totBytes) / float64(maxMonthBytes)) * 100.0
+		}
+
+		item := models.SubscriberMonthlyTraffic{
+			Year:            year,
+			Month:           m,
+			MonthName:       fmt.Sprintf("%02d", m),
+			MonthNameAr:     arabicMonthNamesFull[m],
+			UploadBytes:     md.upBytes,
+			DownloadBytes:   md.downBytes,
+			TotalBytes:      md.totBytes,
+			UploadGB:        upGB,
+			DownloadGB:      downGB,
+			TotalGB:         totGB,
+			TotalDisplay:    FormatBytesHuman(md.totBytes),
+			UploadDisplay:   FormatBytesHuman(md.upBytes),
+			DownloadDisplay: FormatBytesHuman(md.downBytes),
+			SessionCount:    md.sessions,
+			TotalTimeSec:    md.duration,
+			DurationString:  FormatDurationArabic(md.duration),
+			PercentOfPeak:   pct,
+		}
+		report.MonthlyList = append(report.MonthlyList, item)
+	}
+
+	report.YearTotalGB = float64(report.YearTotalBytes) / (1024 * 1024 * 1024)
+	report.YearTotalUploadGB = float64(yearTotalUp) / (1024 * 1024 * 1024)
+	report.YearTotalDownGB = float64(yearTotalDown) / (1024 * 1024 * 1024)
+	report.YearTotalDuration = FormatDurationArabic(yearTotalDurationSec)
+
+	// 5. Daily Usage for Selected Month
+	type dayData struct {
+		upBytes   int64
+		downBytes int64
+		totBytes  int64
+		sessions  int
+		duration  int64
+	}
+	dayMap := make(map[int]dayData)
+
+	dRows, err := d.Query(`SELECT 
+		DAY(acctstarttime) as d,
+		COALESCE(SUM(acctinputoctets), 0),
+		COALESCE(SUM(acctoutputoctets), 0),
+		COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
+		COUNT(*),
+		COALESCE(SUM(acctsessiontime), 0)
+	FROM radacct
+	WHERE username = ? AND YEAR(acctstarttime) = ? AND MONTH(acctstarttime) = ?
+	GROUP BY DAY(acctstarttime)`, username, year, month)
+
+	if err == nil {
+		defer dRows.Close()
+		for dRows.Next() {
+			var d int
+			var dd dayData
+			if err := dRows.Scan(&d, &dd.upBytes, &dd.downBytes, &dd.totBytes, &dd.sessions, &dd.duration); err == nil {
+				dayMap[d] = dd
+			}
+		}
+	}
+
+	// Calculate number of days in selected month
+	daysInMonth := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.Local).Day()
+	var maxDayBytes int64
+	var peakDayNum int
+
+	var monthUpBytes int64
+	var monthDownBytes int64
+	var monthDurationSec int64
+
+	for d := 1; d <= daysInMonth; d++ {
+		if dd, ok := dayMap[d]; ok {
+			report.MonthTotalBytes += dd.totBytes
+			report.MonthSessions += dd.sessions
+			monthUpBytes += dd.upBytes
+			monthDownBytes += dd.downBytes
+			monthDurationSec += dd.duration
+			if dd.totBytes > maxDayBytes {
+				maxDayBytes = dd.totBytes
+				peakDayNum = d
+			}
+		}
+	}
+
+	if maxDayBytes > 0 {
+		report.MonthPeakDay = fmt.Sprintf("%02d/%02d/%d", peakDayNum, month, year)
+		report.MonthPeakDayGB = float64(maxDayBytes) / (1024 * 1024 * 1024)
+	}
+
+	report.MonthTotalGB = float64(report.MonthTotalBytes) / (1024 * 1024 * 1024)
+	report.MonthTotalUpload = float64(monthUpBytes) / (1024 * 1024 * 1024)
+	report.MonthTotalDown = float64(monthDownBytes) / (1024 * 1024 * 1024)
+	report.MonthDuration = FormatDurationArabic(monthDurationSec)
+	if daysInMonth > 0 {
+		report.MonthDailyAvgGB = report.MonthTotalGB / float64(daysInMonth)
+	}
+
+	// Build day-by-day continuous list
+	for d := 1; d <= daysInMonth; d++ {
+		dd := dayMap[d]
+		dateObj := time.Date(year, time.Month(month), d, 0, 0, 0, 0, time.Local)
+		dayNameAr := arabicDayNames[dateObj.Weekday()]
+		dateStr := dateObj.Format("2006-01-02")
+
+		upGB := float64(dd.upBytes) / (1024 * 1024 * 1024)
+		downGB := float64(dd.downBytes) / (1024 * 1024 * 1024)
+		totGB := float64(dd.totBytes) / (1024 * 1024 * 1024)
+
+		var pct float64
+		if maxDayBytes > 0 {
+			pct = (float64(dd.totBytes) / float64(maxDayBytes)) * 100.0
+		}
+
+		item := models.SubscriberDailyTraffic{
+			Date:            dateStr,
+			DayNum:          d,
+			DayNameAr:       dayNameAr,
+			UploadBytes:     dd.upBytes,
+			DownloadBytes:   dd.downBytes,
+			TotalBytes:      dd.totBytes,
+			UploadGB:        upGB,
+			DownloadGB:      downGB,
+			TotalGB:         totGB,
+			TotalDisplay:    FormatBytesHuman(dd.totBytes),
+			UploadDisplay:   FormatBytesHuman(dd.upBytes),
+			DownloadDisplay: FormatBytesHuman(dd.downBytes),
+			SessionCount:    dd.sessions,
+			TotalTimeSec:    dd.duration,
+			DurationString:  FormatDurationArabic(dd.duration),
+			PercentOfPeak:   pct,
+		}
+		report.DailyList = append(report.DailyList, item)
+	}
+
+	return report, nil
+}
+
+func (d *DB) GetTopConsumers(year, month int, limit int) ([]models.TopConsumerItem, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	now := time.Now()
+	if year < 2000 {
+		year = now.Year()
+	}
+	if month < 1 || month > 12 {
+		month = int(now.Month())
+	}
+
+	query := `SELECT 
+		ra.username,
+		COALESCE(s.full_name, ra.username),
+		COALESCE(s.contract_no, ''),
+		COALESCE(s.profile_name, ''),
+		COALESCE(r.name, 'المركز الرئيسي'),
+		COALESCE(SUM(ra.acctinputoctets), 0),
+		COALESCE(SUM(ra.acctoutputoctets), 0),
+		COALESCE(SUM(ra.acctinputoctets + ra.acctoutputoctets), 0) as tot_b,
+		COUNT(*)
+	FROM radacct ra
+	LEFT JOIN subscribers s ON ra.username = s.username
+	LEFT JOIN resellers r ON s.reseller_id = r.id
+	WHERE YEAR(ra.acctstarttime) = ? AND MONTH(ra.acctstarttime) = ?
+	GROUP BY ra.username, s.full_name, s.contract_no, s.profile_name, r.name
+	ORDER BY tot_b DESC
+	LIMIT ?`
+
+	rows, err := d.Query(query, year, month, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.TopConsumerItem
+	for rows.Next() {
+		var item models.TopConsumerItem
+		var inB, outB, totB int64
+		if err := rows.Scan(
+			&item.Username, &item.FullName, &item.ContractNo,
+			&item.ProfileName, &item.ResellerName,
+			&inB, &outB, &totB, &item.SessionCount,
+		); err == nil {
+			item.TotalBytes = totB
+			item.TotalGB = float64(totB) / (1024 * 1024 * 1024)
+			item.TotalDisplay = FormatBytesHuman(totB)
+			item.UploadGB = float64(inB) / (1024 * 1024 * 1024)
+			item.DownloadGB = float64(outB) / (1024 * 1024 * 1024)
+			list = append(list, item)
+		}
+	}
+	return list, nil
+}
+
+func (d *DB) SearchSubscribersForTraffic(query string, limit int) ([]models.Subscriber, error) {
+	if limit <= 0 {
+		limit = 15
+	}
+	q := "%" + query + "%"
+	rows, err := d.Query(`SELECT s.id, s.username, s.full_name, COALESCE(s.contract_no, ''), COALESCE(s.phone, ''), COALESCE(s.profile_name, '')
+		FROM subscribers s
+		WHERE s.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?
+		ORDER BY s.id DESC LIMIT ?`, q, q, q, q, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.Subscriber
+	for rows.Next() {
+		var s models.Subscriber
+		if err := rows.Scan(&s.ID, &s.Username, &s.FullName, &s.ContractNo, &s.Phone, &s.ProfileName); err == nil {
+			list = append(list, s)
+		}
+	}
+	return list, nil
+}
+
 
 
 

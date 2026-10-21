@@ -2,6 +2,7 @@ package reports
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -200,6 +201,58 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 1.2 Handle Traffic Report Export & JSON Live Search
+	trafficUser := strings.TrimSpace(r.URL.Query().Get("user"))
+	trafficYear, _ := strconv.Atoi(r.URL.Query().Get("year"))
+	trafficMonth, _ := strconv.Atoi(r.URL.Query().Get("month"))
+	if trafficYear <= 0 {
+		trafficYear = now.Year()
+	}
+	if trafficMonth <= 0 {
+		trafficMonth = int(now.Month())
+	}
+
+	if tab == "traffic" && r.URL.Query().Get("format") == "json" {
+		subs, _ := bp.db.SearchSubscribersForTraffic(search, 15)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(subs)
+		return
+	}
+
+	if tab == "traffic" && r.URL.Query().Get("export") == "csv" && trafficUser != "" {
+		rep, err := bp.db.GetSubscriberTrafficReport(trafficUser, trafficYear, trafficMonth)
+		if err == nil && rep != nil {
+			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=traffic_%s_%d_%02d.csv", trafficUser, trafficYear, trafficMonth))
+			_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+			writer := csv.NewWriter(w)
+			_ = writer.Write([]string{
+				"اليوم",
+				"التاريخ",
+				"اليوم من الأسبوع",
+				"الرفع (Upload)",
+				"التحميل (Download)",
+				"إجمالي الاستهلاك (Total)",
+				"عدد الجلسات",
+				"مدة الاتصال",
+			})
+			for _, d := range rep.DailyList {
+				_ = writer.Write([]string{
+					fmt.Sprintf("%02d", d.DayNum),
+					d.Date,
+					d.DayNameAr,
+					d.UploadDisplay,
+					d.DownloadDisplay,
+					d.TotalDisplay,
+					fmt.Sprintf("%d", d.SessionCount),
+					d.DurationString,
+				})
+			}
+			writer.Flush()
+			return
+		}
+	}
+
 	// 2. Pagination for Logins Tab
 	limit := 50
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
@@ -290,7 +343,25 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 5. Raw RADIUS Logs Tab Data
+	// 5. Subscriber Traffic Consumption Tab Data (استهلاك المشترك شهري ويومي)
+	var trafficReport *models.SubscriberTrafficReport
+	var topConsumers []models.TopConsumerItem
+	var matchedSubs []models.Subscriber
+
+	if tab == "traffic" {
+		if trafficUser != "" {
+			trafficReport, _ = bp.db.GetSubscriberTrafficReport(trafficUser, trafficYear, trafficMonth)
+		} else if search != "" {
+			matchedSubs, _ = bp.db.SearchSubscribersForTraffic(search, 20)
+			if len(matchedSubs) == 1 {
+				trafficUser = matchedSubs[0].Username
+				trafficReport, _ = bp.db.GetSubscriberTrafficReport(trafficUser, trafficYear, trafficMonth)
+			}
+		}
+		topConsumers, _ = bp.db.GetTopConsumers(trafficYear, trafficMonth, 10)
+	}
+
+	// 6. Raw RADIUS Logs Tab Data
 	var rawLogs []models.RadAcct
 	if tab == "radius" {
 		query := `SELECT radacctid, acctsessionid, username, nasipaddress, acctstarttime, acctstoptime,
@@ -321,6 +392,8 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		pageTitle = "تقرير ديون مشتركي الموزعين والتسوية الذكية"
 	} else if tab == "billing" {
 		pageTitle = "سجل المعاملات المالية والديون"
+	} else if tab == "traffic" {
+		pageTitle = "تقرير استهلاك المشترك الشهري واليومي"
 	}
 
 	_ = bp.renderer.Render(w, r, "reports/index", map[string]interface{}{
@@ -343,6 +416,12 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		"GrandTotalDebtors":    grandTotalDebtors,
 		"AllResellers":         allResellers,
 		"ResellerFilter":       resellerFilter,
+		"TrafficUser":          trafficUser,
+		"TrafficYear":          trafficYear,
+		"TrafficMonth":         trafficMonth,
+		"TrafficReport":        trafficReport,
+		"TopConsumers":         topConsumers,
+		"MatchedSubs":          matchedSubs,
 		"RawLogs":              rawLogs,
 		"SearchQuery":          search,
 		"StatusFilter":         statusFilter,
