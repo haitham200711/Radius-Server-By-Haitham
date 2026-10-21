@@ -316,6 +316,52 @@ type CafeCardTracker struct {
 	SessionTimeSec    int64   `json:"session_time_sec"`
 	UptimeDisplay     string  `json:"uptime_display"`
 	ExpireReason      string  `json:"expire_reason"`
+
+	// Device MAC Multi-Card History & Tracking
+	DeviceCallingMAC      string                  `json:"device_calling_mac"`
+	DeviceCardsHistory    []CafeDeviceCardItem    `json:"device_cards_history"`
+	DeviceSessionsHistory []CafeDeviceSessionItem `json:"device_sessions_history"`
+	DeviceTotalCardsCount int                     `json:"device_total_cards_count"`
+	DeviceTotalTraffic    string                  `json:"device_total_traffic"`
+	DeviceTotalUptime     string                  `json:"device_total_uptime"`
+}
+
+// CafeDeviceCardItem represents an individual card previously or currently used by the device MAC
+type CafeDeviceCardItem struct {
+	CardID          int64   `json:"card_id"`
+	OriginalCode    string  `json:"original_code"`
+	Username        string  `json:"username"`
+	BatchCode       string  `json:"batch_code"`
+	ProfileName     string  `json:"profile_name"`
+	Price           float64 `json:"price"`
+	Status          string  `json:"status"`
+	StatusLabel     string  `json:"status_label"`
+	StatusBadge     string  `json:"status_badge"`
+	FirstLogin      string  `json:"first_login"`
+	ExpiredAt       string  `json:"expired_at"`
+	TotalBytes      int64   `json:"total_bytes"`
+	TotalDisplay    string  `json:"total_display"`
+	BytesInDisplay  string  `json:"bytes_in_display"`
+	BytesOutDisplay string  `json:"bytes_out_display"`
+	UptimeDisplay   string  `json:"uptime_display"`
+	SessionsCount   int     `json:"sessions_count"`
+	IsActive        bool    `json:"is_active"`
+}
+
+// CafeDeviceSessionItem represents a detailed individual radacct session for the device MAC
+type CafeDeviceSessionItem struct {
+	SessionID       string `json:"session_id"`
+	CardCode        string `json:"card_code"`
+	StartTime       string `json:"start_time"`
+	StopTime        string `json:"stop_time"`
+	Duration        string `json:"duration"`
+	BytesInDisplay  string `json:"bytes_in_display"`
+	BytesOutDisplay string `json:"bytes_out_display"`
+	TotalDisplay    string `json:"total_display"`
+	FramedIP        string `json:"framed_ip"`
+	NASName         string `json:"nas_name"`
+	TerminateCause  string `json:"terminate_cause"`
+	IsLive          bool   `json:"is_live"`
 }
 
 // Card represents an individual hotspot / voucher card

@@ -325,6 +325,176 @@
                 </div>
             </div>
         </div>
+
+        <!-- 4. Device Multi-Card History & Sessions (سجل كروت وجلسات الماك أدرس) -->
+        {{ if .TrackedCard.CallingMAC }}
+        <div class="mt-4 pt-3 border-top">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="p-2 bg-info-subtle text-info rounded-3">
+                        <i class="bi bi-clock-history fs-5"></i>
+                    </span>
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">
+                            سجل كروت وجلسات هذا الجهاز (Device MAC History)
+                        </h5>
+                        <small class="text-muted font-monospace">عنوان الماك: <strong class="text-dark">{{ .TrackedCard.CallingMAC }}</strong></small>
+                    </div>
+                </div>
+
+                <!-- Summary Badges -->
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill font-monospace">
+                        <i class="bi bi-credit-card-2-front me-1"></i> {{ .TrackedCard.DeviceTotalCardsCount }} كروت مستخدمة
+                    </span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill font-monospace">
+                        <i class="bi bi-hdd-network me-1"></i> إجمالي الاستهلاك: {{ .TrackedCard.DeviceTotalTraffic }}
+                    </span>
+                    <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-3 py-2 rounded-pill font-monospace">
+                        <i class="bi bi-hourglass-split me-1"></i> إجمالي الوقت: {{ .TrackedCard.DeviceTotalUptime }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Subtabs Navigation -->
+            <ul class="nav nav-pills gap-2 mb-3 bg-white p-1 rounded-3 border d-inline-flex" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active fw-bold small py-1.5 px-3 d-flex align-items-center gap-2" id="device-cards-tab" data-bs-toggle="pill" data-bs-target="#tab-device-cards" type="button" role="tab">
+                        <i class="bi bi-wallet2 text-primary"></i>
+                        <span>الكروت المستخدمة للجهاز ({{ len .TrackedCard.DeviceCardsHistory }})</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link fw-bold small py-1.5 px-3 d-flex align-items-center gap-2" id="device-sessions-tab" data-bs-toggle="pill" data-bs-target="#tab-device-sessions" type="button" role="tab">
+                        <i class="bi bi-activity text-success"></i>
+                        <span>سجل الجلسات التفصيلية ({{ len .TrackedCard.DeviceSessionsHistory }})</span>
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content bg-white rounded-3 shadow-sm border overflow-hidden">
+                <!-- Tab 1: Device Cards Table -->
+                <div class="tab-pane fade show active" id="tab-device-cards" role="tabpanel">
+                    <div class="p-3 border-bottom bg-light bg-opacity-50 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <span class="small fw-bold text-muted">قائمة بكافة الكروت السابقة والنشطة التي استخدمها هذا الجهاز مع تفاصيل الاستهلاك والتواريخ</span>
+                        <input type="text" id="searchDeviceCardsInput" class="form-control form-control-sm" placeholder="بحث برقم الكارت، الباقة، أو التاريخ..." style="max-width: 260px;">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 text-nowrap" id="tableDeviceCards">
+                            <thead class="table-light small text-muted">
+                                <tr>
+                                    <th>#</th>
+                                    <th>رقم الكارت (PIN)</th>
+                                    <th>الباقة / العرض</th>
+                                    <th>سعر الكارت</th>
+                                    <th>تاريخ أول استخدام</th>
+                                    <th>تاريخ الانتهاء</th>
+                                    <th>الجلسات</th>
+                                    <th>الاستهلاك الفعلي</th>
+                                    <th>مدة التشغيل</th>
+                                    <th>حالة الكارت</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{ range $idx, $c := .TrackedCard.DeviceCardsHistory }}
+                                <tr>
+                                    <td class="text-muted small">{{ add $idx 1 }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <i class="bi bi-ticket-perforated text-primary"></i>
+                                            <strong class="font-monospace text-dark fs-6">{{ $c.OriginalCode }}</strong>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">{{ $c.ProfileName }}</span></td>
+                                    <td><strong class="text-success">{{ printf "%.2f" $c.Price }} ج.م</strong></td>
+                                    <td class="font-monospace small text-muted">{{ $c.FirstLogin }}</td>
+                                    <td class="font-monospace small text-muted">{{ $c.ExpiredAt }}</td>
+                                    <td><span class="badge bg-light text-secondary border font-monospace">{{ $c.SessionsCount }} جلسة</span></td>
+                                    <td>
+                                        <div>
+                                            <strong class="text-success font-monospace">{{ $c.TotalDisplay }}</strong>
+                                            <div class="text-muted" style="font-size: 0.72rem;">↓ {{ $c.BytesOutDisplay }} | ↑ {{ $c.BytesInDisplay }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="font-monospace small text-dark">{{ $c.UptimeDisplay }}</td>
+                                    <td>
+                                        <span class="badge {{ $c.StatusBadge }} px-2 py-1 small">
+                                            {{ $c.StatusLabel }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="10" class="text-center py-4 text-muted">
+                                        لا توجد كروت أخرى مسجلة لهذا الجهاز.
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Detailed Sessions Table -->
+                <div class="tab-pane fade" id="tab-device-sessions" role="tabpanel">
+                    <div class="p-3 border-bottom bg-light bg-opacity-50 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <span class="small fw-bold text-muted">سجلات الراديوس الحية radacct لجلسات هذا الجهاز</span>
+                        <input type="text" id="searchDeviceSessionsInput" class="form-control form-control-sm" placeholder="بحث بالآي بي، الكارت، أو التاريخ..." style="max-width: 260px;">
+                    </div>
+                    <div class="table-responsive" style="max-height: 420px;">
+                        <table class="table table-hover align-middle mb-0 text-nowrap" id="tableDeviceSessions">
+                            <thead class="table-light small text-muted sticky-top">
+                                <tr>
+                                    <th>معرف الجلسة</th>
+                                    <th>الكارت المستخدم</th>
+                                    <th>وقت وتاريخ البداية</th>
+                                    <th>وقت وتاريخ النهاية</th>
+                                    <th>المدة المستغرقة</th>
+                                    <th>التحميل (Down)</th>
+                                    <th>الرفع (Up)</th>
+                                    <th>الإجمالي</th>
+                                    <th>الآي بي (IP)</th>
+                                    <th>الراوتر (NAS)</th>
+                                    <th>سبب الإنهاء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{ range .TrackedCard.DeviceSessionsHistory }}
+                                <tr>
+                                    <td class="font-monospace small text-muted">{{ .SessionID }}</td>
+                                    <td>
+                                        <strong class="font-monospace text-primary small">{{ .CardCode }}</strong>
+                                    </td>
+                                    <td class="font-monospace small">{{ .StartTime }}</td>
+                                    <td class="font-monospace small">
+                                        {{ if .IsLive }}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle"><span class="pulse-dot-green me-1"></span> متصل الآن</span>
+                                        {{ else }}
+                                        {{ .StopTime }}
+                                        {{ end }}
+                                    </td>
+                                    <td class="font-monospace small fw-bold text-dark">{{ .Duration }}</td>
+                                    <td class="font-monospace small text-success">{{ .BytesOutDisplay }}</td>
+                                    <td class="font-monospace small text-primary">{{ .BytesInDisplay }}</td>
+                                    <td class="font-monospace small fw-bold text-dark">{{ .TotalDisplay }}</td>
+                                    <td class="font-monospace small text-dark">{{ .FramedIP }}</td>
+                                    <td><span class="badge bg-light text-secondary border small">{{ .NASName }}</span></td>
+                                    <td class="small text-muted">{{ if .TerminateCause }}{{ .TerminateCause }}{{ else }}—{{ end }}</td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="11" class="text-center py-4 text-muted">
+                                        لا توجد جلسات مسجلة في جدول المحاسبة radacct لهذا الجهاز.
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{ end }}
     </div>
 </div>
 {{ end }}
@@ -722,6 +892,21 @@ document.getElementById('cafeModalForm')?.addEventListener('submit', function() 
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> جارٍ التوليد...';
     }
+});
+
+// Device Cards & Sessions Live Filter
+document.getElementById('searchDeviceCardsInput')?.addEventListener('input', function() {
+    var q = this.value.toLowerCase().trim();
+    document.querySelectorAll('#tableDeviceCards tbody tr').forEach(function(tr) {
+        tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
+});
+
+document.getElementById('searchDeviceSessionsInput')?.addEventListener('input', function() {
+    var q = this.value.toLowerCase().trim();
+    document.querySelectorAll('#tableDeviceSessions tbody tr').forEach(function(tr) {
+        tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
 });
 </script>
 {{ end }}

@@ -4292,16 +4292,17 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	var nasName string
 
 	query := `SELECT c.id, c.username, c.password, c.price, c.status, c.first_login_at, c.expired_at,
-		c.batch_id, COALESCE(b.batch_code, ''), COALESCE(c.nas_id, 0), COALESCE(n.shortname, 'ط¹ط§ظ… / ط؛ظٹط± ظ…ظ‚ظٹط¯'),
+		c.batch_id, COALESCE(b.batch_code, ''), COALESCE(c.nas_id, 0), COALESCE(n.shortname, 'عام / غير مقيد'),
 		p.name, p.display_name, p.rate_limit, p.quota_bytes,
 		COALESCE(c.original_code, ''), c.is_mac_converted, COALESCE(c.calling_mac, '')
 		FROM cards c
 		LEFT JOIN batches b ON c.batch_id = b.id
 		LEFT JOIN nas n ON c.nas_id = n.id
 		LEFT JOIN profiles p ON c.profile_id = p.id
-		WHERE c.username = ? OR (c.original_code != '' AND c.original_code = ?) LIMIT 1`
+		WHERE c.username = ? OR (c.original_code != '' AND c.original_code = ?) OR (c.calling_mac != '' AND c.calling_mac = ?)
+		ORDER BY c.id DESC LIMIT 1`
 
-	row := d.QueryRow(query, code, code)
+	row := d.QueryRow(query, code, code, code)
 	err := row.Scan(&c.ID, &c.Username, &c.Password, &c.Price, &c.Status, &c.FirstLoginAt, &c.ExpiredAt,
 		&batchID, &batchCode, &nasID, &nasName,
 		&profileName, &profileDisp, &rateLimit, &quotaBytes,
@@ -4421,9 +4422,154 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 		tracker.ExpireReason = "ط§ظ†طھظ‡طھ ظƒظˆطھط© ط§ظ„طھط­ظ…ظٹظ„ ط§ظ„ظ…ط®طµطµط© ظ„ظ„ظƒط§ط±طھ ط¨ط§ظ„ظƒط§ظ…ظ„ ظˆطھظ… ط¥ظٹظ‚ط§ظپ ط§ظ„ط®ط¯ظ…ط©."
 	} else {
 		tracker.Status = "used"
-		tracker.StatusLabel = "ظ…ط³طھظ‡ظ„ظƒ / ط؛ظٹط± ظ…طھطµظ„"
+		tracker.StatusLabel = "مستهلك / غير متصل"
 		tracker.StatusBadgeClass = "bg-secondary text-white"
-		tracker.ExpireReason = "ط§ظ„ظƒط§ط±طھ ظ…ط³طھط®ط¯ظ… ظˆط؛ظٹط± ظ…طھطµظ„ ط­ط§ظ„ظٹط§ظ‹ (ظ‚ط¯ طھظƒظˆظ† ظ…ط¯ط© ط§ظ„طµظ„ط§ط­ظٹط© ط£ظˆ ط§ظ„ط¬ظ„ط³ط© ط§ظ†طھظ‡طھ)."
+		tracker.ExpireReason = "الكارت مستخدم وغير متصل حالياً (قد تكون مدة الصلاحية أو الجلسة انتهت)."
+	}
+
+	// 6. Device MAC Multi-Card History & Tracking (سجل كروت وجلسات هذا الجهاز)
+	if tracker.CallingMAC != "" {
+		tracker.DeviceCallingMAC = tracker.CallingMAC
+
+		// Fetch all cards used by this MAC address
+		cardRows, err := d.Query(`SELECT c.id, COALESCE(c.original_code, c.username), c.username,
+			COALESCE(b.batch_code, ''), COALESCE(p.name, 'افتراضي'), c.price, c.status,
+			c.first_login_at, c.expired_at, c.is_mac_converted
+			FROM cards c
+			LEFT JOIN batches b ON c.batch_id = b.id
+			LEFT JOIN profiles p ON c.profile_id = p.id
+			WHERE (c.calling_mac != '' AND c.calling_mac = ?)
+			   OR c.username = ?
+			   OR (c.original_code != '' AND c.original_code = ?)
+			ORDER BY c.id DESC`, tracker.CallingMAC, tracker.CallingMAC, tracker.CallingMAC)
+		if err == nil {
+			var deviceTotalBytes int64
+			var deviceTotalUptime int64
+
+			for cardRows.Next() {
+				var item models.CafeDeviceCardItem
+				var origCode, currentU, batchC, profN, st string
+				var pr float64
+				var firstLog, expAt sql.NullTime
+				var isConverted bool
+				var cid int64
+
+				if err := cardRows.Scan(&cid, &origCode, &currentU, &batchC, &profN, &pr, &st, &firstLog, &expAt, &isConverted); err == nil {
+					item.CardID = cid
+					item.OriginalCode = origCode
+					item.Username = currentU
+					item.BatchCode = batchC
+					item.ProfileName = profN
+					item.Price = pr
+					item.Status = st
+
+					if firstLog.Valid {
+						item.FirstLogin = firstLog.Time.Format("2006-01-02 15:04:05")
+					} else {
+						item.FirstLogin = "لم يبدأ"
+					}
+
+					if expAt.Valid {
+						item.ExpiredAt = expAt.Time.Format("2006-01-02 15:04:05")
+					} else {
+						item.ExpiredAt = "—"
+					}
+
+					if item.CardID == c.ID && tracker.IsOnline {
+						item.IsActive = true
+						item.StatusLabel = "نشط ومتصل الآن"
+						item.StatusBadge = "bg-success text-white"
+					} else if st == "expired" {
+						item.StatusLabel = "منتهي الكوتة/الوقت"
+						item.StatusBadge = "bg-danger text-white"
+					} else if st == "used" {
+						item.StatusLabel = "مستهلك سابقاً"
+						item.StatusBadge = "bg-secondary text-white"
+					} else {
+						item.StatusLabel = "متاح / جاهز"
+						item.StatusBadge = "bg-info text-white"
+					}
+
+					// Calculate consumption for this specific card from radacct
+					var cardIn, cardOut, cardSec sql.NullInt64
+					var sessCount int
+					_ = d.QueryRow(`SELECT SUM(acctinputoctets), SUM(acctoutputoctets), SUM(acctsessiontime), COUNT(*)
+						FROM radacct
+						WHERE username = ? OR (username != '' AND username = ?)`, currentU, origCode).Scan(&cardIn, &cardOut, &cardSec, &sessCount)
+
+					var totalB, sec int64
+					if cardIn.Valid {
+						totalB += cardIn.Int64
+						item.BytesInDisplay = FormatBytesHuman(cardIn.Int64)
+					}
+					if cardOut.Valid {
+						totalB += cardOut.Int64
+						item.BytesOutDisplay = FormatBytesHuman(cardOut.Int64)
+					}
+					if cardSec.Valid {
+						sec = cardSec.Int64
+					}
+					item.TotalBytes = totalB
+					item.TotalDisplay = FormatBytesHuman(totalB)
+					item.UptimeDisplay = FormatDurationHuman(sec)
+					item.SessionsCount = sessCount
+
+					deviceTotalBytes += totalB
+					deviceTotalUptime += sec
+
+					tracker.DeviceCardsHistory = append(tracker.DeviceCardsHistory, item)
+				}
+			}
+			cardRows.Close()
+
+			tracker.DeviceTotalCardsCount = len(tracker.DeviceCardsHistory)
+			tracker.DeviceTotalTraffic = FormatBytesHuman(deviceTotalBytes)
+			tracker.DeviceTotalUptime = FormatDurationHuman(deviceTotalUptime)
+		}
+
+		// Fetch detailed radacct sessions for this device MAC
+		sessRows, err := d.Query(`SELECT r.acctsessionid, r.username,
+			COALESCE(r.acctstarttime, '0000-00-00 00:00:00'),
+			COALESCE(r.acctstoptime, ''),
+			r.acctsessiontime,
+			r.acctinputoctets, r.acctoutputoctets,
+			COALESCE(r.framedipaddress, ''),
+			COALESCE(n.shortname, r.nasipaddress),
+			COALESCE(r.acctterminatecause, '')
+			FROM radacct r
+			LEFT JOIN nas n ON r.nasipaddress = n.nasname
+			WHERE r.callingstationid = ?
+			ORDER BY r.radacctid DESC
+			LIMIT 50`, tracker.CallingMAC)
+		if err == nil {
+			for sessRows.Next() {
+				var sItem models.CafeDeviceSessionItem
+				var sessID, u, startT, stopT, framedIP, nasN, termCause string
+				var sessSec, inB, outB int64
+
+				if err := sessRows.Scan(&sessID, &u, &startT, &stopT, &sessSec, &inB, &outB, &framedIP, &nasN, &termCause); err == nil {
+					sItem.SessionID = sessID
+					sItem.CardCode = u
+					sItem.StartTime = startT
+					if stopT == "" || stopT == "0000-00-00 00:00:00" {
+						sItem.StopTime = "متصل حالياً (Live)"
+						sItem.IsLive = true
+					} else {
+						sItem.StopTime = stopT
+					}
+					sItem.Duration = FormatDurationHuman(sessSec)
+					sItem.BytesInDisplay = FormatBytesHuman(inB)
+					sItem.BytesOutDisplay = FormatBytesHuman(outB)
+					sItem.TotalDisplay = FormatBytesHuman(inB + outB)
+					sItem.FramedIP = framedIP
+					sItem.NASName = nasN
+					sItem.TerminateCause = termCause
+
+					tracker.DeviceSessionsHistory = append(tracker.DeviceSessionsHistory, sItem)
+				}
+			}
+			sessRows.Close()
+		}
 	}
 
 	return tracker, nil
@@ -4517,6 +4663,10 @@ func (d *DB) syncActiveCards() {
 		for _, item := range toConvert {
 			mac := item.mac
 			oldUser := item.username
+
+			// If any other card currently holds this MAC as username, revert it to its original_code
+			// This completely prevents MySQL "Duplicate entry for key username" and allows multiple cards on same MAC
+			_, _ = d.Exec(`UPDATE cards SET username = original_code WHERE username = ? AND id != ?`, mac, item.cardID)
 
 			// Update cards table: set username to mac, update password and calling_mac, mark converted
 			_, _ = d.Exec(`UPDATE cards SET username = ?, password = ?, calling_mac = ?, is_mac_converted = 1 WHERE id = ?`, mac, mac, mac, item.cardID)
