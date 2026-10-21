@@ -177,6 +177,7 @@ type Profile struct {
 	LoanQuotaBytes      int64     `json:"loan_quota_bytes"`    // كوتة السلفة بالبايت
 	LoanQuotaGB         float64   `json:"loan_quota_gb"`       // كوتة السلفة بالجيجا
 	LoanDeductionType   string    `json:"loan_deduction_type"` // "partial" (جزئي) أو "full" (كلي)
+	PortalEnabled       bool      `json:"portal_enabled"`      // إتاحة صفحة المشترك لمشتركي هذه الباقة
 	CreatedAt           time.Time `json:"created_at"`
 }
 

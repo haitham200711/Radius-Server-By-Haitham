@@ -22,6 +22,7 @@
                     <th>عند نفاد الكوتة</th>
                     <th>عند انتهاء الوقت</th>
                     <th>نظام السلفة</th>
+                    <th>صفحة المشترك</th>
                     <th>سعر الجمهور</th>
                     <th>سعر التكلفة</th>
                     <th class="text-end">خيارات</th>
@@ -83,6 +84,17 @@
                         <span class="badge bg-light text-muted border">معطل</span>
                         {{ end }}
                     </td>
+                    <td>
+                        {{ if .PortalEnabled }}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold" title="صفحة المشترك متاحة لمشتركي هذه الباقة">
+                            <i class="bi bi-person-check-fill me-1"></i>متاحة
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-secondary-subtle text-secondary border" title="صفحة المشترك معطلة لمشتركي هذه الباقة">
+                            <i class="bi bi-person-x-fill me-1"></i>معطلة
+                        </span>
+                        {{ end }}
+                    </td>
                     <td><strong class="text-success">{{ printf "%.2f" .Price }} ج.م</strong></td>
                     <td><span class="badge bg-light text-secondary border font-monospace">{{ printf "%.2f" .CostPrice }} ج.م</span></td>
                     <td class="text-end">
@@ -106,7 +118,8 @@
                             data-loanenabled="{{ if .LoanEnabled }}1{{ else }}0{{ end }}"
                             data-loanhours="{{ .LoanHours }}"
                             data-loanquota="{{ printf "%.1f" .LoanQuotaGB }}"
-                            data-loandeduction="{{ .LoanDeductionType }}">
+                            data-loandeduction="{{ .LoanDeductionType }}"
+                            data-portalenabled="{{ if .PortalEnabled }}1{{ else }}0{{ end }}">
                             <i class="bi bi-pencil-square"></i> تعديل
                         </button>
                         <a href="/profiles/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة نهائياً من النظام؟');">
@@ -300,6 +313,22 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 4. إتاحة صفحة المشترك (Portal) -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-person-badge-fill me-1"></i> صفحة المشترك (Self-Care Portal)
+                    </h6>
+                    <div class="card bg-light border-0 p-3 mb-2">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="portal_enabled" value="1" id="add_portal_enabled" checked>
+                            <label class="form-check-label fw-bold text-dark" for="add_portal_enabled">
+                                إتاحة صفحة المشترك للمشتركين على هذه الباقة
+                            </label>
+                            <div class="form-text small">
+                                عند التفعيل، يستطيع العميل المشترك على هذا البروفايل تسجيل الدخول لصفحة المشترك ومتابعة رصيده وسحب الجيجات والسلفة. عند التعطيل، يتم حجب صفحة المشترك عنه.
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
@@ -484,6 +513,22 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 4. إتاحة صفحة المشترك (Portal) -->
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-person-badge-fill me-1"></i> صفحة المشترك (Self-Care Portal)
+                    </h6>
+                    <div class="card bg-light border-0 p-3 mb-2">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="portal_enabled" value="1" id="edit_portal_enabled">
+                            <label class="form-check-label fw-bold text-dark" for="edit_portal_enabled">
+                                إتاحة صفحة المشترك للمشتركين على هذه الباقة
+                            </label>
+                            <div class="form-text small">
+                                عند التفعيل، يستطيع العميل المشترك على هذا البروفايل تسجيل الدخول لصفحة المشترك ومتابعة رصيده وسحب الجيجات والسلفة. عند التعطيل، يتم حجب صفحة المشترك عنه.
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
@@ -573,6 +618,10 @@ document.querySelectorAll('.btn-edit-profile').forEach(btn => {
         document.getElementById('edit_loan_quota_gb').value = d.loanquota || 0;
         document.getElementById('edit_loan_deduction_type').value = d.loandeduction || 'full';
         toggleLoanSection('edit', isLoanEnabled);
+
+        // Portal access setting
+        const isPortalEnabled = (d.portalenabled !== '0');
+        document.getElementById('edit_portal_enabled').checked = isPortalEnabled;
 
         const modal = new bootstrap.Modal(document.getElementById('editProfileModal'));
         modal.show();

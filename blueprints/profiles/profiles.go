@@ -91,6 +91,8 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 		loanDeductionType = "full"
 	}
 
+	portalEnabled := r.FormValue("portal_enabled") == "1" || r.FormValue("portal_enabled") == "on" || r.FormValue("portal_enabled") == "true"
+
 	if name != "" && rateLimit != "" {
 		if displayName == "" {
 			displayName = name
@@ -116,6 +118,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 			LoanHours:         loanHours,
 			LoanQuotaBytes:    loanQuotaBytes,
 			LoanDeductionType: loanDeductionType,
+			PortalEnabled:     portalEnabled,
 		}
 		_ = bp.db.SaveProfile(p)
 	}
@@ -194,6 +197,8 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 			loanDeductionType = "full"
 		}
 		p.LoanDeductionType = loanDeductionType
+
+		p.PortalEnabled = r.FormValue("portal_enabled") == "1" || r.FormValue("portal_enabled") == "on" || r.FormValue("portal_enabled") == "true"
 
 		_ = bp.db.SaveProfile(p)
 	}

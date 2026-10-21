@@ -562,6 +562,7 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_deduction_type VARCHAR(20) DEFAULT 'full';`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_initial_used_bytes BIGINT DEFAULT 0;`,
 		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_phone_login TINYINT(1) DEFAULT 0;`,
+		`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS portal_enabled TINYINT(1) DEFAULT 1;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -1509,6 +1510,7 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 		on_quota_action, on_quota_profile, on_quota_pool,
 		on_time_action, on_time_profile, on_time_pool,
 		COALESCE(loan_enabled, 0), COALESCE(loan_hours, 48), COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'),
+		COALESCE(portal_enabled, 1),
 		created_at
 		FROM profiles ORDER BY id ASC`)
 	if err != nil {
@@ -1525,6 +1527,7 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 			&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
 			&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool,
 			&p.LoanEnabled, &p.LoanHours, &p.LoanQuotaBytes, &p.LoanDeductionType,
+			&p.PortalEnabled,
 			&p.CreatedAt,
 		)
 		if err == nil {
@@ -1547,6 +1550,7 @@ func (d *DB) GetProfile(id int64) (*models.Profile, error) {
 		on_quota_action, on_quota_profile, on_quota_pool,
 		on_time_action, on_time_profile, on_time_pool,
 		COALESCE(loan_enabled, 0), COALESCE(loan_hours, 48), COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'),
+		COALESCE(portal_enabled, 1),
 		created_at
 		FROM profiles WHERE id = ?`, id).Scan(
 		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
@@ -1554,6 +1558,7 @@ func (d *DB) GetProfile(id int64) (*models.Profile, error) {
 		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
 		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool,
 		&p.LoanEnabled, &p.LoanHours, &p.LoanQuotaBytes, &p.LoanDeductionType,
+		&p.PortalEnabled,
 		&p.CreatedAt,
 	)
 	if err != nil {
@@ -1575,6 +1580,7 @@ func (d *DB) GetProfileByName(name string) (*models.Profile, error) {
 		on_quota_action, on_quota_profile, on_quota_pool,
 		on_time_action, on_time_profile, on_time_pool,
 		COALESCE(loan_enabled, 0), COALESCE(loan_hours, 48), COALESCE(loan_quota_bytes, 0), COALESCE(loan_deduction_type, 'full'),
+		COALESCE(portal_enabled, 1),
 		created_at
 		FROM profiles WHERE name = ?`, name).Scan(
 		&p.ID, &p.Name, &p.DisplayName, &p.RateLimit, &p.PoolName, &p.QuotaBytes, &p.UptimeSeconds,
@@ -1582,6 +1588,7 @@ func (d *DB) GetProfileByName(name string) (*models.Profile, error) {
 		&p.OnQuotaAction, &p.OnQuotaProfile, &p.OnQuotaPool,
 		&p.OnTimeAction, &p.OnTimeProfile, &p.OnTimePool,
 		&p.LoanEnabled, &p.LoanHours, &p.LoanQuotaBytes, &p.LoanDeductionType,
+		&p.PortalEnabled,
 		&p.CreatedAt,
 	)
 	if err != nil {
@@ -1627,13 +1634,13 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 			validity_value, validity_unit, cost_price, price, shared_users, mikrotik_address_list,
 			on_quota_action, on_quota_profile, on_quota_pool,
 			on_time_action, on_time_profile, on_time_pool,
-			loan_enabled, loan_hours, loan_quota_bytes, loan_deduction_type)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			loan_enabled, loan_hours, loan_quota_bytes, loan_deduction_type, portal_enabled)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
 			p.ValidityValue, p.ValidityUnit, p.CostPrice, p.Price, p.SharedUsers, p.MikrotikAddressList,
 			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
 			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool,
-			p.LoanEnabled, p.LoanHours, p.LoanQuotaBytes, p.LoanDeductionType)
+			p.LoanEnabled, p.LoanHours, p.LoanQuotaBytes, p.LoanDeductionType, p.PortalEnabled)
 		if err != nil {
 			return err
 		}
@@ -1644,13 +1651,13 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 			validity_value = ?, validity_unit = ?, cost_price = ?, price = ?, shared_users = ?, mikrotik_address_list = ?,
 			on_quota_action = ?, on_quota_profile = ?, on_quota_pool = ?,
 			on_time_action = ?, on_time_profile = ?, on_time_pool = ?,
-			loan_enabled = ?, loan_hours = ?, loan_quota_bytes = ?, loan_deduction_type = ?
+			loan_enabled = ?, loan_hours = ?, loan_quota_bytes = ?, loan_deduction_type = ?, portal_enabled = ?
 			WHERE id = ?`,
 			p.Name, p.DisplayName, p.RateLimit, p.PoolName, p.QuotaBytes, p.UptimeSeconds,
 			p.ValidityValue, p.ValidityUnit, p.CostPrice, p.Price, p.SharedUsers, p.MikrotikAddressList,
 			p.OnQuotaAction, p.OnQuotaProfile, p.OnQuotaPool,
 			p.OnTimeAction, p.OnTimeProfile, p.OnTimePool,
-			p.LoanEnabled, p.LoanHours, p.LoanQuotaBytes, p.LoanDeductionType, p.ID)
+			p.LoanEnabled, p.LoanHours, p.LoanQuotaBytes, p.LoanDeductionType, p.PortalEnabled, p.ID)
 		if err != nil {
 			return err
 		}

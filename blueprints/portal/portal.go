@@ -83,6 +83,15 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the subscriber's profile permits subscriber portal access
+	if sub.ProfileName != "" {
+		prof, _ := bp.db.GetProfileByName(sub.ProfileName)
+		if prof != nil && !prof.PortalEnabled {
+			http.Redirect(w, r, "/portal/login?error="+url.QueryEscape("عفواً، صفحة المشترك غير متاحة لمشتركي باقة ("+prof.DisplayName+")"), http.StatusFound)
+			return
+		}
+	}
+
 	token := middleware.GenerateToken(middleware.SessionUser{
 		ID:       sub.ID,
 		Username: sub.Username,
@@ -132,6 +141,19 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if non-admin subscriber's profile has portal access disabled
+	if user.Role != "admin" && data.Profile.Name != "" && !data.Profile.PortalEnabled {
+		http.SetCookie(w, &http.Cookie{
+			Name:     middleware.CookieName,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+		})
+		http.Redirect(w, r, "/portal/login?error="+url.QueryEscape("عفواً، صفحة المشترك غير متاحة لمشتركي باقة ("+data.Profile.DisplayName+")"), http.StatusFound)
+		return
+	}
+
 	flashSuccess := r.URL.Query().Get("success")
 	flashError := r.URL.Query().Get("error")
 
@@ -165,6 +187,18 @@ func (bp *Blueprint) RequestLoanHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	username := user.Username
+
+	if user.Role != "admin" {
+		sub, _ := bp.db.GetSubscriber(username)
+		if sub != nil && sub.ProfileName != "" {
+			prof, _ := bp.db.GetProfileByName(sub.ProfileName)
+			if prof != nil && !prof.PortalEnabled {
+				http.Redirect(w, r, "/portal?error="+url.QueryEscape("صفحة المشترك غير متاحة لهذه الباقة"), http.StatusFound)
+				return
+			}
+		}
+	}
+
 	_, err := bp.db.GrantSubscriberLoan(username, "self-service")
 	if err != nil {
 		http.Redirect(w, r, "/portal?error="+url.QueryEscape(err.Error()), http.StatusFound)
