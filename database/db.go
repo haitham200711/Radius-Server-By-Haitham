@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -1673,7 +1674,18 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Framed-Pool', ':=', ?)", p.Name, p.PoolName)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Apply new rate limit via CoA dynamically to all active subscribers on this profile without kicking them!
+	if p.RateLimit != "" {
+		go func() {
+			_, _ = d.ApplyCoARateLimitToProfileActiveSessions(p.Name, p.RateLimit)
+		}()
+	}
+
+	return nil
 }
 
 func (d *DB) DeleteProfile(id int64) error {
@@ -1771,8 +1783,10 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 	defer tx.Rollback()
 
 	// If profileName is empty, get from subscriber record
+	var oldProfile string
+	_ = tx.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&oldProfile)
 	if profileName == "" {
-		_ = tx.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+		profileName = oldProfile
 	}
 
 	var p models.Profile
@@ -1822,7 +1836,11 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 		return err
 	}
 
-	_ = d.DisconnectSubscriberSession(username)
+	if oldProfile != "" && oldProfile != p.Name {
+		_ = d.DisconnectSubscriberSession(username)
+	} else {
+		_ = d.RestoreActiveSubscriberCoA(username)
+	}
 	return nil
 }
 
@@ -1937,8 +1955,8 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 		return nil, err
 	}
 
-	// Disconnect active session via CoA to apply new expiration/quota immediately
-	_ = d.DisconnectSubscriberSession(username)
+	// Restore active session dynamically via CoA without disconnecting
+	_ = d.RestoreActiveSubscriberCoA(username)
 
 	// Trigger WhatsApp notification asynchronously
 	go func() {
@@ -2952,8 +2970,10 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 	}
 	defer tx.Rollback()
 
+	var oldProfile string
+	_ = tx.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&oldProfile)
 	if profileName == "" {
-		_ = tx.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+		profileName = oldProfile
 	}
 
 	var p models.Profile
@@ -3032,7 +3052,11 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 		return err
 	}
 
-	_ = d.DisconnectSubscriberSession(username)
+	if oldProfile != "" && oldProfile != p.Name {
+		_ = d.DisconnectSubscriberSession(username)
+	} else {
+		_ = d.RestoreActiveSubscriberCoA(username)
+	}
 
 	// Reset notification flags and cycle start for the new period
 	_, _ = d.Exec(`UPDATE subscribers SET
@@ -3793,11 +3817,10 @@ func (d *DB) ApplySpeedBoost(boostType string, boostVal float64, disconnectUsers
 		return err
 	}
 
-	if disconnectUsers {
-		go func() {
-			_, _ = d.DisconnectAllActiveSessions()
-		}()
-	}
+	// Apply CoA rate limit dynamically to all active subscribers without kicking them!
+	go func() {
+		_, _ = d.ApplyCoARateLimitToAllActiveSessions()
+	}()
 
 	return nil
 }
@@ -3837,11 +3860,10 @@ func (d *DB) RestoreBaseSpeeds(disconnectUsers bool) error {
 		return err
 	}
 
-	if disconnectUsers {
-		go func() {
-			_, _ = d.DisconnectAllActiveSessions()
-		}()
-	}
+	// Apply CoA base rate limit dynamically to all active subscribers without kicking them!
+	go func() {
+		_, _ = d.ApplyCoARateLimitToAllActiveSessions()
+	}()
 
 	return nil
 }
@@ -3888,11 +3910,10 @@ func (d *DB) RestoreSingleProfileBaseSpeed(profileID int64, disconnectUsers bool
 		return err
 	}
 
-	if disconnectUsers {
-		go func() {
-			_, _ = d.DisconnectProfileActiveSessions(profName)
-		}()
-	}
+	// Apply CoA base rate limit dynamically to active subscribers of this profile without kicking them!
+	go func() {
+		_, _ = d.ApplyCoARateLimitToProfileActiveSessions(profName, baseRate)
+	}()
 
 	return nil
 }
@@ -5066,6 +5087,415 @@ func (d *DB) DisconnectSubscriberSession(username string) error {
 	subTrafficMu.Unlock()
 
 	return nil
+}
+
+// SendSubscriberCoA sends a dynamic CoA-Request (Code 43) to the subscriber's NAS
+// without disconnecting the active session.
+func (d *DB) SendSubscriberCoA(username string, opts radius.CoAOptions) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	var sessionID, nasIP, framedIPStr sql.NullString
+	err := d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(
+		&sessionID, &nasIP, &framedIPStr)
+	if err != nil || !sessionID.Valid || !nasIP.Valid || nasIP.String == "" {
+		return nil // Not currently online, nothing to update via CoA
+	}
+
+	var secret string
+	var coaPort int
+	_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP.String).Scan(&secret, &coaPort)
+	if secret == "" {
+		secret = "radius123"
+	}
+	if coaPort <= 0 {
+		coaPort = 3799
+	}
+
+	if framedIPStr.Valid && framedIPStr.String != "" {
+		opts.FramedIP = net.ParseIP(framedIPStr.String)
+	}
+
+	res, err := radius.SendCoARequest(nasIP.String, coaPort, []byte(secret), username, sessionID.String, opts)
+	if err != nil {
+		log.Printf("[CoA] Failed to send CoA-Request for %s to NAS %s:%d: %v", username, nasIP.String, coaPort, err)
+		return err
+	}
+	if res != nil && !res.Success {
+		log.Printf("[CoA] NAS %s returned NAK for %s: %s", nasIP.String, username, res.Message)
+	} else if res != nil {
+		log.Printf("[CoA] Successfully applied CoA for %s on NAS %s (Rate: %s, List: %s, Pool: %s)", username, nasIP.String, opts.RateLimit, opts.AddressList, opts.PoolName)
+	}
+	return nil
+}
+
+// RestoreActiveSubscriberCoA restores an active subscriber's speed and normal profile settings via CoA
+func (d *DB) RestoreActiveSubscriberCoA(username string) error {
+	var profileName string
+	err := d.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+	if err != nil {
+		return err
+	}
+
+	prof, _ := d.GetProfileByName(profileName)
+	if prof == nil {
+		return nil
+	}
+
+	return d.SendSubscriberCoA(username, radius.CoAOptions{
+		RateLimit:   prof.RateLimit,
+		AddressList: prof.MikrotikAddressList,
+		PoolName:    prof.PoolName,
+	})
+}
+
+// ApplySubscriberQuotaExpiration transitions a quota-exhausted subscriber dynamically via CoA
+// without kicking them out, unless the profile explicitly specifies 'disconnect'.
+func (d *DB) ApplySubscriberQuotaExpiration(username string) error {
+	var profileName string
+	err := d.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+	if err != nil {
+		return err
+	}
+
+	prof, _ := d.GetProfileByName(profileName)
+	if prof == nil {
+		prof = &models.Profile{
+			OnQuotaAction: "profile",
+		}
+	}
+
+	if prof.OnQuotaAction == "disconnect" {
+		_ = d.DisconnectSubscriberSession(username)
+		_, _ = d.Exec("UPDATE subscribers SET status = 'expired_quota' WHERE username = ?", username)
+		return nil
+	}
+
+	fallbackRate := "256k/512k"
+	fallbackAddrList := "EXPIRED_QUOTA"
+	fallbackPool := prof.OnQuotaPool
+
+	if prof.OnQuotaAction == "profile" && prof.OnQuotaProfile != "" {
+		if fp, err := d.GetProfileByName(prof.OnQuotaProfile); err == nil && fp != nil {
+			if fp.RateLimit != "" {
+				fallbackRate = fp.RateLimit
+			}
+			if fp.MikrotikAddressList != "" {
+				fallbackAddrList = fp.MikrotikAddressList
+			}
+			if fp.PoolName != "" {
+				fallbackPool = fp.PoolName
+			}
+		}
+	} else if prof.OnQuotaAction == "pool" && prof.OnQuotaPool != "" {
+		fallbackAddrList = prof.OnQuotaPool
+		fallbackPool = prof.OnQuotaPool
+	} else if prof.MikrotikAddressList != "" {
+		fallbackAddrList = prof.MikrotikAddressList
+	}
+
+	_ = d.SendSubscriberCoA(username, radius.CoAOptions{
+		RateLimit:   fallbackRate,
+		AddressList: fallbackAddrList,
+		PoolName:    fallbackPool,
+	})
+
+	_, _ = d.Exec("UPDATE subscribers SET status = 'expired_quota' WHERE username = ?", username)
+
+	_, _ = d.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Mikrotik-Rate-Limit', 'Mikrotik-Address-List', 'Framed-Pool')", username)
+	_, _ = d.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?)", username, fallbackRate)
+	if fallbackAddrList != "" {
+		_, _ = d.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Address-List', ':=', ?)", username, fallbackAddrList)
+	}
+	if fallbackPool != "" {
+		_, _ = d.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-Pool', ':=', ?)", username, fallbackPool)
+	}
+
+	return nil
+}
+
+// ApplySubscriberTimeExpiration transitions a time-expired subscriber dynamically via CoA
+// without kicking them out, unless the profile explicitly specifies 'disconnect'.
+func (d *DB) ApplySubscriberTimeExpiration(username string) error {
+	var profileName string
+	err := d.QueryRow("SELECT profile_name FROM subscribers WHERE username = ?", username).Scan(&profileName)
+	if err != nil {
+		return err
+	}
+
+	prof, _ := d.GetProfileByName(profileName)
+	if prof == nil {
+		prof = &models.Profile{
+			OnTimeAction: "profile",
+		}
+	}
+
+	if prof.OnTimeAction == "disconnect" {
+		_ = d.DisconnectSubscriberSession(username)
+		_, _ = d.Exec("UPDATE subscribers SET status = 'expired_time' WHERE username = ?", username)
+		return nil
+	}
+
+	fallbackRate := "256k/512k"
+	fallbackAddrList := "EXPIRED_TIME"
+	fallbackPool := prof.OnTimePool
+
+	if prof.OnTimeAction == "profile" && prof.OnTimeProfile != "" {
+		if fp, err := d.GetProfileByName(prof.OnTimeProfile); err == nil && fp != nil {
+			if fp.RateLimit != "" {
+				fallbackRate = fp.RateLimit
+			}
+			if fp.MikrotikAddressList != "" {
+				fallbackAddrList = fp.MikrotikAddressList
+			}
+			if fp.PoolName != "" {
+				fallbackPool = fp.PoolName
+			}
+		}
+	} else if prof.OnTimeAction == "pool" && prof.OnTimePool != "" {
+		fallbackAddrList = prof.OnTimePool
+		fallbackPool = prof.OnTimePool
+	} else if prof.MikrotikAddressList != "" {
+		fallbackAddrList = prof.MikrotikAddressList
+	}
+
+	_ = d.SendSubscriberCoA(username, radius.CoAOptions{
+		RateLimit:   fallbackRate,
+		AddressList: fallbackAddrList,
+		PoolName:    fallbackPool,
+	})
+
+	_, _ = d.Exec("UPDATE subscribers SET status = 'expired_time' WHERE username = ?", username)
+
+	_, _ = d.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Mikrotik-Rate-Limit', 'Mikrotik-Address-List', 'Framed-Pool')", username)
+	_, _ = d.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?)", username, fallbackRate)
+	if fallbackAddrList != "" {
+		_, _ = d.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Address-List', ':=', ?)", username, fallbackAddrList)
+	}
+	if fallbackPool != "" {
+		_, _ = d.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-Pool', ':=', ?)", username, fallbackPool)
+	}
+
+	return nil
+}
+
+// ApplyCoARateLimitToProfileActiveSessions sends CoA rate limits to all active sessions on a profile
+func (d *DB) ApplyCoARateLimitToProfileActiveSessions(profileName string, rateLimit string) (int, error) {
+	if rateLimit == "" {
+		return 0, nil
+	}
+
+	rows, err := d.Query(`SELECT r.acctsessionid, r.username, r.nasipaddress, r.framedipaddress
+		FROM radacct r
+		JOIN radusergroup ug ON r.username = ug.username
+		WHERE r.acctstoptime IS NULL AND ug.groupname = ?`, profileName)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type sess struct {
+		sessionID string
+		username  string
+		nasIP     string
+		framedIP  string
+	}
+	var sessions []sess
+	for rows.Next() {
+		var s sess
+		_ = rows.Scan(&s.sessionID, &s.username, &s.nasIP, &s.framedIP)
+		sessions = append(sessions, s)
+	}
+	rows.Close()
+
+	count := 0
+	for _, s := range sessions {
+		var secret string
+		var coaPort int
+		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
+		if secret == "" {
+			secret = "radius123"
+		}
+		if coaPort <= 0 {
+			coaPort = 3799
+		}
+
+		var fIP net.IP
+		if s.framedIP != "" {
+			fIP = net.ParseIP(s.framedIP)
+		}
+
+		_, _ = radius.SendCoARequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, radius.CoAOptions{
+			RateLimit: rateLimit,
+			FramedIP:  fIP,
+		})
+		count++
+	}
+	return count, nil
+}
+
+// ApplyCoARateLimitToAllActiveSessions updates rate limits on all active sessions dynamically via CoA
+func (d *DB) ApplyCoARateLimitToAllActiveSessions() (int, error) {
+	rows, err := d.Query(`SELECT r.acctsessionid, r.username, r.nasipaddress, r.framedipaddress,
+		COALESCE(p.rate_limit, '')
+		FROM radacct r
+		JOIN radusergroup ug ON r.username = ug.username
+		JOIN profiles p ON ug.groupname = p.name
+		WHERE r.acctstoptime IS NULL`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type sess struct {
+		sessionID string
+		username  string
+		nasIP     string
+		framedIP  string
+		rateLimit string
+	}
+	var sessions []sess
+	for rows.Next() {
+		var s sess
+		_ = rows.Scan(&s.sessionID, &s.username, &s.nasIP, &s.framedIP, &s.rateLimit)
+		sessions = append(sessions, s)
+	}
+	rows.Close()
+
+	count := 0
+	for _, s := range sessions {
+		if s.rateLimit == "" {
+			continue
+		}
+		var secret string
+		var coaPort int
+		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
+		if secret == "" {
+			secret = "radius123"
+		}
+		if coaPort <= 0 {
+			coaPort = 3799
+		}
+
+		var fIP net.IP
+		if s.framedIP != "" {
+			fIP = net.ParseIP(s.framedIP)
+		}
+
+		_, _ = radius.SendCoARequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, radius.CoAOptions{
+			RateLimit: s.rateLimit,
+			FramedIP:  fIP,
+		})
+		count++
+	}
+	return count, nil
+}
+
+// StartSubscriberSyncDaemon runs background real-time synchronization for subscribers:
+// checking quota consumption and expiration dates, and applying CoA rate-limit and address-list
+// changes dynamically on active sessions without disconnecting them.
+func (d *DB) StartSubscriberSyncDaemon() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			d.syncActiveSubscribers()
+		}
+	}()
+}
+
+func (d *DB) syncActiveSubscribers() {
+	// 1. Disconnect active sessions of accounts that have been disabled, frozen, or suspended
+	rowsDisabled, err := d.Query(`SELECT DISTINCT r.username
+		FROM radacct r
+		JOIN subscribers s ON r.username = s.username
+		WHERE r.acctstoptime IS NULL 
+		  AND (s.status = 'disabled' OR s.status = 'suspended' OR s.status = 'frozen')`)
+	if err == nil {
+		var toKick []string
+		for rowsDisabled.Next() {
+			var u string
+			if err := rowsDisabled.Scan(&u); err == nil {
+				toKick = append(toKick, u)
+			}
+		}
+		rowsDisabled.Close()
+		for _, u := range toKick {
+			_ = d.DisconnectSubscriberSession(u)
+		}
+	}
+
+	// 2. Check active online subscribers who are not disabled/frozen
+	rows, err := d.Query(`SELECT DISTINCT r.username, s.status, s.quota_bytes, s.expiration_date, s.created_at, s.last_renewed_at, s.profile_name
+		FROM radacct r
+		JOIN subscribers s ON r.username = s.username
+		WHERE r.acctstoptime IS NULL 
+		  AND s.status NOT IN ('disabled', 'suspended', 'frozen')`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	type onlineSub struct {
+		username      string
+		status        string
+		quotaBytes    int64
+		expDate       sql.NullTime
+		createdAt     time.Time
+		lastRenewedAt sql.NullTime
+		profileName   string
+	}
+
+	var subs []onlineSub
+	for rows.Next() {
+		var s onlineSub
+		if err := rows.Scan(&s.username, &s.status, &s.quotaBytes, &s.expDate, &s.createdAt, &s.lastRenewedAt, &s.profileName); err == nil {
+			subs = append(subs, s)
+		}
+	}
+	rows.Close()
+
+	now := time.Now()
+
+	for _, s := range subs {
+		// A. Check Time Expiration
+		isTimeExpired := s.expDate.Valid && now.After(s.expDate.Time)
+
+		// B. Check Quota Expiration
+		isQuotaExpired := false
+		if s.quotaBytes > 0 {
+			cycleStart := s.createdAt
+			if s.lastRenewedAt.Valid {
+				cycleStart = s.lastRenewedAt.Time
+			}
+			var usedBytes int64
+			_ = d.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+				FROM radacct WHERE username = ? AND acctstarttime >= ?`, s.username, cycleStart).Scan(&usedBytes)
+			if usedBytes >= s.quotaBytes {
+				isQuotaExpired = true
+			}
+		}
+
+		if isQuotaExpired {
+			// If not already expired_quota, apply CoA quota expiration
+			if s.status != "expired_quota" && s.status != "expired" {
+				_ = d.ApplySubscriberQuotaExpiration(s.username)
+			}
+		} else if isTimeExpired {
+			// If not already expired_time, apply CoA time expiration
+			if s.status != "expired_time" && s.status != "expired" {
+				_ = d.ApplySubscriberTimeExpiration(s.username)
+			}
+		} else if s.status == "expired_quota" || s.status == "expired_time" {
+			// If neither expired but status was marked expired, restore them!
+			_ = d.RestoreActiveSubscriberCoA(s.username)
+			_, _ = d.Exec("UPDATE subscribers SET status = 'active' WHERE username = ?", s.username)
+		}
+	}
 }
 
 // --- Comprehensive Subscriber Login Sessions Reporting ---

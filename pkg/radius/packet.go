@@ -85,6 +85,7 @@ const (
 	AttrLoginLATPort          = 63
 	AttrAcctInterimInterval   = 85
 	AttrMessageAuthenticator  = 80
+	AttrFramedPool            = 88
 )
 
 // Accounting Status Types (RFC 2866)

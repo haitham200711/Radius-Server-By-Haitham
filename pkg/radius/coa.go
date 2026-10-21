@@ -90,8 +90,17 @@ func SendDisconnectRequest(nasIP string, nasPort int, secret []byte, username, s
 	}
 }
 
-// SendCoARateLimit sends CoA-Request to change user bandwidth on the fly without disconnect
-func SendCoARateLimit(nasIP string, nasPort int, secret []byte, username, sessionID, newRateLimit string) (*CoAResult, error) {
+// CoAOptions holds parameters to dynamically modify an active session without disconnection
+type CoAOptions struct {
+	RateLimit   string
+	AddressList string
+	PoolName    string
+	FramedIP    net.IP
+}
+
+// SendCoARequest sends RFC 3576 / RFC 5176 CoA-Request to NAS (MikroTik) to dynamically
+// modify active session attributes (bandwidth rate-limit, address-list, pool) without disconnecting
+func SendCoARequest(nasIP string, nasPort int, secret []byte, username, sessionID string, opts CoAOptions) (*CoAResult, error) {
 	if nasPort <= 0 {
 		nasPort = 3799
 	}
@@ -113,8 +122,17 @@ func SendCoARateLimit(nasIP string, nasPort int, secret []byte, username, sessio
 	if sessionID != "" {
 		pkt.AddString(AttrAcctSessionID, sessionID)
 	}
-	if newRateLimit != "" {
-		pkt.AddMikrotikRateLimit(newRateLimit)
+	if opts.FramedIP != nil {
+		pkt.AddIP(AttrFramedIPAddress, opts.FramedIP)
+	}
+	if opts.RateLimit != "" {
+		pkt.AddMikrotikRateLimit(opts.RateLimit)
+	}
+	if opts.AddressList != "" {
+		pkt.AddMikrotikAddressList(opts.AddressList)
+	}
+	if opts.PoolName != "" {
+		pkt.AddString(AttrFramedPool, opts.PoolName)
 	}
 
 	data, err := pkt.Encode(nil)
@@ -130,7 +148,7 @@ func SendCoARateLimit(nasIP string, nasPort int, secret []byte, username, sessio
 	replyBuf := make([]byte, 4096)
 	n, err := conn.Read(replyBuf)
 	if err != nil {
-		return nil, errors.New("timeout waiting for CoA reply")
+		return nil, errors.New("timeout waiting for CoA reply from NAS")
 	}
 
 	replyPkt, err := ParsePacket(replyBuf[:n], secret)
@@ -142,13 +160,23 @@ func SendCoARateLimit(nasIP string, nasPort int, secret []byte, username, sessio
 		return &CoAResult{
 			Success: true,
 			Code:    CodeCoAACK,
-			Message: "Bandwidth updated on the fly (CoA-ACK)",
+			Message: "Session parameters updated on the fly (CoA-ACK)",
 		}, nil
+	}
+
+	errMsg := replyPkt.GetString(AttrReplyMessage)
+	if errMsg == "" {
+		errMsg = fmt.Sprintf("CoA rejected by NAS (Code %d)", replyPkt.Code)
 	}
 
 	return &CoAResult{
 		Success: false,
 		Code:    replyPkt.Code,
-		Message: "Failed to update bandwidth (CoA-NAK)",
+		Message: errMsg,
 	}, nil
+}
+
+// SendCoARateLimit sends CoA-Request to change user bandwidth on the fly without disconnect
+func SendCoARateLimit(nasIP string, nasPort int, secret []byte, username, sessionID, newRateLimit string) (*CoAResult, error) {
+	return SendCoARequest(nasIP, nasPort, secret, username, sessionID, CoAOptions{RateLimit: newRateLimit})
 }

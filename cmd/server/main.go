@@ -149,6 +149,7 @@ func main() {
 	mux.HandleFunc("/subscribers/bulk", middleware.RequireAuth(subBP.BulkHandler))
 	mux.HandleFunc("/subscribers/live-traffic", middleware.RequireAuth(subBP.LiveTrafficHandler))
 	mux.HandleFunc("/subscribers/disconnect-session", middleware.RequireAuth(subBP.DisconnectSessionHandler))
+	db.StartSubscriberSyncDaemon()
 
 	// Cards Blueprint
 	cardsBP := cards.New(db, renderer)
