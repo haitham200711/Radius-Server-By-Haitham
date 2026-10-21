@@ -469,6 +469,14 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			// If subscriber has unpaid debt from ADV, record initial transaction
+			if s.TotalUnpaid > 0 {
+				_, _ = tx.Exec(`INSERT INTO billing_transactions (
+					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+				) VALUES (?, ?, ?, 'debt', ?, ?, 'pending', 'system', 'رصيد مديونية مرحل من نظام ADV القديم', 'admin')`,
+					s.Username, s.Username, s.FullName, fmt.Sprintf("مديونية سابقة مرحلة من ADV: %.2f ج.م", s.TotalUnpaid), s.TotalUnpaid)
+			}
+
 			// Update FreeRADIUS radcheck, radusergroup, radreply
 			expStr := expDate.Format("02 Jan 2006 15:04:05")
 			_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ?", s.Username)
@@ -581,6 +589,9 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 	usergroupMap := make(map[string]string)
 	subscribers := make(map[string]*SubscriberData)
 	sessionsByUser := make(map[string][]AdvRadacctSession)
+	userIDToUsername := make(map[string]string)
+	userinfoUpdatesDebt := make(map[string]float64)
+	userinfoUpdatesPaid := make(map[string]float64)
 	cardsCount := 0
 
 	for scanner.Scan() {
@@ -706,7 +717,9 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 			rows := parseSQLValues(line)
 			for _, r := range rows {
 				if len(r) >= 20 {
+					userID := r[0]
 					uname := r[1]
+					userIDToUsername[userID] = uname
 					fname := r[2]
 					lname := r[3]
 					phone := r[5]
@@ -758,6 +771,30 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 						CreationTime:   cdate,
 						LastRenewTime:  rdate,
 					}
+				}
+			}
+
+		case "userinfo_updates":
+			rows := parseSQLValues(line)
+			for _, r := range rows {
+				if len(r) >= 3 {
+					uid := r[0]
+					paid, _ := strconv.ParseFloat(r[1], 64)
+					unpaid, _ := strconv.ParseFloat(r[2], 64)
+					userinfoUpdatesDebt[uid] = unpaid
+					userinfoUpdatesPaid[uid] = paid
+				}
+			}
+		}
+	}
+
+	// Apply debts & paid invoices from userinfo_updates if present
+	for uid, unpaid := range userinfoUpdatesDebt {
+		if uname, ok := userIDToUsername[uid]; ok {
+			if sub, exists := subscribers[uname]; exists {
+				sub.TotalUnpaid = unpaid
+				if p, ok := userinfoUpdatesPaid[uid]; ok {
+					sub.TotalPaid = p
 				}
 			}
 		}

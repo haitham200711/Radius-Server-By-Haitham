@@ -847,6 +847,7 @@
                                         <th>اليوزر نيم (Username)</th>
                                         <th>الاسم الكامل</th>
                                         <th>الباقة</th>
+                                        <th>المديونية</th>
                                         <th>الاستهلاك الفعلي</th>
                                         <th>الجلسات</th>
                                         <th>الموزع</th>
@@ -862,6 +863,13 @@
                                         <td class="fw-bold font-monospace text-primary">{{ $s.Username }}</td>
                                         <td>{{ $s.FullName }}</td>
                                         <td><span class="badge bg-light text-dark border">{{ $s.ProfileName }}</span></td>
+                                        <td>
+                                            {{ if gt $s.TotalUnpaid 0.0 }}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace fw-bold">{{ printf "%.2f" $s.TotalUnpaid }} ج.م</span>
+                                            {{ else }}
+                                            <span class="text-muted small">0.00</span>
+                                            {{ end }}
+                                        </td>
                                         <td>
                                             {{ if or (gt $s.TotalUsedBytes 0) (gt $s.SessionsCount 0) }}
                                             <div class="d-flex align-items-center gap-2">
