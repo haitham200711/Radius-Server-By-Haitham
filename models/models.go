@@ -773,6 +773,8 @@ type SubscriberPortalView struct {
 	UsagePercent         float64                  `json:"usage_percent"`
 	ExpirationDisplay    string                   `json:"expiration_display"`
 	RemainingDaysDisplay string                   `json:"remaining_days_display"`
+	IsTimeExpired        bool                     `json:"is_time_expired"`
+	IsQuotaExpired       bool                     `json:"is_quota_expired"`
 	CanRequestLoan       bool                     `json:"can_request_loan"`
 	LoanActive           bool                     `json:"loan_active"`
 	LoanHours            int                      `json:"loan_hours"`

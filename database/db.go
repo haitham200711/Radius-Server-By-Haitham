@@ -1864,6 +1864,15 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 	var currentUsedBytes int64
 	_ = d.QueryRow("SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ?", username).Scan(&currentUsedBytes)
 
+	if adminUser == "self-service" {
+		nowCheck := time.Now()
+		isTimeExpired := sub.ExpirationDate.Valid && nowCheck.After(sub.ExpirationDate.Time)
+		isQuotaExpired := sub.QuotaBytes > 0 && currentUsedBytes >= sub.QuotaBytes
+		if !isTimeExpired && !isQuotaExpired {
+			return nil, fmt.Errorf("لا يمكن طلب سلفة إلا في حال انتهاء صلاحية الاشتراك أو نفاد الكوتة بالكامل")
+		}
+	}
+
 	now := time.Now()
 	newExp := now.Add(time.Duration(loanHours) * time.Hour)
 
@@ -5462,6 +5471,12 @@ func (d *DB) GetSubscriberPortalData(username string) (*models.SubscriberPortalV
 	}
 
 	// 4. Loan Capabilities
+	nowCheck := time.Now()
+	isTimeExpired := sub.ExpirationDate.Valid && nowCheck.After(sub.ExpirationDate.Time)
+	isQuotaExpired := sub.QuotaBytes > 0 && view.RemainingBytes <= 0
+	view.IsTimeExpired = isTimeExpired
+	view.IsQuotaExpired = isQuotaExpired
+
 	view.LoanActive = sub.LoanActive
 	if sub.LoanActive {
 		view.LoanHours = sub.LoanHours
@@ -5474,10 +5489,12 @@ func (d *DB) GetSubscriberPortalData(username string) (*models.SubscriberPortalV
 		}
 		view.CanRequestLoan = false
 	} else {
-		view.CanRequestLoan = settings.AllowLoanRequest && prof.LoanEnabled
 		view.LoanHours = prof.LoanHours
 		view.LoanQuotaGB = prof.LoanQuotaGB
 		view.LoanDeductionType = prof.LoanDeductionType
+		// Loan is only eligible / visible if subscriber is expired in time or quota
+		isExpired := isTimeExpired || isQuotaExpired
+		view.CanRequestLoan = isExpired && settings.AllowLoanRequest && prof.LoanEnabled
 	}
 
 	return view, nil

@@ -301,9 +301,9 @@
     </div>
     {{ end }}
 
-    <!-- Grace Period Loan Section -->
-    {{ if .Settings.AllowLoanRequest }}
-    <div class="portal-card p-4 mb-4">
+    <!-- Grace Period Loan Section (Only shown if subscriber has an active loan, or is expired and eligible) -->
+    {{ if and .Settings.AllowLoanRequest (or .Data.CanRequestLoan .Data.LoanActive) }}
+    <div class="portal-card p-4 mb-4" id="loanSection">
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
             <div>
                 <h5 class="fw-bold mb-1 text-dark">
@@ -340,40 +340,42 @@
 
         {{ else if .Data.CanRequestLoan }}
         <!-- Eligible to Request Loan -->
-        <div class="card bg-primary bg-opacity-10 border border-primary border-opacity-25 p-4 rounded-4">
+        <div class="card bg-warning bg-opacity-10 border border-warning border-opacity-50 p-4 rounded-4">
             <div class="row align-items-center g-3">
                 <div class="col-lg-8">
-                    <h5 class="fw-bold text-primary mb-2">
-                        <i class="bi bi-gift-fill me-1"></i> باقتك مؤهلة للحصول على سلفة فورية!
-                    </h5>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-danger fs-6 px-3 py-1 fw-bold">
+                            {{ if and .Data.IsTimeExpired .Data.IsQuotaExpired }}
+                            <i class="bi bi-exclamation-octagon-fill me-1"></i> منتهي اشتراك وكوتة
+                            {{ else if .Data.IsTimeExpired }}
+                            <i class="bi bi-clock-history me-1"></i> منتهي اشتراك
+                            {{ else }}
+                            <i class="bi bi-pie-chart-fill me-1"></i> منتهي كوتة
+                            {{ end }}
+                        </span>
+                        <h5 class="fw-bold text-dark mb-0">باقتك مؤهلة للحصول على سلفة فترة السماح فوراً!</h5>
+                    </div>
                     <p class="text-muted small mb-2">
-                        في حال انتهاء باقتك أو نفاد الكوتة، يمكنك الاستلاف فوراً لتشغيل النت بدون انقطاع:
+                        نظراً لانتهاء باقتك أو نفاد الكوتة، يمكنك تفعيل سلفة فترة السماح لتشغيل الإنترنت ومواصلة التصفح دون انقطاع:
                     </p>
-                    <div class="d-flex flex-wrap gap-3 small mb-0">
+                    <div class="d-flex flex-wrap gap-2 small mb-0">
                         <span class="badge bg-white text-dark border p-2">
-                            <i class="bi bi-clock-fill text-primary me-1"></i> المدة الممنوحة: <b>{{ .Data.LoanHours }} ساعة</b>
+                            <i class="bi bi-clock-fill text-warning me-1"></i> المدة: <b>{{ .Data.LoanHours }} ساعة</b>
                         </span>
                         <span class="badge bg-white text-dark border p-2">
-                            <i class="bi bi-hdd-fill text-primary me-1"></i> الكوتة: <b>{{ printf "%.1f" .Data.LoanQuotaGB }} GB</b>
+                            <i class="bi bi-hdd-fill text-warning me-1"></i> الكوتة: <b>{{ printf "%.1f" .Data.LoanQuotaGB }} GB</b>
                         </span>
                         <span class="badge bg-white text-dark border p-2">
-                            <i class="bi bi-shield-check text-primary me-1"></i> السداد: <b>{{ if eq .Data.LoanDeductionType "partial" }}خصم المستهلك فقط (جزئي){{ else }}سداد كلي كامل{{ end }}</b>
+                            <i class="bi bi-shield-check text-warning me-1"></i> طريقة السداد: <b>{{ if eq .Data.LoanDeductionType "partial" }}خصم المستهلك فقط (سداد جزئي){{ else }}سداد كلي كامل{{ end }}</b>
                         </span>
                     </div>
                 </div>
                 <div class="col-lg-4 text-lg-end">
-                    <button type="button" class="btn btn-warning btn-lg fw-bold px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#requestLoanModal">
-                        <i class="bi bi-check-circle-fill me-1"></i> طلب السلفة الآن
+                    <button type="button" class="btn btn-warning btn-lg fw-bold px-4 shadow text-dark" data-bs-toggle="modal" data-bs-target="#requestLoanModal">
+                        <i class="bi bi-lightning-charge-fill me-1"></i> طلب السلفة الآن
                     </button>
                 </div>
             </div>
-        </div>
-
-        {{ else }}
-        <!-- Not Eligible -->
-        <div class="alert alert-light border d-flex align-items-center gap-2 small mb-0 text-muted">
-            <i class="bi bi-slash-circle fs-5"></i>
-            <div>خدمة السلفة الذاتية غير مفعلة على باقتك الحالية أو أنك لا تزال تتمتع بصلاحية نشطة.</div>
         </div>
         {{ end }}
     </div>
@@ -435,42 +437,66 @@
 
 <!-- Request Loan Confirmation Modal -->
 {{ if and .Settings.AllowLoanRequest .Data.CanRequestLoan }}
-<div class="modal fade" id="requestLoanModal" tabindex="-1">
+<div class="modal fade" id="requestLoanModal" tabindex="-1" aria-labelledby="requestLoanModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title fw-bold">
-                    <i class="bi bi-clock-history me-2"></i> تأكيد طلب سلفة فترة السماح
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow-lg overflow-hidden">
+            <div class="modal-header bg-warning text-dark border-0 py-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 bg-dark bg-opacity-10 rounded-circle">
+                        <i class="bi bi-lightning-charge-fill fs-5 text-dark"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0" id="requestLoanModalLabel">سلفة فترة السماح متاحة لك الآن!</h5>
+                        <small class="text-dark text-opacity-75">خدمة تجديد مؤقت فورية دون انقطاع الإنترنت</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
             </div>
             <form method="POST" action="/portal/request-loan">
                 <div class="modal-body p-4">
-                    <p class="mb-3">أنت على وشك تفعيل سلفة فترة السماح على باقتك الحالية:</p>
+                    <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-2 mb-3 py-2">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 text-warning"></i>
+                        <div class="small fw-bold">
+                            {{ if and .Data.IsTimeExpired .Data.IsQuotaExpired }}
+                            انتهت صلاحية باقتك ونفدت كوتتك بالكامل!
+                            {{ else if .Data.IsTimeExpired }}
+                            انتهت صلاحية باقتك الحالية!
+                            {{ else }}
+                            نفدت كوتة باقتك بالكامل (0 GB)!
+                            {{ end }}
+                            يمكنك الآن تفعيل سلفة فترة السماح للاستمرار في التصفح فوراً.
+                        </div>
+                    </div>
+
+                    <p class="small text-muted mb-2">تفاصيل السلفة المتاحة على باقتك:</p>
 
                     <div class="p-3 bg-light rounded-3 border mb-3">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted">المدة الزمنية الممنوحة:</span>
-                            <span class="fw-bold text-dark">{{ .Data.LoanHours }} ساعة</span>
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <span class="text-muted small"><i class="bi bi-clock-history me-1 text-primary"></i> المدة الزمنية الممنوحة:</span>
+                            <span class="fw-bold text-dark font-monospace fs-6">{{ .Data.LoanHours }} ساعة</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted">كوتة البيانات الممنوحة:</span>
-                            <span class="fw-bold text-dark">{{ printf "%.1f" .Data.LoanQuotaGB }} GB</span>
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <span class="text-muted small"><i class="bi bi-hdd-network me-1 text-primary"></i> كوتة البيانات الممنوحة:</span>
+                            <span class="fw-bold text-dark font-monospace fs-6">{{ printf "%.1f" .Data.LoanQuotaGB }} GB</span>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="text-muted">نظام الخصم عند الشحن:</span>
-                            <span class="fw-bold text-primary">{{ if eq .Data.LoanDeductionType "partial" }}خصم المستهلك فقط (سداد جزئي){{ else }}سداد كلي كامل{{ end }}</span>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small"><i class="bi bi-arrow-repeat me-1 text-primary"></i> طريقة الخصم عند الشحن:</span>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">
+                                {{ if eq .Data.LoanDeductionType "partial" }}خصم المستهلك فقط (سداد جزئي){{ else }}سداد كلي كامل{{ end }}
+                            </span>
                         </div>
                     </div>
 
-                    <div class="alert alert-info small mb-0">
-                        <i class="bi bi-info-circle-fill me-1"></i> سيتم تشغيل الخدمة وفك الحظر فوراً، ويتم خصم السلفة تلقائياً عند أول شحن وتجديد للباقة.
+                    <div class="alert alert-info small mb-0 py-2 border-0">
+                        <i class="bi bi-info-circle-fill me-1"></i> سيتم تشغيل الخدمة وفك الحظر فوراً، وتُسوّى السلفة تلقائياً عند أول شحن وتجديد للباقة.
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning fw-bold text-dark">
-                        <i class="bi bi-check-circle-fill me-1"></i> نعم، تفعيل السلفة فوراً
+                <div class="modal-footer bg-light border-0 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary px-3 fw-bold" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> إغلاق / لاحقاً
+                    </button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark px-4 shadow">
+                        <i class="bi bi-lightning-charge-fill me-1"></i> استلاف وتفعيل الخدمة الآن
                     </button>
                 </div>
             </form>
@@ -521,5 +547,18 @@
 {{ end }}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+{{ if and .Settings.AllowLoanRequest .Data.CanRequestLoan }}
+<script>
+// Auto popup loan modal on page load if eligible
+document.addEventListener('DOMContentLoaded', function () {
+    const loanModalEl = document.getElementById('requestLoanModal');
+    if (loanModalEl) {
+        const loanModal = new bootstrap.Modal(loanModalEl);
+        loanModal.show();
+    }
+});
+</script>
+{{ end }}
 </body>
 </html>
