@@ -448,6 +448,23 @@ func (d *DB) InitSchema() error {
 			error_message TEXT NULL,
 			INDEX idx_backups_created (created_at)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		// 18. Subscriber Self-Care Portal Settings & Permissions
+		`CREATE TABLE IF NOT EXISTS subscriber_portal_settings (
+			id INT PRIMARY KEY DEFAULT 1,
+			portal_enabled TINYINT(1) DEFAULT 1,
+			allow_loan_request TINYINT(1) DEFAULT 1,
+			show_quota_usage TINYINT(1) DEFAULT 1,
+			show_debt TINYINT(1) DEFAULT 1,
+			show_profile_details TINYINT(1) DEFAULT 1,
+			show_online_status TINYINT(1) DEFAULT 1,
+			allow_password_change TINYINT(1) DEFAULT 0,
+			allow_session_disconnect TINYINT(1) DEFAULT 1,
+			company_name VARCHAR(150) DEFAULT 'شبكتنا لخدمات الإنترنت',
+			company_phone VARCHAR(50) DEFAULT '',
+			portal_announcement TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
@@ -617,6 +634,13 @@ func (d *DB) InitSchema() error {
 	// Seed default Backup Settings
 	_, _ = d.Exec(`INSERT IGNORE INTO backup_settings (id, enabled, interval_hours, retention_count, send_whatsapp, whatsapp_phone, last_status)
 		VALUES (1, 1, 6, 10, 0, '', 'ready')`)
+
+	// Seed default Subscriber Portal Settings
+	_, _ = d.Exec(`INSERT IGNORE INTO subscriber_portal_settings (
+		id, portal_enabled, allow_loan_request, show_quota_usage, show_debt,
+		show_profile_details, show_online_status, allow_password_change, allow_session_disconnect,
+		company_name, company_phone, portal_announcement
+	) VALUES (1, 1, 1, 1, 1, 1, 1, 0, 1, 'شبكتنا لخدمات الإنترنت', '', '')`)
 
 	// Seed default Admin if not present
 	var adminCount int
@@ -5235,6 +5259,257 @@ func (d *DB) GetBackupRecord(id int64) (*models.BackupRecord, error) {
 func (d *DB) MarkBackupWhatsAppSent(id int64, sent bool) error {
 	_, err := d.Exec(`UPDATE backups SET whatsapp_sent = ? WHERE id = ?`, sent, id)
 	return err
+}
+
+// --- Subscriber Self-Care Portal Methods ---
+
+func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, error) {
+	var s models.SubscriberPortalSettings
+	var announcement sql.NullString
+	err := d.QueryRow(`SELECT id, COALESCE(portal_enabled, 1), COALESCE(allow_loan_request, 1),
+		COALESCE(show_quota_usage, 1), COALESCE(show_debt, 1), COALESCE(show_profile_details, 1),
+		COALESCE(show_online_status, 1), COALESCE(allow_password_change, 0), COALESCE(allow_session_disconnect, 1),
+		COALESCE(company_name, 'شبكتنا لخدمات الإنترنت'), COALESCE(company_phone, ''), portal_announcement, updated_at
+		FROM subscriber_portal_settings WHERE id = 1`).Scan(
+		&s.ID, &s.PortalEnabled, &s.AllowLoanRequest,
+		&s.ShowQuotaUsage, &s.ShowDebt, &s.ShowProfileDetails,
+		&s.ShowOnlineStatus, &s.AllowPasswordChange, &s.AllowSessionDisconnect,
+		&s.CompanyName, &s.CompanyPhone, &announcement, &s.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return &models.SubscriberPortalSettings{
+				ID:                     1,
+				PortalEnabled:          true,
+				AllowLoanRequest:       true,
+				ShowQuotaUsage:         true,
+				ShowDebt:               true,
+				ShowProfileDetails:     true,
+				ShowOnlineStatus:       true,
+				AllowPasswordChange:    false,
+				AllowSessionDisconnect: true,
+				CompanyName:            "شبكتنا لخدمات الإنترنت",
+			}, nil
+		}
+		return nil, err
+	}
+	if announcement.Valid {
+		s.PortalAnnouncement = announcement.String
+	}
+	return &s, nil
+}
+
+func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) error {
+	_, err := d.Exec(`INSERT INTO subscriber_portal_settings (
+		id, portal_enabled, allow_loan_request, show_quota_usage, show_debt,
+		show_profile_details, show_online_status, allow_password_change, allow_session_disconnect,
+		company_name, company_phone, portal_announcement
+	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON DUPLICATE KEY UPDATE
+		portal_enabled = VALUES(portal_enabled),
+		allow_loan_request = VALUES(allow_loan_request),
+		show_quota_usage = VALUES(show_quota_usage),
+		show_debt = VALUES(show_debt),
+		show_profile_details = VALUES(show_profile_details),
+		show_online_status = VALUES(show_online_status),
+		allow_password_change = VALUES(allow_password_change),
+		allow_session_disconnect = VALUES(allow_session_disconnect),
+		company_name = VALUES(company_name),
+		company_phone = VALUES(company_phone),
+		portal_announcement = VALUES(portal_announcement)`,
+		s.PortalEnabled, s.AllowLoanRequest, s.ShowQuotaUsage, s.ShowDebt,
+		s.ShowProfileDetails, s.ShowOnlineStatus, s.AllowPasswordChange, s.AllowSessionDisconnect,
+		s.CompanyName, s.CompanyPhone, s.PortalAnnouncement)
+	return err
+}
+
+func (d *DB) GetSubscriberPortalData(username string) (*models.SubscriberPortalView, error) {
+	username = strings.TrimSpace(username)
+	sub, err := d.GetSubscriber(username)
+	if err != nil {
+		return nil, fmt.Errorf("المشترك غير موجود: %w", err)
+	}
+
+	settings, err := d.GetSubscriberPortalSettings()
+	if err != nil {
+		settings = &models.SubscriberPortalSettings{
+			PortalEnabled:          true,
+			AllowLoanRequest:       true,
+			ShowQuotaUsage:         true,
+			ShowDebt:               true,
+			ShowProfileDetails:     true,
+			ShowOnlineStatus:       true,
+			AllowPasswordChange:    false,
+			AllowSessionDisconnect: true,
+			CompanyName:            "شبكتنا لخدمات الإنترنت",
+		}
+	}
+
+	var prof *models.Profile
+	if sub.ProfileName != "" {
+		prof, _ = d.GetProfileByName(sub.ProfileName)
+	}
+	if prof == nil {
+		prof = &models.Profile{
+			Name:        sub.ProfileName,
+			DisplayName: sub.ProfileName,
+		}
+	}
+
+	view := &models.SubscriberPortalView{
+		Subscriber: *sub,
+		Profile:    *prof,
+		Settings:   *settings,
+	}
+
+	// 1. Quota & Consumption
+	if sub.QuotaBytes > 0 {
+		view.QuotaGB = float64(sub.QuotaBytes) / (1024 * 1024 * 1024)
+	} else if prof.QuotaBytes > 0 {
+		view.QuotaGB = float64(prof.QuotaBytes) / (1024 * 1024 * 1024)
+	}
+
+	// Calculate traffic used since cycle start (LastRenewedAt or CreatedAt)
+	cycleStart := sub.CreatedAt
+	var lastRenewed sql.NullTime
+	_ = d.QueryRow("SELECT last_renewed_at FROM subscribers WHERE username = ?", username).Scan(&lastRenewed)
+	if lastRenewed.Valid {
+		cycleStart = lastRenewed.Time
+	}
+
+	var usedBytes int64
+	_ = d.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+		FROM radacct WHERE username = ? AND acctstarttime >= ?`, username, cycleStart).Scan(&usedBytes)
+	view.UsedBytes = usedBytes
+	view.UsedGB = float64(usedBytes) / (1024 * 1024 * 1024)
+
+	if sub.QuotaBytes > 0 {
+		rem := sub.QuotaBytes - usedBytes
+		if rem < 0 {
+			rem = 0
+		}
+		view.RemainingBytes = rem
+		view.RemainingGB = float64(rem) / (1024 * 1024 * 1024)
+		view.UsagePercent = (float64(usedBytes) / float64(sub.QuotaBytes)) * 100.0
+		if view.UsagePercent > 100.0 {
+			view.UsagePercent = 100.0
+		}
+	} else {
+		view.RemainingBytes = -1
+		view.RemainingGB = -1
+		view.UsagePercent = 0.0
+	}
+
+	// 2. Expiration & Remaining Days
+	if sub.ExpirationDate.Valid {
+		expTime := sub.ExpirationDate.Time
+		view.ExpirationDisplay = expTime.Format("2006-01-02 15:04")
+		now := time.Now()
+		if expTime.After(now) {
+			diff := expTime.Sub(now)
+			days := int(diff.Hours() / 24)
+			hours := int(diff.Hours()) % 24
+			if days > 0 {
+				view.RemainingDaysDisplay = fmt.Sprintf("باقي %d يوم و %d ساعة", days, hours)
+			} else {
+				mins := int(diff.Minutes()) % 60
+				view.RemainingDaysDisplay = fmt.Sprintf("باقي %d ساعة و %d دقيقة", hours, mins)
+			}
+		} else {
+			diff := now.Sub(expTime)
+			days := int(diff.Hours() / 24)
+			if days > 0 {
+				view.RemainingDaysDisplay = fmt.Sprintf("منتهي الصلاحية منذ %d يوم", days)
+			} else {
+				view.RemainingDaysDisplay = "منتهي الصلاحية اليوم"
+			}
+		}
+	} else {
+		view.ExpirationDisplay = "غير محدد (مفتوح)"
+		view.RemainingDaysDisplay = "صلاحية غير محدودة"
+	}
+
+	// 3. Online Session Status from radacct
+	var (
+		liveIP, liveMAC, nasIP sql.NullString
+		acctStart              sql.NullTime
+	)
+	errAcct := d.QueryRow(`SELECT framedipaddress, callingstationid, nasipaddress, acctstarttime
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(
+		&liveIP, &liveMAC, &nasIP, &acctStart)
+
+	if errAcct == nil && liveIP.Valid && liveIP.String != "" {
+		view.IsOnline = true
+		view.OnlineIP = liveIP.String
+		if liveMAC.Valid {
+			view.OnlineMAC = liveMAC.String
+		}
+		if nasIP.Valid {
+			view.NasIP = nasIP.String
+		}
+		if acctStart.Valid {
+			dur := time.Since(acctStart.Time)
+			hours := int(dur.Hours())
+			mins := int(dur.Minutes()) % 60
+			if hours > 24 {
+				days := hours / 24
+				hours = hours % 24
+				view.OnlineDuration = fmt.Sprintf("%d يوم و %d ساعة", days, hours)
+			} else {
+				view.OnlineDuration = fmt.Sprintf("%d ساعة و %d دقيقة", hours, mins)
+			}
+		}
+	}
+
+	// 4. Loan Capabilities
+	view.LoanActive = sub.LoanActive
+	if sub.LoanActive {
+		view.LoanHours = sub.LoanHours
+		if sub.LoanQuotaBytes > 0 {
+			view.LoanQuotaGB = float64(sub.LoanQuotaBytes) / (1024 * 1024 * 1024)
+		}
+		view.LoanDeductionType = sub.LoanDeductionType
+		if sub.LoanGrantedAt.Valid {
+			view.LoanGrantedAt = sub.LoanGrantedAt.Time.Format("2006-01-02 15:04")
+		}
+		view.CanRequestLoan = false
+	} else {
+		view.CanRequestLoan = settings.AllowLoanRequest && prof.LoanEnabled
+		view.LoanHours = prof.LoanHours
+		view.LoanQuotaGB = prof.LoanQuotaGB
+		view.LoanDeductionType = prof.LoanDeductionType
+	}
+
+	return view, nil
+}
+
+func (d *DB) UpdateSubscriberPassword(username, newPass string) error {
+	username = strings.TrimSpace(username)
+	newPass = strings.TrimSpace(newPass)
+	if username == "" || newPass == "" {
+		return fmt.Errorf("اسم المستخدم وكلمة المرور مطلوبان")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Update Cleartext-Password in FreeRADIUS radcheck
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", username)
+	_, err = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", username, newPass)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Disconnect session via CoA so subscriber reconnects with new password
+	_ = d.DisconnectSubscriberSession(username)
+	return nil
 }
 
 

@@ -156,6 +156,154 @@
             </div>
         </div>
     </div>
+
+    <!-- Subscriber Portal Permissions & Settings Card -->
+    <div class="col-12" id="portal-settings">
+        <div class="card shadow-sm border-0" style="border-radius: 14px;">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 bg-success-subtle rounded-3 text-success">
+                        <i class="bi bi-person-workspace fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">صفحة المشترك (Subscriber Self-Care Portal)</h6>
+                        <small class="text-muted">التحكم في صلاحيات المشتركين وما يمكنهم رؤيته أو تنفيذه داخل صفحتهم الخاصة</small>
+                    </div>
+                </div>
+                <div>
+                    <a href="/portal" target="_blank" class="btn btn-sm btn-outline-primary fw-bold">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> فتح صفحة المشترك للمعاينة
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="/settings/portal">
+                    <!-- General Portal Status Switch -->
+                    <div class="p-3 bg-light rounded-3 border mb-4 d-flex align-items-center justify-content-between">
+                        <div>
+                            <h6 class="fw-bold mb-1 text-dark">تفعيل صفحة المشترك بالكامل (Portal Status)</h6>
+                            <p class="text-muted small mb-0">عند التعطيل، لن يتمكن المشتركون من تسجيل الدخول إلى صفحتهم الذاتية.</p>
+                        </div>
+                        <div class="form-check form-switch fs-4 mb-0">
+                            <input class="form-check-input" type="checkbox" name="portal_enabled" value="1" id="sw_portal_enabled" {{ if .PortalSettings.PortalEnabled }}checked{{ end }}>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-ui-checks me-1 text-primary"></i> صلاحيات وخيارات ظهور البيانات للمشترك
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_loan">
+                                        <i class="bi bi-clock-history text-warning me-1"></i> طلب سلفة فترة سماح
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="allow_loan_request" value="1" id="sw_allow_loan" {{ if .PortalSettings.AllowLoanRequest }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">إتاحة زر طلب السلفة الذاتية للمشتركين الذين تدعم باقتهم السلفة.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_show_quota">
+                                        <i class="bi bi-pie-chart-fill text-primary me-1"></i> متابعة الكوتة والاستهلاك
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="show_quota_usage" value="1" id="sw_show_quota" {{ if .PortalSettings.ShowQuotaUsage }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">إظهار الجيجات المستهلكة، والمتبقية، والنسبة المئوية وشريط التقدم.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_show_online">
+                                        <i class="bi bi-broadcast text-success me-1"></i> حالة الاتصال والأونلاين
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="show_online_status" value="1" id="sw_show_online" {{ if .PortalSettings.ShowOnlineStatus }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">إظهار هل العميل متصل حالياً (Online) مع عنوان الآيبي والماك.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_show_profile">
+                                        <i class="bi bi-speedometer2 text-info me-1"></i> تفاصيل وسعر الباقة
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="show_profile_details" value="1" id="sw_show_profile" {{ if .PortalSettings.ShowProfileDetails }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">عرض اسم الباقة، السرعة المحددة، سعر التجديد، وموعد الانتهاء.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_show_debt">
+                                        <i class="bi bi-cash-coin text-danger me-1"></i> إظهار المديونية المستحقة
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="show_debt" value="1" id="sw_show_debt" {{ if .PortalSettings.ShowDebt }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">عرض الرصيد المالي والديون المستحقة على المشترك إن وُجدت.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_disconnect">
+                                        <i class="bi bi-arrow-clockwise text-secondary me-1"></i> إعادة تشغيل الجلسة (Reconnect)
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="allow_session_disconnect" value="1" id="sw_allow_disconnect" {{ if .PortalSettings.AllowSessionDisconnect }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">السماح للمشترك بفصل جلسته الحالية لإعادة الاتصال بالراوتر لحل مشاكل التعليق.</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_pass">
+                                        <i class="bi bi-key-fill text-dark me-1"></i> تغيير كلمة المرور
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="allow_password_change" value="1" id="sw_allow_pass" {{ if .PortalSettings.AllowPasswordChange }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">السماح للمشترك بتعديل باسورد اشتراكه ذاتياً من صفحته.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-megaphone me-1 text-primary"></i> بيانات الشبكة ورسائل الإعلانات في صفحة المشترك
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">اسم الشبكة / الشركة الظاهر بالصفحة:</label>
+                            <input type="text" name="company_name" class="form-control" value="{{ .PortalSettings.CompanyName }}" placeholder="مثال: شبكة الأمل لخدمات الإنترنت">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">رقم هاتف الدعم الفني / الواتساب:</label>
+                            <input type="text" name="company_phone" class="form-control" value="{{ .PortalSettings.CompanyPhone }}" placeholder="مثال: 01012345678">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">رسالة تنبيهية أو إعلان يظهر أعلى صفحة المشترك (اختياري):</label>
+                            <textarea name="portal_announcement" class="form-control" rows="2" placeholder="اكتب رسالة ترحيبية أو إعلان بمواعيد الصيانة أو العروض الخاصة...">{{ .PortalSettings.PortalAnnouncement }}</textarea>
+                            <div class="form-text small">اترك الحقل فارغاً إذا كنت لا ترغب بإظهار إعلان في صفحة المشترك.</div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success fw-bold px-4 py-2">
+                        <i class="bi bi-check-circle-fill me-1"></i> حفظ إعدادات وصلاحيات صفحة المشترك
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {{ end }}
 

@@ -738,5 +738,48 @@ type BackupRecord struct {
 	ErrorMessage       string     `json:"error_message"`
 }
 
+// SubscriberPortalSettings represents settings and permissions for the subscriber self-care portal
+type SubscriberPortalSettings struct {
+	ID                     int       `json:"id"`
+	PortalEnabled          bool      `json:"portal_enabled"`
+	AllowLoanRequest       bool      `json:"allow_loan_request"`
+	ShowQuotaUsage         bool      `json:"show_quota_usage"`
+	ShowDebt               bool      `json:"show_debt"`
+	ShowProfileDetails     bool      `json:"show_profile_details"`
+	ShowOnlineStatus       bool      `json:"show_online_status"`
+	AllowPasswordChange    bool      `json:"allow_password_change"`
+	AllowSessionDisconnect bool      `json:"allow_session_disconnect"`
+	CompanyName            string    `json:"company_name"`
+	CompanyPhone           string    `json:"company_phone"`
+	PortalAnnouncement     string    `json:"portal_announcement"`
+	UpdatedAt              time.Time `json:"updated_at"`
+}
+
+// SubscriberPortalView contains all aggregated details needed to render the subscriber self-care portal
+type SubscriberPortalView struct {
+	Subscriber           Subscriber               `json:"subscriber"`
+	Profile              Profile                  `json:"profile"`
+	Settings             SubscriberPortalSettings `json:"settings"`
+	IsOnline             bool                     `json:"is_online"`
+	OnlineIP             string                   `json:"online_ip"`
+	OnlineMAC            string                   `json:"online_mac"`
+	OnlineDuration       string                   `json:"online_duration"`
+	NasIP                string                   `json:"nas_ip"`
+	QuotaGB              float64                  `json:"quota_gb"`
+	UsedBytes            int64                    `json:"used_bytes"`
+	UsedGB               float64                  `json:"used_gb"`
+	RemainingBytes       int64                    `json:"remaining_bytes"`
+	RemainingGB          float64                  `json:"remaining_gb"`
+	UsagePercent         float64                  `json:"usage_percent"`
+	ExpirationDisplay    string                   `json:"expiration_display"`
+	RemainingDaysDisplay string                   `json:"remaining_days_display"`
+	CanRequestLoan       bool                     `json:"can_request_loan"`
+	LoanActive           bool                     `json:"loan_active"`
+	LoanHours            int                      `json:"loan_hours"`
+	LoanQuotaGB          float64                  `json:"loan_quota_gb"`
+	LoanDeductionType    string                   `json:"loan_deduction_type"`
+	LoanGrantedAt        string                   `json:"loan_granted_at"`
+}
+
 
 

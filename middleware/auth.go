@@ -95,12 +95,28 @@ func GetUser(r *http.Request) *SessionUser {
 	return nil
 }
 
-// RequireAuth redirects to login if unauthenticated
+// RequireAuth redirects to login if unauthenticated or redirects subscribers to /portal
 func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := GetUser(r)
 		if u == nil {
 			http.Redirect(w, r, "/auth/login?next="+r.URL.Path, http.StatusFound)
+			return
+		}
+		if u.Role == "subscriber" && !strings.HasPrefix(r.URL.Path, "/portal") && r.URL.Path != "/auth/logout" {
+			http.Redirect(w, r, "/portal", http.StatusFound)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// RequireSubscriberAuth ensures user is authenticated; if unauthenticated redirects to /portal/login
+func RequireSubscriberAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		u := GetUser(r)
+		if u == nil {
+			http.Redirect(w, r, "/portal/login", http.StatusFound)
 			return
 		}
 		next(w, r)

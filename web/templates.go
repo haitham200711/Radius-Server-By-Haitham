@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Renderer struct {
@@ -45,6 +46,8 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"settings/index":         {"templates/base.html", "templates/settings/index.html"},
 		"whatsapp/index":         {"templates/base.html", "templates/whatsapp/index.html"},
 		"backups/index":          {"templates/base.html", "templates/backups/index.html"},
+		"portal/login":           {"templates/portal/login.html"},
+		"portal/index":           {"templates/portal/index.html"},
 	}
 
 	funcMap := template.FuncMap{
@@ -84,7 +87,7 @@ func (r *Renderer) Render(w http.ResponseWriter, name string, data interface{}) 
 		return err
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if name == "cards/print" {
+	if name == "cards/print" || strings.HasPrefix(name, "portal/") {
 		return tmpl.Execute(w, data)
 	}
 	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {

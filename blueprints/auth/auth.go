@@ -88,6 +88,31 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 3. Check Subscribers table / FreeRADIUS radcheck
+	var subPass string
+	err = bp.db.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", username).Scan(&subPass)
+	if err == nil && subPass == password {
+		portalSettings, _ := bp.db.GetSubscriberPortalSettings()
+		if portalSettings == nil || portalSettings.PortalEnabled {
+			token := middleware.GenerateToken(middleware.SessionUser{
+				ID:       0,
+				Username: username,
+				Role:     "subscriber",
+			}, bp.secret)
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     middleware.CookieName,
+				Value:    token,
+				Path:     "/",
+				HttpOnly: true,
+				Expires:  time.Now().Add(7 * 24 * time.Hour),
+			})
+
+			http.Redirect(w, r, "/portal", http.StatusFound)
+			return
+		}
+	}
+
 	// Invalid credentials
 	_ = bp.renderer.Render(w, "auth/login", map[string]interface{}{
 		"Title": "تسجيل الدخول",

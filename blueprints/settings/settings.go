@@ -58,6 +58,8 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 :put ">>> RADIUS Configuration Applied Successfully! <<<"
 `, serverIP, secret, serverIP, serverIP, secret)
 
+	portalSettings, _ := bp.db.GetSubscriberPortalSettings()
+
 	_ = bp.renderer.Render(w, "settings/index", map[string]interface{}{
 		"Title":          "إعدادات النظام وتغيير كلمة المرور",
 		"ActiveMenu":     "settings",
@@ -65,6 +67,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		"ServerIP":       serverIP,
 		"Secret":         secret,
 		"MikrotikScript": mikrotikScript,
+		"PortalSettings": portalSettings,
 		"FlashStatus":    status,
 		"FlashMsg":       msg,
 	})
@@ -171,4 +174,54 @@ func (bp *Blueprint) ChangePasswordHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	respond("error", "صلاحية الحساب غير مصرح لها بتغيير كلمة المرور هنا", http.StatusBadRequest)
+}
+
+func (bp *Blueprint) SavePortalSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		return
+	}
+
+	user := middleware.GetUser(r)
+	if user == nil || user.Role != "admin" {
+		http.Error(w, "Unauthorized: Admins Only", http.StatusForbidden)
+		return
+	}
+
+	portalEnabled := r.FormValue("portal_enabled") == "1" || r.FormValue("portal_enabled") == "on" || r.FormValue("portal_enabled") == "true"
+	allowLoan := r.FormValue("allow_loan_request") == "1" || r.FormValue("allow_loan_request") == "on" || r.FormValue("allow_loan_request") == "true"
+	showQuota := r.FormValue("show_quota_usage") == "1" || r.FormValue("show_quota_usage") == "on" || r.FormValue("show_quota_usage") == "true"
+	showDebt := r.FormValue("show_debt") == "1" || r.FormValue("show_debt") == "on" || r.FormValue("show_debt") == "true"
+	showProfile := r.FormValue("show_profile_details") == "1" || r.FormValue("show_profile_details") == "on" || r.FormValue("show_profile_details") == "true"
+	showOnline := r.FormValue("show_online_status") == "1" || r.FormValue("show_online_status") == "on" || r.FormValue("show_online_status") == "true"
+	allowPass := r.FormValue("allow_password_change") == "1" || r.FormValue("allow_password_change") == "on" || r.FormValue("allow_password_change") == "true"
+	allowDisconnect := r.FormValue("allow_session_disconnect") == "1" || r.FormValue("allow_session_disconnect") == "on" || r.FormValue("allow_session_disconnect") == "true"
+
+	companyName := strings.TrimSpace(r.FormValue("company_name"))
+	if companyName == "" {
+		companyName = "شبكتنا لخدمات الإنترنت"
+	}
+	companyPhone := strings.TrimSpace(r.FormValue("company_phone"))
+	announcement := strings.TrimSpace(r.FormValue("portal_announcement"))
+
+	settings := &models.SubscriberPortalSettings{
+		PortalEnabled:          portalEnabled,
+		AllowLoanRequest:       allowLoan,
+		ShowQuotaUsage:         showQuota,
+		ShowDebt:               showDebt,
+		ShowProfileDetails:     showProfile,
+		ShowOnlineStatus:       showOnline,
+		AllowPasswordChange:    allowPass,
+		AllowSessionDisconnect: allowDisconnect,
+		CompanyName:            companyName,
+		CompanyPhone:           companyPhone,
+		PortalAnnouncement:     announcement,
+	}
+
+	if err := bp.db.SaveSubscriberPortalSettings(settings); err != nil {
+		http.Redirect(w, r, "/settings?status=danger&msg="+url.QueryEscape("حدث خطأ أثناء حفظ إعدادات صفحة المشترك: "+err.Error())+"#portal-settings", http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/settings?status=success&msg="+url.QueryEscape("تم حفظ إعدادات وصلاحيات صفحة المشترك بنجاح!")+"#portal-settings", http.StatusSeeOther)
 }

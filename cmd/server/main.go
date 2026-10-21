@@ -16,6 +16,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/card_templates"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/cards"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/dashboard"
+	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/portal"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/profiles"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/reports"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/resellers"
@@ -236,6 +237,16 @@ func main() {
 	settBP := settings.New(db, renderer)
 	mux.HandleFunc("/settings", middleware.RequireAuth(settBP.IndexHandler))
 	mux.HandleFunc("/settings/change-password", middleware.RequireAuth(settBP.ChangePasswordHandler))
+	mux.HandleFunc("/settings/portal", middleware.RequireAdmin(settBP.SavePortalSettingsHandler))
+
+	// Subscriber Self-Care Portal Blueprint
+	portalBP := portal.New(db, renderer, cfg.SessionSecret)
+	mux.HandleFunc("/portal/login", portalBP.LoginHandler)
+	mux.HandleFunc("/portal/logout", portalBP.LogoutHandler)
+	mux.HandleFunc("/portal", middleware.RequireSubscriberAuth(portalBP.IndexHandler))
+	mux.HandleFunc("/portal/request-loan", middleware.RequireSubscriberAuth(portalBP.RequestLoanHandler))
+	mux.HandleFunc("/portal/disconnect", middleware.RequireSubscriberAuth(portalBP.DisconnectHandler))
+	mux.HandleFunc("/portal/change-password", middleware.RequireSubscriberAuth(portalBP.ChangePasswordHandler))
 
 	// WhatsApp Blueprint
 	waBP := whatsappBP.New(db, renderer)
