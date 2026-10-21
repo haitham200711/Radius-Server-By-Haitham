@@ -96,10 +96,12 @@
 
         <form method="POST" action="/portal/login">
             <div class="mb-3">
-                <label class="form-label small fw-bold text-light">اسم مستخدم الاشتراك (Username):</label>
+                <label class="form-label small fw-bold text-light">
+                    {{ if .Settings.AllowPhoneLogin }}اسم المستخدم أو رقم الموبايل المسجل:{{ else }}اسم مستخدم الاشتراك (Username):{{ end }}
+                </label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person"></i></span>
-                    <input type="text" name="username" class="form-control font-monospace" placeholder="اسم المستخدم الخاص باشتراكك" required autofocus>
+                    <span class="input-group-text"><i class="bi {{ if .Settings.AllowPhoneLogin }}bi-telephone-fill{{ else }}bi-person{{ end }}"></i></span>
+                    <input type="text" name="username" class="form-control font-monospace" placeholder="{{ if .Settings.AllowPhoneLogin }}أدخل اسم المستخدم أو رقم هاتفك{{ else }}اسم المستخدم الخاص باشتراكك{{ end }}" required autofocus>
                 </div>
             </div>
 

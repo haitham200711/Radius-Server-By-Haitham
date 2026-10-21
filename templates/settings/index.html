@@ -276,6 +276,18 @@
                                 <small class="text-muted d-block">السماح للمشترك بتعديل باسورد اشتراكه ذاتياً من صفحته.</small>
                             </div>
                         </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100 bg-white shadow-sm">
+                                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
+                                    <label class="form-check-label fw-bold text-dark" for="sw_allow_phone_login">
+                                        <i class="bi bi-phone-fill text-primary me-1"></i> الدخول برقم الموبايل
+                                    </label>
+                                    <input class="form-check-input ms-0" type="checkbox" name="allow_phone_login" value="1" id="sw_allow_phone_login" {{ if .PortalSettings.AllowPhoneLogin }}checked{{ end }}>
+                                </div>
+                                <small class="text-muted d-block">السماح للمشترك بتسجيل الدخول برقم هاتفه المسجل بدلاً من اليوزر نيم.</small>
+                            </div>
+                        </div>
                     </div>
 
                     <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">

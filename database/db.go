@@ -561,6 +561,7 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_quota_bytes BIGINT DEFAULT 0;`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_deduction_type VARCHAR(20) DEFAULT 'full';`,
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS loan_initial_used_bytes BIGINT DEFAULT 0;`,
+		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_phone_login TINYINT(1) DEFAULT 0;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -2009,6 +2010,152 @@ func (d *DB) CloseSubscriberLoan(username, adminUser string) error {
 	}
 
 	// 4. Disconnect user session via CoA
+	_ = d.DisconnectSubscriberSession(username)
+
+	return nil
+}
+
+// TerminateSubscription ends the subscriber's current subscription, zeroes quota, sets status to expired, and disconnects session
+func (d *DB) TerminateSubscription(username, adminUser string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var contractNo, fullName string
+	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, '') FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName)
+	if fullName == "" {
+		fullName = username
+	}
+
+	pastExp := time.Now().Add(-1 * time.Minute)
+	// Reset expiration date, clear quota bytes to 0, reset loan, set status expired
+	_, err = tx.Exec(`UPDATE subscribers SET
+		expiration_date = ?,
+		quota_bytes = 0,
+		status = 'expired',
+		loan_active = 0,
+		loan_granted_at = NULL,
+		loan_hours = 0,
+		loan_quota_bytes = 0,
+		loan_deduction_type = 'full',
+		loan_initial_used_bytes = 0,
+		last_renewed_at = NOW(),
+		updated_at = NOW()
+		WHERE username = ?`, pastExp, username)
+	if err != nil {
+		return err
+	}
+
+	// Update FreeRADIUS radcheck Expiration to past
+	pastExpStr := pastExp.Format("02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
+	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, pastExpStr)
+
+	// Remove or zero out Mikrotik-Total-Limit in radreply
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'adjustment', 'إنهاء اشتراك العميل وتصفير الكوتة', 0.00, 'paid', 'cash', 'تم إنهاء الاشتراك يدوياً من لوحة التحكم', ?)`,
+		username, contractNo, fullName, adminUser)
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Disconnect session via CoA immediately
+	_ = d.DisconnectSubscriberSession(username)
+
+	return nil
+}
+
+// ChangeSubscriberProfile switches a subscriber to a new profile, terminates their current subscription, zeroes their quota, and disconnects session
+func (d *DB) ChangeSubscriberProfile(username, newProfileName, adminUser string, isAdmin bool) error {
+	username = strings.TrimSpace(username)
+	newProfileName = strings.TrimSpace(newProfileName)
+	if username == "" || newProfileName == "" {
+		return fmt.Errorf("اسم المشترك واسم البروفايل مطلوبان")
+	}
+
+	// Verify profile exists
+	prof, err := d.GetProfileByName(newProfileName)
+	if err != nil || prof == nil {
+		return fmt.Errorf("البروفايل المطلوب غير موجود: %s", newProfileName)
+	}
+
+	sub, err := d.GetSubscriber(username)
+	if err != nil || sub == nil {
+		return fmt.Errorf("المشترك غير موجود: %s", username)
+	}
+
+	// If subscriber is on active loan, only admin can change profile
+	if sub.LoanActive && !isAdmin {
+		return fmt.Errorf("لا يمكن تغيير باقة المشترك أثناء فترة السلفة النشطة إلا بواسطة مدير النظام (Admin)")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	pastExp := time.Now().Add(-1 * time.Minute)
+
+	// Update subscriber: change profile, end subscription, zero out quota, set status to expired, clear loan
+	_, err = tx.Exec(`UPDATE subscribers SET
+		profile_name = ?,
+		expiration_date = ?,
+		quota_bytes = 0,
+		status = 'expired',
+		loan_active = 0,
+		loan_granted_at = NULL,
+		loan_hours = 0,
+		loan_quota_bytes = 0,
+		loan_deduction_type = 'full',
+		loan_initial_used_bytes = 0,
+		last_renewed_at = NOW(),
+		updated_at = NOW()
+		WHERE username = ?`, newProfileName, pastExp, username)
+	if err != nil {
+		return err
+	}
+
+	// Update FreeRADIUS radusergroup
+	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", username)
+	_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", username, newProfileName)
+
+	// Update FreeRADIUS radcheck Expiration to past so they cannot reconnect without renewing
+	pastExpStr := pastExp.Format("02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
+	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, pastExpStr)
+
+	// Clear Mikrotik-Total-Limit
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+	desc := fmt.Sprintf("تحويل الباقة إلى (%s) مع إنهاء الاشتراك وتصفير الكوتة", prof.DisplayName)
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'adjustment', ?, 0.00, 'paid', 'cash', 'تحويل بروفايل من لوحة التحكم', ?)`,
+		username, sub.ContractNo, sub.FullName, desc, adminUser)
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// Disconnect session via CoA immediately
 	_ = d.DisconnectSubscriberSession(username)
 
 	return nil
@@ -5340,12 +5487,12 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 	var announcement sql.NullString
 	err := d.QueryRow(`SELECT id, COALESCE(portal_enabled, 1), COALESCE(allow_loan_request, 1),
 		COALESCE(show_quota_usage, 1), COALESCE(show_debt, 1), COALESCE(show_profile_details, 1),
-		COALESCE(show_online_status, 1), COALESCE(allow_password_change, 0), COALESCE(allow_session_disconnect, 1),
+		COALESCE(show_online_status, 1), COALESCE(allow_password_change, 0), COALESCE(allow_phone_login, 0), COALESCE(allow_session_disconnect, 1),
 		COALESCE(company_name, 'شبكتنا لخدمات الإنترنت'), COALESCE(company_phone, ''), portal_announcement, updated_at
 		FROM subscriber_portal_settings WHERE id = 1`).Scan(
 		&s.ID, &s.PortalEnabled, &s.AllowLoanRequest,
 		&s.ShowQuotaUsage, &s.ShowDebt, &s.ShowProfileDetails,
-		&s.ShowOnlineStatus, &s.AllowPasswordChange, &s.AllowSessionDisconnect,
+		&s.ShowOnlineStatus, &s.AllowPasswordChange, &s.AllowPhoneLogin, &s.AllowSessionDisconnect,
 		&s.CompanyName, &s.CompanyPhone, &announcement, &s.UpdatedAt,
 	)
 	if err != nil {
@@ -5359,6 +5506,7 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 				ShowProfileDetails:     true,
 				ShowOnlineStatus:       true,
 				AllowPasswordChange:    false,
+				AllowPhoneLogin:        false,
 				AllowSessionDisconnect: true,
 				CompanyName:            "شبكتنا لخدمات الإنترنت",
 			}, nil
@@ -5374,9 +5522,9 @@ func (d *DB) GetSubscriberPortalSettings() (*models.SubscriberPortalSettings, er
 func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) error {
 	_, err := d.Exec(`INSERT INTO subscriber_portal_settings (
 		id, portal_enabled, allow_loan_request, show_quota_usage, show_debt,
-		show_profile_details, show_online_status, allow_password_change, allow_session_disconnect,
+		show_profile_details, show_online_status, allow_password_change, allow_phone_login, allow_session_disconnect,
 		company_name, company_phone, portal_announcement
-	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON DUPLICATE KEY UPDATE
 		portal_enabled = VALUES(portal_enabled),
 		allow_loan_request = VALUES(allow_loan_request),
@@ -5385,12 +5533,13 @@ func (d *DB) SaveSubscriberPortalSettings(s *models.SubscriberPortalSettings) er
 		show_profile_details = VALUES(show_profile_details),
 		show_online_status = VALUES(show_online_status),
 		allow_password_change = VALUES(allow_password_change),
+		allow_phone_login = VALUES(allow_phone_login),
 		allow_session_disconnect = VALUES(allow_session_disconnect),
 		company_name = VALUES(company_name),
 		company_phone = VALUES(company_phone),
 		portal_announcement = VALUES(portal_announcement)`,
 		s.PortalEnabled, s.AllowLoanRequest, s.ShowQuotaUsage, s.ShowDebt,
-		s.ShowProfileDetails, s.ShowOnlineStatus, s.AllowPasswordChange, s.AllowSessionDisconnect,
+		s.ShowProfileDetails, s.ShowOnlineStatus, s.AllowPasswordChange, s.AllowPhoneLogin, s.AllowSessionDisconnect,
 		s.CompanyName, s.CompanyPhone, s.PortalAnnouncement)
 	return err
 }

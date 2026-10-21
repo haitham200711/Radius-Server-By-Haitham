@@ -142,6 +142,8 @@ func main() {
 	mux.HandleFunc("/subscribers/renew", middleware.RequireAuth(subBP.RenewHandler))
 	mux.HandleFunc("/subscribers/grant-loan", middleware.RequireAuth(subBP.GrantLoanHandler))
 	mux.HandleFunc("/subscribers/settle-loan", middleware.RequireAuth(subBP.SettleLoanHandler))
+	mux.HandleFunc("/subscribers/terminate", middleware.RequireAuth(subBP.TerminateHandler))
+	mux.HandleFunc("/subscribers/change-profile", middleware.RequireAuth(subBP.ChangeProfileHandler))
 	mux.HandleFunc("/subscribers/add-quota", middleware.RequireAuth(subBP.AddQuotaHandler))
 	mux.HandleFunc("/subscribers/pay-debt", middleware.RequireAuth(subBP.PayDebtHandler))
 	mux.HandleFunc("/subscribers/bulk", middleware.RequireAuth(subBP.BulkHandler))

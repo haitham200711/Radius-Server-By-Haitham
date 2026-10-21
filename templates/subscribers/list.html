@@ -43,6 +43,12 @@
                     </a>
                 </li>
                 <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('change_profile')">
+                        <i class="bi bi-arrow-left-right text-primary fs-5"></i>
+                        <span class="fw-bold text-primary">تحويل / تغيير البروفايل</span>
+                    </a>
+                </li>
+                <li>
                     <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('settle_loan')">
                         <i class="bi bi-check2-circle text-primary fs-5"></i>
                         <span class="fw-bold text-primary">سداد سلفة</span>
@@ -64,6 +70,12 @@
                     <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('debt')">
                         <i class="bi bi-cash-stack text-warning fs-5"></i>
                         <span>سداد / تسوية مديونية</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="toolbarAction('terminate')">
+                        <i class="bi bi-stop-circle fs-5"></i>
+                        <span class="fw-bold">إنهاء الاشتراك فورا</span>
                     </a>
                 </li>
                 <li>
@@ -249,6 +261,14 @@
             <!-- 2. Bulk Renew -->
             <button type="button" class="btn btn-sm btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#bulkRenewModal">
                 <i class="bi bi-arrow-repeat me-1"></i> تجديد للمحدد
+            </button>
+            <!-- 2.2 Bulk Change Profile -->
+            <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="openBulkChangeProfileModal()">
+                <i class="bi bi-arrow-left-right me-1"></i> تغيير البروفايل للمحدد
+            </button>
+            <!-- 2.4 Bulk Terminate -->
+            <button type="button" class="btn btn-sm btn-outline-danger fw-bold bg-white" onclick="openBulkTerminateModal()">
+                <i class="bi bi-stop-circle me-1"></i> إنهاء اشتراك المحدد
             </button>
             <!-- 2.5 Bulk Settle Loan -->
             <button type="button" class="btn btn-sm btn-info text-dark fw-bold" onclick="openBulkSettleLoanModal()">
@@ -1165,6 +1185,206 @@
     </div>
 </div>
 
+<!-- 8. Single Subscriber Terminate Modal -->
+<div class="modal fade" id="singleTerminateModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-stop-circle me-2"></i> إنهاء اشتراك المشترك
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/terminate">
+                <input type="hidden" name="username" id="singleTerminateUsername">
+                <input type="hidden" name="limit" value="{{ .Limit }}">
+                <input type="hidden" name="page" value="{{ .Page }}">
+                <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                <div class="modal-body p-4">
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم العميل:</span>
+                                <span class="fw-bold text-dark" id="singleTerminateFullName">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">اسم المستخدم:</span>
+                                <span class="font-monospace fw-bold text-danger" id="singleTerminateUserDisplay">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger mb-0">
+                        <h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> هل أنت متأكد من إنهاء اشتراك هذا المشترك فوراً؟</h6>
+                        <ul class="small mb-0 pe-3 mt-2">
+                            <li>سيتم تحويل حالة المشترك فوراً إلى <b>منتهي وقت</b>.</li>
+                            <li>سيتم <b>تصفير الكوتة المتبقية</b> بالكامل.</li>
+                            <li>سيتم <b>فصل جلسة المشترك الحالية فوراً (CoA Disconnect)</b> عبر الراديوس.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger fw-bold">
+                        <i class="bi bi-stop-circle-fill me-1"></i> نعم، إنهاء الاشتراك فوراً
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 9. Bulk Terminate Modal -->
+<div class="modal fade" id="bulkTerminateModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-stop-circle me-2"></i> إنهاء اشتراك المشتركين المحددين
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <input type="hidden" name="action" value="terminate">
+                <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+                <input type="hidden" name="limit" value="{{ .Limit }}">
+                <input type="hidden" name="page" value="{{ .Page }}">
+                <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                <div class="modal-body p-4">
+                    <p class="mb-3">أنت على وشك إنهاء اشتراك لعدد <b class="text-danger fs-6 bulk-count-text">0</b> مشترك محدد.</p>
+
+                    <div class="alert alert-danger mb-0">
+                        <h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> تحذير:</h6>
+                        <ul class="small mb-0 pe-3 mt-2">
+                            <li>سيتم تحويل جميع المشتركين المحددين إلى <b>منتهي وقت</b>.</li>
+                            <li>سيتم <b>تصفير رصيد كوتتهم المتبقية بالكامل</b>.</li>
+                            <li>سيتم <b>قطع وفصل جلساتهم النشطة فوراً</b> عبر راديوس (Disconnect CoA).</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger fw-bold">
+                        <i class="bi bi-stop-circle-fill me-1"></i> تأكيد إنهاء الاشتراكات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 10. Single Change Profile Modal -->
+<div class="modal fade" id="singleChangeProfileModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-arrow-left-right me-2"></i> تحويل / تغيير باقة المشترك
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/change-profile">
+                <input type="hidden" name="username" id="singleChangeProfUsername">
+                <input type="hidden" name="limit" value="{{ .Limit }}">
+                <input type="hidden" name="page" value="{{ .Page }}">
+                <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                <div class="modal-body p-4">
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم العميل:</span>
+                                <span class="fw-bold text-dark" id="singleChangeProfFullName">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">اسم المستخدم:</span>
+                                <span class="font-monospace fw-bold text-primary" id="singleChangeProfUserDisplay">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">الباقة الحالية:</span>
+                                <span class="badge bg-secondary" id="singleChangeProfCurrent">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختر الباقة (البروفايل) الجديدة:</label>
+                        <select name="new_profile" id="singleChangeProfSelect" class="form-select form-select-lg fw-bold" required>
+                            <option value="">-- اختر الباقة الجديدة --</option>
+                            {{ range .Profiles }}
+                            <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }}) - {{ printf "%.1f" .QuotaGB }}GB - {{ printf "%.0f" .Price }} ج.م</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <div class="alert alert-warning mb-0 small">
+                        <i class="bi bi-info-circle-fill text-warning me-1"></i>
+                        <b>ملاحظة هامة جداً:</b> عند تغيير البروفايل، سيتم <b>إنهاء اشتراك العميل الحالي فوراً وتصفير كوتته</b> وفصل جلسته، ويبقى منتهياً حتى يتم شحن وتجديد الاشتراك على الباقة الجديدة.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-arrow-left-right me-1"></i> تأكيد التحويل للباقة الجديدة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 11. Bulk Change Profile Modal -->
+<div class="modal fade" id="bulkChangeProfileModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-arrow-left-right me-2"></i> تغيير الباقة (البروفايل) للمشتركين المحددين
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <input type="hidden" name="action" value="change_profile">
+                <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+                <input type="hidden" name="limit" value="{{ .Limit }}">
+                <input type="hidden" name="page" value="{{ .Page }}">
+                <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                <input type="hidden" name="status" value="{{ .FilterStatus }}">
+
+                <div class="modal-body p-4">
+                    <p class="mb-3">تغيير الباقة لعدد <b class="text-primary fs-6 bulk-count-text">0</b> مشترك محدد.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختر الباقة الجديدة للجميع:</label>
+                        <select name="new_profile" class="form-select form-select-lg fw-bold" required>
+                            <option value="">-- اختر الباقة الجديدة --</option>
+                            {{ range .Profiles }}
+                            <option value="{{ .Name }}">{{ .DisplayName }} ({{ .Name }}) - {{ printf "%.1f" .QuotaGB }}GB - {{ printf "%.0f" .Price }} ج.م</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <div class="alert alert-warning mb-0 small">
+                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                        <b>تنبيه:</b> سيتم تحويل جميع المشتركين المحددين للباقة الجديدة، مع <b>إنهاء اشتراكاتهم وتصفير كوتتهم وفصل جلساتهم الحالية</b> فوراً.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-arrow-left-right me-1"></i> تطبيق التغيير للجميع
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Live Traffic Monitor -->
 <div class="modal fade" id="liveTrafficModal" tabindex="-1" aria-labelledby="liveTrafficModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -1628,6 +1848,20 @@ function toolbarAction(action) {
         if (confirm('هل أنت متأكد من حذف المشترك (' + activeSubscriber.username + ') نهائياً من النظام والقاعدة؟')) {
             window.location.href = '/subscribers/delete?username=' + encodeURIComponent(activeSubscriber.username);
         }
+    } else if (action === 'terminate') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            openBulkTerminateModal();
+            return;
+        }
+        openTerminateModal(activeSubscriber.username, activeSubscriber.fullName);
+    } else if (action === 'change_profile') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            openBulkChangeProfileModal();
+            return;
+        }
+        openChangeProfileModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.profile);
     }
 }
 
@@ -1870,6 +2104,52 @@ function onRenewProfileChange() {
     if (opt && opt.dataset.price) {
         document.getElementById('singleRenewPrice').value = opt.dataset.price;
     }
+}
+
+function openTerminateModal(username, fullName) {
+    document.getElementById('singleTerminateUsername').value = username;
+    document.getElementById('singleTerminateUserDisplay').textContent = username;
+    document.getElementById('singleTerminateFullName').textContent = fullName || username;
+    const modal = new bootstrap.Modal(document.getElementById('singleTerminateModal'));
+    modal.show();
+}
+
+function openBulkTerminateModal() {
+    const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+    if (checked.length === 0) {
+        alert('يرجى تحديد مشترك واحد على الأقل من الجدول.');
+        return;
+    }
+    const modal = new bootstrap.Modal(document.getElementById('bulkTerminateModal'));
+    modal.show();
+}
+
+function openChangeProfileModal(username, fullName, currentProfile) {
+    document.getElementById('singleChangeProfUsername').value = username;
+    document.getElementById('singleChangeProfUserDisplay').textContent = username;
+    document.getElementById('singleChangeProfFullName').textContent = fullName || username;
+    document.getElementById('singleChangeProfCurrent').textContent = currentProfile || 'غير محدد';
+    const sel = document.getElementById('singleChangeProfSelect');
+    if (sel && currentProfile) {
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === currentProfile) {
+                sel.selectedIndex = i;
+                break;
+            }
+        }
+    }
+    const modal = new bootstrap.Modal(document.getElementById('singleChangeProfileModal'));
+    modal.show();
+}
+
+function openBulkChangeProfileModal() {
+    const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+    if (checked.length === 0) {
+        alert('يرجى تحديد مشترك واحد على الأقل من الجدول.');
+        return;
+    }
+    const modal = new bootstrap.Modal(document.getElementById('bulkChangeProfileModal'));
+    modal.show();
 }
 
 // 4. Live Traffic Telemetry & Telemetry Monitoring

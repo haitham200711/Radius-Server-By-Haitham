@@ -748,6 +748,7 @@ type SubscriberPortalSettings struct {
 	ShowProfileDetails     bool      `json:"show_profile_details"`
 	ShowOnlineStatus       bool      `json:"show_online_status"`
 	AllowPasswordChange    bool      `json:"allow_password_change"`
+	AllowPhoneLogin        bool      `json:"allow_phone_login"`
 	AllowSessionDisconnect bool      `json:"allow_session_disconnect"`
 	CompanyName            string    `json:"company_name"`
 	CompanyPhone           string    `json:"company_phone"`

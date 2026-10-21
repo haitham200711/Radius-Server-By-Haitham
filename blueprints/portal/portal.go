@@ -47,19 +47,32 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := strings.TrimSpace(r.FormValue("username"))
+	loginIdentifier := strings.TrimSpace(r.FormValue("username"))
 	password := strings.TrimSpace(r.FormValue("password"))
 
-	if username == "" || password == "" {
+	if loginIdentifier == "" || password == "" {
 		http.Redirect(w, r, "/portal/login?error="+url.QueryEscape("يرجى إدخال اسم المستخدم وكلمة المرور"), http.StatusFound)
 		return
+	}
+
+	username := loginIdentifier
+	if settings != nil && settings.AllowPhoneLogin {
+		var uByPhone string
+		errP := bp.db.QueryRow("SELECT username FROM subscribers WHERE phone = ? AND phone != '' LIMIT 1", loginIdentifier).Scan(&uByPhone)
+		if errP == nil && uByPhone != "" {
+			username = uByPhone
+		}
 	}
 
 	// Verify password in FreeRADIUS radcheck
 	var subPass string
 	err := bp.db.QueryRow("SELECT value FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", username).Scan(&subPass)
 	if err != nil || subPass != password {
-		http.Redirect(w, r, "/portal/login?error="+url.QueryEscape("اسم المستخدم أو كلمة المرور غير صحيحة"), http.StatusFound)
+		errMsg := "اسم المستخدم أو كلمة المرور غير صحيحة"
+		if settings != nil && settings.AllowPhoneLogin {
+			errMsg = "اسم المستخدم / رقم الهاتف أو كلمة المرور غير صحيحة"
+		}
+		http.Redirect(w, r, "/portal/login?error="+url.QueryEscape(errMsg), http.StatusFound)
 		return
 	}
 

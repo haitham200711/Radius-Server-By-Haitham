@@ -500,9 +500,97 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 				_ = bp.db.RenewSubscriberBilling(u, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد جماعي", adminUser)
 			}
 		}
+	case "terminate":
+		adminUser := "admin"
+		if u := middleware.GetUser(r); u != nil {
+			adminUser = u.Username
+		}
+		for _, u := range usernames {
+			_ = bp.db.TerminateSubscription(u, adminUser)
+		}
+	case "change_profile":
+		newProfile := strings.TrimSpace(r.FormValue("new_profile"))
+		adminUser := "admin"
+		isAdmin := false
+		if u := middleware.GetUser(r); u != nil {
+			adminUser = u.Username
+			isAdmin = (u.Role == "admin")
+		}
+		for _, u := range usernames {
+			_ = bp.db.ChangeSubscriberProfile(u, newProfile, adminUser, isAdmin)
+		}
 	}
 
 	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func (bp *Blueprint) TerminateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+
+	_ = r.ParseForm()
+	username := strings.TrimSpace(r.FormValue("username"))
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	statusFilter := r.FormValue("status")
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, url.QueryEscape(q), url.QueryEscape(statusFilter))
+
+	if username == "" {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك مطلوب"), http.StatusFound)
+		return
+	}
+
+	adminUser := "admin"
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+	}
+
+	err := bp.db.TerminateSubscription(username, adminUser)
+	if err != nil {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("تعذر إنهاء الاشتراك: "+err.Error()), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(fmt.Sprintf("تم إنهاء اشتراك المشترك (%s) وتصفير كوتته وفصل اتصاله بنجاح", username)), http.StatusFound)
+}
+
+func (bp *Blueprint) ChangeProfileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+
+	_ = r.ParseForm()
+	username := strings.TrimSpace(r.FormValue("username"))
+	newProfile := strings.TrimSpace(r.FormValue("new_profile"))
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	statusFilter := r.FormValue("status")
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, url.QueryEscape(q), url.QueryEscape(statusFilter))
+
+	if username == "" || newProfile == "" {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك والبروفايل الجديد مطلوبان"), http.StatusFound)
+		return
+	}
+
+	adminUser := "admin"
+	isAdmin := false
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+		isAdmin = (u.Role == "admin")
+	}
+
+	err := bp.db.ChangeSubscriberProfile(username, newProfile, adminUser, isAdmin)
+	if err != nil {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(fmt.Sprintf("تم تحويل بروفايل المشترك (%s) إلى (%s) مع إنهاء الاشتراك وتصفير الكوتة بنجاح", username, newProfile)), http.StatusFound)
 }
 
 func (bp *Blueprint) SettleLoanHandler(w http.ResponseWriter, r *http.Request) {
