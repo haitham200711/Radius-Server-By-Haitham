@@ -59,12 +59,18 @@
                     {{ if .Resellers }}
                     <div class="mb-2">
                         <label class="form-label fw-bold">تخصيص لموزع (اختياري)</label>
-                        <select name="reseller_id" class="form-select">
+                        <select name="reseller_id" id="generate_reseller_select" class="form-select" onchange="toggleChargeResellerOption()">
                             <option value="0">المدير العام (بدون موزع)</option>
                             {{ range .Resellers }}
-                            <option value="{{ .ID }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
+                            <option value="{{ .ID }}" data-balance="{{ .Balance }}">{{ .Name }} (رصيده: {{ .Balance }} ج.م)</option>
                             {{ end }}
                         </select>
+                    </div>
+                    <div class="form-check form-switch mt-2 d-none p-2 bg-light rounded border" id="charge_reseller_wrapper">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" name="charge_reseller" value="1" id="charge_reseller_check" checked>
+                        <label class="form-check-label fw-bold small text-dark" for="charge_reseller_check">
+                            خصم تكلفة الدفعة من رصيد محفظة الموزع وتتبع الحركة بكشف حسابه
+                        </label>
                     </div>
                     {{ else }}
                     <input type="hidden" name="reseller_id" value="0">
@@ -436,6 +442,18 @@ function updatePreview() {
 
 // Trigger initial preview
 updatePreview();
+
+function toggleChargeResellerOption() {
+    var sel = document.getElementById('generate_reseller_select');
+    var wrap = document.getElementById('charge_reseller_wrapper');
+    if (!sel || !wrap) return;
+    if (sel.value && sel.value !== '0') {
+        wrap.classList.remove('d-none');
+    } else {
+        wrap.classList.add('d-none');
+    }
+}
+toggleChargeResellerOption();
 
 document.getElementById('advancedCardGenForm')?.addEventListener('submit', function() {
     var btn = document.getElementById('btnSubmitGenerate');

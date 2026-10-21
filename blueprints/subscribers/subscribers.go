@@ -826,6 +826,22 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 
 	if username != "" && amount > 0 {
+		if currentUser != nil && currentUser.Role == "reseller" {
+			newBal, newDebt, settled, err := bp.db.ResellerAddSubscriberBalance(currentUser.ID, username, amount, notes, currentUser.Username, settleDebtFirst)
+			if err != nil {
+				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+				return
+			}
+			var msg string
+			if settled > 0 {
+				msg = fmt.Sprintf("تم شحن رصيد المشترك وخصم المبلغ من محفظتك! تم سداد %.2f ج.م من الدين (متبقي الدين: %.2f ج.م، رصيد المشترك: %.2f ج.م)", settled, newDebt, newBal)
+			} else {
+				msg = fmt.Sprintf("تم شحن رصيد المشترك بمبلغ %.2f ج.م وخصمها من محفظتك بنجاح!", amount)
+			}
+			http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(msg), http.StatusFound)
+			return
+		}
+
 		newBal, newDebt, settled, err := bp.db.AddSubscriberBalance(username, amount, paymentMethod, notes, adminUser, settleDebtFirst)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
@@ -883,9 +899,10 @@ func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
+	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
-	if u := middleware.GetUser(r); u != nil {
-		adminUser = u.Username
+	if currentUser != nil {
+		adminUser = currentUser.Username
 	}
 
 	limit := r.FormValue("limit")
@@ -893,11 +910,20 @@ func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.FormValue("q")
 	status := r.FormValue("status")
 
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
+
 	if username != "" && quotaGB > 0 {
+		if currentUser != nil && currentUser.Role == "reseller" {
+			if err := bp.db.ResellerAddQuota(currentUser.ID, username, quotaGB, price, isPaid, currentUser.Username); err != nil {
+				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+				return
+			}
+			http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(fmt.Sprintf("تمت إضافة كوتة %.1f GB للمشترك وخصم التكلفة من رصيدك بنجاح", quotaGB)), http.StatusFound)
+			return
+		}
+
 		_ = bp.db.AddQuotaBilling(username, quotaGB, price, isPaid, paymentMethod, notes, adminUser)
 	}
-
-	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 

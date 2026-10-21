@@ -1380,30 +1380,94 @@ func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount f
 	return tx.Commit()
 }
 
-func (d *DB) GetResellerTransactions(resellerID int64, limit int) ([]models.ResellerTransaction, error) {
+func (d *DB) GetResellerTransactionsFiltered(resellerID int64, txType, startDate, endDate, search string, limit, offset int) ([]models.ResellerTransaction, int, map[string]float64, error) {
 	if limit <= 0 {
 		limit = 100
 	}
+	if offset < 0 {
+		offset = 0
+	}
 
+	whereClause := " WHERE 1=1"
+	var args []interface{}
+
+	if resellerID > 0 {
+		whereClause += " AND t.reseller_id = ?"
+		args = append(args, resellerID)
+	}
+
+	if txType != "" && txType != "all" {
+		whereClause += " AND t.type = ?"
+		args = append(args, txType)
+	}
+
+	if startDate != "" {
+		whereClause += " AND t.created_at >= ?"
+		args = append(args, startDate+" 00:00:00")
+	}
+
+	if endDate != "" {
+		whereClause += " AND t.created_at <= ?"
+		args = append(args, endDate+" 23:59:59")
+	}
+
+	if search != "" {
+		whereClause += " AND (t.notes LIKE ? OR t.subscriber_name LIKE ? OR r.name LIKE ? OR r.username LIKE ? OR t.created_by LIKE ?)"
+		sArg := "%" + search + "%"
+		args = append(args, sArg, sArg, sArg, sArg, sArg)
+	}
+
+	// 1. Count total
+	countQuery := "SELECT COUNT(*) FROM reseller_transactions t LEFT JOIN resellers r ON t.reseller_id = r.id" + whereClause
+	var totalCount int
+	_ = d.QueryRow(countQuery, args...).Scan(&totalCount)
+
+	// 2. Compute financial breakdown stats for the filtered set
+	statsQuery := `SELECT 
+		COALESCE(SUM(CASE WHEN t.type = 'deposit' THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type = 'renew' THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type = 'generate_cards' THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type = 'quota' THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type IN ('pay_debt', 'pay_debt_from_balance') THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type = 'withdraw' THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type = 'subscriber_deposit' THEN t.amount ELSE 0 END), 0.00),
+		COALESCE(SUM(CASE WHEN t.type IN ('renew', 'generate_cards', 'quota', 'withdraw', 'subscriber_deposit') THEN t.amount ELSE 0 END), 0.00)
+	FROM reseller_transactions t
+	LEFT JOIN resellers r ON t.reseller_id = r.id` + whereClause
+
+	stats := make(map[string]float64)
+	var totDep, totRenew, totCards, totQuota, totDebtPaid, totWith, totSubDep, totSpent float64
+	_ = d.QueryRow(statsQuery, args...).Scan(&totDep, &totRenew, &totCards, &totQuota, &totDebtPaid, &totWith, &totSubDep, &totSpent)
+	stats["TotalDeposits"] = totDep
+	stats["TotalRenewals"] = totRenew
+	stats["TotalCards"] = totCards
+	stats["TotalQuotas"] = totQuota
+	stats["TotalDebtPaid"] = totDebtPaid
+	stats["TotalWithdrawals"] = totWith
+	stats["TotalSubscriberDeposits"] = totSubDep
+	stats["TotalSpent"] = totSpent
+
+	// If single reseller, also provide current balance and debt in stats
+	if resellerID > 0 {
+		var curBal, curDebt float64
+		_ = d.QueryRow("SELECT COALESCE(balance, 0.00), COALESCE(debt, 0.00) FROM resellers WHERE id = ?", resellerID).Scan(&curBal, &curDebt)
+		stats["CurrentBalance"] = curBal
+		stats["CurrentDebt"] = curDebt
+	}
+
+	// 3. Select transactions
 	query := `SELECT 
 		t.id, t.reseller_id, COALESCE(r.name, ''), t.type, t.amount,
 		t.balance_before, t.balance_after, t.debt_before, t.debt_after,
 		t.subscriber_id, COALESCE(t.subscriber_name, ''),
 		t.notes, t.created_by, t.created_at
 	FROM reseller_transactions t
-	LEFT JOIN resellers r ON t.reseller_id = r.id`
+	LEFT JOIN resellers r ON t.reseller_id = r.id` + whereClause + " ORDER BY t.id DESC LIMIT ? OFFSET ?"
 
-	var args []interface{}
-	if resellerID > 0 {
-		query += " WHERE t.reseller_id = ?"
-		args = append(args, resellerID)
-	}
-	query += " ORDER BY t.id DESC LIMIT ?"
-	args = append(args, limit)
-
-	rows, err := d.Query(query, args...)
+	queryArgs := append(args, limit, offset)
+	rows, err := d.Query(query, queryArgs...)
 	if err != nil {
-		return nil, err
+		return nil, 0, stats, err
 	}
 	defer rows.Close()
 
@@ -1418,7 +1482,13 @@ func (d *DB) GetResellerTransactions(resellerID int64, limit int) ([]models.Rese
 			txs = append(txs, t)
 		}
 	}
-	return txs, nil
+
+	return txs, totalCount, stats, nil
+}
+
+func (d *DB) GetResellerTransactions(resellerID int64, limit int) ([]models.ResellerTransaction, error) {
+	txs, _, _, err := d.GetResellerTransactionsFiltered(resellerID, "", "", "", "", limit, 0)
+	return txs, err
 }
 
 func (d *DB) GetResellerFinancialSummary() (map[string]interface{}, error) {
@@ -1495,10 +1565,14 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 
 	availablePower := res.Balance + res.CreditLimit
 	if availablePower < cost {
-		return fmt.Errorf("رصيدك غير كافٍ لتجديد الباقة. تكلفة الباقة: %.2f ج.م، رصيدك المتاح: %.2f ج.م", cost, availablePower)
+		return fmt.Errorf("رصيدك غير كافٍ لتجديد الباقة. تكلفة الباقة للموزع: %.2f ج.م، رصيدك المتاح: %.2f ج.م", cost, availablePower)
 	}
 
-	err = d.RenewSubscriberBilling(username, profileName, prof.Price, isCustomerPaid, "reseller", fmt.Sprintf("تجديد عبر الموزع %s", res.Name), adminUser)
+	payOpt := "cash"
+	if !isCustomerPaid {
+		payOpt = "debt"
+	}
+	err = d.RenewSubscriberWithPaymentOption(username, profileName, prof.Price, payOpt, "reseller", fmt.Sprintf("تجديد عبر الموزع %s", res.Name), adminUser)
 	if err != nil {
 		return err
 	}
@@ -1509,18 +1583,259 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 	}
 	defer tx.Rollback()
 
-	newBalance := res.Balance - cost
-	_, err = tx.Exec("UPDATE resellers SET balance = ? WHERE id = ?", newBalance, resellerID)
+	var newBalance, newDebt float64
+	if res.Balance >= cost {
+		newBalance = res.Balance - cost
+		newDebt = res.Debt
+	} else {
+		paidFromBal := res.Balance
+		if paidFromBal < 0 {
+			paidFromBal = 0
+		}
+		deficit := cost - paidFromBal
+		newBalance = 0
+		newDebt = res.Debt + deficit
+	}
+
+	_, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newBalance, newDebt, resellerID)
 	if err != nil {
 		return err
 	}
 
-	notes := fmt.Sprintf("تجديد باقة %s للمشترك %s (سعر الجمهور %.2f - خصم الموزع)", prof.DisplayName, username, prof.Price)
+	notes := fmt.Sprintf("تجديد باقة %s للمشترك %s (سعر الباقة %.2f ج.م - تكلفة الموزع %.2f ج.م)", prof.DisplayName, username, prof.Price, cost)
 	_, _ = tx.Exec(`INSERT INTO reseller_transactions (reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
 		VALUES (?, 'renew', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		resellerID, cost, res.Balance, newBalance, res.Debt, res.Debt, subID, username, notes, adminUser)
+		resellerID, cost, res.Balance, newBalance, res.Debt, newDebt, subID, username, notes, adminUser)
 
 	return tx.Commit()
+}
+
+// ResellerGenerateCards handles cards batch generation for a reseller with balance deduction and tracking
+func (d *DB) ResellerGenerateCards(resellerID int64, opts models.GenerateBatchOptions, adminUser string) (string, int, error) {
+	res, err := d.GetReseller(resellerID)
+	if err != nil {
+		return "", 0, fmt.Errorf("الموزع غير موجود: %w", err)
+	}
+	if !res.IsActive {
+		return "", 0, fmt.Errorf("حساب الموزع معطل حالياً")
+	}
+	if !res.Permissions.CanGenerateCards {
+		return "", 0, fmt.Errorf("ليس لديك صلاحية توليد كروت الشحن أو الكافيهات")
+	}
+
+	var prof models.Profile
+	err = d.QueryRow("SELECT id, name, display_name, cost_price, price, quota_bytes, uptime_seconds, validity_value, validity_unit FROM profiles WHERE id = ?", opts.ProfileID).Scan(
+		&prof.ID, &prof.Name, &prof.DisplayName, &prof.CostPrice, &prof.Price, &prof.QuotaBytes, &prof.UptimeSeconds, &prof.ValidityValue, &prof.ValidityUnit)
+	if err != nil {
+		return "", 0, fmt.Errorf("الباقة غير موجودة")
+	}
+
+	pricePerCard := opts.PricePerCard
+	if pricePerCard <= 0 {
+		pricePerCard = prof.Price
+	}
+	costPerCard := opts.CostPricePerCard
+	if costPerCard <= 0 {
+		if res.CommissionPercent > 0 {
+			costPerCard = pricePerCard * (1.0 - (res.CommissionPercent / 100.0))
+		} else if prof.CostPrice > 0 {
+			costPerCard = prof.CostPrice
+		} else {
+			costPerCard = pricePerCard
+		}
+	}
+	opts.PricePerCard = pricePerCard
+	opts.CostPricePerCard = costPerCard
+	opts.ResellerID = resellerID
+
+	totalCost := float64(opts.Count) * costPerCard
+	availablePower := res.Balance + res.CreditLimit
+	if availablePower < totalCost {
+		return "", 0, fmt.Errorf("رصيدك غير كافٍ لتوليد الدفعة. التكلفة الإجمالية: %.2f ج.م، رصيدك المتاح: %.2f ج.م", totalCost, availablePower)
+	}
+
+	batchCode, count, err := d.GenerateAdvancedBatch(opts)
+	if err != nil {
+		return "", 0, err
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return batchCode, count, err
+	}
+	defer tx.Rollback()
+
+	var newBalance, newDebt float64
+	if res.Balance >= totalCost {
+		newBalance = res.Balance - totalCost
+		newDebt = res.Debt
+	} else {
+		paidFromBal := res.Balance
+		if paidFromBal < 0 {
+			paidFromBal = 0
+		}
+		deficit := totalCost - paidFromBal
+		newBalance = 0
+		newDebt = res.Debt + deficit
+	}
+
+	_, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newBalance, newDebt, resellerID)
+	if err != nil {
+		return batchCode, count, err
+	}
+
+	cardTypeName := "كروت شحن"
+	if opts.CardType == "cafe" {
+		cardTypeName = "كروت كافيهات"
+	}
+	notes := fmt.Sprintf("توليد دفعة %s (%d كارت، باقة: %s، تكلفة الكارت: %.2f ج.م، كود الدفعة: %s)", cardTypeName, count, prof.DisplayName, costPerCard, batchCode)
+	_, _ = tx.Exec(`INSERT INTO reseller_transactions (reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
+		VALUES (?, 'generate_cards', ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+		resellerID, totalCost, res.Balance, newBalance, res.Debt, newDebt, batchCode, notes, adminUser)
+
+	_ = tx.Commit()
+	return batchCode, count, nil
+}
+
+// ResellerAddQuota handles quota addition for a reseller's subscriber with balance tracking
+func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64, price float64, isPaid bool, adminUser string) error {
+	res, err := d.GetReseller(resellerID)
+	if err != nil {
+		return fmt.Errorf("الموزع غير موجود: %w", err)
+	}
+	if !res.IsActive {
+		return fmt.Errorf("حساب الموزع معطل حالياً")
+	}
+	if !res.Permissions.CanAddQuota {
+		return fmt.Errorf("ليس لديك صلاحية إضافة كوتة للمشتركين")
+	}
+
+	var subResellerID int64
+	var subID int64
+	err = d.QueryRow("SELECT id, reseller_id FROM subscribers WHERE username = ?", username).Scan(&subID, &subResellerID)
+	if err != nil {
+		return fmt.Errorf("المشترك غير موجود")
+	}
+	if subResellerID != resellerID {
+		return fmt.Errorf("هذا المشترك غير مسجل تحت حسابك كموزع")
+	}
+
+	cost := price
+	if res.CommissionPercent > 0 && price > 0 {
+		cost = price * (1.0 - (res.CommissionPercent / 100.0))
+	}
+	if cost <= 0 {
+		cost = price
+	}
+
+	availablePower := res.Balance + res.CreditLimit
+	if availablePower < cost {
+		return fmt.Errorf("رصيدك غير كافٍ لإضافة الكوتة. التكلفة للموزع: %.2f ج.م، رصيدك المتاح: %.2f ج.م", cost, availablePower)
+	}
+
+	err = d.AddQuotaBilling(username, quotaGB, price, isPaid, "reseller", fmt.Sprintf("إضافة كوتة عبر الموزع %s", res.Name), adminUser)
+	if err != nil {
+		return err
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var newBalance, newDebt float64
+	if res.Balance >= cost {
+		newBalance = res.Balance - cost
+		newDebt = res.Debt
+	} else {
+		paidFromBal := res.Balance
+		if paidFromBal < 0 {
+			paidFromBal = 0
+		}
+		deficit := cost - paidFromBal
+		newBalance = 0
+		newDebt = res.Debt + deficit
+	}
+
+	_, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newBalance, newDebt, resellerID)
+	if err != nil {
+		return err
+	}
+
+	notes := fmt.Sprintf("إضافة كوتة رصيد (%.1f GB) للمشترك %s (السعر %.2f ج.م - تكلفة الموزع %.2f ج.م)", quotaGB, username, price, cost)
+	_, _ = tx.Exec(`INSERT INTO reseller_transactions (reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
+		VALUES (?, 'quota', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		resellerID, cost, res.Balance, newBalance, res.Debt, newDebt, subID, username, notes, adminUser)
+
+	return tx.Commit()
+}
+
+// ResellerAddSubscriberBalance handles balance deposit from reseller's wallet into their subscriber's balance
+func (d *DB) ResellerAddSubscriberBalance(resellerID int64, username string, amount float64, notes, adminUser string, settleDebtFirst bool) (float64, float64, float64, error) {
+	res, err := d.GetReseller(resellerID)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("الموزع غير موجود: %w", err)
+	}
+	if !res.IsActive {
+		return 0, 0, 0, fmt.Errorf("حساب الموزع معطل حالياً")
+	}
+	if !res.Permissions.CanCollectDebt {
+		return 0, 0, 0, fmt.Errorf("ليس لديك صلاحية شحن رصيد أو سداد ديون للمشتركين")
+	}
+
+	var subResellerID int64
+	var subID int64
+	err = d.QueryRow("SELECT id, reseller_id FROM subscribers WHERE username = ?", username).Scan(&subID, &subResellerID)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("المشترك غير موجود")
+	}
+	if subResellerID != resellerID {
+		return 0, 0, 0, fmt.Errorf("هذا المشترك غير مسجل تحت حسابك كموزع")
+	}
+
+	availablePower := res.Balance + res.CreditLimit
+	if availablePower < amount {
+		return 0, 0, 0, fmt.Errorf("رصيدك بالمحفظة غير كافٍ. المبلغ المطلوب: %.2f ج.م، رصيدك المتاح: %.2f ج.م", amount, availablePower)
+	}
+
+	newBal, newDebt, settled, err := d.AddSubscriberBalance(username, amount, "reseller_wallet", fmt.Sprintf("إيداع عبر الموزع %s: %s", res.Name, notes), adminUser, settleDebtFirst)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return newBal, newDebt, settled, err
+	}
+	defer tx.Rollback()
+
+	var newResBalance, newResDebt float64
+	if res.Balance >= amount {
+		newResBalance = res.Balance - amount
+		newResDebt = res.Debt
+	} else {
+		paidFromBal := res.Balance
+		if paidFromBal < 0 {
+			paidFromBal = 0
+		}
+		deficit := amount - paidFromBal
+		newResBalance = 0
+		newResDebt = res.Debt + deficit
+	}
+
+	_, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID)
+	if err != nil {
+		return newBal, newDebt, settled, err
+	}
+
+	txNotes := fmt.Sprintf("شحن رصيد محفظة للمشترك %s بمبلغ %.2f ج.م (سداد دين: %.2f ج.م، متبقي رصيد: %.2f ج.م)", username, amount, settled, amount-settled)
+	_, _ = tx.Exec(`INSERT INTO reseller_transactions (reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
+		VALUES (?, 'subscriber_deposit', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		resellerID, amount, res.Balance, newResBalance, res.Debt, newResDebt, subID, username, txNotes, adminUser)
+
+	_ = tx.Commit()
+	return newBal, newDebt, settled, nil
 }
 
 // --- Profile Methods ---

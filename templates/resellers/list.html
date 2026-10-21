@@ -658,24 +658,91 @@
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
                 <h5 class="modal-title fw-bold">
-                    <i class="bi bi-receipt me-2"></i> كشف الحساب وسجل الحركات المالية: <span id="stmt_reseller_name" class="text-warning"></span>
+                    <i class="bi bi-receipt me-2"></i> كشف الحساب وتتبع حركات الموزع: <span id="stmt_reseller_name" class="text-warning"></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <div class="d-flex align-items-center justify-content-between mb-3 no-print">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="fw-bold small text-muted">تصفية حسب موزع:</span>
-                        <select id="stmt_filter_select" class="form-select form-select-sm" style="width: 250px;" onchange="onStatementFilterChanged()">
-                            <option value="0">جميع الموزعين</option>
-                            {{ range .Resellers }}
-                            <option value="{{ .ID }}">{{ .Name }} ({{ .Username }})</option>
-                            {{ end }}
-                        </select>
+                <!-- Summary Stats Bar -->
+                <div class="row g-2 mb-3" id="stmtStatsStrip">
+                    <div class="col-md-3 col-6">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">إجمالي المصروفات (خرج)</small>
+                            <span class="fw-bold text-danger fs-6 font-monospace" id="stmtStatSpent">0.00 ج.م</span>
+                        </div>
                     </div>
-                    <button class="btn btn-sm btn-outline-dark fw-bold" onclick="window.print()">
-                        <i class="bi bi-printer me-1"></i> طباعة كشف الحساب
-                    </button>
+                    <div class="col-md-3 col-6">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">إجمالي الإيداعات والشحن</small>
+                            <span class="fw-bold text-success fs-6 font-monospace" id="stmtStatDeposits">0.00 ج.م</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">تجديدات المشتركين</small>
+                            <span class="fw-bold text-primary fs-6 font-monospace" id="stmtStatRenew">0.00 ج.م</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <small class="text-muted d-block">توليد دفعات كروت</small>
+                            <span class="fw-bold text-purple fs-6 font-monospace" id="stmtStatCards">0.00 ج.م</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Controls Form -->
+                <div class="card bg-light border-0 mb-3 no-print">
+                    <div class="card-body p-3">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold mb-1">الموزع:</label>
+                                <select id="stmt_filter_select" class="form-select form-select-sm" onchange="applyStatementFilters()">
+                                    <option value="0">جميع الموزعين</option>
+                                    {{ range .Resellers }}
+                                    <option value="{{ .ID }}">{{ .Name }} ({{ .Username }})</option>
+                                    {{ end }}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold mb-1">نوع الحركة المالية:</label>
+                                <select id="stmt_filter_type" class="form-select form-select-sm" onchange="applyStatementFilters()">
+                                    <option value="all">كل العمليات والمصروفات</option>
+                                    <option value="renew">تجديد باقة مشترك</option>
+                                    <option value="generate_cards">توليد كروت شحن / كافيهات</option>
+                                    <option value="quota">إضافة كوتة رصيد للمشتركين</option>
+                                    <option value="subscriber_deposit">شحن محفظة رصيد لمشترك</option>
+                                    <option value="deposit">شحن وإيداع رصيد للموزع</option>
+                                    <option value="pay_debt">سداد مديونية نقداً</option>
+                                    <option value="pay_debt_from_balance">سداد مديونية من المحفظة</option>
+                                    <option value="withdraw">سحب أو خصم رصيد</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-bold mb-1">من تاريخ:</label>
+                                <input type="date" id="stmt_start_date" class="form-control form-control-sm" onchange="applyStatementFilters()">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-bold mb-1">إلى تاريخ:</label>
+                                <input type="date" id="stmt_end_date" class="form-control form-control-sm" onchange="applyStatementFilters()">
+                            </div>
+                            <div class="col-md-2 d-flex gap-1 align-items-end">
+                                <button type="button" class="btn btn-sm btn-dark w-100 fw-bold mt-auto" onclick="applyStatementFilters()">
+                                    <i class="bi bi-filter me-1"></i> تصفية
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-auto" title="طباعة" onclick="window.print()">
+                                    <i class="bi bi-printer"></i>
+                                </button>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="stmt_search" class="form-control" placeholder="بحث باسم المشترك، كود دفعة الكروت، أو البيان..." oninput="debounceStatementSearch()">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="resetStatementFilters()">إلغاء الفلاتر</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="table-responsive border rounded">
@@ -685,11 +752,11 @@
                                 <th>#</th>
                                 <th>التاريخ والوقت</th>
                                 <th>الموزع</th>
-                                <th>نوع العملية</th>
+                                <th>نوع الحركة</th>
                                 <th>المبلغ</th>
-                                <th>الرصيد (قبل / بعد)</th>
-                                <th>المديونية (قبل / بعد)</th>
-                                <th>البيان والملاحظات</th>
+                                <th>رصيد المحفظة (قبل ➔ بعد)</th>
+                                <th>المديونية (قبل ➔ بعد)</th>
+                                <th>البيان ومصرف الأموال</th>
                                 <th>المنفذ</th>
                             </tr>
                         </thead>
@@ -814,70 +881,117 @@ function onRechargeResellerChanged() {
     }
 }
 
-// 4. Financial Statement
+// 4. Financial Statement & Activity Tracking
+let stmtSearchTimeout = null;
+
 function viewStatement(id, name) {
-    document.getElementById('stmt_reseller_name').textContent = name;
+    document.getElementById('stmt_reseller_name').textContent = name || 'جميع الموزعين';
     document.getElementById('stmt_filter_select').value = id;
-    loadStatementTable(id);
+    document.getElementById('stmt_filter_type').value = 'all';
+    document.getElementById('stmt_start_date').value = '';
+    document.getElementById('stmt_end_date').value = '';
+    document.getElementById('stmt_search').value = '';
+    loadStatementTable();
     const modal = new bootstrap.Modal(document.getElementById('statementModal'));
     modal.show();
 }
 
-function onStatementFilterChanged() {
+function applyStatementFilters() {
     const sel = document.getElementById('stmt_filter_select');
-    const id = sel.value;
     const name = sel.options[sel.selectedIndex].text;
     document.getElementById('stmt_reseller_name').textContent = name;
-    loadStatementTable(id);
+    loadStatementTable();
 }
 
-function loadStatementTable(resellerID) {
-    const tbody = document.getElementById('statementTbody');
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> جاري تحميل سجل الحركات...</td></tr>';
+function resetStatementFilters() {
+    document.getElementById('stmt_filter_type').value = 'all';
+    document.getElementById('stmt_start_date').value = '';
+    document.getElementById('stmt_end_date').value = '';
+    document.getElementById('stmt_search').value = '';
+    loadStatementTable();
+}
 
-    fetch('/resellers/transactions?id=' + resellerID + '&limit=150')
+function debounceStatementSearch() {
+    clearTimeout(stmtSearchTimeout);
+    stmtSearchTimeout = setTimeout(() => {
+        loadStatementTable();
+    }, 350);
+}
+
+function loadStatementTable() {
+    const resellerID = document.getElementById('stmt_filter_select').value || '0';
+    const txType = document.getElementById('stmt_filter_type').value || 'all';
+    const startDate = document.getElementById('stmt_start_date').value || '';
+    const endDate = document.getElementById('stmt_end_date').value || '';
+    const search = document.getElementById('stmt_search').value.trim();
+
+    const tbody = document.getElementById('statementTbody');
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> جاري تحميل وتتبع الحركات المالية...</td></tr>';
+
+    let url = `/resellers/transactions?id=${resellerID}&type=${encodeURIComponent(txType)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&search=${encodeURIComponent(search)}&limit=200`;
+
+    fetch(url)
         .then(res => res.json())
         .then(data => {
+            // Update stats strip if provided
+            if (data.stats) {
+                const s = data.stats;
+                document.getElementById('stmtStatSpent').textContent = (s.TotalSpent || 0).toFixed(2) + ' ج.م';
+                document.getElementById('stmtStatDeposits').textContent = (s.TotalDeposits || 0).toFixed(2) + ' ج.م';
+                document.getElementById('stmtStatRenew').textContent = (s.TotalRenewals || 0).toFixed(2) + ' ج.م';
+                document.getElementById('stmtStatCards').textContent = (s.TotalCards || 0).toFixed(2) + ' ج.م';
+            }
+
             if (!data.success || !data.transactions || data.transactions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">لا توجد حركات مالية مسجلة لهذا الموزع بعد</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2 text-muted"></i> لا توجد حركات مالية مطابقة لمعايير البحث والتصفية</td></tr>';
                 return;
             }
 
             let html = '';
-            data.transactions.forEach((tx, idx) => {
+            data.transactions.forEach((tx) => {
                 let badgeClass = 'bg-secondary';
                 let typeName = tx.type;
                 let sign = '';
                 let amountClass = 'text-dark';
 
                 if (tx.type === 'deposit') {
-                    badgeClass = 'bg-success';
-                    typeName = 'شحن رصيد';
+                    badgeClass = 'bg-success-subtle text-success border border-success-subtle';
+                    typeName = '📥 شحن رصيد';
                     sign = '+';
                     amountClass = 'text-success fw-bold';
                 } else if (tx.type === 'withdraw') {
-                    badgeClass = 'bg-danger';
-                    typeName = 'خصم / سحب';
+                    badgeClass = 'bg-danger-subtle text-danger border border-danger-subtle';
+                    typeName = '📤 سحب / خصم';
                     sign = '-';
                     amountClass = 'text-danger fw-bold';
                 } else if (tx.type === 'pay_debt' || tx.type === 'pay_debt_from_balance') {
-                    badgeClass = 'bg-info text-dark';
-                    typeName = 'سداد مديونية';
+                    badgeClass = 'bg-info-subtle text-info border border-info-subtle';
+                    typeName = '💵 سداد مديونية';
                     sign = '-';
                     amountClass = 'text-info fw-bold';
                 } else if (tx.type === 'add_debt') {
-                    badgeClass = 'bg-warning text-dark';
-                    typeName = 'إضافة مديونية';
+                    badgeClass = 'bg-warning-subtle text-dark border border-warning-subtle';
+                    typeName = '⏳ إضافة مديونية';
                     sign = '+';
                     amountClass = 'text-danger fw-bold';
                 } else if (tx.type === 'renew') {
-                    badgeClass = 'bg-primary';
-                    typeName = 'تجديد اشتراك';
+                    badgeClass = 'bg-primary-subtle text-primary border border-primary-subtle';
+                    typeName = '🔄 تجديد باقة';
+                    sign = '-';
+                    amountClass = 'text-danger fw-bold';
+                } else if (tx.type === 'generate_cards') {
+                    badgeClass = 'bg-purple-subtle text-purple border border-purple-subtle';
+                    typeName = '🎟️ توليد كروت';
                     sign = '-';
                     amountClass = 'text-danger fw-bold';
                 } else if (tx.type === 'quota') {
-                    badgeClass = 'bg-purple text-purple';
-                    typeName = 'إضافة كوتة';
+                    badgeClass = 'bg-info-subtle text-dark border border-info-subtle';
+                    typeName = '📊 إضافة كوتة';
+                    sign = '-';
+                    amountClass = 'text-danger fw-bold';
+                } else if (tx.type === 'subscriber_deposit') {
+                    badgeClass = 'bg-teal-subtle text-teal border';
+                    typeName = '👛 شحن رصيد مشترك';
                     sign = '-';
                     amountClass = 'text-danger fw-bold';
                 }
@@ -887,14 +1001,17 @@ function loadStatementTable(resellerID) {
 
                 html += `<tr>
                     <td class="text-muted font-monospace small">${tx.id}</td>
-                    <td class="small">${dateStr}</td>
-                    <td class="fw-bold">${tx.reseller_name || '-'}</td>
-                    <td><span class="badge ${badgeClass}">${typeName}</span></td>
-                    <td class="${amountClass}">${sign}${parseFloat(tx.amount).toFixed(2)} ج.م</td>
-                    <td class="small font-monospace">${parseFloat(tx.balance_before).toFixed(2)} ➔ <strong>${parseFloat(tx.balance_after).toFixed(2)}</strong></td>
-                    <td class="small font-monospace">${parseFloat(tx.debt_before).toFixed(2)} ➔ <strong>${parseFloat(tx.debt_after).toFixed(2)}</strong></td>
-                    <td class="small">${tx.notes || '-'} ${tx.subscriber_name ? '<span class="badge bg-light text-dark border ms-1">' + tx.subscriber_name + '</span>' : ''}</td>
-                    <td class="small text-muted">${tx.created_by || 'admin'}</td>
+                    <td class="small font-monospace">${dateStr}</td>
+                    <td class="fw-bold text-dark">${tx.reseller_name || '-'}</td>
+                    <td><span class="badge ${badgeClass} fw-bold">${typeName}</span></td>
+                    <td class="${amountClass} font-monospace">${sign}${parseFloat(tx.amount).toFixed(2)} ج.م</td>
+                    <td class="small font-monospace text-nowrap">${parseFloat(tx.balance_before).toFixed(2)} ➔ <strong class="text-success">${parseFloat(tx.balance_after).toFixed(2)}</strong></td>
+                    <td class="small font-monospace text-nowrap">${parseFloat(tx.debt_before).toFixed(2)} ➔ <strong class="text-danger">${parseFloat(tx.debt_after).toFixed(2)}</strong></td>
+                    <td class="small">
+                        ${tx.notes || '-'}
+                        ${tx.subscriber_name ? '<span class="badge bg-light text-dark border ms-1 font-monospace"><i class="bi bi-person me-1"></i>' + tx.subscriber_name + '</span>' : ''}
+                    </td>
+                    <td class="small text-muted"><span class="badge bg-light text-secondary border">${tx.created_by || 'admin'}</span></td>
                 </tr>`;
             });
 

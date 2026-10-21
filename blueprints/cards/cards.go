@@ -234,13 +234,23 @@ func (bp *Blueprint) GenerateHandler(w http.ResponseWriter, r *http.Request) {
 	if cardType != "" {
 		opts.CardType = cardType
 	}
+	var batchCode string
+	var err error
 	if u.Role == "reseller" {
 		opts.ResellerID = u.ID
+		batchCode, _, err = bp.db.ResellerGenerateCards(u.ID, opts, u.Username)
+	} else if opts.ResellerID > 0 && (r.FormValue("charge_reseller") == "1" || r.FormValue("charge_reseller") == "on" || r.FormValue("charge_reseller") == "true") {
+		batchCode, _, err = bp.db.ResellerGenerateCards(opts.ResellerID, opts, u.Username)
+	} else {
+		batchCode, _, err = bp.db.GenerateAdvancedBatch(opts)
 	}
 
-	batchCode, _, err := bp.db.GenerateAdvancedBatch(opts)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error generating batch: %v", err), http.StatusInternalServerError)
+		redir := "/cards?error=" + url.QueryEscape(err.Error())
+		if opts.CardType == "cafe" {
+			redir = "/cards/cafe?error=" + url.QueryEscape(err.Error())
+		}
+		http.Redirect(w, r, redir, http.StatusFound)
 		return
 	}
 

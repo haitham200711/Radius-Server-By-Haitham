@@ -239,15 +239,31 @@ func (bp *Blueprint) TransactionsAPIHandler(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	if limit <= 0 {
-		limit = 100
+		limit = 150
 	}
 
-	txs, err := bp.db.GetResellerTransactions(id, limit)
+	txType := strings.TrimSpace(r.URL.Query().Get("type"))
+	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
+	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
+	search := strings.TrimSpace(r.URL.Query().Get("search"))
+
+	currentUser := middleware.GetUser(r)
+	if currentUser != nil && currentUser.Role == "reseller" {
+		id = currentUser.ID // Security: reseller restricted to their own account transactions
+	}
+
+	txs, totalCount, stats, err := bp.db.GetResellerTransactionsFiltered(id, txType, startDate, endDate, search, limit, offset)
 	if err != nil {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "transactions": txs})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":      true,
+		"transactions": txs,
+		"total_count":  totalCount,
+		"stats":        stats,
+	})
 }
