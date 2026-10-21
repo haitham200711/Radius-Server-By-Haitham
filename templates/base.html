@@ -258,14 +258,42 @@
                     </a>
                     {{ end }}
 
-                    <!-- 11. الإعدادات -->
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "settings" }}active{{ end }}" href="/settings">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-gear-wide-connected text-secondary"></i>
-                            <span>الإعدادات</span>
-                        </span>
-                        {{ if eq .ActiveMenu "settings" }}<i class="bi bi-chevron-left small"></i>{{ end }}
-                    </a>
+                    <!-- 11. الإعدادات (Dropdown) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if eq .ActiveMenu "settings" }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#settingsSubmenu" role="button" 
+                           aria-expanded="{{ if eq .ActiveMenu "settings" }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-gear-wide-connected text-secondary"></i>
+                                <span>الإعدادات</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if eq .ActiveMenu "settings" }}show{{ end }} sidebar-submenu flex-column" id="settingsSubmenu">
+                            <a class="sidebar-sub-link" href="/settings#system">
+                                <i class="bi bi-shield-lock-fill text-primary"></i>
+                                <span>إعدادات النظام والأمان</span>
+                            </a>
+                            <a class="sidebar-sub-link" href="/settings#portal-settings">
+                                <i class="bi bi-person-workspace text-success"></i>
+                                <span>صفحة المشترك</span>
+                            </a>
+                            {{ if eq .CurrentUser.Role "admin" }}
+                            <a class="sidebar-sub-link" href="/settings#backups">
+                                <i class="bi bi-cloud-arrow-down-fill text-info"></i>
+                                <span>النسخ الاحتياطي</span>
+                            </a>
+                            <a class="sidebar-sub-link" href="/settings#adv">
+                                <i class="bi bi-database-fill-up text-warning"></i>
+                                <span>استيراد ADV&SAS</span>
+                            </a>
+                            {{ end }}
+                            <a class="sidebar-sub-link" href="/settings#maintenance">
+                                <i class="bi bi-tools text-danger"></i>
+                                <span>صيانة النظام والخدمات</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Sidebar Footer -->
