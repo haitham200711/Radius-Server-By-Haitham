@@ -4,7 +4,7 @@
         <h3 class="fw-bold mb-1">
             <i class="bi bi-database-fill-up text-warning me-2"></i> استيراد واسترداد بيانات ADV / SAS4
         </h3>
-        <p class="text-muted small mb-0">أداة الهجرة الآلية الشاملة: قراءة واستيراد المشتركين، الباقات والعروض، والموزعين بأرصدتهم ومديونياتهم</p>
+        <p class="text-muted small mb-0">أداة الهجرة الآلية الشاملة: قراءة واستيراد المشتركين، الباقات، الموزعين، وسجلات الاستهلاك والترافيك والجلسات بالكامل</p>
     </div>
     <div class="d-flex align-items-center gap-2">
         <form action="/adv/analyze-server" method="POST" class="d-inline">
@@ -39,15 +39,15 @@
 {{ if .Analysis }}
 <!-- Statistics Cards -->
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-lg-4 col-xl-2dot4" style="flex: 0 0 auto; width: 20%;">
         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
-            <div class="card-body d-flex align-items-center gap-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
                 <div class="p-3 bg-primary-subtle text-primary rounded-3">
-                    <i class="bi bi-people-fill fs-3"></i>
+                    <i class="bi bi-people-fill fs-4"></i>
                 </div>
                 <div>
-                    <span class="text-muted small d-block">إجمالي المشتركين المستخرجين</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ len .Analysis.Subscribers }} <small class="text-muted fs-6">مشترك</small></h4>
+                    <span class="text-muted small d-block">إجمالي المشتركين</span>
+                    <h5 class="fw-bold mb-0 text-dark">{{ len .Analysis.Subscribers }} <small class="text-muted fs-6">مشترك</small></h5>
                     <span class="small text-success fw-semibold">{{ .Analysis.ActiveSubsCount }} نشط</span> | 
                     <span class="small text-danger fw-semibold">{{ .Analysis.ExpSubsCount }} منتهي</span>
                 </div>
@@ -55,45 +55,60 @@
         </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-lg-4 col-xl-2dot4" style="flex: 0 0 auto; width: 20%;">
         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="p-3 bg-warning-subtle text-warning rounded-3">
-                    <i class="bi bi-tags-fill fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="p-3 bg-success-subtle text-success rounded-3">
+                    <i class="bi bi-activity fs-4"></i>
                 </div>
                 <div>
-                    <span class="text-muted small d-block">الباقات والعروض (Profiles)</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ len .Analysis.Profiles }} <small class="text-muted fs-6">باقة</small></h4>
+                    <span class="text-muted small d-block">استهلاك الترافيك</span>
+                    <h5 class="fw-bold mb-0 text-success">{{ .Analysis.TotalTrafficDisplay }}</h5>
+                    <span class="small text-muted fw-semibold">{{ .Analysis.TotalSubSessions }} جلسة تفصيلية</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-4 col-xl-2dot4" style="flex: 0 0 auto; width: 20%;">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="p-3 bg-warning-subtle text-warning rounded-3">
+                    <i class="bi bi-tags-fill fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">الباقات (Profiles)</span>
+                    <h5 class="fw-bold mb-0 text-dark">{{ len .Analysis.Profiles }} <small class="text-muted fs-6">باقة</small></h5>
                     <span class="small text-muted">بأسعارها وسرعاتها</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-lg-4 col-xl-2dot4" style="flex: 0 0 auto; width: 20%;">
         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
-            <div class="card-body d-flex align-items-center gap-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
                 <div class="p-3 bg-info-subtle text-info rounded-3">
-                    <i class="bi bi-shop-window fs-3"></i>
+                    <i class="bi bi-shop-window fs-4"></i>
                 </div>
                 <div>
                     <span class="text-muted small d-block">الموزعين والأدمن</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ len .Analysis.Managers }} <small class="text-muted fs-6">موزع</small></h4>
+                    <h5 class="fw-bold mb-0 text-dark">{{ len .Analysis.Managers }} <small class="text-muted fs-6">موزع</small></h5>
                     <span class="small text-muted">بالأرصدة والمديونيات</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-lg-4 col-xl-2dot4" style="flex: 0 0 auto; width: 20%;">
         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
-            <div class="card-body d-flex align-items-center gap-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
                 <div class="p-3 bg-secondary-subtle text-secondary rounded-3">
-                    <i class="bi bi-credit-card-2-front-fill fs-3"></i>
+                    <i class="bi bi-credit-card-2-front-fill fs-4"></i>
                 </div>
                 <div>
-                    <span class="text-muted small d-block">كروت الهوتسبوت والكافيهات</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ .Analysis.HotspotCards }} <small class="text-muted fs-6">كارت</small></h4>
+                    <span class="text-muted small d-block">كروت الهوتسبوت</span>
+                    <h5 class="fw-bold mb-0 text-dark">{{ .Analysis.HotspotCards }} <small class="text-muted fs-6">كارت</small></h5>
                     <span class="small text-muted">ملف النسخة: {{ .Analysis.FileSize }}</span>
                 </div>
             </div>
@@ -108,7 +123,7 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link active fw-bold px-3 d-flex align-items-center gap-2" id="subs-tab" data-bs-toggle="pill" data-bs-target="#tab-subscribers" type="button" role="tab">
                     <i class="bi bi-people-fill text-primary"></i>
-                    <span>المشتركين ({{ len .Analysis.Subscribers }})</span>
+                    <span>المشتركين وتفاصيل الاستهلاك ({{ len .Analysis.Subscribers }})</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -129,7 +144,7 @@
         <div class="tab-content" id="advDataTabsContent">
             <!-- 1. Subscribers Tab -->
             <div class="tab-pane fade show active p-3" id="tab-subscribers" role="tabpanel">
-                <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light sticky-top shadow-sm">
                             <tr>
@@ -137,8 +152,11 @@
                                 <th>اسم المستخدم</th>
                                 <th>كلمة المرور</th>
                                 <th>الاسم الكامل</th>
-                                <th>الباقة المشترك بها</th>
-                                <th>الموزع التابع له</th>
+                                <th>الباقة / الكوتة</th>
+                                <th>الاستهلاك (تحميل / رفع)</th>
+                                <th>المتبقي من الكوتة</th>
+                                <th>الجلسات</th>
+                                <th>الموزع</th>
                                 <th>رقم الموبايل</th>
                                 <th>تاريخ الانتهاء</th>
                                 <th>الحالة</th>
@@ -158,9 +176,30 @@
                                 </td>
                                 <td class="fw-semibold">{{ $s.FullName }}</td>
                                 <td>
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle d-block mb-1">
                                         {{ $s.ProfileName }}
                                     </span>
+                                    <span class="text-muted small" style="font-size: 0.75rem;">الكوتة: {{ $s.QuotaDisplay }}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ $s.UsedDisplay }}</div>
+                                    <div class="text-muted small" style="font-size: 0.75rem;">
+                                        <i class="bi bi-arrow-down text-success"></i> {{ $s.DownDisplay }} | <i class="bi bi-arrow-up text-primary"></i> {{ $s.UpDisplay }}
+                                    </div>
+                                </td>
+                                <td>
+                                    {{ if gt $s.QuotaBytes 0 }}
+                                    <div class="fw-bold text-success">{{ $s.RemainingDisplay }}</div>
+                                    <div class="progress mt-1" style="height: 4px; width: 85px;">
+                                        <div class="progress-bar {{ if ge $s.UsagePercent 90.0 }}bg-danger{{ else if ge $s.UsagePercent 75.0 }}bg-warning{{ else }}bg-primary{{ end }}" style="width: {{ $s.UsagePercent }}%;"></div>
+                                    </div>
+                                    <span class="text-muted" style="font-size: 0.7rem;">{{ printf "%.1f" $s.UsagePercent }}% مستهلك</span>
+                                    {{ else }}
+                                    <span class="badge bg-secondary-subtle text-secondary">غير محدود ∞</span>
+                                    {{ end }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border font-monospace">{{ $s.SessionsCount }} جلسة</span>
                                 </td>
                                 <td>
                                     <span class="badge bg-info-subtle text-info border border-info-subtle">
@@ -300,6 +339,13 @@
                             استيراد وتحديث المشتركين وتواريخ الصلاحية (Subscribers) - <span class="text-muted small">{{ len .Analysis.Subscribers }} مشترك</span>
                         </label>
                     </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="import_accounting" value="1" id="chkAccounting" checked>
+                        <label class="form-check-label fw-semibold text-primary" for="chkAccounting">
+                            <i class="bi bi-bar-chart-fill me-1"></i> استيراد ونقل سجلات الاستهلاك والجلسات (Accounting / Traffic Usage) - <span class="fw-bold">{{ .Analysis.TotalSubSessions }} جلسة ({{ .Analysis.TotalTrafficDisplay }})</span>
+                        </label>
+                        <div class="text-muted small ms-4">يقوم بنقل جلسات الرفع والتحميل السابقة لكل مشترك في جدول radacct لاحتساب الكوتة المستهلكة والمتبقية بدقة تامة.</div>
+                    </div>
                 </div>
 
                 <div class="col-md-6">
@@ -348,18 +394,16 @@
         </div>
         <h4 class="fw-bold mb-2">استيراد واسترداد بيانات ADV / SAS4</h4>
         <p class="text-muted mx-auto" style="max-width: 600px;">
-            قم برفع ملف النسخة الاحتياطية (.sql) المستخرج من نظام ADV القديم، أو اضغط على زر الفحص للبحث عن النسخة المرفوعة مسبقاً على السيرفر.
+            يمكنك رفع نسخة قاعدة البيانات الاحتياطية (.sql) المستخرجة من نظام ADV / SAS4 لاستخراج العملاء، الباقات، الموزعين، وسجلات الاستهلاك والترافيك ونقلها لنظامك بضغطة زر واحدة.
         </p>
-        <div class="d-flex justify-content-center gap-2 mt-4">
-            <form action="/adv/analyze-server" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-primary d-flex align-items-center gap-2 px-4 shadow-sm">
-                    <i class="bi bi-cpu"></i>
-                    <span>فحص النسخة الموجودة على السيرفر</span>
+        <div class="d-flex justify-content-center gap-3 mt-4">
+            <form action="/adv/analyze-server" method="POST">
+                <button type="submit" class="btn btn-outline-primary btn-lg px-4 shadow-sm">
+                    <i class="bi bi-cpu me-2"></i> فحص النسخة الموجودة على السيرفر
                 </button>
             </form>
-            <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2 px-4" data-bs-toggle="modal" data-bs-target="#uploadBackupModal">
-                <i class="bi bi-cloud-arrow-up-fill"></i>
-                <span>رفع ملف باك أب يدوي</span>
+            <button type="button" class="btn btn-primary btn-lg px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadBackupModal">
+                <i class="bi bi-cloud-arrow-up-fill me-2"></i> رفع ملف باك أب جديد (.sql)
             </button>
         </div>
     </div>
@@ -370,24 +414,27 @@
 <div class="modal fade" id="uploadBackupModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i> رفع ملف النسخة الاحتياطية (.sql)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
             <form action="/adv/upload" method="POST" enctype="multipart/form-data">
-                <div class="modal-header bg-light border-bottom">
-                    <h5 class="modal-title fw-bold">
-                        <i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i> رفع ملف باك أب ADV (.sql)
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اختر ملف قاعدة البيانات (.sql):</label>
+                        <label class="form-label fw-semibold">اختر ملف الباك أب (.sql):</label>
                         <input type="file" name="backup_file" class="form-control" accept=".sql" required>
-                        <div class="form-text small text-muted">يدعم ملفات MySQL dump الخاصة بنظام AdvRadius / SAS4.</div>
+                        <div class="form-text text-muted small">يدعم ملفات MySQL Dump الخاصة بأنظمة ADV و SAS4 حتى حجم 250 ميجابايت.</div>
+                    </div>
+                    <div class="alert alert-info py-2 px-3 small border-0 mb-0">
+                        <i class="bi bi-info-circle me-1"></i> بعد الرفع، سيقوم النظام بتحليل محتويات النسخة فوراً وعرض تقرير معاينة شامل قبل البدء في الاستيراد.
                     </div>
                 </div>
-                <div class="modal-footer bg-light border-top">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3">
-                        <i class="bi bi-upload me-1"></i> رفع وفحص النسخة
+                <div class="modal-footer border-top bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                        <i class="bi bi-upload me-1"></i> رفع وتحليل
                     </button>
                 </div>
             </form>
@@ -396,10 +443,8 @@
 </div>
 {{ end }}
 
-{{ define "auth_content" }}{{ end }}
 
 {{ define "scripts" }}
-<script>
-console.log("ADV Migration Module initialized.");
-</script>
 {{ end }}
+
+{{ define "auth_content" }}{{ end }}

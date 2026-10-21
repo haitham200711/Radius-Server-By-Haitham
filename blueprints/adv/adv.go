@@ -54,6 +54,31 @@ type ManagerData struct {
 	IsAdmin  int
 }
 
+// AdvRadacctSession parsed from ADV radacct table
+type AdvRadacctSession struct {
+	SessionID        string
+	UniqueID         string
+	Username         string
+	Realm            string
+	NasIP            string
+	NasPortID        string
+	NasPortType      string
+	StartTime        string
+	StopTime         string
+	SessionSec       int64
+	AcctAuthentic    string
+	ConnectInfoStart string
+	ConnectInfoStop  string
+	InOctets         int64
+	OutOctets        int64
+	CalledMAC        string
+	CallingMAC       string
+	TermCause        string
+	ServiceType      string
+	FramedProto      string
+	FramedIP         string
+}
+
 // SubscriberData parsed from ADV userinfo, radcheck, and radusergroup
 type SubscriberData struct {
 	Username       string
@@ -74,20 +99,42 @@ type SubscriberData struct {
 	ExpDateStr     string
 	InternetStatus string
 	IsExpired      bool
+
+	// Accounting and consumption
+	TotalUsedBytes   int64
+	TotalInBytes     int64
+	TotalOutBytes    int64
+	UsedDisplay      string
+	DownDisplay      string
+	UpDisplay        string
+	QuotaBytes       int64
+	QuotaDisplay     string
+	RemainingBytes   int64
+	RemainingDisplay string
+	UsagePercent     float64
+	SessionsCount    int
+	LastMAC          string
+	LastIP           string
+	LastRenewTime    int64
+	CreationTime     int64
 }
 
 // BackupAnalysis holds the parsed data from the ADV backup
 type BackupAnalysis struct {
-	FileName        string
-	FileSize        string
-	AnalyzedAt      time.Time
-	Profiles        []ProfileData
-	Managers        []ManagerData
-	Subscribers     []SubscriberData
-	HotspotCards    int
-	ActiveSubsCount int
-	ExpSubsCount    int
-	TotalDebt       float64
+	FileName            string
+	FileSize            string
+	AnalyzedAt          time.Time
+	Profiles            []ProfileData
+	Managers            []ManagerData
+	Subscribers         []SubscriberData
+	HotspotCards        int
+	ActiveSubsCount     int
+	ExpSubsCount        int
+	TotalDebt           float64
+	TotalSubSessions    int
+	TotalTrafficBytes   int64
+	TotalTrafficDisplay string
+	SubscriberSessions  map[string][]AdvRadacctSession
 }
 
 var (
@@ -129,15 +176,16 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	errorMsg := r.URL.Query().Get("error")
 
 	data := map[string]interface{}{
-		"Title":       "استرداد بيانات ADV / SAS4",
-		"ActiveMenu":  "adv",
-		"CurrentUser": middleware.GetUser(r),
-		"Analysis":    analysis,
-		"SuccessMsg":  successMsg,
-		"ErrorMsg":    errorMsg,
-		"ImportedSubs": r.URL.Query().Get("subs"),
-		"ImportedProfs": r.URL.Query().Get("profs"),
+		"Title":             "استرداد بيانات ADV / SAS4",
+		"ActiveMenu":        "adv",
+		"CurrentUser":       middleware.GetUser(r),
+		"Analysis":          analysis,
+		"SuccessMsg":        successMsg,
+		"ErrorMsg":          errorMsg,
+		"ImportedSubs":      r.URL.Query().Get("subs"),
+		"ImportedProfs":     r.URL.Query().Get("profs"),
 		"ImportedResellers": r.URL.Query().Get("resellers"),
+		"ImportedSessions":  r.URL.Query().Get("sessions"),
 	}
 
 	_ = bp.renderer.Render(w, "adv/index", data)
@@ -247,6 +295,8 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	importProfiles := r.FormValue("import_profiles") == "1"
 	importResellers := r.FormValue("import_resellers") == "1"
 	importSubscribers := r.FormValue("import_subscribers") == "1"
+	importAccounting := r.FormValue("import_accounting") == "1"
+
 	defaultPassword := strings.TrimSpace(r.FormValue("default_password"))
 	if defaultPassword == "" {
 		defaultPassword = "0000"
@@ -259,6 +309,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	importedProfilesCount := 0
 	importedResellersCount := 0
 	importedSubscribersCount := 0
+	importedSessionsCount := 0
 
 	tx, err := bp.db.Begin()
 	if err != nil {
@@ -332,7 +383,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Import Subscribers
+	// 3. Import Subscribers & Accounting
 	if importSubscribers {
 		now := time.Now()
 		for _, s := range analysis.Subscribers {
@@ -372,19 +423,60 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 			var quotaBytes int64 = 0
 			_ = tx.QueryRow("SELECT quota_bytes FROM profiles WHERE name = ?", s.ProfileName).Scan(&quotaBytes)
 
+			// Determine created_at and last_renewed_at
+			createdAt := now
+			if s.CreationTime > 0 {
+				createdAt = time.Unix(s.CreationTime, 0)
+			}
+
+			// Earliest session start time from backup
+			var minSessionTime time.Time
+			userSessions := analysis.SubscriberSessions[s.Username]
+			for _, sess := range userSessions {
+				if t, err := time.Parse("2006-01-02 15:04:05", sess.StartTime); err == nil {
+					if minSessionTime.IsZero() || t.Before(minSessionTime) {
+						minSessionTime = t
+					}
+				}
+			}
+
+			var lastRenewedAt time.Time
+			if s.LastRenewTime > 1000000000 {
+				t := time.Unix(s.LastRenewTime, 0)
+				if !minSessionTime.IsZero() && minSessionTime.Before(t) {
+					lastRenewedAt = minSessionTime.Add(-1 * time.Second)
+				} else {
+					lastRenewedAt = t
+				}
+			} else if !minSessionTime.IsZero() {
+				lastRenewedAt = minSessionTime.Add(-1 * time.Second)
+			} else if s.ExpTime > 0 {
+				lastRenewedAt = time.Unix(s.ExpTime, 0).AddDate(0, -1, 0)
+			} else {
+				lastRenewedAt = now.AddDate(0, -1, 0)
+			}
+
 			_, err := tx.Exec(`INSERT INTO subscribers (
-				username, contract_no, full_name, phone, address, debt, profile_name, quota_bytes, expiration_date, status, reseller_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				username, contract_no, full_name, phone, address, debt, profile_name,
+				calling_mac, static_ip, quota_bytes, expiration_date, status, reseller_id,
+				created_at, last_renewed_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON DUPLICATE KEY UPDATE
 				full_name = VALUES(full_name),
 				phone = VALUES(phone),
 				debt = VALUES(debt),
 				profile_name = VALUES(profile_name),
+				calling_mac = VALUES(calling_mac),
+				static_ip = VALUES(static_ip),
 				quota_bytes = VALUES(quota_bytes),
 				expiration_date = VALUES(expiration_date),
 				status = VALUES(status),
-				reseller_id = VALUES(reseller_id)`,
-				s.Username, s.Username, s.FullName, s.Phone, s.Address, s.TotalUnpaid, s.ProfileName, quotaBytes, expDate, status, ourResellerID)
+				reseller_id = VALUES(reseller_id),
+				created_at = VALUES(created_at),
+				last_renewed_at = VALUES(last_renewed_at)`,
+				s.Username, s.Username, s.FullName, s.Phone, s.Address, s.TotalUnpaid, s.ProfileName,
+				s.LastMAC, s.LastIP, quotaBytes, expDate, status, ourResellerID,
+				createdAt, lastRenewedAt)
 			if err != nil {
 				log.Printf("[ADV-IMPORT] Error inserting subscriber %s: %v", s.Username, err)
 				continue
@@ -406,6 +498,40 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", s.Username, fmt.Sprintf("%d", quotaBytes))
 			}
 
+			// 4. Import radacct Accounting Sessions if selected
+			if importAccounting && len(userSessions) > 0 {
+				// Clear old sessions for this user before inserting to avoid duplicates
+				_, _ = tx.Exec("DELETE FROM radacct WHERE username = ?", s.Username)
+
+				for _, sess := range userSessions {
+					var startTime, stopTime interface{}
+					if sess.StartTime != "" && sess.StartTime != "NULL" && sess.StartTime != "0000-00-00 00:00:00" {
+						startTime = sess.StartTime
+					} else {
+						startTime = nil
+					}
+					if sess.StopTime != "" && sess.StopTime != "NULL" && sess.StopTime != "0000-00-00 00:00:00" {
+						stopTime = sess.StopTime
+					} else {
+						stopTime = nil
+					}
+
+					_, err := tx.Exec(`INSERT INTO radacct (
+						acctsessionid, acctuniqueid, username, realm, nasipaddress,
+						nasportid, nasporttype, acctstarttime, acctstoptime, acctsessiontime,
+						acctauthentic, connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
+						calledstationid, callingstationid, acctterminatecause, servicetype, framedprotocol, framedipaddress
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						sess.SessionID, sess.UniqueID, sess.Username, sess.Realm, sess.NasIP,
+						sess.NasPortID, sess.NasPortType, startTime, stopTime, sess.SessionSec,
+						sess.AcctAuthentic, sess.ConnectInfoStart, sess.ConnectInfoStop, sess.InOctets, sess.OutOctets,
+						sess.CalledMAC, sess.CallingMAC, sess.TermCause, sess.ServiceType, sess.FramedProto, sess.FramedIP)
+					if err == nil {
+						importedSessionsCount++
+					}
+				}
+			}
+
 			importedSubscribersCount++
 		}
 	}
@@ -415,9 +541,9 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بنجاح!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع.",
-		importedSubscribersCount, importedProfilesCount, importedResellersCount)
-	http.Redirect(w, r, fmt.Sprintf("/adv?success=%s&subs=%d&profs=%d&resellers=%d", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount), http.StatusFound)
+	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بنجاح!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع،+و+%d+جلسة+استهلاك+واكاونتنج.",
+		importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount)
+	http.Redirect(w, r, fmt.Sprintf("/adv?success=%s&subs=%d&profs=%d&resellers=%d&sessions=%d", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount), http.StatusFound)
 }
 
 // formatRateLimit formats up and down speeds from ADV into MikroTik "rx/tx" rate limit
@@ -467,6 +593,7 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 	passwordsMap := make(map[string]string)
 	usergroupMap := make(map[string]string)
 	subscribers := make(map[string]*SubscriberData)
+	sessionsByUser := make(map[string][]AdvRadacctSession)
 	cardsCount := 0
 
 	for scanner.Scan() {
@@ -552,6 +679,42 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 				}
 			}
 
+		case "radacct":
+			rows := parseSQLValues(line)
+			for _, r := range rows {
+				if len(r) > 22 {
+					uname := r[3]
+					sec, _ := strconv.ParseInt(r[11], 10, 64)
+					inOct, _ := strconv.ParseInt(r[15], 10, 64)
+					outOct, _ := strconv.ParseInt(r[16], 10, 64)
+
+					sess := AdvRadacctSession{
+						SessionID:        r[1],
+						UniqueID:         r[2],
+						Username:         uname,
+						Realm:            r[5],
+						NasIP:            r[6],
+						NasPortID:        r[7],
+						NasPortType:      r[8],
+						StartTime:        r[9],
+						StopTime:         r[10],
+						SessionSec:       sec,
+						AcctAuthentic:    r[12],
+						ConnectInfoStart: r[13],
+						ConnectInfoStop:  r[14],
+						InOctets:         inOct,
+						OutOctets:        outOct,
+						CalledMAC:        r[17],
+						CallingMAC:       r[18],
+						TermCause:        r[19],
+						ServiceType:      r[20],
+						FramedProto:      r[21],
+						FramedIP:         r[22],
+					}
+					sessionsByUser[uname] = append(sessionsByUser[uname], sess)
+				}
+			}
+
 		case "userinfo":
 			rows := parseSQLValues(line)
 			for _, r := range rows {
@@ -561,13 +724,14 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 					lname := r[3]
 					phone := r[5]
 					addr := r[7]
+					cdate, _ := strconv.ParseInt(r[11], 10, 64)
 					inDown, _ := strconv.ParseInt(r[15], 10, 64)
 					inUp, _ := strconv.ParseInt(r[16], 10, 64)
 					ownerID, _ := strconv.Atoi(r[19])
 					avQuota, _ := strconv.ParseFloat(r[28], 64)
 					money, _ := strconv.ParseFloat(r[37], 64)
 
-					var expTime int64
+					var expTime, rdate int64
 					var unpaid, paid float64
 					status := "enabled"
 
@@ -580,6 +744,9 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 					}
 					if len(r) > 86 {
 						status = r[86]
+					}
+					if len(r) > 90 {
+						rdate, _ = strconv.ParseInt(r[90], 10, 64)
 					}
 
 					fullName := strings.TrimSpace(fname + " " + lname)
@@ -601,6 +768,8 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 						TotalPaid:      paid,
 						TotalUnpaid:    unpaid,
 						InternetStatus: status,
+						CreationTime:   cdate,
+						LastRenewTime:  rdate,
 					}
 				}
 			}
@@ -611,8 +780,12 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 	nowUnix := now.Unix()
 	var activeCount, expCount int
 	var totalDebt float64
+	var totalTraffic int64
+	var totalSubSessions int
 
-	// Link relations
+	subSessionsMap := make(map[string][]AdvRadacctSession)
+
+	// Link relations and compute traffic
 	for uname, sub := range subscribers {
 		if pw, ok := passwordsMap[uname]; ok {
 			sub.Password = pw
@@ -647,6 +820,63 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 		}
 
 		totalDebt += sub.TotalUnpaid
+
+		// Calculate Traffic / Sessions from parsed radacct
+		userSessions := sessionsByUser[uname]
+		sub.SessionsCount = len(userSessions)
+		var totalIn, totalOut int64
+		var lastMAC, lastIP string
+
+		for _, s := range userSessions {
+			totalIn += s.InOctets
+			totalOut += s.OutOctets
+			if s.CallingMAC != "" {
+				lastMAC = s.CallingMAC
+			}
+			if s.FramedIP != "" && s.FramedIP != "0.0.0.0" {
+				lastIP = s.FramedIP
+			}
+		}
+
+		sub.TotalInBytes = totalIn
+		sub.TotalOutBytes = totalOut
+		sub.TotalUsedBytes = totalIn + totalOut
+		sub.LastMAC = lastMAC
+		sub.LastIP = lastIP
+
+		// Determine quota bytes from profile
+		profQuotaMB := 0
+		if p, ok := profilesMap[sub.ProfileName]; ok {
+			profQuotaMB = p.QuotaMB
+		}
+		sub.QuotaBytes = int64(profQuotaMB) * 1024 * 1024
+
+		if sub.QuotaBytes > 0 {
+			sub.QuotaDisplay = database.FormatBytesHuman(sub.QuotaBytes)
+			rem := sub.QuotaBytes - sub.TotalUsedBytes
+			if rem < 0 {
+				rem = 0
+			}
+			sub.RemainingBytes = rem
+			sub.RemainingDisplay = database.FormatBytesHuman(rem)
+			sub.UsagePercent = (float64(sub.TotalUsedBytes) / float64(sub.QuotaBytes)) * 100.0
+			if sub.UsagePercent > 100.0 {
+				sub.UsagePercent = 100.0
+			}
+		} else {
+			sub.QuotaDisplay = "غير محدود"
+			sub.RemainingDisplay = "غير محدود"
+		}
+
+		sub.UsedDisplay = database.FormatBytesHuman(sub.TotalUsedBytes)
+		sub.DownDisplay = database.FormatBytesHuman(sub.TotalOutBytes)
+		sub.UpDisplay = database.FormatBytesHuman(sub.TotalInBytes)
+
+		if len(userSessions) > 0 {
+			subSessionsMap[uname] = userSessions
+			totalSubSessions += len(userSessions)
+			totalTraffic += sub.TotalUsedBytes
+		}
 	}
 
 	var subList []SubscriberData
@@ -674,16 +904,20 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 	})
 
 	return &BackupAnalysis{
-		FileName:        filepath.Base(filePath),
-		FileSize:        fileSizeMB,
-		AnalyzedAt:      time.Now(),
-		Profiles:        profList,
-		Managers:        mgrList,
-		Subscribers:     subList,
-		HotspotCards:    cardsCount,
-		ActiveSubsCount: activeCount,
-		ExpSubsCount:    expCount,
-		TotalDebt:       totalDebt,
+		FileName:            filepath.Base(filePath),
+		FileSize:            fileSizeMB,
+		AnalyzedAt:          time.Now(),
+		Profiles:            profList,
+		Managers:            mgrList,
+		Subscribers:         subList,
+		HotspotCards:        cardsCount,
+		ActiveSubsCount:     activeCount,
+		ExpSubsCount:        expCount,
+		TotalDebt:           totalDebt,
+		TotalSubSessions:    totalSubSessions,
+		TotalTrafficBytes:   totalTraffic,
+		TotalTrafficDisplay: database.FormatBytesHuman(totalTraffic),
+		SubscriberSessions:  subSessionsMap,
 	}, nil
 }
 
