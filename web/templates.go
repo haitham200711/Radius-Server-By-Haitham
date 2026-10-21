@@ -46,12 +46,19 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"settings/index":         {"templates/base.html", "templates/settings/index.html"},
 		"whatsapp/index":         {"templates/base.html", "templates/whatsapp/index.html"},
 		"backups/index":          {"templates/base.html", "templates/backups/index.html"},
+		"adv/index":              {"templates/base.html", "templates/adv/index.html"},
 		"portal/login":           {"templates/portal/login.html"},
 		"portal/index":           {"templates/portal/index.html"},
 	}
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
+		"divFloat": func(a, b int) string {
+			if b == 0 {
+				return "0"
+			}
+			return fmt.Sprintf("%.1f", float64(a)/float64(b))
+		},
 		"bytesToGB": func(b int64) float64 {
 			return float64(b) / (1024 * 1024 * 1024)
 		},

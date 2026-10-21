@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/adv"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/auth"
 	backupsBP "github.com/haitham200711/Radius-Server-By-Haitham/blueprints/backups"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/card_templates"
@@ -275,6 +276,13 @@ func main() {
 	mux.HandleFunc("/backups/delete", middleware.RequireAdmin(bakBP.DeleteHandler))
 	mux.HandleFunc("/backups/send-whatsapp", middleware.RequireAdmin(bakBP.SendWhatsAppHandler))
 	mux.HandleFunc("/backups/restore", middleware.RequireAdmin(bakBP.RestoreHandler))
+
+	// ADV Migration & Restore Blueprint (Admin Only)
+	advBP := adv.New(db, renderer)
+	mux.HandleFunc("/adv", middleware.RequireAdmin(advBP.IndexHandler))
+	mux.HandleFunc("/adv/upload", middleware.RequireAdmin(advBP.UploadHandler))
+	mux.HandleFunc("/adv/analyze-server", middleware.RequireAdmin(advBP.AnalyzeServerFileHandler))
+	mux.HandleFunc("/adv/import", middleware.RequireAdmin(advBP.ImportHandler))
 
 	// Wrap mux with Session Authentication middleware
 	handler := middleware.AuthMiddleware(cfg.SessionSecret)(mux)
