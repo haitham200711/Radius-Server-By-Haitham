@@ -159,6 +159,8 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		countQuery += " AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)"
 	} else if statusFilter == "expired_quota" {
 		countQuery += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
+	} else if statusFilter == "loan" {
+		countQuery += " AND s.loan_active = 1"
 	}
 
 	if resellerFilter > 0 {
@@ -226,6 +228,8 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		query += " AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)"
 	} else if statusFilter == "expired_quota" {
 		query += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
+	} else if statusFilter == "loan" {
+		query += " AND s.loan_active = 1"
 	}
 
 	if resellerFilter > 0 {
@@ -375,13 +379,15 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	profiles, _ := bp.db.GetProfiles()
 	resellersList, _ := bp.db.GetResellers()
 
-	var expiredTimeCount, expiredQuotaCount int
+	var expiredTimeCount, expiredQuotaCount, loanActiveCount int
 	if resellerFilter > 0 {
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)`, resellerFilter).Scan(&expiredTimeCount)
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`, resellerFilter).Scan(&expiredQuotaCount)
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.loan_active = 1`, resellerFilter).Scan(&loanActiveCount)
 	} else {
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE (s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1`).Scan(&expiredTimeCount)
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`).Scan(&expiredQuotaCount)
+		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.loan_active = 1`).Scan(&loanActiveCount)
 	}
 
 	_ = bp.renderer.Render(w, "subscribers/list", map[string]interface{}{
@@ -397,6 +403,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"OnlineCount":       onlineCount,
 		"ExpiredTimeCount":  expiredTimeCount,
 		"ExpiredQuotaCount": expiredQuotaCount,
+		"LoanActiveCount":   loanActiveCount,
 		"Page":             page,
 		"Limit":            limit,
 		"TotalCount":       totalCount,
@@ -475,9 +482,75 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 	case "add_debt":
 		amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("debt_amount")), 64)
 		_ = bp.db.BulkAddDebt(usernames, amount)
+	case "settle_loan":
+		settleType := r.FormValue("settle_type") // "renew" or "close"
+		isPaid := r.FormValue("payment_status") != "unpaid"
+		paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
+		if paymentMethod == "" {
+			paymentMethod = "cash"
+		}
+		adminUser := "admin"
+		if u := middleware.GetUser(r); u != nil {
+			adminUser = u.Username
+		}
+		for _, u := range usernames {
+			if settleType == "close" {
+				_ = bp.db.CloseSubscriberLoan(u, adminUser)
+			} else {
+				_ = bp.db.RenewSubscriberBilling(u, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد جماعي", adminUser)
+			}
+		}
 	}
 
 	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func (bp *Blueprint) SettleLoanHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+
+	_ = r.ParseForm()
+	username := strings.TrimSpace(r.FormValue("username"))
+	settleType := r.FormValue("settle_type") // "renew" or "close"
+	isPaid := r.FormValue("payment_status") != "unpaid"
+	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
+	if paymentMethod == "" {
+		paymentMethod = "cash"
+	}
+
+	limit := r.FormValue("limit")
+	page := r.FormValue("page")
+	q := r.FormValue("q")
+	statusFilter := r.FormValue("status")
+	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, url.QueryEscape(q), url.QueryEscape(statusFilter))
+
+	if username == "" {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك مطلوب"), http.StatusFound)
+		return
+	}
+
+	adminUser := "admin"
+	if u := middleware.GetUser(r); u != nil {
+		adminUser = u.Username
+	}
+
+	if settleType == "close" {
+		err := bp.db.CloseSubscriberLoan(username, adminUser)
+		if err != nil {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("تعذر إغلاق السلفة: "+err.Error()), http.StatusFound)
+			return
+		}
+		http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(fmt.Sprintf("تم إنهاء وإغلاق السلفة للمشترك (%s) بنجاح", username)), http.StatusFound)
+	} else {
+		err := bp.db.RenewSubscriberBilling(username, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد باقة", adminUser)
+		if err != nil {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("تعذر تسوية السلفة والتجديد: "+err.Error()), http.StatusFound)
+			return
+		}
+		http.Redirect(w, r, redirectURL+"&success="+url.QueryEscape(fmt.Sprintf("تم سداد السلفة وتجديد باقة المشترك (%s) بنجاح وتطبيق الخصم", username)), http.StatusFound)
+	}
 }
 
 func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {

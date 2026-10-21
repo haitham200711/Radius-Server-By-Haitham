@@ -1946,9 +1946,72 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 	sub.LoanQuotaBytes = loanQuotaBytes
 	sub.LoanDeductionType = loanDeductionType
 	sub.ExpirationDate = sql.NullTime{Time: newExp, Valid: true}
-	sub.Status = "active"
+	sub.Status = "expired"
 
 	return sub, nil
+}
+
+// CloseSubscriberLoan terminates an active loan without full renewal, clearing loan status and cutting temporary access
+func (d *DB) CloseSubscriberLoan(username, adminUser string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var contractNo, fullName string
+	_ = tx.QueryRow("SELECT COALESCE(contract_no, ''), COALESCE(full_name, '') FROM subscribers WHERE username = ?", username).Scan(&contractNo, &fullName)
+	if fullName == "" {
+		fullName = username
+	}
+
+	// 1. Reset loan fields and set status to expired
+	pastExp := time.Now().Add(-1 * time.Minute)
+	_, err = tx.Exec(`UPDATE subscribers SET
+		loan_active = 0,
+		loan_granted_at = NULL,
+		loan_hours = 0,
+		loan_quota_bytes = 0,
+		loan_deduction_type = 'full',
+		loan_initial_used_bytes = 0,
+		expiration_date = ?,
+		status = 'expired',
+		updated_at = NOW()
+		WHERE username = ?`, pastExp, username)
+	if err != nil {
+		return err
+	}
+
+	// 2. Set FreeRADIUS radcheck Expiration to past so they cannot reconnect
+	pastExpStr := pastExp.Format("02 Jan 2006 15:04:05")
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
+	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, pastExpStr)
+
+	// 3. Clear Mikrotik-Total-Limit
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+
+	// Log billing transaction note
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
+	) VALUES (?, ?, ?, 'adjustment', 'إنهاء وإغلاق سلفة فترة السماح', 0.00, 'paid', 'cash', 'إلغاء السلفة يدوياً من لوحة التحكم', ?)`,
+		username, contractNo, fullName, adminUser)
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	// 4. Disconnect user session via CoA
+	_ = d.DisconnectSubscriberSession(username)
+
+	return nil
 }
 
 // --- Subscriber CRM Edit Methods ---

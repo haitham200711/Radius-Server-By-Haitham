@@ -13,10 +13,12 @@
 }
 </style>
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 p-3 bg-white rounded-3 shadow-sm border">
     <div>
-        <h3 class="fw-bold mb-1">إدارة المشتركين والعقود (PPPoE / Hotspot)</h3>
-        <p class="text-muted small mb-0">سجل المشتركين المتكامل مع النظام وقاعدة بيانات المشتركين</p>
+        <h4 class="fw-bold mb-1 text-dark">
+            <i class="bi bi-people-fill text-primary me-2"></i> إدارة المشتركين والعقود (PPPoE / Hotspot)
+        </h4>
+        <p class="text-muted small mb-0">سجل المشتركين المتكامل مع النظام والتحكم المباشر في الجلسات والباقات</p>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">
         <!-- Active Subscriber Selection Badge -->
@@ -26,33 +28,69 @@
             <button type="button" class="btn-close btn-close-sm ms-1" style="font-size: 0.6rem;" onclick="clearActiveSubscriber(event)" title="إلغاء التحديد"></button>
         </div>
 
-        <!-- Unified Action Buttons Toolbar -->
-        <div class="btn-group shadow-sm bg-white" role="group" aria-label="أدوات المشترك">
-            <button type="button" class="btn btn-outline-primary fw-bold" onclick="toolbarAction('traffic')" title="مراقبة سحب العميل المحدد لايف">
-                <i class="bi bi-activity text-danger me-1"></i> سحب لايف
+        <!-- Unified Actions Dropdown Menu (Clean & Fixed) -->
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle fw-bold shadow-sm d-flex align-items-center gap-2 px-3 py-2" type="button" id="subscribersActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-grid-fill"></i>
+                <span>إجراءات المشتركين</span>
             </button>
-            <button type="button" class="btn btn-outline-success fw-bold" onclick="toolbarAction('renew')" title="تجديد اشتراك العميل المحدد">
-                <i class="bi bi-arrow-repeat me-1"></i> تجديد
-            </button>
-            <button type="button" class="btn btn-outline-warning text-dark fw-bold" onclick="toolbarAction('loan')" title="منح سلفة فترة سماح للعميل المحدد">
-                <i class="bi bi-clock-history me-1"></i> سلفة
-            </button>
-            <button type="button" class="btn btn-outline-primary fw-bold" onclick="toolbarAction('edit')" title="تعديل بيانات المشترك المحدد">
-                <i class="bi bi-pencil-square me-1"></i> تعديل
-            </button>
-            <button type="button" class="btn btn-outline-info text-dark fw-bold" onclick="toolbarAction('quota')" title="إضافة كوتة رصيد إضافية">
-                <i class="bi bi-database-add me-1"></i> +كوتة
-            </button>
-            <button type="button" class="btn btn-outline-warning text-dark fw-bold" onclick="toolbarAction('debt')" title="سداد مديونية المشترك المحدد">
-                <i class="bi bi-cash-stack me-1"></i> سداد
-            </button>
-            <button type="button" class="btn btn-outline-danger fw-bold" onclick="toolbarAction('delete')" title="حذف المشترك المحدد">
-                <i class="bi bi-trash me-1"></i> حذف
-            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 py-2" aria-labelledby="subscribersActionsDropdown" style="min-width: 250px; border-radius: 12px;">
+                <li><h6 class="dropdown-header text-uppercase text-muted small fw-bold">العمليات على المشترك</h6></li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('renew')">
+                        <i class="bi bi-arrow-repeat text-success fs-5"></i>
+                        <span class="fw-bold">تجديد الاشتراك</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('settle_loan')">
+                        <i class="bi bi-check2-circle text-primary fs-5"></i>
+                        <span class="fw-bold text-primary">سداد سلفة</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('loan')">
+                        <i class="bi bi-clock-history text-warning fs-5"></i>
+                        <span>منح سلفة فترة سماح</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('quota')">
+                        <i class="bi bi-database-add text-info fs-5"></i>
+                        <span>إضافة كوتة رصيد (+GB)</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('debt')">
+                        <i class="bi bi-cash-stack text-warning fs-5"></i>
+                        <span>سداد / تسوية مديونية</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('traffic')">
+                        <i class="bi bi-activity text-danger fs-5"></i>
+                        <span>مراقبة السحب لايف</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('edit')">
+                        <i class="bi bi-pencil-square text-secondary fs-5"></i>
+                        <span>تعديل بيانات المشترك</span>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="toolbarAction('delete')">
+                        <i class="bi bi-trash fs-5"></i>
+                        <span class="fw-bold">حذف المشترك</span>
+                    </a>
+                </li>
+            </ul>
         </div>
 
-        <a href="/subscribers/add" class="btn btn-primary fw-bold shadow-sm">
-            <i class="bi bi-person-plus-fill me-1"></i> إضافة مشترك جديد
+        <a href="/subscribers/add" class="btn btn-outline-primary fw-bold shadow-sm d-flex align-items-center gap-1 px-3 py-2">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>إضافة مشترك جديد</span>
         </a>
     </div>
 </div>
@@ -70,6 +108,9 @@
         <a href="/subscribers?status=offline&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "offline" }}btn-secondary fw-bold{{ else }}btn-outline-secondary{{ end }}">
             <i class="bi bi-slash-circle me-1"></i> غير متصلين
         </a>
+        <a href="/subscribers?status=loan&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "loan" }}btn-warning text-dark fw-bold shadow-sm{{ else }}btn-outline-warning text-dark{{ end }}">
+            <i class="bi bi-clock-history me-1"></i> مستلفين ({{ .LoanActiveCount }})
+        </a>
         <a href="/subscribers?status=expired_time&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_time" }}btn-danger fw-bold{{ else }}btn-outline-danger{{ end }}">
             <i class="bi bi-clock-history me-1"></i> منتهي وقت ({{ .ExpiredTimeCount }})
         </a>
@@ -81,8 +122,9 @@
     {{ if .FilterStatus }}
     <div>
         <a href="/subscribers?limit={{ .Limit }}" class="badge bg-light text-dark text-decoration-none border p-2">
-            إلغاء الفلتر: {{ if eq .FilterStatus "online" }}متصلين فقط{{ else if eq .FilterStatus "offline" }}غير متصلين{{ else if eq .FilterStatus "expired_time" }}منتهي وقت{{ else if eq .FilterStatus "expired_quota" }}منتهي كوتة{{ else }}{{ .FilterStatus }}{{ end }} <i class="bi bi-x-circle ms-1"></i>
+            إلغاء الفلتر: {{ if eq .FilterStatus "online" }}متصلين فقط{{ else if eq .FilterStatus "offline" }}غير متصلين{{ else if eq .FilterStatus "loan" }}مستلفين فقط{{ else if eq .FilterStatus "expired_time" }}منتهي وقت{{ else if eq .FilterStatus "expired_quota" }}منتهي كوتة{{ else }}{{ .FilterStatus }}{{ end }} <i class="bi bi-x-circle ms-1"></i>
         </a>
+    </div>
     </div>
     {{ end }}
 </div>
@@ -207,6 +249,10 @@
             <!-- 2. Bulk Renew -->
             <button type="button" class="btn btn-sm btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#bulkRenewModal">
                 <i class="bi bi-arrow-repeat me-1"></i> تجديد للمحدد
+            </button>
+            <!-- 2.5 Bulk Settle Loan -->
+            <button type="button" class="btn btn-sm btn-info text-dark fw-bold" onclick="openBulkSettleLoanModal()">
+                <i class="bi bi-check2-circle me-1"></i> سداد سلفة للمحدد
             </button>
             <!-- 3. Bulk Add Quota -->
             <button type="button" class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkQuotaModal">
@@ -897,6 +943,152 @@
     </div>
 </div>
 
+<!-- 7.5. Single Subscriber Settle Loan Modal -->
+<div class="modal fade" id="settleLoanModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-check2-circle me-2"></i> سداد وتسوية سلفة المشترك
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/settle-loan">
+                <input type="hidden" name="limit" value="{{ .Limit }}">
+                <input type="hidden" name="page" value="{{ .Page }}">
+                <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                <input type="hidden" name="status" value="{{ .FilterStatus }}">
+                <input type="hidden" name="username" id="settleLoanUsername">
+
+                <div class="modal-body p-4">
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">المشترك:</span>
+                            <span class="fw-bold text-dark" id="settleLoanFullName">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">اسم المستخدم:</span>
+                            <code class="fw-bold text-primary" id="settleLoanUserDisplay">-</code>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">حالة السلفة الحالية:</span>
+                            <span class="badge" id="settleLoanBadge">-</span>
+                        </div>
+                    </div>
+
+                    <label class="form-label fw-bold small text-secondary">اختر نوع إجراء السداد المطلوب:</label>
+                    <div class="mb-3">
+                        <div class="form-check p-3 border rounded-3 mb-2 bg-white shadow-sm">
+                            <input class="form-check-input" type="radio" name="settle_type" id="settleTypeRenew" value="renew" checked onchange="toggleSettlePayFields(true)">
+                            <label class="form-check-label fw-bold text-dark d-block" for="settleTypeRenew">
+                                <i class="bi bi-arrow-repeat text-success me-1"></i> سداد السلفة وتجديد الاشتراك (موصى به)
+                            </label>
+                            <small class="text-muted d-block mt-1">تجديد باقة المشترك لشهر جديد مع خصم مدة وكوتة السلفة المستهلكة تلقائياً وفقاً لإعدادات الباقة وإلغاء قفل السلفة.</small>
+                        </div>
+
+                        <div class="form-check p-3 border rounded-3 bg-white shadow-sm">
+                            <input class="form-check-input" type="radio" name="settle_type" id="settleTypeClose" value="close" onchange="toggleSettlePayFields(false)">
+                            <label class="form-check-label fw-bold text-dark d-block" for="settleTypeClose">
+                                <i class="bi bi-x-circle text-danger me-1"></i> إنهاء وإغلاق السلفة الحالية فقط (بدون تجديد)
+                            </label>
+                            <small class="text-muted d-block mt-1">تصفير السلفة وإلغاؤها وفصل جلسة الاتصال المؤقتة حتى يقوم العميل بالشحن لاحقاً.</small>
+                        </div>
+                    </div>
+
+                    <div id="settlePayFields">
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">حالة التحصيل المالي:</label>
+                                <select name="payment_status" class="form-select fw-bold">
+                                    <option value="paid" selected>✅ تم استلام المبلغ (مدفوع)</option>
+                                    <option value="unpaid">⏳ تسجيل كمديونية على العميل</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">طريقة الدفع:</label>
+                                <select name="payment_method" class="form-select">
+                                    <option value="cash" selected>نقداً (كاش)</option>
+                                    <option value="vodafone_cash">فودافون كاش / محفظة</option>
+                                    <option value="instapay">انستاباي (InstaPay)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle-fill me-1"></i> تنفيذ سداد السلفة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 7.6. Bulk Settle Loan Modal -->
+<div class="modal fade" id="bulkSettleLoanModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-check2-circle me-2"></i> سداد وتسوية السلفة للمشتركين المحددين
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/subscribers/bulk">
+                <input type="hidden" name="action" value="settle_loan">
+                <input type="hidden" name="limit" value="{{ .Limit }}">
+                <input type="hidden" name="page" value="{{ .Page }}">
+                <input type="hidden" name="q" value="{{ .SearchQuery }}">
+                <input type="hidden" name="status" value="{{ .FilterStatus }}">
+                <input type="hidden" name="usernames_csv" class="bulk-usernames-field">
+
+                <div class="modal-body p-4">
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i> أنت على وشك سداد وتسوية السلفة لعدد <b class="text-primary fs-6 bulk-count-text">0</b> مشترك محدد.
+                    </div>
+
+                    <label class="form-label fw-bold small text-secondary">اختر نوع إجراء السداد الجماعي:</label>
+                    <div class="mb-3">
+                        <div class="form-check p-3 border rounded-3 mb-2 bg-white shadow-sm">
+                            <input class="form-check-input" type="radio" name="settle_type" id="bulkSettleRenew" value="renew" checked onchange="toggleBulkSettleFields(true)">
+                            <label class="form-check-label fw-bold text-dark d-block" for="bulkSettleRenew">
+                                <i class="bi bi-arrow-repeat text-success me-1"></i> سداد السلفة وتجديد الاشتراكات (موصى به)
+                            </label>
+                            <small class="text-muted d-block mt-1">تجديد اشتراكات الجميع لشهر جديد مع خصم مدة وكوتة السلفة المستهلكة لكل مشترك تلقائياً.</small>
+                        </div>
+
+                        <div class="form-check p-3 border rounded-3 bg-white shadow-sm">
+                            <input class="form-check-input" type="radio" name="settle_type" id="bulkSettleClose" value="close" onchange="toggleBulkSettleFields(false)">
+                            <label class="form-check-label fw-bold text-dark d-block" for="bulkSettleClose">
+                                <i class="bi bi-x-circle text-danger me-1"></i> إنهاء وإغلاق السلف الحالية فقط (بدون تجديد)
+                            </label>
+                            <small class="text-muted d-block mt-1">تصفير السلف للمحددين وفصل الاتصال المؤقت لحين شحن وتجديد الباقات لاحقاً.</small>
+                        </div>
+                    </div>
+
+                    <div id="bulkSettlePayFields">
+                        <div class="mb-2">
+                            <label class="form-label fw-bold small">حالة التحصيل المالي:</label>
+                            <select name="payment_status" class="form-select fw-bold">
+                                <option value="paid" selected>✅ تم استلام المبلغ (مدفوع)</option>
+                                <option value="unpaid">⏳ تسجيل كمديونية على العملاء</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-circle-fill me-1"></i> تأكيد السداد الجماعي
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- 7. Single Subscriber Pay Debt Modal -->
 <div class="modal fade" id="payDebtModal" tabindex="-1">
     <div class="modal-dialog">
@@ -1375,20 +1567,52 @@ function toolbarAction(action) {
         return;
     }
 
+    if (action === 'settle_loan') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            openBulkSettleLoanModal();
+            return;
+        }
+        if (activeSubscriber) {
+            openSettleLoanModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.loanActive);
+            return;
+        }
+        alert('يرجى تحديد مشترك أو مجموعة مشتركين من الجدول أولاً بالنقر على الصف أو تحديد المربعات.');
+        return;
+    }
+
     if (!activeSubscriber) {
         alert('يرجى تحديد مشترك من الجدول أولاً بالنقر على الصف الخاص به.');
         return;
     }
 
     if (action === 'renew') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            const modal = new bootstrap.Modal(document.getElementById('bulkRenewModal'));
+            modal.show();
+            return;
+        }
         openRenewModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.profile);
     } else if (action === 'loan') {
         openLoanModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.profile, activeSubscriber.loanActive);
     } else if (action === 'edit') {
         window.location.href = '/subscribers/edit?username=' + encodeURIComponent(activeSubscriber.username);
     } else if (action === 'quota') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            const modal = new bootstrap.Modal(document.getElementById('bulkQuotaModal'));
+            modal.show();
+            return;
+        }
         openAddQuotaModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.quota);
     } else if (action === 'debt') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            const modal = new bootstrap.Modal(document.getElementById('bulkDebtModal'));
+            modal.show();
+            return;
+        }
         const debtVal = parseFloat(activeSubscriber.debt) || 0;
         if (debtVal <= 0) {
             alert('المشترك (' + activeSubscriber.username + ') ليس لديه أي مديونية مستحقة.');
@@ -1396,6 +1620,11 @@ function toolbarAction(action) {
         }
         openPayDebtModal(activeSubscriber.username, activeSubscriber.fullName, activeSubscriber.debt);
     } else if (action === 'delete') {
+        const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+        if (checked.length > 1) {
+            openBulkDeleteModal();
+            return;
+        }
         if (confirm('هل أنت متأكد من حذف المشترك (' + activeSubscriber.username + ') نهائياً من النظام والقاعدة؟')) {
             window.location.href = '/subscribers/delete?username=' + encodeURIComponent(activeSubscriber.username);
         }
@@ -1581,6 +1810,57 @@ function openLoanModal(username, fullName, profile, loanActive) {
 
     const modal = new bootstrap.Modal(document.getElementById('singleLoanModal'));
     modal.show();
+}
+
+function openSettleLoanModal(username, fullName, loanActive) {
+    document.getElementById('settleLoanUsername').value = username;
+    document.getElementById('settleLoanFullName').textContent = fullName || username;
+    document.getElementById('settleLoanUserDisplay').textContent = username;
+
+    const badge = document.getElementById('settleLoanBadge');
+    if (loanActive) {
+        badge.className = 'badge bg-warning text-dark';
+        badge.innerHTML = '<i class="bi bi-clock-history me-1"></i> سلفة مفعلة حالياً';
+    } else {
+        badge.className = 'badge bg-secondary';
+        badge.textContent = 'لا توجد سلفة نشطة مسجلة';
+    }
+
+    const renewRadio = document.getElementById('settleTypeRenew');
+    if (renewRadio) {
+        renewRadio.checked = true;
+        toggleSettlePayFields(true);
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('settleLoanModal'));
+    modal.show();
+}
+
+function openBulkSettleLoanModal() {
+    const checked = Array.from(rowCheckboxes).filter(cb => cb.checked);
+    if (checked.length === 0) {
+        alert('يرجى تحديد مشترك واحد على الأقل من الجدول.');
+        return;
+    }
+    const renewRadio = document.getElementById('bulkSettleRenew');
+    if (renewRadio) {
+        renewRadio.checked = true;
+        toggleBulkSettleFields(true);
+    }
+    const modal = new bootstrap.Modal(document.getElementById('bulkSettleLoanModal'));
+    modal.show();
+}
+
+function toggleSettlePayFields(isRenew) {
+    const fields = document.getElementById('settlePayFields');
+    if (!fields) return;
+    fields.style.display = isRenew ? 'block' : 'none';
+}
+
+function toggleBulkSettleFields(isRenew) {
+    const fields = document.getElementById('bulkSettlePayFields');
+    if (!fields) return;
+    fields.style.display = isRenew ? 'block' : 'none';
 }
 
 function onRenewProfileChange() {
