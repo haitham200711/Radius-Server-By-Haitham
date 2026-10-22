@@ -204,18 +204,18 @@
                         </div>
                     </div>
 
-                    <!-- 4. كروت (Dropdown: كروت الشحن + كروت الكافيهات) -->
+                    <!-- 4. كروت (Dropdown: كروت الشحن + كروت الكافيهات + أشكال الكروت) -->
                     <div class="sidebar-nav-group">
-                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}active-parent{{ end }}" 
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "cards") (or (eq .ActiveMenu "cafe_cards") (eq .ActiveMenu "card_templates")) }}active-parent{{ end }}" 
                            data-bs-toggle="collapse" href="#cardsSubmenu" role="button" 
-                           aria-expanded="{{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}true{{ else }}false{{ end }}">
+                           aria-expanded="{{ if or (eq .ActiveMenu "cards") (or (eq .ActiveMenu "cafe_cards") (eq .ActiveMenu "card_templates")) }}true{{ else }}false{{ end }}">
                             <span class="sidebar-nav-content">
                                 <i class="bi bi-credit-card-2-front-fill text-warning"></i>
                                 <span>{{ tr .Lang "كروت" "Cards" }}</span>
                             </span>
                             <i class="bi bi-chevron-down submenu-arrow"></i>
                         </a>
-                        <div class="collapse {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}show{{ end }} sidebar-submenu flex-column" id="cardsSubmenu">
+                        <div class="collapse {{ if or (eq .ActiveMenu "cards") (or (eq .ActiveMenu "cafe_cards") (eq .ActiveMenu "card_templates")) }}show{{ end }} sidebar-submenu flex-column" id="cardsSubmenu">
                             <a class="sidebar-sub-link {{ if eq .ActiveMenu "cards" }}active{{ end }}" href="/cards">
                                 <i class="bi bi-wallet2 text-primary"></i>
                                 <span>{{ tr .Lang "كروت الشحن" "Recharge Cards" }}</span>
@@ -224,17 +224,12 @@
                                 <i class="bi bi-cup-hot text-warning"></i>
                                 <span>{{ tr .Lang "كروت الكافيهات" "Cafe Hotspot Cards" }}</span>
                             </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "card_templates" }}active{{ end }}" href="/card-templates">
+                                <i class="bi bi-palette-fill" style="color: #8b5cf6;"></i>
+                                <span>{{ tr .Lang "اشكال الكروت" "Card Templates" }}</span>
+                            </a>
                         </div>
                     </div>
-
-                    <!-- 5. اشكال الكروت -->
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "card_templates" }}active{{ end }}" href="/card-templates">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-palette-fill" style="color: #8b5cf6;"></i>
-                            <span>{{ tr .Lang "اشكال الكروت" "Card Templates" }}</span>
-                        </span>
-                        {{ if eq .ActiveMenu "card_templates" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
-                    </a>
 
                     <!-- 6. NAS -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "routers" }}active{{ end }}" href="/routers">
