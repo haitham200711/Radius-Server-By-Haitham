@@ -845,3 +845,159 @@ html[dir="ltr"] .sidebar-nav-link[aria-expanded="true"] .submenu-arrow {
     transform: rotate(180deg);
 }
 
+/* ==========================================================================
+   AdminLTE / Adv Radius Small Boxes & Color Palette
+   ========================================================================== */
+.small-box {
+    border-radius: 8px;
+    position: relative;
+    display: block;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+    color: #ffffff !important;
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.small-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+}
+.small-box .inner {
+    padding: 16px 20px;
+    position: relative;
+    z-index: 2;
+}
+.small-box h3 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
+    color: #ffffff !important;
+    line-height: 1.15;
+}
+.small-box p {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.95) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.small-box .icon {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    z-index: 1;
+    font-size: 64px;
+    color: rgba(0, 0, 0, 0.15);
+    transition: all 0.2s linear;
+    line-height: 1;
+    pointer-events: none;
+}
+html[dir="ltr"] .small-box .icon {
+    left: auto;
+    right: 15px;
+}
+.small-box:hover .icon {
+    font-size: 70px;
+    color: rgba(0, 0, 0, 0.22);
+}
+.small-box-footer {
+    position: relative;
+    text-align: center;
+    padding: 6px 0;
+    color: rgba(255, 255, 255, 0.88) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.14);
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+.small-box-footer:hover {
+    color: #ffffff !important;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* Adv Radius Exact Color Palette */
+.bg-blue-steel { background-color: #3598dc !important; }
+.bg-green-adv { background-color: #26c281 !important; }
+.bg-yellow-adv { background-color: #dfba49 !important; }
+.bg-red-adv { background-color: #e7505a !important; }
+.bg-purple-adv { background-color: #8e44ad !important; }
+.bg-teal-adv { background-color: #1bbc9b !important; }
+
+/* Adv Radius Classic Dark Navy Sidebar */
+.app-sidebar {
+    background-color: #1a2332 !important;
+    border-left: 1px solid #141b27 !important;
+}
+html[dir="ltr"] .app-sidebar {
+    border-right: 1px solid #141b27 !important;
+    border-left: none !important;
+}
+.sidebar-section-title {
+    color: #64748b !important;
+}
+.sidebar-nav-link {
+    color: #cbd5e1 !important;
+}
+.sidebar-nav-link:hover {
+    color: #ffffff !important;
+    background-color: #222d3d !important;
+}
+.sidebar-nav-link.active {
+    color: #ffffff !important;
+    background-color: #141b27 !important;
+    border-right: 4px solid #3598dc !important;
+    font-weight: 700;
+}
+html[dir="ltr"] .sidebar-nav-link.active {
+    border-right: none !important;
+    border-left: 4px solid #3598dc !important;
+}
+.sidebar-nav-link.active-parent {
+    color: #38bdf8 !important;
+    background-color: #16202e !important;
+}
+.sidebar-submenu {
+    background-color: #141b27 !important;
+    border-right: 2px solid #222d3d !important;
+    border-radius: 6px;
+    padding: 4px 6px !important;
+}
+html[dir="ltr"] .sidebar-submenu {
+    border-right: none !important;
+    border-left: 2px solid #222d3d !important;
+}
+.sidebar-sub-link {
+    color: #94a3b8 !important;
+}
+.sidebar-sub-link:hover {
+    color: #ffffff !important;
+    background-color: #1a2332 !important;
+}
+.sidebar-sub-link.active {
+    color: #38bdf8 !important;
+    background-color: #1e293b !important;
+    border-right: 3px solid #38bdf8 !important;
+}
+html[dir="ltr"] .sidebar-sub-link.active {
+    border-right: none !important;
+    border-left: 3px solid #38bdf8 !important;
+}
+.sidebar-nav-link[aria-expanded="true"] {
+    background-color: #16202e !important;
+    color: #ffffff !important;
+}
+.submenu-arrow {
+    color: #64748b !important;
+}
+

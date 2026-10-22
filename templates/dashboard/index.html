@@ -1,200 +1,331 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h3 class="fw-bold mb-1">{{ tr .Lang "لوحة التحكم والمراقبة" "Dashboard & Live Monitoring" }}</h3>
-        <p class="text-muted small mb-0">{{ tr .Lang "نظام راديوس مايكروتك الاحترافي مع إدارة الموزعين والكروت" "MikroTik RADIUS Enterprise Platform & Reseller Management" }}</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="/cards/generate" class="btn btn-primary fw-bold">
-            <i class="bi bi-plus-circle me-1"></i> {{ tr .Lang "توليد كروت جديدة" "Generate Cards" }}
-        </a>
-        <a href="/subscribers/add" class="btn btn-outline-primary fw-bold">
-            <i class="bi bi-person-plus me-1"></i> {{ tr .Lang "إضافة مشترك" "Add Subscriber" }}
-        </a>
-    </div>
-</div>
-
-<!-- Stat Cards Grid -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4 col-lg-2">
-        <div class="stat-card bg-grad-blue">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">{{ tr .Lang "المشتركين" "Subscribers" }}</span>
-                <i class="bi bi-people-fill"></i>
-            </div>
-            <div class="stat-value">{{ .Metrics.TotalSubscribers }}</div>
+<div class="mb-3">
+    <!-- Top Dashboard Ribbon -->
+    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+        <div>
+            <h4 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-speedometer2 text-primary me-2"></i>{{ tr .Lang "لوحة التحكم" "Dashboard" }}
+                <span class="text-muted fw-normal fs-6 ms-2">| {{ tr .Lang "نظرة عامة على المشتركين والرصيد وحالة النظام" "Subscribers, Financials & System Overview" }}</span>
+            </h4>
         </div>
-    </div>
-
-    <div class="col-md-4 col-lg-2">
-        <div class="stat-card bg-grad-green">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">{{ tr .Lang "الكروت المتاحة" "Available Cards" }}</span>
-                <i class="bi bi-credit-card-2-front"></i>
-            </div>
-            <div class="stat-value">{{ .Metrics.ActiveCards }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-4 col-lg-2">
-        <div class="stat-card bg-grad-orange">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">{{ tr .Lang "المتصلين الآن" "Online Users" }}</span>
-                <i class="bi bi-activity"></i>
-            </div>
-            <div class="stat-value">{{ .Metrics.OnlineSessions }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-4 col-lg-2">
-        <div class="stat-card bg-grad-purple">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">{{ tr .Lang "الراوترات NAS" "NAS Routers" }}</span>
-                <i class="bi bi-hdd-network"></i>
-            </div>
-            <div class="stat-value">{{ .Metrics.TotalRouters }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-4 col-lg-2">
-        <div class="stat-card bg-grad-cyan">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">{{ tr .Lang "الموزعين" "Resellers" }}</span>
-                <i class="bi bi-shop"></i>
-            </div>
-            <div class="stat-value">{{ .Metrics.TotalResellers }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-4 col-lg-2">
-        <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #047857);">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="stat-label">{{ tr .Lang "المبيعات" "Revenue" }}</span>
-                <i class="bi bi-cash-stack"></i>
-            </div>
-            <div class="stat-value">{{ printf "%.1f" .Metrics.TotalRevenue }} {{ tr .Lang "ج.م" "EGP" }}</div>
-        </div>
-    </div>
-</div>
-
-<!-- Host System Resources -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="d-flex align-items-center gap-2">
-            <span class="p-2 bg-primary-subtle text-primary rounded-3">
-                <i class="bi bi-cpu-fill fs-5"></i>
-            </span>
-            <div>
-                <h5 class="fw-bold mb-0 text-dark">{{ tr .Lang "موارد السيرفر والخادم" "Host System Resources" }}</h5>
-                <small class="text-muted">{{ tr .Lang "مراقبة حية لاستهلاك المعالج والرام والمساحة وحالة الخادم المضيف" "Live monitoring of CPU, RAM, Disk, and host status" }}</small>
-            </div>
-        </div>
-        <div class="d-flex align-items-center flex-wrap gap-2">
-            <span class="badge bg-light text-dark border px-2 py-1 font-monospace">
-                <i class="bi bi-hdd-rack me-1 text-primary"></i> <span id="sysHost">{{ .System.Hostname }}</span>
-            </span>
-            <span class="badge bg-light text-secondary border px-2 py-1">
-                <i class="bi bi-ubuntu me-1 text-danger"></i> <span id="sysOS">{{ .System.OS }}</span>
-            </span>
-            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 d-flex align-items-center gap-1">
-                <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
-                <span>{{ tr .Lang "تحديث مباشر" "Live" }}</span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-bold d-flex align-items-center gap-2 shadow-xs">
+                <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.55rem; height: 0.55rem;" role="status"></span>
+                <span>{{ tr .Lang "خادم الراديوس نشط" "RADIUS Service Active" }}</span>
             </span>
         </div>
     </div>
-    <div class="card-body p-3 p-md-4">
-        <div class="row g-3">
-            <!-- 1. CPU -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> {{ tr .Lang "استهلاك المعالج (CPU)" "CPU Usage" }}</span>
-                            <span class="badge bg-white text-dark border font-monospace small" id="cpuCores">{{ .System.CPUCores }} Cores</span>
-                        </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <span class="fs-3 fw-bold font-monospace text-dark" id="cpuUsageVal">{{ printf "%.1f" .System.CPUUsage }}%</span>
-                            <span class="text-muted small">Load: <b class="font-monospace text-dark" id="loadAvg">{{ .System.LoadAverage }}</b></span>
-                        </div>
-                        <div class="progress mb-2" style="height: 7px; background-color: #e2e8f0;">
-                            <div id="cpuProgressBar" class="progress-bar {{ if gt .System.CPUUsage 85.0 }}bg-danger{{ else if gt .System.CPUUsage 60.0 }}bg-warning{{ else }}bg-primary{{ end }}" 
-                                 role="progressbar" style="width: {{ .System.CPUUsage }}%;"></div>
-                        </div>
-                    </div>
-                    <div class="text-truncate small text-muted mt-2 pt-2 border-top" title="{{ .System.CPUModel }}">
-                        <i class="bi bi-info-circle me-1"></i> <span id="cpuModel">{{ .System.CPUModel }}</span>
-                    </div>
+
+    <!-- Row 1: The Main 2 Hero Small Boxes (Subscribers & Online) -->
+    <div class="row g-3 mb-3">
+        <!-- 1. Total Subscribers -->
+        <div class="col-12 col-md-6">
+            <div class="small-box bg-blue-steel">
+                <div class="inner">
+                    <h3>{{ .Metrics.TotalSubscribers }}</h3>
+                    <p>{{ tr .Lang "مشتركين" "Total Subscribers" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <a href="/subscribers" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 2. Online Subscribers -->
+        <div class="col-12 col-md-6">
+            <div class="small-box bg-blue-steel">
+                <div class="inner">
+                    <h3>{{ .Metrics.OnlineSubscribers }}</h3>
+                    <p>{{ tr .Lang "المشتركين المتصلين الآن" "Online Subscribers Now" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-lightbulb-fill"></i>
+                </div>
+                <a href="/sessions" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: Status Breakdown Boxes (3 Columns) -->
+    <div class="row g-3 mb-3">
+        <!-- 3. Active Subscribers -->
+        <div class="col-12 col-md-4">
+            <div class="small-box bg-green-adv">
+                <div class="inner">
+                    <h3>{{ .Metrics.ActiveSubscribers }}</h3>
+                    <p>{{ tr .Lang "المشتركين المتاحين (النشطين)" "Active Subscribers" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-emoji-smile-fill"></i>
+                </div>
+                <a href="/subscribers?status=active" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 4. Expired Subscribers -->
+        <div class="col-12 col-md-4">
+            <div class="small-box bg-red-adv">
+                <div class="inner">
+                    <h3>{{ .Metrics.ExpiredSubscribers }}</h3>
+                    <p>{{ tr .Lang "المشتركين المنتهي اشتراكهم" "Expired Subscribers" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-emoji-frown-fill"></i>
+                </div>
+                <a href="/subscribers?status=expired" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 5. Expiring in 3 Days -->
+        <div class="col-12 col-md-4">
+            <div class="small-box bg-yellow-adv">
+                <div class="inner">
+                    <h3>{{ .Metrics.ExpiringSoonSubscribers }}</h3>
+                    <p>{{ tr .Lang "ينتهي اشتراكهم خلال 3 أيام" "Expiring in 3 Days" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <a href="/subscribers?expiring=3" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: Cards & Financials (4 Columns) -->
+    <div class="row g-3 mb-4">
+        <!-- 6. Total Cards -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="small-box bg-blue-steel">
+                <div class="inner">
+                    <h3>{{ .Metrics.TotalCards }}</h3>
+                    <p>{{ tr .Lang "كروت" "Total Cards" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-credit-card-2-front-fill"></i>
+                </div>
+                <a href="/cards" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 7. Online Cards -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="small-box bg-blue-steel">
+                <div class="inner">
+                    <h3>{{ .Metrics.OnlineCards }}</h3>
+                    <p>{{ tr .Lang "الكروت المتصلة" "Online Cards" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-wifi"></i>
+                </div>
+                <a href="/sessions" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 8. Today's Revenue -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="small-box bg-green-adv">
+                <div class="inner">
+                    <h3>{{ printf "%.0f" .Metrics.TodayRevenue }} <small class="fs-6 opacity-75">{{ tr .Lang "ج.م" "EGP" }}</small></h3>
+                    <p>{{ tr .Lang "تحصيل اليوم" "Today's Collections" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <a href="/reports" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 9. Total Debts / Loans -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="small-box bg-purple-adv">
+                <div class="inner">
+                    <h3>{{ printf "%.0f" .Metrics.TotalDebts }} <small class="fs-6 opacity-75">{{ tr .Lang "ج.م" "EGP" }}</small></h3>
+                    <p>{{ tr .Lang "إجمالي قيم الاستلاف والديون" "Debts & Overdue Loans" }}</p>
+                </div>
+                <div class="icon">
+                    <i class="bi bi-database-fill-exclamation"></i>
+                </div>
+                <a href="/subscribers?has_debt=1" class="small-box-footer">
+                    <span>{{ tr .Lang "تفاصيل أخرى" "More info" }}</span>
+                    <i class="bi bi-arrow-left-circle-fill"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 4: Quick Actions Bar -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 10px;">
+        <div class="card-body p-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="p-2 bg-warning-subtle text-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                    <i class="bi bi-lightning-charge-fill fs-6 text-warning"></i>
+                </span>
+                <span class="fw-bold text-dark small">{{ tr .Lang "روابط سريعة مباشرة:" "Direct Quick Actions:" }}</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="/subscribers/add" class="btn btn-sm btn-light border fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-person-plus-fill text-primary"></i>
+                    <span>{{ tr .Lang "إضافة مشترك" "Add Subscriber" }}</span>
+                </a>
+                <a href="/subscribers" class="btn btn-sm btn-light border fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-arrow-repeat text-success"></i>
+                    <span>{{ tr .Lang "تجديد اشتراك" "Renew Quota" }}</span>
+                </a>
+                <a href="/cards/generate" class="btn btn-sm btn-light border fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-credit-card text-warning"></i>
+                    <span>{{ tr .Lang "توليد كروت" "Generate Cards" }}</span>
+                </a>
+                <a href="/cards/cafe" class="btn btn-sm btn-light border fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-cup-hot text-danger"></i>
+                    <span>{{ tr .Lang "كروت الكافيهات" "Cafe Cards" }}</span>
+                </a>
+                <a href="/profiles/speed-control" class="btn btn-sm btn-light border fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-xs">
+                    <i class="bi bi-speedometer2 text-info"></i>
+                    <span>{{ tr .Lang "التحكم بالسرعات" "Speed Control" }}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 5: Host System Resources (Live Hardware Pulse) -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius: 10px;">
+        <div class="card-header bg-white py-2.5 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="p-1.5 bg-primary-subtle text-primary rounded-3">
+                    <i class="bi bi-cpu-fill fs-6"></i>
+                </span>
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">{{ tr .Lang "موارد السيرفر والخادم" "Host System Resources" }}</h6>
                 </div>
             </div>
-
-            <!-- 2. RAM -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> {{ tr .Lang "الذاكرة العشوائية (RAM)" "RAM Usage" }}</span>
-                            <span class="badge bg-white text-info border font-monospace small" id="memUsageValBadge">{{ printf "%.1f" .System.MemUsage }}%</span>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="badge bg-light text-dark border px-2 py-1 font-monospace small">
+                    <i class="bi bi-hdd-rack me-1 text-primary"></i> <span id="sysHost">{{ .System.Hostname }}</span>
+                </span>
+                <span class="badge bg-light text-secondary border px-2 py-1 small">
+                    <i class="bi bi-ubuntu me-1 text-danger"></i> <span id="sysOS">{{ .System.OS }}</span>
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-3">
+            <div class="row g-3">
+                <!-- 1. CPU -->
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-2.5 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> {{ tr .Lang "المعالج (CPU)" "CPU Usage" }}</span>
+                                <span class="badge bg-white text-dark border font-monospace small" id="cpuCores">{{ .System.CPUCores }} Cores</span>
+                            </div>
+                            <div class="d-flex align-items-baseline gap-2 mb-1">
+                                <span class="fs-4 fw-bold font-monospace text-dark" id="cpuUsageVal">{{ printf "%.1f" .System.CPUUsage }}%</span>
+                                <span class="text-muted small">Load: <b class="font-monospace text-dark" id="loadAvg">{{ .System.LoadAverage }}</b></span>
+                            </div>
+                            <div class="progress mb-1" style="height: 6px; background-color: #e2e8f0;">
+                                <div id="cpuProgressBar" class="progress-bar {{ if gt .System.CPUUsage 85.0 }}bg-danger{{ else if gt .System.CPUUsage 60.0 }}bg-warning{{ else }}bg-primary{{ end }}" 
+                                     role="progressbar" style="width: {{ .System.CPUUsage }}%;"></div>
+                            </div>
                         </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <span class="fs-3 fw-bold font-monospace text-dark" id="memUsageVal">{{ printf "%.1f" .System.MemUsage }}%</span>
-                            <span class="text-muted small font-monospace" id="memFormatted">{{ .System.MemFormatted }}</span>
+                        <div class="text-truncate small text-muted mt-1 pt-1 border-top" style="font-size: 0.75rem;" title="{{ .System.CPUModel }}">
+                            <i class="bi bi-info-circle me-1"></i> <span id="cpuModel">{{ .System.CPUModel }}</span>
                         </div>
-                        <div class="progress mb-2" style="height: 7px; background-color: #e2e8f0;">
-                            <div id="memProgressBar" class="progress-bar {{ if gt .System.MemUsage 85.0 }}bg-danger{{ else if gt .System.MemUsage 60.0 }}bg-warning{{ else }}bg-info{{ end }}" 
-                                 role="progressbar" style="width: {{ .System.MemUsage }}%;"></div>
-                        </div>
-                    </div>
-                    <div class="d-flex justify-content-between small text-muted mt-2 pt-2 border-top">
-                        <span>{{ tr .Lang "المتبقي الشاغر:" "Free Memory:" }}</span>
-                        <b class="text-success font-monospace" id="memFree">{{ .System.MemFreeFormatted }}</b>
                     </div>
                 </div>
-            </div>
 
-            <!-- 3. Disk -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> {{ tr .Lang "مساحة التخزين (Root /)" "Disk Usage (Root /)" }}</span>
-                            <span class="badge bg-white text-warning border font-monospace small" id="diskUsageValBadge">{{ printf "%.1f" .System.DiskUsage }}%</span>
+                <!-- 2. RAM -->
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-2.5 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> {{ tr .Lang "الذاكرة (RAM)" "RAM Usage" }}</span>
+                                <span class="badge bg-white text-info border font-monospace small" id="memUsageValBadge">{{ printf "%.1f" .System.MemUsage }}%</span>
+                            </div>
+                            <div class="d-flex align-items-baseline gap-2 mb-1">
+                                <span class="fs-4 fw-bold font-monospace text-dark" id="memUsageVal">{{ printf "%.1f" .System.MemUsage }}%</span>
+                                <span class="text-muted small font-monospace" id="memFormatted">{{ .System.MemFormatted }}</span>
+                            </div>
+                            <div class="progress mb-1" style="height: 6px; background-color: #e2e8f0;">
+                                <div id="memProgressBar" class="progress-bar {{ if gt .System.MemUsage 85.0 }}bg-danger{{ else if gt .System.MemUsage 60.0 }}bg-warning{{ else }}bg-info{{ end }}" 
+                                     role="progressbar" style="width: {{ .System.MemUsage }}%;"></div>
+                            </div>
                         </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <span class="fs-3 fw-bold font-monospace text-dark" id="diskUsageVal">{{ printf "%.1f" .System.DiskUsage }}%</span>
-                            <span class="text-muted small font-monospace" id="diskFormatted">{{ .System.DiskFormatted }}</span>
+                        <div class="d-flex justify-content-between small text-muted mt-1 pt-1 border-top" style="font-size: 0.75rem;">
+                            <span>{{ tr .Lang "الشاغر:" "Free:" }}</span>
+                            <b class="text-success font-monospace" id="memFree">{{ .System.MemFreeFormatted }}</b>
                         </div>
-                        <div class="progress mb-2" style="height: 7px; background-color: #e2e8f0;">
-                            <div id="diskProgressBar" class="progress-bar {{ if gt .System.DiskUsage 85.0 }}bg-danger{{ else if gt .System.DiskUsage 60.0 }}bg-warning{{ else }}bg-success{{ end }}" 
-                                 role="progressbar" style="width: {{ .System.DiskUsage }}%;"></div>
-                        </div>
-                    </div>
-                    <div class="d-flex justify-content-between small text-muted mt-2 pt-2 border-top">
-                        <span>{{ tr .Lang "المساحة الحرة:" "Free Disk:" }}</span>
-                        <b class="text-primary font-monospace" id="diskFree">{{ .System.DiskFreeFormatted }}</b>
                     </div>
                 </div>
-            </div>
 
-            <!-- 4. Uptime & Server info -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> {{ tr .Lang "وقت تشغيل النظام" "System Uptime" }}</span>
-                            <span class="badge bg-success-subtle text-success border border-success-subtle small">{{ tr .Lang "نشط ومستقر" "Active & Healthy" }}</span>
+                <!-- 3. Disk -->
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-2.5 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> {{ tr .Lang "التخزين (Root /)" "Disk Usage (Root /)" }}</span>
+                                <span class="badge bg-white text-warning border font-monospace small" id="diskUsageValBadge">{{ printf "%.1f" .System.DiskUsage }}%</span>
+                            </div>
+                            <div class="d-flex align-items-baseline gap-2 mb-1">
+                                <span class="fs-4 fw-bold font-monospace text-dark" id="diskUsageVal">{{ printf "%.1f" .System.DiskUsage }}%</span>
+                                <span class="text-muted small font-monospace" id="diskFormatted">{{ .System.DiskFormatted }}</span>
+                            </div>
+                            <div class="progress mb-1" style="height: 6px; background-color: #e2e8f0;">
+                                <div id="diskProgressBar" class="progress-bar {{ if gt .System.DiskUsage 85.0 }}bg-danger{{ else if gt .System.DiskUsage 60.0 }}bg-warning{{ else }}bg-success{{ end }}" 
+                                     role="progressbar" style="width: {{ .System.DiskUsage }}%;"></div>
+                            </div>
                         </div>
-                        <div class="mb-2">
-                            <span class="fs-5 fw-bold text-success d-block" id="uptimeVal">{{ .System.Uptime }}</span>
+                        <div class="d-flex justify-content-between small text-muted mt-1 pt-1 border-top" style="font-size: 0.75rem;">
+                            <span>{{ tr .Lang "المتبقي:" "Free:" }}</span>
+                            <b class="text-primary font-monospace" id="diskFree">{{ .System.DiskFreeFormatted }}</b>
                         </div>
                     </div>
-                    <div class="small text-muted mt-2 pt-2 border-top">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span>{{ tr .Lang "النواة (Kernel):" "Kernel:" }}</span>
-                            <b class="text-dark font-monospace small" id="sysKernel">{{ .System.Kernel }}</b>
+                </div>
+
+                <!-- 4. Uptime & Server info -->
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-2.5 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> {{ tr .Lang "تشغيل السيرفر" "System Uptime" }}</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle small">{{ tr .Lang "مستقر" "Healthy" }}</span>
+                            </div>
+                            <div class="mb-1">
+                                <span class="fs-5 fw-bold text-success d-block" id="uptimeVal">{{ .System.Uptime }}</span>
+                            </div>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <span>{{ tr .Lang "توقيت السيرفر:" "Server Time:" }}</span>
-                            <b class="text-dark font-monospace small" id="serverTime">{{ .System.ServerTime }}</b>
+                        <div class="small text-muted mt-1 pt-1 border-top" style="font-size: 0.75rem;">
+                            <div class="d-flex justify-content-between mb-0.5">
+                                <span>{{ tr .Lang "النواة:" "Kernel:" }}</span>
+                                <b class="text-dark font-monospace" id="sysKernel">{{ .System.Kernel }}</b>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>{{ tr .Lang "التوقيت:" "Time:" }}</span>
+                                <b class="text-dark font-monospace" id="serverTime">{{ .System.ServerTime }}</b>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -202,8 +333,6 @@
         </div>
     </div>
 </div>
-
-
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}

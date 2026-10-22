@@ -784,9 +784,50 @@ func (d *DB) InitSchema() error {
 func (d *DB) GetMetrics() (*models.DashboardMetrics, error) {
 	m := &models.DashboardMetrics{}
 
-	_ = d.QueryRow("SELECT COUNT(DISTINCT username) FROM radcheck").Scan(&m.TotalSubscribers)
-	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE status = 'available'").Scan(&m.ActiveCards)
+	// 1. Subscribers
+	var subsCount int64
+	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers").Scan(&subsCount)
+	if subsCount > 0 {
+		m.TotalSubscribers = subsCount
+	} else {
+		_ = d.QueryRow("SELECT COUNT(DISTINCT username) FROM radcheck").Scan(&m.TotalSubscribers)
+	}
+
+	// Active / Expired / Expiring soon
+	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE status = 'active' AND (expiration_date IS NULL OR expiration_date >= NOW())").Scan(&m.ActiveSubscribers)
+	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE status = 'expired' OR (expiration_date IS NOT NULL AND expiration_date < NOW())").Scan(&m.ExpiredSubscribers)
+	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE status = 'active' AND expiration_date IS NOT NULL AND expiration_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 3 DAY)").Scan(&m.ExpiringSoonSubscribers)
+
+	// Online Sessions
 	_ = d.QueryRow("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL").Scan(&m.OnlineSessions)
+
+	// Online Subscribers vs Online Cards
+	_ = d.QueryRow("SELECT COUNT(DISTINCT r.username) FROM radacct r JOIN subscribers s ON r.username = s.username WHERE r.acctstoptime IS NULL").Scan(&m.OnlineSubscribers)
+	_ = d.QueryRow("SELECT COUNT(DISTINCT r.username) FROM radacct r JOIN cards c ON r.username = c.username WHERE r.acctstoptime IS NULL").Scan(&m.OnlineCards)
+	if m.OnlineSubscribers == 0 && m.OnlineSessions > 0 {
+		if m.OnlineCards > 0 {
+			m.OnlineSubscribers = m.OnlineSessions - m.OnlineCards
+			if m.OnlineSubscribers < 0 {
+				m.OnlineSubscribers = 0
+			}
+		} else {
+			m.OnlineSubscribers = m.OnlineSessions
+		}
+	}
+
+	// 2. Cards
+	_ = d.QueryRow("SELECT COUNT(*) FROM cards").Scan(&m.TotalCards)
+	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE status = 'available'").Scan(&m.ActiveCards)
+
+	// 3. Financials (Today's Revenue & Debts)
+	_ = d.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM billing_transactions WHERE DATE(created_at) = CURDATE() AND payment_status = 'paid'").Scan(&m.TodayRevenue)
+	if m.TodayRevenue == 0 {
+		// Fallback to today's batches if billing_transactions is empty
+		_ = d.QueryRow("SELECT COALESCE(SUM(total_price), 0) FROM batches WHERE DATE(created_at) = CURDATE()").Scan(&m.TodayRevenue)
+	}
+	_ = d.QueryRow("SELECT COALESCE(SUM(debt), 0) FROM subscribers WHERE debt > 0").Scan(&m.TotalDebts)
+
+	// 4. Infrastructure & General
 	_ = d.QueryRow("SELECT COUNT(*) FROM resellers WHERE is_active = 1").Scan(&m.TotalResellers)
 	_ = d.QueryRow("SELECT COUNT(*) FROM nas").Scan(&m.TotalRouters)
 	_ = d.QueryRow("SELECT COALESCE(SUM(acctinputoctets), 0), COALESCE(SUM(acctoutputoctets), 0) FROM radacct").Scan(&m.TotalDownload, &m.TotalUpload)

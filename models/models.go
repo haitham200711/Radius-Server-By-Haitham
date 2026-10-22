@@ -638,14 +638,22 @@ type RadAcct struct {
 
 // DashboardMetrics holds aggregated dashboard stats
 type DashboardMetrics struct {
-	TotalSubscribers int64   `json:"total_subscribers"`
-	ActiveCards      int64   `json:"active_cards"`
-	OnlineSessions   int64   `json:"online_sessions"`
-	TotalResellers   int64   `json:"total_resellers"`
-	TotalRouters     int64   `json:"total_routers"`
-	TotalDownload    int64   `json:"total_download"`
-	TotalUpload      int64   `json:"total_upload"`
-	TotalRevenue     float64 `json:"total_revenue"`
+	TotalSubscribers        int64   `json:"total_subscribers"`
+	OnlineSubscribers       int64   `json:"online_subscribers"`
+	ActiveSubscribers       int64   `json:"active_subscribers"`
+	ExpiredSubscribers      int64   `json:"expired_subscribers"`
+	ExpiringSoonSubscribers int64   `json:"expiring_soon_subscribers"`
+	TotalCards              int64   `json:"total_cards"`
+	ActiveCards             int64   `json:"active_cards"`
+	OnlineCards             int64   `json:"online_cards"`
+	OnlineSessions          int64   `json:"online_sessions"`
+	TotalResellers          int64   `json:"total_resellers"`
+	TotalRouters            int64   `json:"total_routers"`
+	TotalDownload           int64   `json:"total_download"`
+	TotalUpload             int64   `json:"total_upload"`
+	TotalRevenue            float64 `json:"total_revenue"`
+	TodayRevenue            float64 `json:"today_revenue"`
+	TotalDebts              float64 `json:"total_debts"`
 }
 
 // Subscriber represents an ISP subscriber with CRM and account details
