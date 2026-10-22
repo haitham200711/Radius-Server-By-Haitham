@@ -203,77 +203,7 @@
     </div>
 </div>
 
-<div class="row g-4">
-    <!-- Recent Sessions -->
-    <div class="col-lg-8">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-activity me-1 text-primary"></i> {{ tr .Lang "الجلسات النشطة حالياً على المايكروتك" "Active Online MikroTik Sessions" }}</span>
-                <a href="/sessions" class="btn btn-sm btn-outline-primary">{{ tr .Lang "عرض الكل" "View All" }}</a>
-            </div>
-            <div class="card-body p-0 table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>{{ tr .Lang "المشترك" "Subscriber" }}</th>
-                            <th>{{ tr .Lang "IP المشترك" "Framed IP" }}</th>
-                            <th>{{ tr .Lang "MAC الجهاز" "Calling MAC" }}</th>
-                            <th>{{ tr .Lang "راوتر NAS" "NAS Router" }}</th>
-                            <th>{{ tr .Lang "التحميل" "Download" }}</th>
-                            <th>{{ tr .Lang "الرفع" "Upload" }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{ range .RecentSessions }}
-                        <tr>
-                            <td><strong>{{ .UserName }}</strong></td>
-                            <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
-                            <td><code>{{ .CallingStationID }}</code></td>
-                            <td>{{ .NASIPAddress }}</td>
-                            <td>{{ .AcctInputOctets }} B</td>
-                            <td>{{ .AcctOutputOctets }} B</td>
-                        </tr>
-                        {{ else }}
-                        <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">{{ tr .Lang "لا يوجد جلسات نشطة حالياً" "No active sessions currently" }}</td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
-    <!-- Recent Batches -->
-    <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-clock-history me-1 text-primary"></i> {{ tr .Lang "آخر دفعات الكروت" "Recent Card Batches" }}</span>
-                <a href="/cards" class="btn btn-sm btn-outline-primary">{{ tr .Lang "عرض الكل" "View All" }}</a>
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {{ range .RecentBatches }}
-                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
-                        <div>
-                            <strong class="d-block">{{ .BatchCode }}</strong>
-                            <small class="text-muted">{{ .ProfileName }} ({{ .Count }} {{ tr $.Lang "كارت" "cards" }})</small>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-success">{{ printf "%.2f" .TotalPrice }} {{ tr $.Lang "ج.م" "EGP" }}</span>
-                            <a href="/cards/print?batch={{ .BatchCode }}" class="btn btn-sm btn-outline-secondary d-block mt-1" target="_blank">
-                                <i class="bi bi-printer"></i> {{ tr $.Lang "طباعة" "Print" }}
-                            </a>
-                        </div>
-                    </li>
-                    {{ else }}
-                    <li class="list-group-item text-center py-4 text-muted">{{ tr .Lang "لم يتم توليد أي دفعات بعد" "No card batches generated yet" }}</li>
-                    {{ end }}
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
