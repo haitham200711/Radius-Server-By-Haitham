@@ -7004,6 +7004,39 @@ func (d *DB) FindActiveSubscriberByIP(ip string) (*models.Subscriber, error) {
 	return d.GetSubscriber(username)
 }
 
+// FindSubscriberForExpiredPortal finds subscriber by active framed IP, static IP, or most recent session IP
+func (d *DB) FindSubscriberForExpiredPortal(ip string) (*models.Subscriber, error) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+		return nil, sql.ErrNoRows
+	}
+
+	var username string
+	// 1. Check active session in radacct
+	err := d.QueryRow(`SELECT username FROM radacct 
+		WHERE framedipaddress = ? AND acctstoptime IS NULL 
+		ORDER BY radacctid DESC LIMIT 1`, ip).Scan(&username)
+	if err == nil && username != "" {
+		return d.GetSubscriber(username)
+	}
+
+	// 2. Check static IP in subscribers table
+	err = d.QueryRow(`SELECT username FROM subscribers WHERE static_ip = ? LIMIT 1`, ip).Scan(&username)
+	if err == nil && username != "" {
+		return d.GetSubscriber(username)
+	}
+
+	// 3. Check most recent session from this IP (e.g. within past 48 hours)
+	err = d.QueryRow(`SELECT username FROM radacct 
+		WHERE framedipaddress = ? 
+		ORDER BY radacctid DESC LIMIT 1`, ip).Scan(&username)
+	if err == nil && username != "" {
+		return d.GetSubscriber(username)
+	}
+
+	return nil, sql.ErrNoRows
+}
+
 func (d *DB) GetSubscriberPortalData(username string) (*models.SubscriberPortalView, error) {
 	username = strings.TrimSpace(username)
 	sub, err := d.GetSubscriber(username)

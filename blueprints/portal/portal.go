@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
@@ -422,4 +423,302 @@ func (bp *Blueprint) RenewFromBalanceHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	http.Redirect(w, r, "/portal?success="+url.QueryEscape("تم تجديد باقتك بنجاح وخصم قيمة الاشتراك من رصيد محفظتك!"), http.StatusFound)
+}
+
+// ExpiredPageViewData holds all rendering context for the 4 expired portals
+type ExpiredPageViewData struct {
+	Title               string
+	PageType            string // "quota", "time", "quota_loan", "time_loan"
+	IsQuotaMode         bool
+	IsTimeMode          bool
+	ShowLoanOption      bool
+	ClientIP            string
+	Subscriber          *models.Subscriber
+	Profile             *models.Profile
+	Reseller            *models.Reseller
+	Settings            *models.SubscriberPortalSettings
+	IsIdentified        bool
+
+	// FreeRADIUS / Database verified flags:
+	IsQuotaExpired      bool
+	IsTimeExpired       bool
+	IsLoanEligible      bool
+	IneligibilityReason string
+
+	// Loan Parameters:
+	LoanHours           int
+	LoanQuotaGB         float64
+	LoanDeductionText   string
+
+	// Wallet & Balance:
+	CanRenewFromBalance bool
+	WalletBalance       float64
+	ProfilePrice        float64
+
+	// Usage Statistics:
+	UsedQuotaGB         float64
+	TotalQuotaGB        float64
+	ExpiryDateFormatted string
+
+	SuccessMsg          string
+	ErrorMsg            string
+	IsPreview           bool
+}
+
+// buildExpiredViewData prepares comprehensive context for expired pages with strict IP and quota/time verification
+func (bp *Blueprint) buildExpiredViewData(r *http.Request, pageType string, allowLoan bool) *ExpiredPageViewData {
+	clientIP := extractClientIP(r)
+	settings, _ := bp.db.GetSubscriberPortalSettings()
+	if settings == nil {
+		settings = &models.SubscriberPortalSettings{
+			PortalEnabled: true,
+			CompanyName:   "شبكة خدمات الإنترنت",
+		}
+	}
+
+	data := &ExpiredPageViewData{
+		PageType:       pageType,
+		IsQuotaMode:    strings.HasPrefix(pageType, "quota"),
+		IsTimeMode:     strings.HasPrefix(pageType, "time"),
+		ShowLoanOption: allowLoan,
+		ClientIP:       clientIP,
+		Settings:       settings,
+		SuccessMsg:     r.URL.Query().Get("success"),
+		ErrorMsg:       r.URL.Query().Get("error"),
+	}
+
+	if r.URL.Query().Get("loan_success") == "1" && data.SuccessMsg == "" {
+		data.SuccessMsg = "تم منح وتفعيل سلفة الطوارئ بنجاح على حسابك، وإرسال أمر استعادة الاتصال للراوتر عبر خادم الراديوس!"
+	}
+
+	// 1. Identify Subscriber: Check admin preview or active IP lookup
+	var sub *models.Subscriber
+
+	previewParam := r.URL.Query().Get("preview")
+	targetUser := strings.TrimSpace(r.URL.Query().Get("user"))
+	currentUser := middleware.GetUser(r)
+
+	// If admin is previewing another user
+	if targetUser != "" && (currentUser != nil && (currentUser.Role == "admin" || currentUser.Role == "reseller")) {
+		sub, _ = bp.db.GetSubscriber(targetUser)
+	} else if currentUser != nil && currentUser.Role == "subscriber" {
+		sub, _ = bp.db.GetSubscriber(currentUser.Username)
+	} else if clientIP != "" {
+		sub, _ = bp.db.FindSubscriberForExpiredPortal(clientIP)
+	}
+
+	// Mock preview mode for admin testing
+	if previewParam != "" && sub == nil {
+		data.IsPreview = true
+		sub = &models.Subscriber{
+			Username:   "demo_subscriber",
+			FullName:   "مشترك تجريبي (معاينة الإدارة)",
+			ContractNo: "TEST-9988",
+			Status:     "expired",
+			Balance:    150.0,
+			QuotaBytes: 100 * 1024 * 1024 * 1024, // 100 GB
+		}
+	}
+
+	if sub != nil {
+		data.Subscriber = sub
+		data.IsIdentified = true
+		data.WalletBalance = sub.Balance
+
+		// Fetch Profile
+		var prof *models.Profile
+		if sub.ProfileName != "" {
+			prof, _ = bp.db.GetProfileByName(sub.ProfileName)
+		}
+		if prof == nil {
+			prof = &models.Profile{
+				Name:              sub.ProfileName,
+				DisplayName:       sub.ProfileName,
+				LoanEnabled:       true,
+				LoanHours:         48,
+				LoanQuotaBytes:    5 * 1024 * 1024 * 1024,
+				LoanDeductionType: "full",
+				Price:             200.0,
+			}
+		}
+		data.Profile = prof
+		data.ProfilePrice = prof.Price
+
+		// Fetch Reseller
+		if sub.ResellerID > 0 {
+			reseller, _ := bp.db.GetReseller(sub.ResellerID)
+			data.Reseller = reseller
+		}
+		if data.Reseller == nil {
+			data.Reseller = &models.Reseller{
+				Name:  settings.CompanyName,
+				Phone: settings.CompanyPhone,
+			}
+		}
+
+		// Calculate Usage and Quotas
+		totalQuotaBytes := sub.QuotaBytes
+		if totalQuotaBytes <= 0 && prof.QuotaBytes > 0 {
+			totalQuotaBytes = prof.QuotaBytes
+		}
+		data.TotalQuotaGB = float64(totalQuotaBytes) / (1024 * 1024 * 1024)
+
+		cycleStart := sub.CreatedAt
+		var lastRenewed sql.NullTime
+		_ = bp.db.QueryRow("SELECT last_renewed_at FROM subscribers WHERE username = ?", sub.Username).Scan(&lastRenewed)
+		if lastRenewed.Valid {
+			cycleStart = lastRenewed.Time
+		}
+
+		var usedBytes int64
+		_ = bp.db.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
+			FROM radacct WHERE username = ? AND acctstarttime >= ?`, sub.Username, cycleStart).Scan(&usedBytes)
+		data.UsedQuotaGB = float64(usedBytes) / (1024 * 1024 * 1024)
+
+		now := time.Now()
+		data.IsQuotaExpired = (totalQuotaBytes > 0 && usedBytes >= totalQuotaBytes)
+		data.IsTimeExpired = (sub.ExpirationDate.Valid && now.After(sub.ExpirationDate.Time))
+
+		if sub.ExpirationDate.Valid {
+			data.ExpiryDateFormatted = sub.ExpirationDate.Time.Format("2006-01-02 15:04")
+		} else {
+			data.ExpiryDateFormatted = "منتهي الصلاحية"
+		}
+
+		// Check wallet balance renewal
+		if sub.Balance >= prof.Price && prof.Price > 0 {
+			data.CanRenewFromBalance = true
+		}
+
+		// Loan details
+		loanHours := prof.LoanHours
+		if loanHours <= 0 {
+			loanHours = 48
+		}
+		data.LoanHours = loanHours
+		data.LoanQuotaGB = float64(prof.LoanQuotaBytes) / (1024 * 1024 * 1024)
+		if data.LoanQuotaGB <= 0 {
+			data.LoanQuotaGB = 5.0 // default 5 GB
+		}
+		data.LoanDeductionText = "سداد كلي كامل عند التجديد"
+		if prof.LoanDeductionType == "partial" {
+			data.LoanDeductionText = "سداد جزئي حسب الاستهلاك الفعلي"
+		}
+
+		// Strict RADIUS & DB Verification: Is Loan Eligible?
+		if allowLoan {
+			if previewParam == "eligible" {
+				data.IsLoanEligible = true
+			} else if previewParam == "ineligible" {
+				data.IsLoanEligible = false
+				data.IneligibilityReason = "تم استخدام سلفة الطوارئ مسبقاً لهذا الشهر وما زالت نشطة على حسابك."
+			} else {
+				// Real strict verification
+				if sub.LoanActive {
+					data.IsLoanEligible = false
+					data.IneligibilityReason = "لقد قمت بتفعيل سلفة الطوارئ مسبقاً لهذا الشهر وما زالت نشطة على حسابك."
+				} else if !prof.LoanEnabled {
+					data.IsLoanEligible = false
+					data.IneligibilityReason = fmt.Sprintf("عفواً، نظام السلفة غير مفعل على باقة اشتراكك الحالية (%s).", prof.DisplayName)
+				} else if pageType == "quota_loan" && !data.IsQuotaExpired {
+					data.IsLoanEligible = false
+					data.IneligibilityReason = "لم تنفد الكوتة الشهرية لحسابك بالكامل بعد، ولا يمكن طلب سلفة طوارئ قبل نفاد الكوتة."
+				} else if pageType == "time_loan" && !data.IsTimeExpired {
+					data.IsLoanEligible = false
+					data.IneligibilityReason = "فترة صلاحية اشتراكك لم تنتهِ بعد، ولا يمكن تفعيل سلفة فترة السماح قبل حلول موعد الانتهاء."
+				} else {
+					data.IsLoanEligible = true
+				}
+			}
+		}
+	} else {
+		// Not identified by IP
+		if allowLoan {
+			data.IsLoanEligible = false
+			data.IneligibilityReason = "تعذر التحقق من رقم الآيبي الخاص بجهازك تلقائياً. يرجى تسجيل الدخول إلى بوابة المشترك للتأكد من حسابك وأهليتك للسلفة."
+		}
+		data.Reseller = &models.Reseller{
+			Name:  settings.CompanyName,
+			Phone: settings.CompanyPhone,
+		}
+	}
+
+	return data
+}
+
+// ExpiredQuotaHandler renders the Quota Expired page (Notice only, without loan)
+func (bp *Blueprint) ExpiredQuotaHandler(w http.ResponseWriter, r *http.Request) {
+	data := bp.buildExpiredViewData(r, "quota", false)
+	_ = bp.renderer.Render(w, r, "portal/expired_quota", data)
+}
+
+// ExpiredTimeHandler renders the Time Expired page (Notice only, without loan)
+func (bp *Blueprint) ExpiredTimeHandler(w http.ResponseWriter, r *http.Request) {
+	data := bp.buildExpiredViewData(r, "time", false)
+	_ = bp.renderer.Render(w, r, "portal/expired_time", data)
+}
+
+// ExpiredQuotaLoanHandler renders the Quota Expired page with smart loan button strictly verified by IP
+func (bp *Blueprint) ExpiredQuotaLoanHandler(w http.ResponseWriter, r *http.Request) {
+	data := bp.buildExpiredViewData(r, "quota_loan", true)
+	_ = bp.renderer.Render(w, r, "portal/expired_quota_loan", data)
+}
+
+// ExpiredTimeLoanHandler renders the Time Expired page with smart loan button strictly verified by IP
+func (bp *Blueprint) ExpiredTimeLoanHandler(w http.ResponseWriter, r *http.Request) {
+	data := bp.buildExpiredViewData(r, "time_loan", true)
+	_ = bp.renderer.Render(w, r, "portal/expired_time_loan", data)
+}
+
+// ApplyExpiredLoanHandler handles smart loan activation from the expired portals
+func (bp *Blueprint) ApplyExpiredLoanHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/portal", http.StatusSeeOther)
+		return
+	}
+
+	clientIP := extractClientIP(r)
+	loanType := r.FormValue("type") // "quota" or "time"
+
+	redirectPath := "/expired/quota-loan"
+	if loanType == "time" {
+		redirectPath = "/expired/time-loan"
+	}
+
+	// 1. Identify Subscriber strictly by IP (or authenticated subscriber session)
+	var sub *models.Subscriber
+	var err error
+
+	user := middleware.GetUser(r)
+	if user != nil && user.Role == "subscriber" {
+		sub, err = bp.db.GetSubscriber(user.Username)
+	} else {
+		sub, err = bp.db.FindSubscriberForExpiredPortal(clientIP)
+	}
+
+	if err != nil || sub == nil {
+		http.Redirect(w, r, redirectPath+"?error="+url.QueryEscape("تعذر التحقق من حسابك عبر عنوان الآيبي الخاص بك ("+clientIP+"). يرجى تسجيل الدخول أو التواصل مع الموزع."), http.StatusFound)
+		return
+	}
+
+	// 2. Strict FreeRADIUS & DB Eligibility Verification
+	prof, _ := bp.db.GetProfileByName(sub.ProfileName)
+	if prof == nil || !prof.LoanEnabled {
+		http.Redirect(w, r, redirectPath+"?error="+url.QueryEscape("نظام السلفة غير مفعل على باقة اشتراكك الحالية"), http.StatusFound)
+		return
+	}
+
+	if sub.LoanActive {
+		http.Redirect(w, r, redirectPath+"?error="+url.QueryEscape("لديك سلفة نشطة بالفعل لهذا الشهر ولا يمكن طلب سلفة أخرى قبل التجديد"), http.StatusFound)
+		return
+	}
+
+	// 3. Grant Loan (updates DB, FreeRADIUS radcheck, radreply, adds billing transaction, triggers WhatsApp & CoA)
+	_, err = bp.db.GrantSubscriberLoan(sub.Username, "self-service-portal")
+	if err != nil {
+		http.Redirect(w, r, redirectPath+"?error="+url.QueryEscape("تعذر تفعيل السلفة: "+err.Error()), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, redirectPath+"?loan_success=1", http.StatusFound)
 }

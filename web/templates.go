@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,12 +51,19 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"whatsapp/index":         {"templates/base.html", "templates/whatsapp/index.html"},
 		"backups/index":          {"templates/base.html", "templates/backups/index.html"},
 		"adv/index":              {"templates/base.html", "templates/adv/index.html"},
-		"portal/login":           {"templates/portal/login.html"},
-		"portal/index":           {"templates/portal/index.html"},
+		"portal/login":              {"templates/portal/login.html"},
+		"portal/index":              {"templates/portal/index.html"},
+		"portal/expired_quota":      {"templates/portal/expired_quota.html"},
+		"portal/expired_time":       {"templates/portal/expired_time.html"},
+		"portal/expired_quota_loan": {"templates/portal/expired_quota_loan.html"},
+		"portal/expired_time_loan":  {"templates/portal/expired_time_loan.html"},
 	}
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
+		"urlQueryEscape": func(s string) string {
+			return url.QueryEscape(s)
+		},
 		"divFloat": func(a, b int) string {
 			if b == 0 {
 				return "0"

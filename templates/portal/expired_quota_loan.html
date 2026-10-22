@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>انتهاء سعة الباقة (الكوتة) وسلفة الطوارئ - {{ if .Settings.CompanyName }}{{ .Settings.CompanyName }}{{ else }}بوابة المشتركين{{ end }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --quota-primary: #f59e0b;
+            --quota-dark: #b45309;
+            --bg-dark: #0f172a;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0b1120 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            color: #f8fafc;
+        }
+        .expired-card {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            border-radius: 24px;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(245, 158, 11, 0.15);
+            width: 100%;
+            max-width: 530px;
+            overflow: hidden;
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card-header-quota {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            padding: 2.2rem 1.5rem 1.8rem;
+            text-align: center;
+            position: relative;
+        }
+        .icon-circle {
+            width: 82px;
+            height: 82px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.8rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            animation: pulse-warn 2s infinite;
+        }
+        @keyframes pulse-warn {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+            70% { transform: scale(1.04); box-shadow: 0 0 0 12px rgba(245, 158, 11, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .info-pill {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 0.85rem 1.1rem;
+        }
+        .progress-quota {
+            height: 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .loan-box {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.25) 100%);
+            border: 2px solid rgba(245, 158, 11, 0.5);
+            border-radius: 18px;
+            padding: 1.25rem;
+            box-shadow: 0 10px 30px -5px rgba(245, 158, 11, 0.2);
+            position: relative;
+        }
+        .btn-loan {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border: none;
+            color: #1e1b4b;
+            font-weight: 800;
+            border-radius: 12px;
+            padding: 0.95rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 18px rgba(245, 158, 11, 0.4);
+            font-size: 1.05rem;
+        }
+        .btn-loan:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.6);
+            color: #0f172a;
+        }
+        .btn-renew {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            border-radius: 12px;
+            padding: 0.85rem;
+            transition: all 0.2s ease;
+        }
+        .btn-renew:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+            color: #fff;
+        }
+        .btn-whatsapp {
+            background: #25d366;
+            color: #fff;
+            font-weight: 700;
+            border-radius: 12px;
+            border: none;
+            padding: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .btn-whatsapp:hover {
+            background: #20ba59;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(37, 211, 102, 0.35);
+        }
+        .btn-secondary-custom {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-weight: 600;
+            border-radius: 12px;
+            padding: 0.75rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        .btn-secondary-custom:hover {
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="expired-card">
+    <!-- Header -->
+    <div class="card-header-quota">
+        <div class="icon-circle">
+            <i class="bi bi-speedometer2 fs-1 text-white"></i>
+        </div>
+        <h4 class="fw-bold mb-1 text-white">انتهت سعة الباقة (الكوتة)</h4>
+        <p class="small text-white text-opacity-90 mb-0">تم استهلاك كامل الرصيد المخصص لاشتراكك</p>
+    </div>
+
+    <div class="p-4">
+        <!-- Success Alert if Loan Just Granted -->
+        {{ if .SuccessMsg }}
+        <div class="card bg-success bg-opacity-20 border border-success p-3 rounded-4 mb-4 text-center">
+            <div class="d-inline-flex p-2 bg-success text-white rounded-circle mb-2">
+                <i class="bi bi-check-lg fs-2"></i>
+            </div>
+            <h5 class="fw-bold text-success mb-1">تم تفعيل سلفة الطوارئ بنجاح! 🎉</h5>
+            <p class="small text-white mb-2">{{ .SuccessMsg }}</p>
+            <div class="badge bg-success-subtle text-success fs-6 py-2 px-3">
+                <span class="spinner-grow spinner-grow-sm me-1" role="status"></span>
+                تم إرسال أمر فك الحظر وتحديث الاتصال لحظياً.. يمكنك الآن تصفح الإنترنت!
+            </div>
+        </div>
+        {{ end }}
+
+        <!-- Error Message if Any -->
+        {{ if .ErrorMsg }}
+        <div class="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-30 text-danger small py-2.5 mb-3 text-center">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            {{ .ErrorMsg }}
+        </div>
+        {{ end }}
+
+        <!-- Subscriber Identity Card -->
+        {{ if .IsIdentified }}
+        <div class="info-pill mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-person-circle fs-5 text-warning"></i>
+                    <div>
+                        <strong class="d-block text-white fs-6">{{ .Subscriber.FullName }}</strong>
+                        <small class="text-white-50 font-monospace">@{{ .Subscriber.Username }}</small>
+                    </div>
+                </div>
+                {{ if .Subscriber.ContractNo }}
+                <span class="badge bg-white bg-opacity-10 text-white font-monospace border border-white border-opacity-10 px-2 py-1">
+                    عقد: {{ .Subscriber.ContractNo }}
+                </span>
+                {{ end }}
+            </div>
+
+            <div class="d-flex justify-content-between text-muted small pt-1 border-top border-white border-opacity-10">
+                <span>الباقة: <strong class="text-white">{{ if .Profile.DisplayName }}{{ .Profile.DisplayName }}{{ else }}{{ .Subscriber.ProfileName }}{{ end }}</strong></span>
+                <span>الموزع: <strong class="text-warning">{{ if .Reseller.Name }}{{ .Reseller.Name }}{{ else }}المركز الرئيسي{{ end }}</strong></span>
+            </div>
+        </div>
+
+        <!-- Quota Progress -->
+        <div class="mb-3.5">
+            <div class="d-flex justify-content-between small text-white mb-1.5 font-monospace">
+                <span><i class="bi bi-pie-chart me-1 text-warning"></i>الاستهلاك: <strong>{{ printf "%.2f" .UsedQuotaGB }} GB</strong></span>
+                <span>السعة: <strong>{{ printf "%.2f" .TotalQuotaGB }} GB</strong></span>
+            </div>
+            <div class="progress progress-quota">
+                <div class="progress-bar bg-warning" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <small class="text-white-50 text-center d-block mt-1 font-monospace" style="font-size: 0.75rem;">
+                تم استهلاك كامل الرصيد المخصص لهذا الشهر
+            </small>
+        </div>
+        {{ else }}
+        <div class="alert alert-warning bg-warning bg-opacity-10 border-warning border-opacity-25 text-warning small py-2.5 mb-3 text-center">
+            <i class="bi bi-info-circle me-1"></i>
+            انتهت كوتة الإنترنت لجهازك المتصل بعنوان الآيبي: <strong class="font-monospace">{{ .ClientIP }}</strong>
+        </div>
+        {{ end }}
+
+        <!-- ======================================================== -->
+        <!-- SMART LOAN SECTION: ONLY VISIBLE IF RADIUS VERIFIES IP   -->
+        <!-- ======================================================== -->
+        {{ if .IsLoanEligible }}
+        <div class="loan-box mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="badge bg-warning text-dark fw-bold px-2.5 py-1">
+                    <i class="bi bi-lightning-charge-fill me-0.5"></i> خدمة متاحة لحسابك الآن
+                </span>
+                <span class="text-warning-emphasis small font-monospace fw-bold">فحص الراديوس: مؤهل ✓</span>
+            </div>
+
+            <h5 class="fw-bold text-white mb-1">سلفة طوارئ (كوتة إضافية مؤقتة)</h5>
+            <p class="small text-white-50 mb-3">
+                تأكد نظام الراديوس من نفاد الكوتة لحسابك، يمكنك الآن تفعيل سلفة طوارئ فورية لاستعادة اتصال الإنترنت دون انقطاع.
+            </p>
+
+            <div class="d-flex justify-content-around text-center p-2 rounded-3 bg-black bg-opacity-30 mb-3 small font-monospace">
+                <div>
+                    <span class="text-white-50 d-block">سعة السلفة:</span>
+                    <strong class="text-warning fs-6">+{{ printf "%.2f" .LoanQuotaGB }} GB</strong>
+                </div>
+                <div class="border-end border-white border-opacity-10"></div>
+                <div>
+                    <span class="text-white-50 d-block">فترة الصلاحية:</span>
+                    <strong class="text-white fs-6">{{ .LoanHours }} ساعة</strong>
+                </div>
+                <div class="border-end border-white border-opacity-10"></div>
+                <div>
+                    <span class="text-white-50 d-block">طريقة السداد:</span>
+                    <strong class="text-info fs-6">{{ .LoanDeductionText }}</strong>
+                </div>
+            </div>
+
+            <form method="POST" action="/expired/loan">
+                <input type="hidden" name="type" value="quota">
+                <input type="hidden" name="client_ip" value="{{ .ClientIP }}">
+                {{ if .Subscriber.Username }}
+                <input type="hidden" name="username" value="{{ .Subscriber.Username }}">
+                {{ end }}
+                <button type="submit" class="btn btn-loan w-100 shadow">
+                    <i class="bi bi-lightning-charge-fill me-1"></i> تفعيل سلفة الطوارئ الآن واستعادة الإنترنت فوراً
+                </button>
+            </form>
+            <small class="text-white-50 text-center d-block mt-2" style="font-size: 0.72rem;">
+                <i class="bi bi-shield-check text-warning me-1"></i>يتم فك الحظر وتحديث سرعة الجلسة تلقائياً عبر FreeRADIUS
+            </small>
+        </div>
+        {{ else if .IneligibilityReason }}
+        <!-- INELIGIBILITY NOTICE (BUTTON IS HIDDEN) -->
+        <div class="card bg-secondary bg-opacity-15 border border-white border-opacity-15 rounded-3 p-3 mb-4 text-center">
+            <i class="bi bi-info-circle text-warning fs-4 mb-1 d-block"></i>
+            <span class="text-white fw-bold d-block small mb-1">حالة سلفة الطوارئ:</span>
+            <span class="text-white-50 small">{{ .IneligibilityReason }}</span>
+        </div>
+        {{ end }}
+
+        <!-- Balance Renewal Option (If subscriber has enough balance) -->
+        {{ if .CanRenewFromBalance }}
+        <div class="card bg-success bg-opacity-10 border border-success border-opacity-30 rounded-3 p-3 mb-3 text-center">
+            <div class="d-flex align-items-center justify-content-center gap-2 text-success fw-bold mb-1">
+                <i class="bi bi-wallet2 fs-5"></i>
+                <span>لديك رصيد متاح في محفظتك ({{ printf "%.2f" .WalletBalance }} ج.م)</span>
+            </div>
+            <small class="text-white-50 d-block mb-2.5">يمكنك تجديد باقتك الشهرية الآن فوراً خصماً من رصيدك المتاح دون انتظار.</small>
+            <form method="POST" action="/portal/renew-balance">
+                <button type="submit" class="btn btn-renew w-100 shadow-sm">
+                    <i class="bi bi-check-circle-fill me-1"></i> تجديد الباقة الآن من رصيد المحفظة
+                </button>
+            </form>
+        </div>
+        {{ end }}
+
+        <!-- Action Buttons -->
+        <div class="d-flex flex-column gap-2.5">
+            {{ if .Reseller.Phone }}
+            <a href="https://wa.me/{{ .Reseller.Phone }}?text={{ urlQueryEscape "مرحباً، أنا المشترك " }}{{ if .Subscriber.FullName }}{{ urlQueryEscape .Subscriber.FullName }}{{ end }}{{ urlQueryEscape " (رقم: " }}{{ if .Subscriber.Username }}{{ urlQueryEscape .Subscriber.Username }}{{ end }}{{ urlQueryEscape ") - أود تجديد باقة الإنترنت أو شحن باقة إضافية." }}" target="_blank" class="btn-whatsapp">
+                <i class="bi bi-whatsapp fs-5"></i>
+                <span>مراسلة الموزع عبر واتساب للتجديد والشحن</span>
+            </a>
+            <a href="tel:{{ .Reseller.Phone }}" class="btn-secondary-custom">
+                <i class="bi bi-telephone-fill text-warning"></i>
+                <span>الاتصال هاتفياً بالموزع: {{ .Reseller.Phone }}</span>
+            </a>
+            {{ else if .Settings.CompanyPhone }}
+            <a href="https://wa.me/{{ .Settings.CompanyPhone }}?text={{ urlQueryEscape "مرحباً، أود تجديد باقة الإنترنت أو شحن باقة إضافية." }}" target="_blank" class="btn-whatsapp">
+                <i class="bi bi-whatsapp fs-5"></i>
+                <span>مراسلة خدمة العملاء عبر واتساب</span>
+            </a>
+            <a href="tel:{{ .Settings.CompanyPhone }}" class="btn-secondary-custom">
+                <i class="bi bi-telephone-fill text-warning"></i>
+                <span>الاتصال بخدمة العملاء: {{ .Settings.CompanyPhone }}</span>
+            </a>
+            {{ end }}
+
+            <a href="/portal" class="btn-secondary-custom">
+                <i class="bi bi-person-badge"></i>
+                <span>الدخول لبوابة المشترك لمتابعة الحساب</span>
+            </a>
+        </div>
+
+        <div class="text-center mt-3 pt-2 border-top border-white border-opacity-10">
+            <small class="text-white-50 font-monospace" style="font-size: 0.72rem;">
+                {{ if .Settings.CompanyName }}{{ .Settings.CompanyName }}{{ else }}شبكة خدمات الإنترنت المتطورة{{ end }} &bull; عنوان الآيبي: {{ .ClientIP }}
+            </small>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

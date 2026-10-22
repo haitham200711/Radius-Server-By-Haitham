@@ -401,6 +401,119 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Expired Pages URLs & MikroTik Integration Card -->
+            <div class="card shadow-sm border-0 mt-4" style="border-radius: 14px;">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 bg-warning-subtle rounded-3 text-warning">
+                            <i class="bi bi-link-45deg fs-5"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">صفحات انتهاء الخدمة وتوجيه راوترات MikroTik (Expired Redirection Pages)</h6>
+                            <small class="text-muted">روابط مخصصة لصفحات انتهاء الكوتة وانتهاء الوقت مع خدمة السلفة الذكية بالتحقق الصارم من الآيبي</small>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FreeRADIUS Smart Redirection</span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <!-- 1. Quota Expired (Notice Only) -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="fw-bold text-dark"><i class="bi bi-speedometer2 text-warning me-1"></i> 1. صفحة انتهاء الكوتة (إشعار فقط)</span>
+                                        <span class="badge bg-secondary-subtle text-secondary small">بدون استلاف</span>
+                                    </div>
+                                    <p class="text-muted small mb-2">توجه العميل عند نفاد الجيجابايت مع إرشادات التجديد ومراسلة الموزع دون زر استلاف.</p>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" class="form-control font-monospace bg-white" readonly value="/expired/quota" id="url_exp_quota">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/expired/quota'); alert('تم نسخ الرابط الكامل!');"><i class="bi bi-clipboard"></i> نسخ</button>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-end">
+                                    <a href="/expired/quota?preview=1" target="_blank" class="btn btn-xs btn-outline-primary fw-bold">
+                                        <i class="bi bi-eye me-1"></i> معاينة الصفحة
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Time Expired (Notice Only) -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="fw-bold text-dark"><i class="bi bi-hourglass-bottom text-danger me-1"></i> 2. صفحة انتهاء الوقت (إشعار فقط)</span>
+                                        <span class="badge bg-secondary-subtle text-secondary small">بدون استلاف</span>
+                                    </div>
+                                    <p class="text-muted small mb-2">توجه العميل عند انتهاء موعد وتاريخ الصلاحية دون إتاحة زر استلاف فترة سماح.</p>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" class="form-control font-monospace bg-white" readonly value="/expired/time" id="url_exp_time">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/expired/time'); alert('تم نسخ الرابط الكامل!');"><i class="bi bi-clipboard"></i> نسخ</button>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-end">
+                                    <a href="/expired/time?preview=1" target="_blank" class="btn btn-xs btn-outline-primary fw-bold">
+                                        <i class="bi bi-eye me-1"></i> معاينة الصفحة
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Quota Expired + Smart Loan -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-warning-subtle bg-opacity-25 rounded-3 border border-warning h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="fw-bold text-dark"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> 3. انتهاء الكوتة + سلفة طوارئ ذكية</span>
+                                        <span class="badge bg-warning text-dark small fw-bold">تحقق صارم بالـ IP</span>
+                                    </div>
+                                    <p class="text-muted small mb-2">يفحص الراديوس آيبي العميل؛ إذا كان منتهي كوتة فعلياً ولم يستلف، يظهر زر الاستلاف، وإلا يُحجب الزر تلقائياً.</p>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" class="form-control font-monospace bg-white" readonly value="/expired/quota-loan" id="url_exp_quota_loan">
+                                        <button class="btn btn-outline-warning text-dark" type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/expired/quota-loan'); alert('تم نسخ الرابط الكامل!');"><i class="bi bi-clipboard"></i> نسخ</button>
+                                    </div>
+                                </div>
+                                <div class="mt-2 d-flex justify-content-between align-items-center">
+                                    <a href="/expired/quota-loan?preview=eligible" target="_blank" class="btn btn-xs btn-warning fw-bold text-dark">
+                                        <i class="bi bi-eye me-1"></i> معاينة (مؤهل)
+                                    </a>
+                                    <a href="/expired/quota-loan?preview=ineligible" target="_blank" class="btn btn-xs btn-outline-secondary">
+                                        <i class="bi bi-eye-slash me-1"></i> معاينة (محجوب)
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Time Expired + Smart Loan -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-success-subtle bg-opacity-25 rounded-3 border border-success h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="fw-bold text-dark"><i class="bi bi-clock-history text-success me-1"></i> 4. انتهاء الوقت + فترة سماح ذكية</span>
+                                        <span class="badge bg-success text-white small fw-bold">تحقق صارم بالـ IP</span>
+                                    </div>
+                                    <p class="text-muted small mb-2">يفحص الراديوس آيبي العميل؛ إذا كان منتهي وقت فعلياً ولم يستلف، يظهر زر فترة السماح، وإلا يُحجب الزر تلقائياً.</p>
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" class="form-control font-monospace bg-white" readonly value="/expired/time-loan" id="url_exp_time_loan">
+                                        <button class="btn btn-outline-success" type="button" onclick="navigator.clipboard.writeText(window.location.origin + '/expired/time-loan'); alert('تم نسخ الرابط الكامل!');"><i class="bi bi-clipboard"></i> نسخ</button>
+                                    </div>
+                                </div>
+                                <div class="mt-2 d-flex justify-content-between align-items-center">
+                                    <a href="/expired/time-loan?preview=eligible" target="_blank" class="btn btn-xs btn-success fw-bold text-white">
+                                        <i class="bi bi-eye me-1"></i> معاينة (مؤهل)
+                                    </a>
+                                    <a href="/expired/time-loan?preview=ineligible" target="_blank" class="btn btn-xs btn-outline-secondary">
+                                        <i class="bi bi-eye-slash me-1"></i> معاينة (محجوب)
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

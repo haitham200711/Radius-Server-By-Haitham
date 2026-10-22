@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>انتهاء فترة الاشتراك (انتهاء الوقت) - {{ if .Settings.CompanyName }}{{ .Settings.CompanyName }}{{ else }}بوابة المشتركين{{ end }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --time-primary: #ef4444;
+            --time-dark: #b91c1c;
+            --bg-dark: #0f172a;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0b1120 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            color: #f8fafc;
+        }
+        .expired-card {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 24px;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(239, 68, 68, 0.15);
+            width: 100%;
+            max-width: 520px;
+            overflow: hidden;
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card-header-time {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            padding: 2.2rem 1.5rem 1.8rem;
+            text-align: center;
+            position: relative;
+        }
+        .icon-circle {
+            width: 82px;
+            height: 82px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.8rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            animation: pulse-danger 2s infinite;
+        }
+        @keyframes pulse-danger {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+            70% { transform: scale(1.04); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .info-pill {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 0.85rem 1.1rem;
+        }
+        .btn-renew {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            border-radius: 12px;
+            padding: 0.85rem;
+            transition: all 0.2s ease;
+        }
+        .btn-renew:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+            color: #fff;
+        }
+        .btn-whatsapp {
+            background: #25d366;
+            color: #fff;
+            font-weight: 700;
+            border-radius: 12px;
+            border: none;
+            padding: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .btn-whatsapp:hover {
+            background: #20ba59;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(37, 211, 102, 0.35);
+        }
+        .btn-secondary-custom {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-weight: 600;
+            border-radius: 12px;
+            padding: 0.75rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        .btn-secondary-custom:hover {
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="expired-card">
+    <!-- Header -->
+    <div class="card-header-time">
+        <div class="icon-circle">
+            <i class="bi bi-hourglass-bottom fs-1 text-white"></i>
+        </div>
+        <h4 class="fw-bold mb-1 text-white">انتهت فترة الاشتراك الحالية</h4>
+        <p class="small text-white text-opacity-90 mb-0">لقد انتهت فترة الصلاحية المحددة لاشتراكك الشهري</p>
+    </div>
+
+    <div class="p-4">
+        <!-- Subscriber Identity Card -->
+        {{ if .IsIdentified }}
+        <div class="info-pill mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-person-circle fs-5 text-danger"></i>
+                    <div>
+                        <strong class="d-block text-white fs-6">{{ .Subscriber.FullName }}</strong>
+                        <small class="text-white-50 font-monospace">@{{ .Subscriber.Username }}</small>
+                    </div>
+                </div>
+                {{ if .Subscriber.ContractNo }}
+                <span class="badge bg-white bg-opacity-10 text-white font-monospace border border-white border-opacity-10 px-2 py-1">
+                    عقد: {{ .Subscriber.ContractNo }}
+                </span>
+                {{ end }}
+            </div>
+
+            <div class="d-flex justify-content-between text-muted small pt-1 border-top border-white border-opacity-10">
+                <span>الباقة: <strong class="text-white">{{ if .Profile.DisplayName }}{{ .Profile.DisplayName }}{{ else }}{{ .Subscriber.ProfileName }}{{ end }}</strong></span>
+                <span>الموزع: <strong class="text-danger">{{ if .Reseller.Name }}{{ .Reseller.Name }}{{ else }}المركز الرئيسي{{ end }}</strong></span>
+            </div>
+        </div>
+
+        <!-- Expiration Date Details -->
+        <div class="card bg-danger bg-opacity-10 border border-danger border-opacity-30 rounded-3 p-3 mb-4 text-center">
+            <span class="text-danger small fw-bold d-block mb-1">
+                <i class="bi bi-calendar-x me-1"></i>تاريخ وتوقيت انتهاء الاشتراك:
+            </span>
+            <span class="fs-5 fw-bold text-white font-monospace">
+                {{ if .ExpiryDateFormatted }}{{ .ExpiryDateFormatted }}{{ else }}منتهي الصلاحية{{ end }}
+            </span>
+        </div>
+        {{ else }}
+        <div class="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-25 text-danger small py-2.5 mb-4 text-center">
+            <i class="bi bi-exclamation-circle me-1"></i>
+            انتهت صلاحية وقت الاشتراك لجهازك المتصل بعنوان الآيبي: <strong class="font-monospace">{{ .ClientIP }}</strong>
+        </div>
+        {{ end }}
+
+        <!-- Balance Renewal Option (If subscriber has enough balance) -->
+        {{ if .CanRenewFromBalance }}
+        <div class="card bg-success bg-opacity-10 border border-success border-opacity-30 rounded-3 p-3 mb-3 text-center">
+            <div class="d-flex align-items-center justify-content-center gap-2 text-success fw-bold mb-1">
+                <i class="bi bi-wallet2 fs-5"></i>
+                <span>لديك رصيد متاح في محفظتك ({{ printf "%.2f" .WalletBalance }} ج.م)</span>
+            </div>
+            <small class="text-white-50 d-block mb-2.5">يمكنك تجديد اشتراكك الآن فوراً خصماً من رصيدك المتاح دون انتظار.</small>
+            <form method="POST" action="/portal/renew-balance">
+                <button type="submit" class="btn btn-renew w-100 shadow-sm">
+                    <i class="bi bi-check-circle-fill me-1"></i> تجديد الاشتراك الآن من رصيد المحفظة
+                </button>
+            </form>
+        </div>
+        {{ end }}
+
+        <!-- Notice & How to renew -->
+        <div class="card bg-white bg-opacity-5 border border-white border-opacity-10 rounded-3 p-3 mb-4 text-center">
+            <i class="bi bi-info-circle-fill fs-3 text-danger mb-1.5 d-block"></i>
+            <h6 class="fw-bold text-white mb-1">كيف تستعيد خدمة الإنترنت؟</h6>
+            <p class="small text-white-50 mb-0">
+                لتجديد الاشتراك واستعادة سرعة الإنترنت فوراً، يرجى سداد قيمة الاشتراك من خلال الموزع المعتمد التابع له أو التواصل مع إدارة الشبكة.
+            </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex flex-column gap-2.5">
+            {{ if .Reseller.Phone }}
+            <a href="https://wa.me/{{ .Reseller.Phone }}?text={{ urlQueryEscape "مرحباً، أنا المشترك " }}{{ if .Subscriber.FullName }}{{ urlQueryEscape .Subscriber.FullName }}{{ end }}{{ urlQueryEscape " (رقم: " }}{{ if .Subscriber.Username }}{{ urlQueryEscape .Subscriber.Username }}{{ end }}{{ urlQueryEscape ") - انتهت صلاحية اشتراكي وأود التجديد الآن." }}" target="_blank" class="btn-whatsapp">
+                <i class="bi bi-whatsapp fs-5"></i>
+                <span>مراسلة الموزع عبر واتساب لتجديد الاشتراك</span>
+            </a>
+            <a href="tel:{{ .Reseller.Phone }}" class="btn-secondary-custom">
+                <i class="bi bi-telephone-fill text-danger"></i>
+                <span>الاتصال هاتفياً بالموزع: {{ .Reseller.Phone }}</span>
+            </a>
+            {{ else if .Settings.CompanyPhone }}
+            <a href="https://wa.me/{{ .Settings.CompanyPhone }}?text={{ urlQueryEscape "مرحباً، انتهت صلاحية اشتراكي وأود التجديد الآن." }}" target="_blank" class="btn-whatsapp">
+                <i class="bi bi-whatsapp fs-5"></i>
+                <span>مراسلة خدمة العملاء عبر واتساب</span>
+            </a>
+            <a href="tel:{{ .Settings.CompanyPhone }}" class="btn-secondary-custom">
+                <i class="bi bi-telephone-fill text-danger"></i>
+                <span>الاتصال بخدمة العملاء: {{ .Settings.CompanyPhone }}</span>
+            </a>
+            {{ end }}
+
+            <a href="/portal" class="btn-secondary-custom">
+                <i class="bi bi-person-badge"></i>
+                <span>الدخول لبوابة المشترك لمتابعة الحساب</span>
+            </a>
+        </div>
+
+        <div class="text-center mt-3 pt-2 border-top border-white border-opacity-10">
+            <small class="text-white-50 font-monospace" style="font-size: 0.72rem;">
+                {{ if .Settings.CompanyName }}{{ .Settings.CompanyName }}{{ else }}شبكة خدمات الإنترنت المتطورة{{ end }} &bull; عنوان الآيبي: {{ .ClientIP }}
+            </small>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

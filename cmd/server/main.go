@@ -303,6 +303,20 @@ func main() {
 	mux.HandleFunc("/portal/renew-balance", middleware.RequireSubscriberAuth(portalBP.RenewFromBalanceHandler))
 	mux.HandleFunc("/portal/change-password", middleware.RequireSubscriberAuth(portalBP.ChangePasswordHandler))
 
+	// Expired Redirection Pages (for MikroTik dst-nat / walled garden & Direct Access)
+	mux.HandleFunc("/expired/quota", portalBP.ExpiredQuotaHandler)
+	mux.HandleFunc("/expired/time", portalBP.ExpiredTimeHandler)
+	mux.HandleFunc("/expired/quota-loan", portalBP.ExpiredQuotaLoanHandler)
+	mux.HandleFunc("/expired/time-loan", portalBP.ExpiredTimeLoanHandler)
+	mux.HandleFunc("/expired/loan", portalBP.ApplyExpiredLoanHandler)
+
+	// Aliases under /portal/expired/...
+	mux.HandleFunc("/portal/expired/quota", portalBP.ExpiredQuotaHandler)
+	mux.HandleFunc("/portal/expired/time", portalBP.ExpiredTimeHandler)
+	mux.HandleFunc("/portal/expired/quota-loan", portalBP.ExpiredQuotaLoanHandler)
+	mux.HandleFunc("/portal/expired/time-loan", portalBP.ExpiredTimeLoanHandler)
+	mux.HandleFunc("/portal/expired/loan", portalBP.ApplyExpiredLoanHandler)
+
 	// WhatsApp Blueprint
 	waBP := whatsappBP.New(db, renderer)
 	waBP.StartWhatsAppAutomator()
