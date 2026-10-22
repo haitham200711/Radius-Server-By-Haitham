@@ -681,12 +681,31 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					if sess.StopTime != "" && sess.StopTime != "NULL" && sess.StopTime != "0000-00-00 00:00:00" {
 						stopTime = sess.StopTime
+					} else {
+						// Stale session from old backup: close it so it doesn't falsely display as live/online
+						if startTime != nil && sess.SessionSec > 0 {
+							if st, err := time.Parse("2006-01-02 15:04:05", sess.StartTime); err == nil {
+								stopTime = st.Add(time.Duration(sess.SessionSec) * time.Second).Format("2006-01-02 15:04:05")
+							} else {
+								stopTime = sess.StartTime
+							}
+						} else if startTime != nil {
+							stopTime = sess.StartTime
+						} else {
+							stopTime = time.Now().Format("2006-01-02 15:04:05")
+						}
 					}
+
+					termCause := sess.TermCause
+					if termCause == "" {
+						termCause = "Backup-Migration-Closed"
+					}
+
 					args = append(args,
 						sess.SessionID, sess.UniqueID, sess.Username, sess.Realm, sess.NasIP,
 						sess.NasPortID, sess.NasPortType, startTime, stopTime, sess.SessionSec,
 						sess.AcctAuthentic, sess.ConnectInfoStart, sess.ConnectInfoStop, sess.InOctets, sess.OutOctets,
-						sess.CalledMAC, sess.CallingMAC, sess.TermCause, sess.ServiceType, sess.FramedProto, sess.FramedIP)
+						sess.CalledMAC, sess.CallingMAC, termCause, sess.ServiceType, sess.FramedProto, sess.FramedIP)
 				}
 
 				q := fmt.Sprintf(`INSERT IGNORE INTO radacct (
