@@ -153,6 +153,9 @@ func GetCurrentAnalysis() *BackupAnalysis {
 	if analysis == nil {
 		possiblePaths := []string{
 			"/opt/radius-server/adv_backup.sql",
+			"/opt/radius-server/uploads/adv/adv_uploaded.sql",
+			"./uploads/adv/adv_uploaded.sql",
+			"C:\\Users\\Haitham Abd-Elkader\\Downloads\\adv_db-Drwbz261022_11_59_20.sql\\adv_db-Drwbz261022_11_59_20.sql",
 			"D:\\AI Files\\adv_db-iFrRe261021_17_10_21.sql",
 			"./adv_backup.sql",
 			"/tmp/adv_backup.sql",
@@ -232,6 +235,9 @@ func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 func (bp *Blueprint) AnalyzeServerFileHandler(w http.ResponseWriter, r *http.Request) {
 	possiblePaths := []string{
 		"/opt/radius-server/adv_backup.sql",
+		"/opt/radius-server/uploads/adv/adv_uploaded.sql",
+		"./uploads/adv/adv_uploaded.sql",
+		"C:\\Users\\Haitham Abd-Elkader\\Downloads\\adv_db-Drwbz261022_11_59_20.sql\\adv_db-Drwbz261022_11_59_20.sql",
 		"D:\\AI Files\\adv_db-iFrRe261021_17_10_21.sql",
 		"./adv_backup.sql",
 		"/tmp/adv_backup.sql",
@@ -264,7 +270,7 @@ func (bp *Blueprint) AnalyzeServerFileHandler(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/settings?adv_success=تم+فحص+وتحليل+النسخة+الموجودة+على+السيرفر+بنجاح#adv", http.StatusFound)
 }
 
-// ImportHandler executes the actual database migration into our system
+// ImportHandler executes the actual database migration into our system with ultra-fast batch operations
 func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/settings#adv", http.StatusFound)
@@ -299,6 +305,14 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	importedSubscribersCount := 0
 	importedSessionsCount := 0
 
+	// Speed optimization: disable integrity checks for bulk ingestion
+	_, _ = bp.db.Exec("SET foreign_key_checks = 0")
+	_, _ = bp.db.Exec("SET unique_checks = 0")
+	defer func() {
+		_, _ = bp.db.Exec("SET foreign_key_checks = 1")
+		_, _ = bp.db.Exec("SET unique_checks = 1")
+	}()
+
 	tx, err := bp.db.Begin()
 	if err != nil {
 		http.Redirect(w, r, fmt.Sprintf("/settings?adv_error=فشل+بدء+معاملة+قاعدة+البيانات:+%v#adv", err), http.StatusFound)
@@ -307,6 +321,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 
 	// 1. Import Profiles
+	profQuotaMap := make(map[string]int64)
 	if importProfiles {
 		for _, p := range analysis.Profiles {
 			rateLimit := p.RateLimit
@@ -314,6 +329,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				rateLimit = formatRateLimit(p.UpSpeed, p.DownSpeed)
 			}
 			quotaBytes := int64(p.QuotaMB) * 1024 * 1024
+			profQuotaMap[p.Name] = quotaBytes
 
 			_, err := tx.Exec(`INSERT INTO profiles (name, display_name, rate_limit, quota_bytes, price, validity_value, validity_unit)
 				VALUES (?, ?, ?, ?, ?, 1, 'months')
@@ -335,6 +351,19 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			importedProfilesCount++
 		}
+	} else {
+		// Populate profQuotaMap from existing profiles in DB
+		rows, err := tx.Query("SELECT name, quota_bytes FROM profiles")
+		if err == nil {
+			for rows.Next() {
+				var n string
+				var q int64
+				if err := rows.Scan(&n, &q); err == nil {
+					profQuotaMap[n] = q
+				}
+			}
+			rows.Close()
+		}
 	}
 
 	// 2. Import Resellers (Managers)
@@ -351,13 +380,18 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				name = m.Username
 			}
 
+			credit := m.Credit
+			if credit > 999999999999.00 {
+				credit = 999999999.00
+			}
+
 			res, err := tx.Exec(`INSERT INTO resellers (name, username, password_hash, phone, balance, is_active)
 				VALUES (?, ?, ?, ?, ?, 1)
 				ON DUPLICATE KEY UPDATE
 					name = VALUES(name),
 					phone = VALUES(phone),
 					balance = VALUES(balance)`,
-				name, m.Username, string(passHash), m.Phone, m.Credit)
+				name, m.Username, string(passHash), m.Phone, credit)
 			if err == nil {
 				resID, _ := res.LastInsertId()
 				if resID == 0 {
@@ -369,13 +403,51 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[ADV-IMPORT] Error inserting reseller %s: %v", m.Username, err)
 			}
 		}
+	} else {
+		// Populate resellerIDMap from existing resellers
+		rows, err := tx.Query("SELECT id, username FROM resellers")
+		if err == nil {
+			for rows.Next() {
+				var id int64
+				var uname string
+				if err := rows.Scan(&id, &uname); err == nil {
+					for _, m := range analysis.Managers {
+						if m.Username == uname {
+							resellerIDMap[m.ID] = id
+						}
+					}
+				}
+			}
+			rows.Close()
+		}
 	}
 
-	// 3. Import Subscribers & Accounting
-	if importSubscribers {
+	// 3. Import Subscribers & Accounting (Batched for instant speed)
+	if importSubscribers && len(analysis.Subscribers) > 0 {
 		now := time.Now()
+
+		type SubRow struct {
+			Username    string
+			ContractNo  string
+			FullName    string
+			Phone       string
+			Address     string
+			Debt        float64
+			Balance     float64
+			ProfileName string
+			LastMAC     string
+			LastIP      string
+			QuotaBytes  int64
+			ExpDate     time.Time
+			Status      string
+			ResellerID  int64
+			CreatedAt   time.Time
+			LastRenewAt time.Time
+			Password    string
+		}
+
+		var subRows []SubRow
 		for _, s := range analysis.Subscribers {
-			// Password resolution
 			pass := s.Password
 			if pass == "" || pass == "(بدون باسورد)" || pass == "(فارغ / بدون باسورد)" {
 				if defaultPassword == "username" {
@@ -385,13 +457,11 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Reseller mapping
 			var ourResellerID int64 = 0
 			if s.OwnerID > 1 {
 				ourResellerID = resellerIDMap[s.OwnerID]
 			}
 
-			// Expiration date
 			var expDate time.Time
 			if s.ExpTime > 0 {
 				expDate = time.Unix(s.ExpTime, 0)
@@ -407,48 +477,67 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				status = "disabled"
 			}
 
-			// Quota
-			var quotaBytes int64 = 0
-			_ = tx.QueryRow("SELECT quota_bytes FROM profiles WHERE name = ?", s.ProfileName).Scan(&quotaBytes)
+			quotaBytes := profQuotaMap[s.ProfileName]
 
-			// Determine created_at and last_renewed_at
 			createdAt := now
 			if s.CreationTime > 0 {
 				createdAt = time.Unix(s.CreationTime, 0)
 			}
 
-			// Earliest session start time from backup
-			var minSessionTime time.Time
-			userSessions := analysis.SubscriberSessions[s.Username]
-			for _, sess := range userSessions {
-				if t, err := time.Parse("2006-01-02 15:04:05", sess.StartTime); err == nil {
-					if minSessionTime.IsZero() || t.Before(minSessionTime) {
-						minSessionTime = t
-					}
-				}
-			}
-
 			var lastRenewedAt time.Time
 			if s.LastRenewTime > 1000000000 {
-				t := time.Unix(s.LastRenewTime, 0)
-				if !minSessionTime.IsZero() && minSessionTime.Before(t) {
-					lastRenewedAt = minSessionTime.Add(-1 * time.Second)
-				} else {
-					lastRenewedAt = t
-				}
-			} else if !minSessionTime.IsZero() {
-				lastRenewedAt = minSessionTime.Add(-1 * time.Second)
+				lastRenewedAt = time.Unix(s.LastRenewTime, 0)
 			} else if s.ExpTime > 0 {
 				lastRenewedAt = time.Unix(s.ExpTime, 0).AddDate(0, -1, 0)
 			} else {
 				lastRenewedAt = now.AddDate(0, -1, 0)
 			}
 
-			_, err := tx.Exec(`INSERT INTO subscribers (
+			subRows = append(subRows, SubRow{
+				Username:    s.Username,
+				ContractNo:  s.Username,
+				FullName:    s.FullName,
+				Phone:       s.Phone,
+				Address:     s.Address,
+				Debt:        s.TotalUnpaid,
+				Balance:     s.Money,
+				ProfileName: s.ProfileName,
+				LastMAC:     s.LastMAC,
+				LastIP:      s.LastIP,
+				QuotaBytes:  quotaBytes,
+				ExpDate:     expDate,
+				Status:      status,
+				ResellerID:  ourResellerID,
+				CreatedAt:   createdAt,
+				LastRenewAt: lastRenewedAt,
+				Password:    pass,
+			})
+		}
+
+		// Insert Subscribers in batches of 100
+		const subBatchSize = 100
+		for i := 0; i < len(subRows); i += subBatchSize {
+			end := i + subBatchSize
+			if end > len(subRows) {
+				end = len(subRows)
+			}
+			chunk := subRows[i:end]
+
+			var valPlaceholders []string
+			var valArgs []interface{}
+			for _, sr := range chunk {
+				valPlaceholders = append(valPlaceholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+				valArgs = append(valArgs,
+					sr.Username, sr.ContractNo, sr.FullName, sr.Phone, sr.Address, sr.Debt, sr.Balance, sr.ProfileName,
+					sr.LastMAC, sr.LastIP, sr.QuotaBytes, sr.ExpDate, sr.Status, sr.ResellerID,
+					sr.CreatedAt, sr.LastRenewAt)
+			}
+
+			query := fmt.Sprintf(`INSERT INTO subscribers (
 				username, contract_no, full_name, phone, address, debt, balance, profile_name,
 				calling_mac, static_ip, quota_bytes, expiration_date, status, reseller_id,
 				created_at, last_renewed_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES %s
 			ON DUPLICATE KEY UPDATE
 				full_name = VALUES(full_name),
 				phone = VALUES(phone),
@@ -462,82 +551,157 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				status = VALUES(status),
 				reseller_id = VALUES(reseller_id),
 				created_at = VALUES(created_at),
-				last_renewed_at = VALUES(last_renewed_at)`,
-				s.Username, s.Username, s.FullName, s.Phone, s.Address, s.TotalUnpaid, s.Money, s.ProfileName,
-				s.LastMAC, s.LastIP, quotaBytes, expDate, status, ourResellerID,
-				createdAt, lastRenewedAt)
-			if err != nil {
-				log.Printf("[ADV-IMPORT] Error inserting subscriber %s: %v", s.Username, err)
-				continue
+				last_renewed_at = VALUES(last_renewed_at)`, strings.Join(valPlaceholders, ","))
+
+			if _, err := tx.Exec(query, valArgs...); err != nil {
+				log.Printf("[ADV-IMPORT] Error batch inserting subscribers: %v", err)
+			} else {
+				importedSubscribersCount += len(chunk)
+			}
+		}
+
+		// Batch FreeRADIUS radcheck (passwords & expiration)
+		var radcheckArgs []interface{}
+		var radcheckPlaceholders []string
+		for _, sr := range subRows {
+			radcheckPlaceholders = append(radcheckPlaceholders, "(?, 'Cleartext-Password', ':=', ?)")
+			radcheckArgs = append(radcheckArgs, sr.Username, sr.Password)
+
+			expStr := sr.ExpDate.Format("02 Jan 2006 15:04:05")
+			radcheckPlaceholders = append(radcheckPlaceholders, "(?, 'Expiration', ':=', ?)")
+			radcheckArgs = append(radcheckArgs, sr.Username, expStr)
+		}
+
+		const radBatchSize = 400
+		for i := 0; i < len(radcheckPlaceholders); i += radBatchSize {
+			end := i + radBatchSize
+			if end > len(radcheckPlaceholders) {
+				end = len(radcheckPlaceholders)
+			}
+			chunkPl := radcheckPlaceholders[i:end]
+			chunkArgs := radcheckArgs[i*2 : end*2]
+			q := fmt.Sprintf("INSERT INTO radcheck (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(chunkPl, ","))
+			if _, err := tx.Exec(q, chunkArgs...); err != nil {
+				log.Printf("[ADV-IMPORT] Error batch inserting radcheck: %v", err)
+			}
+		}
+
+		// Batch FreeRADIUS radusergroup
+		var grpPlaceholders []string
+		var grpArgs []interface{}
+		for _, sr := range subRows {
+			if sr.ProfileName != "" && sr.ProfileName != "غير محدد" {
+				grpPlaceholders = append(grpPlaceholders, "(?, ?, 1)")
+				grpArgs = append(grpArgs, sr.Username, sr.ProfileName)
+			}
+		}
+		for i := 0; i < len(grpPlaceholders); i += radBatchSize {
+			end := i + radBatchSize
+			if end > len(grpPlaceholders) {
+				end = len(grpPlaceholders)
+			}
+			chunkPl := grpPlaceholders[i:end]
+			chunkArgs := grpArgs[i*2 : end*2]
+			q := fmt.Sprintf("INSERT INTO radusergroup (username, groupname, priority) VALUES %s ON DUPLICATE KEY UPDATE groupname = VALUES(groupname)", strings.Join(chunkPl, ","))
+			if _, err := tx.Exec(q, chunkArgs...); err != nil {
+				log.Printf("[ADV-IMPORT] Error batch inserting radusergroup: %v", err)
+			}
+		}
+
+		// Batch FreeRADIUS radreply (quota limit)
+		var repPlaceholders []string
+		var repArgs []interface{}
+		for _, sr := range subRows {
+			if sr.QuotaBytes > 0 {
+				repPlaceholders = append(repPlaceholders, "(?, 'Mikrotik-Total-Limit', ':=', ?)")
+				repArgs = append(repArgs, sr.Username, fmt.Sprintf("%d", sr.QuotaBytes))
+			}
+		}
+		for i := 0; i < len(repPlaceholders); i += radBatchSize {
+			end := i + radBatchSize
+			if end > len(repPlaceholders) {
+				end = len(repPlaceholders)
+			}
+			chunkPl := repPlaceholders[i:end]
+			chunkArgs := repArgs[i*2 : end*2]
+			q := fmt.Sprintf("INSERT INTO radreply (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(chunkPl, ","))
+			if _, err := tx.Exec(q, chunkArgs...); err != nil {
+				log.Printf("[ADV-IMPORT] Error batch inserting radreply: %v", err)
+			}
+		}
+
+		// Batch Billing Transactions for debt / deposit balances
+		var billPl []string
+		var billArgs []interface{}
+		for _, sr := range subRows {
+			if sr.Debt > 0 {
+				billPl = append(billPl, "(?, ?, ?, 'debt', ?, ?, 'pending', 'system', 'رصيد مديونية مرحل من نظام ADV القديم', 'admin')")
+				billArgs = append(billArgs, sr.Username, sr.Username, sr.FullName, fmt.Sprintf("مديونية سابقة مرحلة من ADV: %.2f ج.م", sr.Debt), sr.Debt)
+			}
+			if sr.Balance > 0 {
+				billPl = append(billPl, "(?, ?, ?, 'deposit', ?, ?, 'paid', 'system', 'رصيد محفظة مرحل من نظام ADV القديم', 'admin')")
+				billArgs = append(billArgs, sr.Username, sr.Username, sr.FullName, fmt.Sprintf("رصيد محفظة مرحل من ADV: %.2f ج.م", sr.Balance), sr.Balance)
+			}
+		}
+		for i := 0; i < len(billPl); i += 200 {
+			end := i + 200
+			if end > len(billPl) {
+				end = len(billPl)
+			}
+			chunkPl := billPl[i:end]
+			chunkArgs := billArgs[i*6 : end*6]
+			q := fmt.Sprintf("INSERT INTO billing_transactions (username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by) VALUES %s", strings.Join(chunkPl, ","))
+			_, _ = tx.Exec(q, chunkArgs...)
+		}
+
+		// 4. Batch Radacct Accounting Sessions (if selected)
+		if importAccounting {
+			var allSessions []AdvRadacctSession
+			for _, sr := range subRows {
+				if sessList, ok := analysis.SubscriberSessions[sr.Username]; ok {
+					allSessions = append(allSessions, sessList...)
+				}
 			}
 
-			// If subscriber has unpaid debt from ADV, record initial transaction
-			if s.TotalUnpaid > 0 {
-				_, _ = tx.Exec(`INSERT INTO billing_transactions (
-					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
-				) VALUES (?, ?, ?, 'debt', ?, ?, 'pending', 'system', 'رصيد مديونية مرحل من نظام ADV القديم', 'admin')`,
-					s.Username, s.Username, s.FullName, fmt.Sprintf("مديونية سابقة مرحلة من ADV: %.2f ج.م", s.TotalUnpaid), s.TotalUnpaid)
-			}
+			const acctBatchSize = 400
+			for i := 0; i < len(allSessions); i += acctBatchSize {
+				end := i + acctBatchSize
+				if end > len(allSessions) {
+					end = len(allSessions)
+				}
+				chunk := allSessions[i:end]
 
-			// If subscriber has wallet balance/money from ADV, record initial transaction
-			if s.Money > 0 {
-				_, _ = tx.Exec(`INSERT INTO billing_transactions (
-					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
-				) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', 'system', 'رصيد محفظة مرحل من نظام ADV القديم', 'admin')`,
-					s.Username, s.Username, s.FullName, fmt.Sprintf("رصيد محفظة مرحل من ADV: %.2f ج.م", s.Money), s.Money)
-			}
-
-			// Update FreeRADIUS radcheck, radusergroup, radreply
-			expStr := expDate.Format("02 Jan 2006 15:04:05")
-			_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ?", s.Username)
-			_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", s.Username, pass)
-			_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", s.Username, expStr)
-
-			_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", s.Username)
-			if s.ProfileName != "" && s.ProfileName != "غير محدد" {
-				_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", s.Username, s.ProfileName)
-			}
-
-			_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", s.Username)
-			if quotaBytes > 0 {
-				_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", s.Username, fmt.Sprintf("%d", quotaBytes))
-			}
-
-			// 4. Import radacct Accounting Sessions if selected
-			if importAccounting && len(userSessions) > 0 {
-				// Clear old sessions for this user before inserting to avoid duplicates
-				_, _ = tx.Exec("DELETE FROM radacct WHERE username = ?", s.Username)
-
-				for _, sess := range userSessions {
+				var pl []string
+				var args []interface{}
+				for _, sess := range chunk {
+					pl = append(pl, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 					var startTime, stopTime interface{}
 					if sess.StartTime != "" && sess.StartTime != "NULL" && sess.StartTime != "0000-00-00 00:00:00" {
 						startTime = sess.StartTime
-					} else {
-						startTime = nil
 					}
 					if sess.StopTime != "" && sess.StopTime != "NULL" && sess.StopTime != "0000-00-00 00:00:00" {
 						stopTime = sess.StopTime
-					} else {
-						stopTime = nil
 					}
-
-					_, err := tx.Exec(`INSERT INTO radacct (
-						acctsessionid, acctuniqueid, username, realm, nasipaddress,
-						nasportid, nasporttype, acctstarttime, acctstoptime, acctsessiontime,
-						acctauthentic, connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
-						calledstationid, callingstationid, acctterminatecause, servicetype, framedprotocol, framedipaddress
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					args = append(args,
 						sess.SessionID, sess.UniqueID, sess.Username, sess.Realm, sess.NasIP,
 						sess.NasPortID, sess.NasPortType, startTime, stopTime, sess.SessionSec,
 						sess.AcctAuthentic, sess.ConnectInfoStart, sess.ConnectInfoStop, sess.InOctets, sess.OutOctets,
 						sess.CalledMAC, sess.CallingMAC, sess.TermCause, sess.ServiceType, sess.FramedProto, sess.FramedIP)
-					if err == nil {
-						importedSessionsCount++
-					}
+				}
+
+				q := fmt.Sprintf(`INSERT IGNORE INTO radacct (
+					acctsessionid, acctuniqueid, username, realm, nasipaddress,
+					nasportid, nasporttype, acctstarttime, acctstoptime, acctsessiontime,
+					acctauthentic, connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
+					calledstationid, callingstationid, acctterminatecause, servicetype, framedprotocol, framedipaddress
+				) VALUES %s`, strings.Join(pl, ","))
+
+				if _, err := tx.Exec(q, args...); err != nil {
+					log.Printf("[ADV-IMPORT] Error batch inserting radacct: %v", err)
+				} else {
+					importedSessionsCount += len(chunk)
 				}
 			}
-
-			importedSubscribersCount++
 		}
 	}
 
@@ -546,7 +710,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بنجاح!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع،+و+%d+جلسة+استهلاك+واكاونتنج.",
+	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بسرعة+فائقة!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع،+و+%d+جلسة+استهلاك.",
 		importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount)
 	http.Redirect(w, r, fmt.Sprintf("/settings?adv_success=%s&subs=%d&profs=%d&resellers=%d&sessions=%d#adv", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount), http.StatusFound)
 }
