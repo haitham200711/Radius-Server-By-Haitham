@@ -109,12 +109,17 @@ systemctl enable mariadb
 systemctl start mariadb
 
 echo -e "${CYAN}[INFO] Creating database and radius user...${NC}"
-mariadb -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mariadb -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
-mariadb -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
-mariadb -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';"
-mariadb -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'127.0.0.1';"
-mariadb -e "FLUSH PRIVILEGES;"
+MYSQL_CMD="mariadb"
+if ! command -v mariadb &>/dev/null; then
+    MYSQL_CMD="mysql"
+fi
+
+$MYSQL_CMD -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+$MYSQL_CMD -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+$MYSQL_CMD -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
+$MYSQL_CMD -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';"
+$MYSQL_CMD -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'127.0.0.1';"
+$MYSQL_CMD -e "FLUSH PRIVILEGES;"
 
 echo -e "${GREEN}[OK] MariaDB database '${DB_NAME}' initialized.${NC}"
 echo ""
@@ -129,13 +134,20 @@ echo -e "${BLUE}================================================================
 apt-get install -y freeradius freeradius-mysql freeradius-utils
 
 # Check if tables exist; if not, import FreeRADIUS standard schema
-TABLE_COUNT=$(mariadb -u ${DB_USER} -p${DB_PASS} -D ${DB_NAME} -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${DB_NAME}' AND table_name = 'radcheck';" || echo "0")
+TABLE_COUNT=$($MYSQL_CMD -u ${DB_USER} -p${DB_PASS} -D ${DB_NAME} -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${DB_NAME}' AND table_name = 'radcheck';" 2>/dev/null || echo "0")
 if [[ "$TABLE_COUNT" -eq "0" ]]; then
     echo -e "${CYAN}[INFO] Importing standard FreeRADIUS MySQL schema...${NC}"
+    SCHEMA_PATH=""
     if [[ -f "/etc/freeradius/3.0/mods-config/sql/main/mysql/schema.sql" ]]; then
-        mariadb -u ${DB_USER} -p${DB_PASS} -D ${DB_NAME} < /etc/freeradius/3.0/mods-config/sql/main/mysql/schema.sql
+        SCHEMA_PATH="/etc/freeradius/3.0/mods-config/sql/main/mysql/schema.sql"
     elif [[ -f "/etc/freeradius/mods-config/sql/main/mysql/schema.sql" ]]; then
-        mariadb -u ${DB_USER} -p${DB_PASS} -D ${DB_NAME} < /etc/freeradius/mods-config/sql/main/mysql/schema.sql
+        SCHEMA_PATH="/etc/freeradius/mods-config/sql/main/mysql/schema.sql"
+    else
+        SCHEMA_PATH=$(find /etc/freeradius* /usr/share/freeradius* -name "schema.sql" 2>/dev/null | grep -E "main/mysql|mysql/schema" | head -n1 || true)
+    fi
+    if [[ -n "$SCHEMA_PATH" && -f "$SCHEMA_PATH" ]]; then
+        echo -e "${CYAN}[INFO] Found FreeRADIUS schema at: ${SCHEMA_PATH}${NC}"
+        $MYSQL_CMD -u ${DB_USER} -p${DB_PASS} -D ${DB_NAME} < "$SCHEMA_PATH"
     fi
 fi
 
@@ -164,7 +176,7 @@ if [[ -f "$SQL_CONF" ]]; then
     ln -sf /etc/freeradius/3.0/mods-available/sql /etc/freeradius/3.0/mods-enabled/sql
 fi
 
-# Enable SQL in default site
+# Enable SQL in default site and inner-tunnel site
 DEFAULT_SITE="/etc/freeradius/3.0/sites-available/default"
 if [[ -f "$DEFAULT_SITE" ]]; then
     echo -e "${CYAN}[INFO] Enabling SQL handlers in sites-available/default...${NC}"
@@ -172,6 +184,14 @@ if [[ -f "$DEFAULT_SITE" ]]; then
     sed -i '/accounting {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$DEFAULT_SITE"
     sed -i '/session {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$DEFAULT_SITE"
     sed -i '/post-auth {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$DEFAULT_SITE"
+fi
+
+INNER_TUNNEL="/etc/freeradius/3.0/sites-available/inner-tunnel"
+if [[ -f "$INNER_TUNNEL" ]]; then
+    echo -e "${CYAN}[INFO] Enabling SQL handlers in sites-available/inner-tunnel...${NC}"
+    sed -i '/authorize {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$INNER_TUNNEL"
+    sed -i '/session {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$INNER_TUNNEL"
+    sed -i '/post-auth {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$INNER_TUNNEL"
 fi
 
 # Set proper ownership and restart
@@ -293,15 +313,23 @@ if ! grep -q "^net.ipv4.ip_forward = 1" /etc/sysctl.conf 2>/dev/null; then
     echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 fi
 
+# Enable NAT Masquerade for SSTP VPN subnet if iptables is available
+if command -v iptables &>/dev/null; then
+    iptables -t nat -C POSTROUTING -s 10.171.171.0/24 ! -d 10.171.171.0/24 -j MASQUERADE 2>/dev/null || \
+    iptables -t nat -A POSTROUTING -s 10.171.171.0/24 ! -d 10.171.171.0/24 -j MASQUERADE 2>/dev/null || true
+fi
+
+ACCEL_BIN=$(command -v accel-pppd || echo "/usr/local/sbin/accel-pppd")
+
 # Accel-PPP Service
-cat << 'EOF' > /etc/systemd/system/accel-ppp.service
+cat << EOF > /etc/systemd/system/accel-ppp.service
 [Unit]
 Description=Accel-PPP SSTP VPN Server
 After=network.target
 
 [Service]
 Type=forking
-ExecStart=/usr/local/sbin/accel-pppd -d -c /etc/accel-ppp.conf
+ExecStart=${ACCEL_BIN} -d -c /etc/accel-ppp.conf
 ExecStop=/usr/bin/pkill accel-pppd
 Restart=always
 
@@ -360,14 +388,16 @@ echo -e "${BLUE}================================================================
 echo -e "${CYAN}${BOLD}[STEP 6/8] Compiling & Deploying Control-Plane Platform...${NC}"
 echo -e "${BLUE}===================================================================${NC}"
 
-# Compile or deploy binary
+# Stop running service if active to avoid "text file busy" when overwriting binary
+systemctl stop radius-server 2>/dev/null || true
+
 CURRENT_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 if [[ "$CURRENT_SCRIPT_DIR" = "$INSTALL_DIR" || -f "$CURRENT_SCRIPT_DIR/go.mod" ]]; then
     echo -e "${CYAN}[INFO] Installing from local source tree: ${CURRENT_SCRIPT_DIR}...${NC}"
     mkdir -p "$INSTALL_DIR"
     if [[ "$CURRENT_SCRIPT_DIR" != "$INSTALL_DIR" ]]; then
-        cp -ru "$CURRENT_SCRIPT_DIR"/* "$INSTALL_DIR"/
+        cp -a "$CURRENT_SCRIPT_DIR"/. "$INSTALL_DIR"/
     fi
     cd "$INSTALL_DIR"
     echo -e "${CYAN}[INFO] Building Go binary: radius-platform...${NC}"
@@ -396,8 +426,7 @@ else
     if git clone --depth 1 "$CLONE_TARGET" "$TMP_CLONE" 2>/dev/null; then
         CLONE_SUCCESS=true
         mkdir -p "$INSTALL_DIR"
-        cp -ru "$TMP_CLONE"/* "$INSTALL_DIR"/
-        cp -ru "$TMP_CLONE"/.git "$INSTALL_DIR"/ 2>/dev/null || true
+        cp -a "$TMP_CLONE"/. "$INSTALL_DIR"/
         rm -rf "$TMP_CLONE"
         cd "$INSTALL_DIR"
         echo -e "${CYAN}[INFO] Building Go binary: radius-platform...${NC}"
@@ -518,6 +547,12 @@ echo -e "${BOLD}🌐 Accel-PPP SSTP VPN Tunnel:${NC}"
 echo -e "   VPN Port:       ${CYAN}4444 TCP${NC}"
 echo -e "   Gateway IP:     ${CYAN}10.171.171.1${NC}"
 echo -e "   VPN Pool:       ${CYAN}10.171.171.2-255${NC}"
+echo ""
+echo -e "${BOLD}📡 MikroTik Expired Redirection URLs:${NC}"
+echo -e "   Quota Expired (Notice):   ${CYAN}http://${SERVER_IP}/expired/quota${NC}"
+echo -e "   Time Expired (Notice):    ${CYAN}http://${SERVER_IP}/expired/time${NC}"
+echo -e "   Quota + Smart Loan:       ${CYAN}http://${SERVER_IP}/expired/quota-loan${NC}"
+echo -e "   Time + Smart Loan:        ${CYAN}http://${SERVER_IP}/expired/time-loan${NC}"
 echo ""
 echo -e "${BOLD}⚙️ Management Commands:${NC}"
 echo -e "   Restart Web App:    ${CYAN}systemctl restart radius-server${NC}"
