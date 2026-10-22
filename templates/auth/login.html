@@ -1,186 +1,192 @@
 {{ define "auth_content" }}
 <style>
-/* Exact Adv Radius Login Styles */
-body.login-page, .login-page-wrapper {
+/* Design #1 Luxury Dark Glassmorphic Login */
+body, .login-page-wrapper {
     min-height: 100vh;
-    background: url('/static/img/city-wallpaper-18.jpg') no-repeat center center fixed !important;
-    background-size: cover !important;
+    background-color: #0b0f17 !important;
+    background-image: 
+        radial-gradient(circle at 50% 10%, rgba(14, 165, 233, 0.15), transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.12), transparent 50%) !important;
     -webkit-font-smoothing: antialiased;
     font-smoothing: antialiased;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px 10px;
+    padding: 25px 15px;
     font-family: 'Cairo', 'Inter', -apple-system, sans-serif;
     position: relative;
-}
-
-.login-page-wrapper::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.45);
-    z-index: 1;
+    color: #f8fafc;
 }
 
 .login-box {
-    width: 360px;
+    width: 400px;
     max-width: 95vw;
     margin: 0 auto;
     position: relative;
     z-index: 2;
 }
 
-.login-logo {
-    font-size: 35px;
+.login-brand {
     text-align: center;
     margin-bottom: 25px;
-    font-weight: 300;
+}
+.brand-glow-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #0284c7, #6366f1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    color: #fff;
+    box-shadow: 0 0 25px rgba(2, 132, 199, 0.45);
+    margin-bottom: 12px;
+}
+.brand-title-text {
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+.brand-subtitle-text {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 4px;
 }
 
-.login-logo img {
-    max-width: 280px;
-    height: auto;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+.login-glass-card {
+    background: rgba(17, 24, 39, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 30px 28px 24px 28px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.login-box-body {
-    background: #ffffff;
-    padding: 25px 25px 20px 25px;
-    border-top: 0;
-    color: #666;
-    border-radius: 6px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
-}
-
-.login-box-body .form-control {
-    border-radius: 4px;
-    box-shadow: none;
-    border-color: #d2d6de;
-    height: 38px;
+.login-glass-card .form-control {
+    background-color: #162032 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+    border-radius: 8px;
+    height: 42px;
     font-size: 14px;
-    padding-left: 35px;
+    padding-left: 42px;
+    transition: all 0.2s ease;
 }
 
-html[dir="rtl"] .login-box-body .form-control {
-    padding-left: 12px;
-    padding-right: 35px;
+html[dir="rtl"] .login-glass-card .form-control {
+    padding-left: 14px;
+    padding-right: 42px;
+}
+
+.login-glass-card .form-control:focus {
+    background-color: #1a273e !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
 }
 
 .form-control-feedback {
     position: absolute;
     top: 0;
-    height: 38px;
-    line-height: 38px;
-    width: 34px;
+    height: 42px;
+    line-height: 42px;
+    width: 38px;
     text-align: center;
-    color: #007bff;
+    color: #38bdf8;
     z-index: 5;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-html[dir="rtl"] .form-control-feedback {
-    right: 0;
-}
-html[dir="ltr"] .form-control-feedback {
-    left: 0;
-}
+html[dir="rtl"] .form-control-feedback { right: 0; }
+html[dir="ltr"] .form-control-feedback { left: 0; }
 
 .form-control-feedback.feedback-end {
     left: 0;
     right: auto;
     cursor: pointer;
+    color: #94a3b8;
 }
-html[dir="rtl"] .form-control-feedback.feedback-end {
-    left: 0;
-    right: auto;
-}
-html[dir="ltr"] .form-control-feedback.feedback-end {
-    right: 0;
-    left: auto;
-}
+html[dir="rtl"] .form-control-feedback.feedback-end { left: 0; right: auto; }
+html[dir="ltr"] .form-control-feedback.feedback-end { right: 0; left: auto; }
 
-/* Primary Button exact Adv Radius styling */
-.btn-primary.btn-flat {
-    background-color: #0056b3;
-    border-color: #004d9e;
+/* Gradient Submit Button */
+.btn-login-gradient {
+    background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+    border: none;
     color: #ffffff;
-    border-radius: 4px;
-    padding: 8px 16px;
+    border-radius: 8px;
+    padding: 10px 18px;
     font-size: 15px;
     font-weight: 700;
+    box-shadow: 0 0 20px rgba(2, 132, 199, 0.4);
     transition: all 0.2s ease;
 }
-
-.btn-primary.btn-flat:hover {
-    background-color: #004085;
-    border-color: #00376f;
+.btn-login-gradient:hover {
+    background: linear-gradient(135deg, #0396e3 0%, #1d4ed8 100%);
+    box-shadow: 0 0 25px rgba(2, 132, 199, 0.6);
+    transform: translateY(-1px);
+    color: #ffffff;
 }
 
-.btn-ucp {
-    background-color: #3598dc;
-    border-color: #2980b9;
-    color: #ffffff;
+.btn-portal {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
     font-weight: 700;
-    font-size: 14px;
-    border-radius: 4px;
-    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 8px;
+    padding: 9px 16px;
     text-decoration: none;
-    display: block;
-    width: 100%;
-}
-.btn-ucp:hover {
-    background-color: #258cd1;
-    color: #ffffff;
-}
-
-.social-auth-links {
-    margin: 18px 0 5px 0;
-}
-
-.login-copyright-bar {
-    position: relative;
-    margin-top: 15px;
-    padding: 8px 12px;
-    background: rgba(220, 220, 220, 0.88);
-    border-radius: 4px;
-    color: #222;
-    font-size: 12px;
-    font-weight: 600;
-    text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    gap: 8px;
+    transition: all 0.15s ease;
+}
+.btn-portal:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.login-footer-bar {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
 }
 </style>
 
 <div class="login-page-wrapper">
     <div class="login-box">
-        <!-- Logo -->
-        <div class="login-logo">
-            <a href="/auth/login" class="text-decoration-none">
-                <img src="/static/img/logo.png" alt="Adv Radius Logo" width="280" height="80">
-            </a>
+        <!-- Logo & Header -->
+        <div class="login-brand">
+            <div class="brand-glow-icon">
+                <i class="bi bi-router-fill"></i>
+            </div>
+            <h1 class="brand-title-text">{{ tr .Lang "راديوس مايكروتك PRO" "RADIUS MikroTik PRO" }}</h1>
+            <p class="brand-subtitle-text">{{ tr .Lang "نظام إدارة الشبكات والمشتركين الذكي 2026" "Next-Gen ISP & Network Management SaaS" }}</p>
         </div>
 
-        <!-- Login Card Body -->
-        <div class="login-box-body">
+        <!-- Glassmorphic Card -->
+        <div class="login-glass-card">
             {{ if .Error }}
-            <div class="alert alert-danger py-2 px-3 small d-flex align-items-center gap-2 mb-3 border-0" role="alert" style="border-radius: 4px; font-size: 13px;">
+            <div class="alert alert-danger py-2 px-3 small d-flex align-items-center gap-2 mb-3 border-0" role="alert" style="background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3) !important; color: #fda4af; border-radius: 8px; font-size: 13px;">
                 <i class="bi bi-exclamation-triangle-fill fs-6 text-danger"></i>
                 <span class="fw-bold">{{ tr .Lang .Error "اسم المستخدم أو كلمة المرور غير صحيحة" }}</span>
             </div>
             {{ end }}
 
             <form method="POST" action="/auth/login" id="loginForm" autocomplete="off">
-                <!-- User Name -->
+                <!-- Username -->
                 <div class="position-relative mb-3">
-                    <input type="text" id="username" name="username" class="form-control" placeholder="{{ tr .Lang "اسم المستخدم / User Name" "User Name" }}" required autofocus autocomplete="off">
+                    <input type="text" id="username" name="username" class="form-control" placeholder="{{ tr .Lang "اسم المستخدم / Username" "Username" }}" required autofocus autocomplete="off">
                     <span class="form-control-feedback">
                         <i class="bi bi-person-fill fs-5"></i>
                     </span>
@@ -193,7 +199,7 @@ html[dir="ltr"] .form-control-feedback.feedback-end {
                         <i class="bi bi-lock-fill fs-5"></i>
                     </span>
                     <span class="form-control-feedback feedback-end" id="togglePassword" title="{{ tr .Lang "إظهار/إخفاء كلمة المرور" "Show/Hide Password" }}">
-                        <i class="bi bi-eye-slash-fill fs-6 text-muted" id="togglePasswordIcon"></i>
+                        <i class="bi bi-eye-slash-fill fs-6" id="togglePasswordIcon"></i>
                     </span>
                 </div>
 
@@ -209,42 +215,37 @@ html[dir="ltr"] .form-control-feedback.feedback-end {
                 <div class="row align-items-center g-2 mb-3">
                     <div class="col-7">
                         <div class="form-check m-0">
-                            <input class="form-check-input" type="checkbox" id="rememberMe" name="remember" checked>
-                            <label class="form-check-label text-dark small fw-semibold" for="rememberMe" style="font-size: 13px;">
-                                {{ tr .Lang "تذكرني" "Remember Me" }}
+                            <input class="form-check-input" type="checkbox" id="rememberMe" name="remember" checked style="background-color: #162032; border-color: rgba(255,255,255,0.2);">
+                            <label class="form-check-label text-secondary small fw-semibold" for="rememberMe" style="font-size: 13px;">
+                                {{ tr .Lang "تذكر تسجيل دخولي" "Remember Me" }}
                             </label>
                         </div>
                     </div>
                     <div class="col-5">
-                        <button type="submit" class="btn btn-primary btn-flat w-100">
-                            {{ tr .Lang "دخول" "Sign In" }}
+                        <button type="submit" class="btn btn-login-gradient w-100">
+                            {{ tr .Lang "دخول" "Sign In" }} <i class="bi bi-arrow-left ms-1"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- Or Go To User Control Panel -->
-                <div class="social-auth-links text-center pt-2 border-top">
-                    <p class="text-muted small mb-2" style="font-size: 12px; font-weight: 700;">- {{ tr .Lang "أو الانتقال إلى" "Or GO To" }} -</p>
-                    <a href="/ucp" class="btn btn-ucp">
-                        <i class="bi bi-person-bounding-box me-1"></i>
-                        {{ tr .Lang "بوابة المشتركين (User Control Panel)" "User Control Panel" }}
+                <!-- Or Go To Subscriber Portal -->
+                <div class="pt-3 border-top" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+                    <a href="/ucp" class="btn-portal">
+                        <i class="bi bi-person-bounding-box text-info"></i>
+                        <span>{{ tr .Lang "بوابة المشتركين (User Control Panel)" "User Control Panel" }}</span>
                     </a>
                 </div>
             </form>
         </div>
 
-        <!-- All Rights Reserved Footer Bar -->
-        <div class="login-copyright-bar">
-            <span>All Right Reserved &copy;</span>
-            <a href="https://www.advradius.com/" target="_blank" style="text-decoration:none;" class="d-inline-flex align-items-center">
-                <img src="/static/img/copy.png" alt="Adv Radius" width="100" height="18">
-            </a>
+        <!-- Footer -->
+        <div class="login-footer-bar">
+            <span>{{ tr .Lang "جميع الحقوق محفوظة © راديوس مايكروتك PRO" "All Rights Reserved © RADIUS MikroTik PRO" }}</span>
         </div>
     </div>
 </div>
 
 <script>
-// Password toggle functionality
 document.addEventListener('DOMContentLoaded', function() {
     const toggleBtn = document.getElementById('togglePassword');
     const pwdInput = document.getElementById('password');
@@ -255,10 +256,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (pwdInput.type === 'password') {
                 pwdInput.type = 'text';
                 pwdIcon.classList.remove('bi-eye-slash-fill');
-                pwdIcon.classList.add('bi-eye-fill', 'text-primary');
+                pwdIcon.classList.add('bi-eye-fill', 'text-info');
             } else {
                 pwdInput.type = 'password';
-                pwdIcon.classList.remove('bi-eye-fill', 'text-primary');
+                pwdIcon.classList.remove('bi-eye-fill', 'text-info');
                 pwdIcon.classList.add('bi-eye-slash-fill');
             }
         });

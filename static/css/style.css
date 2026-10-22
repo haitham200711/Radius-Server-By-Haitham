@@ -5,64 +5,64 @@
    ========================================================================== */
 
 :root {
-    --font-main: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-main: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     
-    /* Backgrounds */
-    --bg-body: #f4f6fa;
-    --bg-surface: #ffffff;
-    --bg-subtle: #f8fafc;
-    --bg-sidebar: #ffffff;
+    /* Backgrounds - Design #1 Obsidian & Deep Slate */
+    --bg-body: #0b0f17;
+    --bg-surface: #111827;
+    --bg-subtle: #162032;
+    --bg-sidebar: #0d131f;
     
     /* Text */
-    --text-main: #182433;
-    --text-secondary: #475569;
+    --text-main: #f8fafc;
+    --text-secondary: #94a3b8;
     --text-muted: #64748b;
-    --text-light: #94a3b8;
+    --text-light: #475569;
     
-    /* Tabler Brand & Status Accents */
-    --primary: #206bc4;
-    --primary-hover: #1a569d;
-    --primary-subtle: #eef4fc;
-    --primary-border: #d0e1f7;
+    /* Design #1 Glowing Neon Accents */
+    --primary: #38bdf8;
+    --primary-hover: #0ea5e9;
+    --primary-subtle: rgba(56, 189, 248, 0.12);
+    --primary-border: rgba(56, 189, 248, 0.3);
     
-    --success: #2fb344;
-    --success-hover: #269638;
-    --success-subtle: #edf8ef;
-    --success-border: #bce4c3;
+    --success: #10b981;
+    --success-hover: #059669;
+    --success-subtle: rgba(16, 185, 129, 0.12);
+    --success-border: rgba(16, 185, 129, 0.3);
     
-    --warning: #f76707;
-    --warning-hover: #d95a04;
-    --warning-subtle: #fef2e6;
-    --warning-border: #fcd2af;
+    --warning: #f59e0b;
+    --warning-hover: #d97706;
+    --warning-subtle: rgba(245, 158, 11, 0.12);
+    --warning-border: rgba(245, 158, 11, 0.3);
     
-    --danger: #d63939;
-    --danger-hover: #b52c2c;
-    --danger-subtle: #fbebeb;
-    --danger-border: #f3bfbf;
+    --danger: #f43f5e;
+    --danger-hover: #e11d48;
+    --danger-subtle: rgba(244, 63, 94, 0.12);
+    --danger-border: rgba(244, 63, 94, 0.3);
     
-    --info: #4299e1;
-    --info-subtle: #eff6fc;
-    --info-border: #cbe2f7;
+    --info: #06b6d4;
+    --info-subtle: rgba(6, 182, 212, 0.12);
+    --info-border: rgba(6, 182, 212, 0.3);
     
-    --purple: #7952b3;
-    --purple-subtle: #f3eff9;
-    --purple-border: #d9cde9;
+    --purple: #8b5cf6;
+    --purple-subtle: rgba(139, 92, 246, 0.12);
+    --purple-border: rgba(139, 92, 246, 0.3);
     
-    /* Hairline Borders & Restful Shadows */
-    --border-color: #e6e8eb;
-    --border-subtle: #f1f5f9;
-    --border-focus: #90b5e2;
+    /* Hairline Borders & Shadows */
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-focus: #38bdf8;
     
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-    --shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.07);
-    --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.35);
+    --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.45);
+    --shadow-dropdown: 0 12px 36px rgba(0, 0, 0, 0.55);
     
     /* Dimensions */
     --sidebar-w: 260px;
     --header-h: 62px;
-    --radius-base: 8px;
-    --radius-sm: 6px;
-    --radius-lg: 12px;
+    --radius-base: 10px;
+    --radius-sm: 8px;
+    --radius-lg: 14px;
 }
 
 /* Base Reset */
@@ -1002,17 +1002,22 @@ html[dir="ltr"] .sidebar-sub-link.active {
 }
 
 /* ==========================================================================
-   AdminLTE Classic Skin-Blue Top Header
+   Design #1: Next-Gen ISP & RADIUS Management Dashboard (Dark Mode / Sleek Slate)
+   Inspired by Linear, Stripe & Apple macOS Sonoma/Sequoia
    ========================================================================== */
+
+/* Top Header Navbar */
 .app-header {
     height: var(--header-h);
-    background-color: #3c8dbc !important;
-    border-bottom: none !important;
+    background: rgba(13, 19, 31, 0.85) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border-color) !important;
     position: sticky;
     top: 0;
     z-index: 1030;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-    padding: 0 1.25rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    padding: 0 1.5rem;
     color: #ffffff !important;
 }
 .header-brand {
@@ -1027,203 +1032,372 @@ html[dir="ltr"] .sidebar-sub-link.active {
     font-weight: 800;
 }
 .header-brand .brand-subtitle {
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: var(--accent-cyan) !important;
     font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
 }
 .brand-icon-box {
-    background: rgba(255, 255, 255, 0.2) !important;
+    background: linear-gradient(135deg, #0284c7 0%, #6366f1 100%) !important;
     color: #ffffff !important;
+    border-radius: 10px !important;
+    box-shadow: 0 0 16px rgba(2, 132, 199, 0.45) !important;
 }
 .status-pill {
-    background-color: rgba(0, 0, 0, 0.15) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: #cbd5e1 !important;
+    border: 1px solid var(--border-color) !important;
     font-weight: 600;
 }
 .status-pill:hover {
-    background-color: rgba(0, 0, 0, 0.25) !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
     color: #ffffff !important;
+    border-color: rgba(56, 189, 248, 0.3) !important;
 }
 .user-btn {
-    background-color: rgba(0, 0, 0, 0.15) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
     color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid var(--border-color) !important;
     font-weight: 600;
 }
 .user-btn:hover {
-    background-color: rgba(0, 0, 0, 0.25) !important;
-    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(56, 189, 248, 0.3) !important;
 }
 .user-avatar-circle {
-    background: #ffffff !important;
-    color: #3c8dbc !important;
+    background: linear-gradient(135deg, #0284c7, #6366f1) !important;
+    color: #ffffff !important;
 }
 
-/* ==========================================================================
-   AdminLTE / Adv Radius Content Area & Section Headers
-   ========================================================================== */
-.app-main {
-    background-color: #ecf0f5 !important;
-    min-height: calc(100vh - var(--header-h));
-    padding: 1.25rem 1.5rem;
+/* Sidebar Navigation */
+.app-sidebar {
+    background-color: #0d131f !important;
+    border-left: 1px solid var(--border-color) !important;
 }
-
-.content-header {
-    position: relative;
-    padding: 6px 0 16px 0;
+html[dir="ltr"] .app-sidebar {
+    border-right: 1px solid var(--border-color) !important;
+    border-left: none !important;
 }
-.content-header > h1, .content-header > h3, .content-header > h4 {
-    margin: 0;
-    font-size: 20px;
+.sidebar-section-title {
+    color: #64748b !important;
+    font-size: 0.7rem;
     font-weight: 800;
-    color: #1a2332;
+    letter-spacing: 0.08em;
 }
-.content-header > h1 > small, .content-header > h3 > small, .content-header > h4 > small {
-    font-size: 13px;
-    display: inline-block;
-    padding-left: 4px;
-    font-weight: 400;
-    color: #777;
+.sidebar-nav-link {
+    color: #94a3b8 !important;
+    border-radius: 8px !important;
+    padding: 9px 12px !important;
+    font-weight: 600;
+    transition: all 0.2s ease;
 }
-
-/* ==========================================================================
-   AdminLTE Classic Boxes (.box & .card)
-   ========================================================================== */
-.box, .card:not(.stat-card):not(.small-box) {
-    position: relative;
+.sidebar-nav-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+.sidebar-nav-link.active {
+    background: linear-gradient(90deg, rgba(14, 165, 233, 0.15), rgba(99, 102, 241, 0.08)) !important;
+    color: #ffffff !important;
+    border-right: 3px solid #38bdf8 !important;
+    font-weight: 700;
+    box-shadow: inset 0 0 12px rgba(14, 165, 233, 0.1);
+}
+.sidebar-nav-link.active i {
+    color: #38bdf8 !important;
+    text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+html[dir="ltr"] .sidebar-nav-link.active {
+    border-right: none !important;
+    border-left: 3px solid #38bdf8 !important;
+}
+.sidebar-nav-link.active-parent {
+    color: #38bdf8 !important;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.sidebar-submenu {
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    border-right: 2px solid rgba(56, 189, 248, 0.2) !important;
+    border-radius: 6px;
+    padding: 4px 6px !important;
+}
+html[dir="ltr"] .sidebar-submenu {
+    border-right: none !important;
+    border-left: 2px solid rgba(56, 189, 248, 0.2) !important;
+}
+.sidebar-sub-link {
+    color: #64748b !important;
     border-radius: 6px !important;
-    background: #ffffff;
-    border: 1px solid #d2d6de !important;
-    border-top: 3px solid #3c8dbc !important;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+    transition: all 0.15s ease;
 }
-.box.box-primary, .card.border-primary { border-top-color: #3598dc !important; }
-.box.box-success, .card.border-success { border-top-color: #26c281 !important; }
-.box.box-warning, .card.border-warning { border-top-color: #dfba49 !important; }
-.box.box-danger, .card.border-danger { border-top-color: #e7505a !important; }
-.box.box-info, .card.border-info { border-top-color: #00c0ef !important; }
-.box.box-purple, .card.border-purple { border-top-color: #8e44ad !important; }
+.sidebar-sub-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
+}
+.sidebar-sub-link.active {
+    color: #38bdf8 !important;
+    background-color: rgba(56, 189, 248, 0.1) !important;
+    font-weight: 700;
+    border-right: 2px solid #38bdf8 !important;
+}
+html[dir="ltr"] .sidebar-sub-link.active {
+    border-right: none !important;
+    border-left: 2px solid #38bdf8 !important;
+}
+.sidebar-nav-link[aria-expanded="true"] {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: #ffffff !important;
+}
 
-.box-header, .card-header {
-    color: #444;
+/* Main Workspace Canvas */
+.app-main {
+    background-color: #0b0f17 !important;
+    min-height: calc(100vh - var(--header-h));
+    padding: 1.5rem 1.75rem;
+    color: #f8fafc !important;
+}
+
+/* Design #1 KPI Metric Cards */
+.metric-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem 1.4rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.35);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--card-accent, #38bdf8), transparent);
+    opacity: 0.85;
+}
+.metric-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px !important;
-    position: relative;
-    background-color: #ffffff !important;
-    border-bottom: 1px solid #f4f4f4 !important;
+    margin-bottom: 0.75rem;
 }
-.box-header .box-title, .card-header .card-title, .box-header h5, .card-header h5, .box-header h6, .card-header h6 {
-    font-size: 15px;
+.metric-label {
+    font-size: 0.85rem;
     font-weight: 700;
-    margin: 0;
-    color: #222d32;
+    color: var(--text-secondary);
+}
+.metric-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--card-accent, #38bdf8);
+}
+.metric-val {
+    font-size: 1.95rem;
+    font-weight: 800;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.1;
+    margin-bottom: 0.35rem;
+}
+.metric-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 8px;
-}
-.box-body, .card-body {
-    padding: 16px !important;
-}
-.box-footer, .card-footer {
-    border-top: 1px solid #f4f4f4 !important;
-    padding: 10px 16px !important;
-    background-color: #fcfcfc !important;
+    font-weight: 600;
 }
 
-/* ==========================================================================
-   AdminLTE Tables (.table)
-   ========================================================================== */
+/* Cards & Box Containers */
+.card, .box {
+    background-color: #111827 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    color: #f8fafc !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+}
+.card-header, .box-header {
+    background-color: #111827 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: #f8fafc !important;
+    padding: 12px 18px !important;
+}
+.card-footer, .box-footer {
+    background-color: #0d131f !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding: 10px 18px !important;
+}
+
+/* Tables in Dark Luxury Theme */
 .table {
     margin-bottom: 0;
     font-size: 13px;
-    color: #333333;
+    color: #e2e8f0 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
 }
 .table > thead > tr > th {
-    border-bottom: 2px solid #cbd5e1 !important;
+    background-color: #0f172a !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1) !important;
     vertical-align: middle;
-    background-color: #f8fafc;
-    color: #1e293b;
     font-weight: 700;
-    padding: 10px 12px;
+    padding: 11px 14px;
     white-space: nowrap;
 }
 .table > tbody > tr > td {
-    padding: 9px 12px;
+    padding: 10px 14px;
     vertical-align: middle;
-    border-top: 1px solid #e2e8f0;
-}
-.table-bordered {
-    border: 1px solid #e2e8f0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: #cbd5e1 !important;
 }
 .table-hover > tbody > tr:hover {
-    background-color: #f1f5f9 !important;
+    background-color: rgba(255, 255, 255, 0.035) !important;
 }
 .table-striped > tbody > tr:nth-of-type(odd) {
-    background-color: #fbfcfe;
+    background-color: rgba(255, 255, 255, 0.015) !important;
+}
+.table-bordered {
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-/* ==========================================================================
-   AdminLTE Form Controls & Buttons
-   ========================================================================== */
+/* Form Controls */
 .form-control, .form-select {
-    border-radius: 4px;
-    box-shadow: none;
-    border: 1px solid #ced4da;
+    background-color: #162032 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    border-radius: 8px !important;
     font-size: 13px;
-    color: #334155;
 }
 .form-control:focus, .form-select:focus {
-    border-color: #3c8dbc;
-    box-shadow: 0 0 0 2px rgba(60, 141, 188, 0.2);
+    background-color: #1a273e !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
+    color: #ffffff !important;
 }
 .input-group-text {
-    border-radius: 4px;
-    background-color: #f8fafc;
-    border: 1px solid #ced4da;
-    color: #64748b;
-    font-size: 13px;
+    background-color: #0f172a !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #94a3b8 !important;
+    border-radius: 8px !important;
 }
 
+/* Buttons */
 .btn {
-    border-radius: 4px;
+    border-radius: 8px !important;
     font-size: 13px;
     font-weight: 600;
-    padding: 6px 14px;
-    transition: all 0.15s ease;
+    padding: 7px 16px;
+    transition: all 0.2s ease;
 }
-.btn.btn-flat {
-    border-radius: 0 !important;
+.btn-primary {
+    background: linear-gradient(135deg, #0284c7, #2563eb) !important;
+    border: none !important;
+    color: #fff !important;
+    box-shadow: 0 0 14px rgba(2, 132, 199, 0.35) !important;
 }
-.btn-primary { background-color: #3598dc !important; border-color: #2a80b9 !important; color: #fff !important; }
-.btn-primary:hover { background-color: #258cd1 !important; border-color: #2172a6 !important; }
-.btn-success { background-color: #26c281 !important; border-color: #1ea16a !important; color: #fff !important; }
-.btn-success:hover { background-color: #20aa70 !important; border-color: #1a885a !important; }
-.btn-warning { background-color: #dfba49 !important; border-color: #caa235 !important; color: #fff !important; }
-.btn-warning:hover { background-color: #d1ab38 !important; border-color: #ba9329 !important; }
-.btn-danger { background-color: #e7505a !important; border-color: #d43b45 !important; color: #fff !important; }
-.btn-danger:hover { background-color: #d83d47 !important; border-color: #be2e38 !important; }
-.btn-info { background-color: #00c0ef !important; border-color: #00a7d0 !important; color: #fff !important; }
-.btn-info:hover { background-color: #00acd6 !important; border-color: #0090b2 !important; }
-.btn-default, .btn-light { background-color: #f4f4f4 !important; color: #444 !important; border-color: #ddd !important; }
-.btn-default:hover, .btn-light:hover { background-color: #e7e7e7 !important; color: #333 !important; border-color: #ccc !important; }
+.btn-primary:hover {
+    box-shadow: 0 0 20px rgba(2, 132, 199, 0.55) !important;
+    transform: translateY(-1px);
+    color: #fff !important;
+}
+.btn-light, .btn-default {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #cbd5e1 !important;
+}
+.btn-light:hover, .btn-default:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+    border-color: rgba(56, 189, 248, 0.3) !important;
+}
 
-/* ==========================================================================
-   AdminLTE Status Badges (.badge & .label)
-   ========================================================================== */
-.badge, .label {
-    border-radius: 3px;
+/* Quick Action Buttons */
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+    color: #fff;
+    border-color: rgba(56, 189, 248, 0.3);
+}
+.action-btn.primary {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(2, 132, 199, 0.3);
+}
+.action-btn.primary:hover {
+    box-shadow: 0 0 18px rgba(2, 132, 199, 0.5);
+}
+
+/* Dropdown Menu */
+.dropdown-menu {
+    background-color: #111827 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+    color: #f8fafc !important;
+}
+.dropdown-item {
+    color: #cbd5e1 !important;
+    font-size: 0.88rem;
+    padding: 8px 14px;
+}
+.dropdown-item:hover {
+    background-color: rgba(56, 189, 248, 0.12) !important;
+    color: #38bdf8 !important;
+}
+.dropdown-divider {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Badges */
+.badge {
+    border-radius: 6px;
     font-weight: 700;
     font-size: 11px;
-    padding: 4px 8px;
+    padding: 5px 9px;
     letter-spacing: 0.02em;
 }
-.badge.bg-success, .label-success { background-color: #26c281 !important; color: #fff !important; }
-.badge.bg-danger, .label-danger { background-color: #e7505a !important; color: #fff !important; }
-.badge.bg-warning, .label-warning { background-color: #dfba49 !important; color: #fff !important; }
-.badge.bg-info, .label-info { background-color: #00c0ef !important; color: #fff !important; }
-.badge.bg-primary, .label-primary { background-color: #3598dc !important; color: #fff !important; }
-.badge.bg-secondary, .label-default { background-color: #777777 !important; color: #fff !important; }
+.badge.bg-success, .badge.bg-success-subtle {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+.badge.bg-danger, .badge.bg-danger-subtle {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+    color: #fda4af !important;
+    border: 1px solid rgba(244, 63, 94, 0.3) !important;
+}
+.badge.bg-warning, .badge.bg-warning-subtle {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fcd34d !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+.badge.bg-primary, .badge.bg-primary-subtle, .badge.bg-info, .badge.bg-info-subtle {
+    background-color: rgba(56, 189, 248, 0.15) !important;
+    color: #38bdf8 !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+}
 
