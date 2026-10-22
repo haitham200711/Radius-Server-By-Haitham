@@ -5092,12 +5092,11 @@ func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 	b.TotalProfit = b.TotalPrice - b.TotalCostPrice
 
 	// Compute available, used, and currently online cards
-	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NULL", b.ID).Scan(&b.AvailableCount)
-	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NOT NULL", b.ID).Scan(&b.UsedCount)
+	_ = d.QueryRow("SELECT COALESCE(SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN status != 'available' THEN 1 ELSE 0 END), 0) FROM cards WHERE batch_id = ?", b.ID).Scan(&b.AvailableCount, &b.UsedCount)
 
 	_ = d.QueryRow(`SELECT COUNT(DISTINCT r.username)
 		FROM radacct r
-		JOIN cards c ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
+		JOIN cards c ON r.username = c.username
 		WHERE c.batch_id = ? AND r.acctstoptime IS NULL`, b.ID).Scan(&b.OnlineCount)
 
 	return &b, nil
@@ -5117,7 +5116,7 @@ func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 		query += " AND b.nas_id = ?"
 		args = append(args, nasID)
 	}
-	query += " ORDER BY b.id DESC LIMIT 50"
+	query += " ORDER BY b.id DESC LIMIT 500"
 
 	rows, err := d.Query(query, args...)
 	if err != nil {
@@ -5126,14 +5125,43 @@ func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 	defer rows.Close()
 
 	var list []models.Batch
+	var batchIDs []interface{}
 	for rows.Next() {
 		var b models.Batch
 		if err := rows.Scan(&b.ID, &b.BatchCode, &b.BatchName, &b.ProfileID, &b.ProfileName, &b.Count,
 			&b.CostPricePerCard, &b.PricePerCard, &b.TotalCostPrice, &b.TotalPrice, &b.CreatedAt, &b.NASID, &b.NASName); err == nil {
 			b.TotalProfit = b.TotalPrice - b.TotalCostPrice
-			_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NULL", b.ID).Scan(&b.AvailableCount)
-			_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE batch_id = ? AND first_login_at IS NOT NULL", b.ID).Scan(&b.UsedCount)
+			b.AvailableCount = b.Count
 			list = append(list, b)
+			batchIDs = append(batchIDs, b.ID)
+		}
+	}
+
+	if len(batchIDs) > 0 {
+		placeholders := make([]string, len(batchIDs))
+		for i := range batchIDs {
+			placeholders[i] = "?"
+		}
+		cRows, err := d.Query(fmt.Sprintf(`SELECT batch_id,
+			COALESCE(SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN status != 'available' THEN 1 ELSE 0 END), 0)
+			FROM cards WHERE batch_id IN (%s) GROUP BY batch_id`, strings.Join(placeholders, ",")), batchIDs...)
+		if err == nil {
+			defer cRows.Close()
+			stats := make(map[int64][2]int)
+			for cRows.Next() {
+				var bid int64
+				var avail, used int
+				if err := cRows.Scan(&bid, &avail, &used); err == nil {
+					stats[bid] = [2]int{avail, used}
+				}
+			}
+			for i := range list {
+				if s, ok := stats[list[i].ID]; ok {
+					list[i].AvailableCount = s[0]
+					list[i].UsedCount = s[1]
+				}
+			}
 		}
 	}
 

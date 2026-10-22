@@ -848,12 +848,13 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 			res, err := tx.Exec(`INSERT INTO batches (
 				batch_code, batch_name, profile_id, reseller_id, count, cost_price_per_card, price_per_card,
 				total_cost_price, total_price, card_type, created_at
-			) VALUES (?, ?, ?, ?, ?, 0.0, ?, 0.0, ?, 'charge', ?)
+			) VALUES (?, ?, ?, ?, ?, 0.0, ?, 0.0, ?, 'cafe', ?)
 			ON DUPLICATE KEY UPDATE
 				batch_name = VALUES(batch_name),
 				count = VALUES(count),
 				price_per_card = VALUES(price_per_card),
-				total_price = VALUES(total_price)`,
+				total_price = VALUES(total_price),
+				card_type = 'cafe'`,
 				batchCode, batchName, ourProfID, ourResellerID, cardCount, b.Price, totalPrice, createdAt)
 			if err == nil {
 				ourBID, _ := res.LastInsertId()
@@ -910,7 +911,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 			var valPlaceholders []string
 			var valArgs []interface{}
 			for _, cr := range chunk {
-				valPlaceholders = append(valPlaceholders, "(?, ?, ?, ?, ?, ?, ?, 'charge', ?)")
+				valPlaceholders = append(valPlaceholders, "(?, ?, ?, ?, ?, ?, ?, 'cafe', ?)")
 				valArgs = append(valArgs,
 					cr.BatchID, cr.Username, cr.Password, cr.ProfileID, cr.ResellerID, cr.Status, cr.Price, cr.CreatedAt)
 			}
@@ -922,7 +923,8 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 				batch_id = VALUES(batch_id),
 				password = VALUES(password),
 				status = VALUES(status),
-				price = VALUES(price)`, strings.Join(valPlaceholders, ","))
+				price = VALUES(price),
+				card_type = 'cafe'`, strings.Join(valPlaceholders, ","))
 
 			if _, err := tx.Exec(q, valArgs...); err != nil {
 				log.Printf("[ADV-IMPORT] Error batch inserting cards: %v", err)
