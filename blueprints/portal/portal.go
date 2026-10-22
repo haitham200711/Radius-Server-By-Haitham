@@ -98,7 +98,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method == http.MethodGet {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		errorMsg := r.URL.Query().Get("error")
 		_ = bp.renderer.Render(w, r, "portal/login", map[string]interface{}{
 			"Title":        "تسجيل دخول المشترك",

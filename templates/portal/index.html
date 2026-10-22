@@ -8,37 +8,40 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Design #2 Enterprise Clean Light SaaS */
         body {
             font-family: 'Cairo', sans-serif;
-            background-color: #f1f5f9;
-            color: #1e293b;
+            background-color: #F8FAFC;
+            color: #0F172A;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            -webkit-font-smoothing: antialiased;
         }
         .portal-header {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #fff;
-            padding: 1.25rem 0;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            background: #FFFFFF;
+            color: #0F172A;
+            padding: 1rem 0;
+            border-bottom: 1px solid #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
         .portal-card {
-            background: #ffffff;
+            background: #FFFFFF;
             border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .portal-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
         }
         .pulse-online {
             display: inline-block;
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background-color: #10b981;
+            background-color: #10B981;
             box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
             animation: pulse 1.6s infinite;
         }
@@ -50,44 +53,49 @@
         .stat-value {
             font-size: 1.85rem;
             font-weight: 800;
+            color: #0F172A;
         }
         .progress {
-            background-color: #e2e8f0;
+            background-color: #F1F5F9;
             border-radius: 12px;
             overflow: hidden;
         }
         .badge-soft-success {
-            background-color: #d1fae5;
-            color: #065f46;
+            background-color: #ECFDF5;
+            color: #065F46;
+            border: 1px solid #A7F3D0;
         }
         .badge-soft-warning {
-            background-color: #fef3c7;
-            color: #92400e;
+            background-color: #FFFBEB;
+            color: #92400E;
+            border: 1px solid #FDE68A;
         }
         .badge-soft-danger {
-            background-color: #fee2e2;
-            color: #991b1b;
+            background-color: #FFF1F2;
+            color: #9F1239;
+            border: 1px solid #FECDD3;
         }
         .badge-soft-primary {
-            background-color: #e0f2fe;
-            color: #0369a1;
+            background-color: #EEF2FF;
+            color: #4338CA;
+            border: 1px solid #C7D2FE;
         }
     </style>
 </head>
 <body>
 
-<!-- Header -->
+<!-- Header (Design #2 Clean White) -->
 <header class="portal-header mb-4">
     <div class="container">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
             <div class="d-flex align-items-center gap-3">
-                <div class="p-2 rounded-3 bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25">
+                <div class="p-2 rounded-3 text-white shadow-xs" style="background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);">
                     <i class="bi bi-wifi fs-3 text-white"></i>
                 </div>
                 <div>
-                    <h5 class="fw-bold mb-0 text-white">{{ if .Settings.CompanyName }}{{ .Settings.CompanyName }}{{ else }}شبكتنا لخدمات الإنترنت{{ end }}</h5>
-                    <small class="text-white text-opacity-75">
-                        أهلاً بك، <span class="fw-bold text-white">{{ .Data.Subscriber.FullName }}</span>
+                    <h5 class="fw-bold mb-0 text-dark">{{ if .Settings.CompanyName }}{{ .Settings.CompanyName }}{{ else }}شبكتنا لخدمات الإنترنت{{ end }}</h5>
+                    <small class="text-secondary">
+                        أهلاً بك، <span class="fw-bold text-dark">{{ .Data.Subscriber.FullName }}</span>
                         ({{ .Data.Subscriber.Username }})
                     </small>
                 </div>
@@ -95,18 +103,18 @@
 
             <div class="d-flex align-items-center gap-2">
                 {{ if .ClientIP }}
-                <span class="badge bg-white bg-opacity-10 text-white font-monospace border border-white border-opacity-25 py-2 px-2.5 small" title="عنوان IP اتصالك الحالي">
-                    <i class="bi bi-broadcast me-1 text-info"></i>{{ .ClientIP }}
+                <span class="badge bg-light text-dark font-monospace border py-2 px-2.5 small" title="عنوان IP اتصالك الحالي">
+                    <i class="bi bi-broadcast me-1 text-primary"></i>{{ .ClientIP }}
                 </span>
                 {{ end }}
 
                 {{ if .Settings.AllowPasswordChange }}
-                <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#changePassModal">
-                    <i class="bi bi-key me-1"></i> تغيير كلمة المرور
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold border bg-white text-dark" data-bs-toggle="modal" data-bs-target="#changePassModal">
+                    <i class="bi bi-key me-1 text-primary"></i> تغيير كلمة المرور
                 </button>
                 {{ end }}
 
-                <a href="/portal/logout" class="btn btn-sm btn-danger fw-bold">
+                <a href="/portal/logout" class="btn btn-sm btn-outline-danger fw-bold">
                     <i class="bi bi-box-arrow-right me-1"></i> خروج
                 </a>
             </div>
