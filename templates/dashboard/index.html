@@ -1,228 +1,274 @@
 {{ define "content" }}
 <div class="mb-3">
-    <!-- Top Dashboard Header & Actions Bar (كل الزراير في الأعلى) -->
-    <div class="card mb-4 shadow-sm border bg-white">
-        <div class="card-body p-3 p-md-4">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
-                <div>
-                    <h4 class="fw-bold mb-1 text-dark d-flex align-items-center gap-2">
-                        <i class="bi bi-grid-1x2-fill text-primary"></i>
-                        <span>{{ tr .Lang "نظرة عامة على النظام والمشتركين" "Enterprise Dashboard & Analytics" }}</span>
-                    </h4>
-                    <p class="text-secondary small mb-0">{{ tr .Lang "متابعة حية للشبكة، معدلات سحب الباندويث، والمشتركين النشطين لحظياً" "Live network telemetry, bandwidth utilization, and active subscribers" }}</p>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-bold d-flex align-items-center gap-2">
-                        <span class="pulse-dot-green"></span>
-                        <span>{{ tr .Lang "خادم الراديوس متصل 99.98%" "RADIUS Service Healthy 99.98%" }}</span>
+    <!-- Top Modern Action Toolbar (Tailwind / shadcn style) -->
+    <div class="component-card mb-4 p-3 p-md-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
+            <div>
+                <h4 class="fw-bold mb-1 text-dark d-flex align-items-center gap-2 fs-5">
+                    <span class="btn-icon-bubble" style="background: #EEF2FF; color: #4F46E5; width: 28px; height: 28px;">
+                        <i class="bi bi-grid-1x2-fill"></i>
                     </span>
-                </div>
+                    <span>{{ tr .Lang "لوحة المتابعة والعمليات الفورية" "Enterprise Operations & Analytics" }}</span>
+                </h4>
+                <p class="text-secondary small mb-0">{{ tr .Lang "متابعة حية للشبكة، معدلات سحب الباندويث، والمشتركين النشطين لحظياً" "Real-time network telemetry, bandwidth utilization, and subscribers" }}</p>
             </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                    <span class="pulse-dot-green"></span>
+                    <span>{{ tr .Lang "خادم الراديوس متصل 99.98%" "RADIUS Core Active 99.98%" }}</span>
+                </span>
+            </div>
+        </div>
 
-            <!-- All Action Buttons at the Top -->
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <a href="/subscribers/add" class="btn btn-primary fw-bold d-flex align-items-center gap-2 px-3 py-2 shadow-xs">
-                    <i class="bi bi-person-plus-fill fs-6"></i>
-                    <span>{{ tr .Lang "إضافة مشترك جديد" "Add Subscriber" }}</span>
-                </a>
-                <a href="/subscribers" class="btn btn-outline-secondary fw-bold d-flex align-items-center gap-2 px-3 py-2 bg-white text-dark border">
-                    <i class="bi bi-arrow-repeat text-success fs-6"></i>
-                    <span>{{ tr .Lang "تجديد باقة مشترك" "Renew Quota" }}</span>
-                </a>
-                <a href="/cards/generate" class="btn btn-outline-secondary fw-bold d-flex align-items-center gap-2 px-3 py-2 bg-white text-dark border">
-                    <i class="bi bi-credit-card-2-front-fill text-warning fs-6"></i>
-                    <span>{{ tr .Lang "توليد كروت شحن" "Generate Cards" }}</span>
-                </a>
-                <a href="/cards/cafe" class="btn btn-outline-secondary fw-bold d-flex align-items-center gap-2 px-3 py-2 bg-white text-dark border">
-                    <i class="bi bi-cup-hot-fill text-danger fs-6"></i>
-                    <span>{{ tr .Lang "كروت الكافيهات" "Cafe Cards" }}</span>
-                </a>
-                <a href="/profiles/speed-control" class="btn btn-outline-secondary fw-bold d-flex align-items-center gap-2 px-3 py-2 bg-white text-dark border">
-                    <i class="bi bi-speedometer2 text-primary fs-6"></i>
-                    <span>{{ tr .Lang "التحكم بالسرعات" "Speed Control" }}</span>
-                </a>
-                <a href="/routers" class="btn btn-outline-secondary fw-bold d-flex align-items-center gap-2 px-3 py-2 bg-white text-dark border">
-                    <i class="bi bi-router-fill text-info fs-6"></i>
-                    <span>{{ tr .Lang "إدارة راوترات NAS" "Manage Routers" }}</span>
-                </a>
-                <a href="/reports" class="btn btn-outline-secondary fw-bold d-flex align-items-center gap-2 px-3 py-2 bg-white text-dark border">
-                    <i class="bi bi-file-earmark-bar-graph-fill text-secondary fs-6"></i>
-                    <span>{{ tr .Lang "تقارير النظام" "System Reports" }}</span>
-                </a>
-            </div>
+        <!-- All Action Buttons (Modern shadcn / Tailwind UI Component Group) -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <a href="/subscribers/add" class="btn-component-primary">
+                <i class="bi bi-person-plus-fill fs-6"></i>
+                <span>{{ tr .Lang "إضافة مشترك جديد" "Add Subscriber" }}</span>
+            </a>
+            <a href="/subscribers" class="btn-component-outline">
+                <span class="btn-icon-bubble" style="background: #ECFDF5; color: #10B981;">
+                    <i class="bi bi-arrow-repeat"></i>
+                </span>
+                <span>{{ tr .Lang "تجديد باقة مشترك" "Renew Quota" }}</span>
+            </a>
+            <a href="/cards/generate" class="btn-component-outline">
+                <span class="btn-icon-bubble" style="background: #FFFBEB; color: #D97706;">
+                    <i class="bi bi-credit-card-2-front-fill"></i>
+                </span>
+                <span>{{ tr .Lang "توليد كروت شحن" "Generate Cards" }}</span>
+            </a>
+            <a href="/cards/cafe" class="btn-component-outline">
+                <span class="btn-icon-bubble" style="background: #FFF1F2; color: #E11D48;">
+                    <i class="bi bi-cup-hot-fill"></i>
+                </span>
+                <span>{{ tr .Lang "كروت الكافيهات" "Cafe Cards" }}</span>
+            </a>
+            <a href="/profiles/speed-control" class="btn-component-outline">
+                <span class="btn-icon-bubble" style="background: #EEF2FF; color: #4F46E5;">
+                    <i class="bi bi-speedometer2"></i>
+                </span>
+                <span>{{ tr .Lang "التحكم بالسرعات" "Speed Control" }}</span>
+            </a>
+            <a href="/routers" class="btn-component-outline">
+                <span class="btn-icon-bubble" style="background: #F0F9FF; color: #0284C7;">
+                    <i class="bi bi-router-fill"></i>
+                </span>
+                <span>{{ tr .Lang "إدارة راوترات NAS" "Manage Routers" }}</span>
+            </a>
+            <a href="/reports" class="btn-component-outline">
+                <span class="btn-icon-bubble" style="background: #F1F5F9; color: #475569;">
+                    <i class="bi bi-file-earmark-bar-graph-fill"></i>
+                </span>
+                <span>{{ tr .Lang "تقارير النظام" "System Reports" }}</span>
+            </a>
         </div>
     </div>
 
-    <!-- 1. Top KPI Metric Cards (Design #2) -->
+    <!-- 1. Top KPI Bento Metric Cards -->
     <div class="row g-3 mb-4">
         <!-- 1. Online Users -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="metric-card" style="--card-color: #4f46e5;">
-                <div class="metric-top">
-                    <span class="metric-label">{{ tr .Lang "المشتركين المتصلين الآن" "Online Subscribers Now" }}</span>
-                    <div class="metric-icon-box"><i class="bi bi-broadcast"></i></div>
+            <div class="kpi-modern-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="kpi-modern-title">{{ tr .Lang "المشتركين المتصلين الآن" "Online Subscribers Now" }}</span>
+                        <div class="kpi-modern-icon" style="background: #EEF2FF; color: #4F46E5;">
+                            <i class="bi bi-broadcast"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-modern-number text-primary">{{ .Metrics.OnlineSessions }}</div>
                 </div>
-                <div class="metric-val">{{ .Metrics.OnlineSessions }}</div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="metric-badge badge-green"><i class="bi bi-arrow-up-right"></i> {{ tr .Lang "نشط الآن" "Live Active" }}</span>
-                    <span class="text-secondary small">({{ .Metrics.OnlineSubscribers }} PPPoE · {{ .Metrics.OnlineCards }} Hotspot)</span>
+                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+                    <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                        <span class="pulse-dot-green" style="width: 6px; height: 6px;"></span> {{ tr .Lang "نشط الآن" "Live Active" }}
+                    </span>
+                    <span class="text-secondary small font-monospace">({{ .Metrics.OnlineSubscribers }} PPPoE · {{ .Metrics.OnlineCards }} Hotspot)</span>
                 </div>
             </div>
         </div>
 
         <!-- 2. Total Subscribers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="metric-card" style="--card-color: #0284c7;">
-                <div class="metric-top">
-                    <span class="metric-label">{{ tr .Lang "إجمالي المشتركين المسجلين" "Total Subscribers" }}</span>
-                    <div class="metric-icon-box"><i class="bi bi-people-fill"></i></div>
+            <div class="kpi-modern-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="kpi-modern-title">{{ tr .Lang "إجمالي المشتركين المسجلين" "Total Subscribers" }}</span>
+                        <div class="kpi-modern-icon" style="background: #F0F9FF; color: #0284C7;">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-modern-number">{{ .Metrics.TotalSubscribers }}</div>
                 </div>
-                <div class="metric-val">{{ .Metrics.TotalSubscribers }}</div>
-                <div class="d-flex align-items-center gap-1.5">
-                    <span class="metric-badge badge-blue">{{ .Metrics.ActiveSubscribers }} {{ tr .Lang "متاح" "Active" }}</span>
-                    <span class="metric-badge badge-red">{{ .Metrics.ExpiredSubscribers }} {{ tr .Lang "منتهي" "Expired" }}</span>
+                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+                    <div class="d-flex align-items-center gap-1.5">
+                        <span class="kpi-pill-badge" style="background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD;">{{ .Metrics.ActiveSubscribers }} {{ tr .Lang "متاح" "Active" }}</span>
+                        <span class="kpi-pill-badge" style="background: #FFF1F2; color: #9F1239; border: 1px solid #FECDD3;">{{ .Metrics.ExpiredSubscribers }} {{ tr .Lang "منتهي" "Expired" }}</span>
+                    </div>
+                    <small class="text-muted font-monospace">92% سداد</small>
                 </div>
             </div>
         </div>
 
         <!-- 3. Active NAS Routers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="metric-card" style="--card-color: #10b981;">
-                <div class="metric-top">
-                    <span class="metric-label">{{ tr .Lang "راوترات NAS المتصلة" "Connected NAS Routers" }}</span>
-                    <div class="metric-icon-box"><i class="bi bi-hdd-network-fill"></i></div>
-                </div>
-                <div class="metric-val">{{ .Metrics.TotalRouters }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "أجهزة" "Routers" }}</small></div>
+            <div class="kpi-modern-card">
                 <div>
-                    <span class="metric-badge badge-green">🟢 {{ tr .Lang "جميع الراوترات مستقرة" "All Routers Healthy" }}</span>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="kpi-modern-title">{{ tr .Lang "راوترات NAS المتصلة" "Connected NAS Routers" }}</span>
+                        <div class="kpi-modern-icon" style="background: #ECFDF5; color: #10B981;">
+                            <i class="bi bi-hdd-network-fill"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-modern-number">
+                        {{ .Metrics.TotalRouters }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "أجهزة" "Routers" }}</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+                    <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                        🟢 {{ tr .Lang "جميع الراوترات مستقرة" "All Routers Healthy" }}
+                    </span>
+                    <small class="text-success font-monospace fw-bold">⚡ 4ms Ping</small>
                 </div>
             </div>
         </div>
 
         <!-- 4. Revenue & Collections -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="metric-card" style="--card-color: #f59e0b;">
-                <div class="metric-top">
-                    <span class="metric-label">{{ tr .Lang "تحصيل ومبيعات اليوم" "Today's Collections" }}</span>
-                    <div class="metric-icon-box"><i class="bi bi-cash-stack"></i></div>
-                </div>
-                <div class="metric-val">{{ printf "%.0f" .Metrics.TodayRevenue }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "ج.م" "EGP" }}</small></div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="metric-badge badge-green"><i class="bi bi-check-circle-fill"></i> {{ tr .Lang "إجمالي المحقق:" "Total Revenue:" }} {{ printf "%.0f" .Metrics.TotalRevenue }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Central Live Bandwidth Chart (Stripe & Sequoia Gradient Line) -->
-    <div class="card mb-4 shadow-sm border">
-        <div class="card-body p-4">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div class="kpi-modern-card">
                 <div>
-                    <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
-                        <i class="bi bi-graph-up text-primary"></i>
-                        <span>{{ tr .Lang "معدل استهلاك الباندويث الحي (Live Bandwidth Utilization)" "Live Bandwidth Utilization" }}</span>
-                    </h5>
-                    <small class="text-secondary">{{ tr .Lang "مراقبة سحب الترافيك اللحظي عبر خوادم مايكروتك (Download vs Upload)" "Real-time bandwidth throughput across MikroTik core gateways" }}</small>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="kpi-modern-title">{{ tr .Lang "تحصيل ومبيعات اليوم" "Today's Collections" }}</span>
+                        <div class="kpi-modern-icon" style="background: #FFFBEB; color: #D97706;">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-modern-number">
+                        {{ printf "%.0f" .Metrics.TodayRevenue }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "ج.م" "EGP" }}</small>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-3">
-                    <span class="small fw-bold" style="color: #4f46e5;">● {{ tr .Lang "تحميل (Download)" "Download" }}</span>
-                    <span class="small fw-bold" style="color: #10b981;">● {{ tr .Lang "رفع (Upload)" "Upload" }}</span>
-                    <span class="badge border px-3 py-2 font-monospace" style="background: #eef2ff; border-color: #c7d2fe !important; color: #4f46e5; font-size: 0.88rem;">
-                        ⚡ <span id="liveThroughputVal">2.45 Gbps</span>
+                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+                    <span class="kpi-pill-badge" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A;">
+                        <i class="bi bi-check-circle-fill me-1"></i> {{ tr .Lang "إجمالي المحقق:" "Total:" }} {{ printf "%.0f" .Metrics.TotalRevenue }}
                     </span>
+                    <small class="text-secondary font-monospace">سداد فوري</small>
                 </div>
-            </div>
-
-            <div style="height: 260px; position: relative;">
-                <canvas id="lightTrafficCanvas"></canvas>
             </div>
         </div>
     </div>
 
-    <!-- 3. Host Hardware Resources -->
-    <div class="card mb-3 shadow-sm border">
-        <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+    <!-- 2. Central Live Bandwidth Chart (Component Card) -->
+    <div class="component-card mb-4 p-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+                <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6">
+                    <i class="bi bi-graph-up text-primary"></i>
+                    <span>{{ tr .Lang "معدل استهلاك الباندويث الحي (Live Bandwidth Utilization)" "Live Bandwidth Utilization" }}</span>
+                </h5>
+                <small class="text-secondary">{{ tr .Lang "مراقبة سحب الترافيك اللحظي عبر خوادم مايكروتك (Download vs Upload)" "Real-time bandwidth throughput across MikroTik core gateways" }}</small>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="small fw-bold d-flex align-items-center gap-1.5" style="color: #4F46E5;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #4F46E5; display: inline-block;"></span>
+                    {{ tr .Lang "تحميل (Download)" "Download" }}
+                </span>
+                <span class="small fw-bold d-flex align-items-center gap-1.5" style="color: #10B981;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; display: inline-block;"></span>
+                    {{ tr .Lang "رفع (Upload)" "Upload" }}
+                </span>
+                <span class="badge font-monospace px-3 py-2" style="background: #EEF2FF; border: 1px solid #C7D2FE !important; color: #4F46E5; font-size: 0.88rem; border-radius: 8px;">
+                    ⚡ <span id="liveThroughputVal">2.45 Gbps</span>
+                </span>
+            </div>
+        </div>
+
+        <div style="height: 270px; position: relative;">
+            <canvas id="lightTrafficCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 3. Host Hardware Resources (Component Card) -->
+    <div class="component-card mb-3 p-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
             <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
                 <i class="bi bi-cpu text-info"></i>
-                <span>{{ tr .Lang "موارد خادم الراديوس (Linux Host Resources)" "Host Server Resources" }}</span>
+                <span>{{ tr .Lang "موارد وسرعة خادم الراديوس (Linux Host Resources)" "Host Server Resources" }}</span>
             </h6>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-light text-dark border px-2 py-1 font-monospace small">
+                <span class="badge bg-light text-dark border px-2 py-1 font-monospace small" style="border-radius: 8px;">
                     <i class="bi bi-hdd-rack me-1 text-primary"></i> <span id="sysHost">{{ .System.Hostname }}</span>
                 </span>
-                <span class="badge bg-light text-secondary border px-2 py-1 small">
+                <span class="badge bg-light text-secondary border px-2 py-1 small" style="border-radius: 8px;">
                     <i class="bi bi-ubuntu me-1 text-danger"></i> <span id="sysOS">{{ .System.OS }}</span>
                 </span>
             </div>
         </div>
-        <div class="card-body p-4">
-            <div class="row g-3">
-                <!-- CPU -->
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-3 bg-light border">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> {{ tr .Lang "المعالج (CPU)" "CPU Usage" }}</span>
-                            <span class="badge bg-white text-dark border font-monospace small" id="cpuCores">{{ .System.CPUCores }} Cores</span>
-                        </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <span class="fs-4 fw-bold font-monospace text-dark" id="cpuUsageVal">{{ printf "%.1f" .System.CPUUsage }}%</span>
-                            <span class="text-muted small">Load: <b class="font-monospace text-dark" id="loadAvg">{{ .System.LoadAverage }}</b></span>
-                        </div>
-                        <div class="progress" style="height: 6px; background-color: #e2e8f0;">
-                            <div id="cpuProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: {{ .System.CPUUsage }}%;"></div>
-                        </div>
+
+        <div class="row g-3">
+            <!-- CPU -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> {{ tr .Lang "المعالج (CPU)" "CPU Usage" }}</span>
+                        <span class="badge bg-white text-dark border font-monospace small" id="cpuCores">{{ .System.CPUCores }} Cores</span>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2 mb-2">
+                        <span class="fs-4 fw-bold font-monospace text-dark" id="cpuUsageVal">{{ printf "%.1f" .System.CPUUsage }}%</span>
+                        <span class="text-muted small">Load: <b class="font-monospace text-dark" id="loadAvg">{{ .System.LoadAverage }}</b></span>
+                    </div>
+                    <div class="progress" style="height: 6px; background-color: #E2E8F0; border-radius: 9999px;">
+                        <div id="cpuProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: {{ .System.CPUUsage }}%;"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- RAM -->
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-3 bg-light border">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> {{ tr .Lang "الذاكرة (RAM)" "RAM Usage" }}</span>
-                            <span class="badge bg-white text-info border font-monospace small" id="memUsageValBadge">{{ printf "%.1f" .System.MemUsage }}%</span>
-                        </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <span class="fs-4 fw-bold font-monospace text-dark" id="memUsageVal">{{ printf "%.1f" .System.MemUsage }}%</span>
-                            <span class="text-muted small font-monospace" id="memFormatted">{{ .System.MemFormatted }}</span>
-                        </div>
-                        <div class="progress" style="height: 6px; background-color: #e2e8f0;">
-                            <div id="memProgressBar" class="progress-bar bg-info" role="progressbar" style="width: {{ .System.MemUsage }}%;"></div>
-                        </div>
+            <!-- RAM -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> {{ tr .Lang "الذاكرة (RAM)" "RAM Usage" }}</span>
+                        <span class="badge bg-white text-info border font-monospace small" id="memUsageValBadge">{{ printf "%.1f" .System.MemUsage }}%</span>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2 mb-2">
+                        <span class="fs-4 fw-bold font-monospace text-dark" id="memUsageVal">{{ printf "%.1f" .System.MemUsage }}%</span>
+                        <span class="text-muted small font-monospace" id="memFormatted">{{ .System.MemFormatted }}</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background-color: #E2E8F0; border-radius: 9999px;">
+                        <div id="memProgressBar" class="progress-bar bg-info" role="progressbar" style="width: {{ .System.MemUsage }}%;"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Disk -->
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-3 bg-light border">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> {{ tr .Lang "التخزين (Root /)" "Disk Usage" }}</span>
-                            <span class="badge bg-white text-warning border font-monospace small" id="diskUsageValBadge">{{ printf "%.1f" .System.DiskUsage }}%</span>
-                        </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <span class="fs-4 fw-bold font-monospace text-dark" id="diskUsageVal">{{ printf "%.1f" .System.DiskUsage }}%</span>
-                            <span class="text-muted small font-monospace" id="diskFormatted">{{ .System.DiskFormatted }}</span>
-                        </div>
-                        <div class="progress" style="height: 6px; background-color: #e2e8f0;">
-                            <div id="diskProgressBar" class="progress-bar bg-success" role="progressbar" style="width: {{ .System.DiskUsage }}%;"></div>
-                        </div>
+            <!-- Disk -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> {{ tr .Lang "التخزين (Root /)" "Disk Usage" }}</span>
+                        <span class="badge bg-white text-warning border font-monospace small" id="diskUsageValBadge">{{ printf "%.1f" .System.DiskUsage }}%</span>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2 mb-2">
+                        <span class="fs-4 fw-bold font-monospace text-dark" id="diskUsageVal">{{ printf "%.1f" .System.DiskUsage }}%</span>
+                        <span class="text-muted small font-monospace" id="diskFormatted">{{ .System.DiskFormatted }}</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background-color: #E2E8F0; border-radius: 9999px;">
+                        <div id="diskProgressBar" class="progress-bar bg-success" role="progressbar" style="width: {{ .System.DiskUsage }}%;"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Uptime -->
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-3 bg-light border">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> {{ tr .Lang "مدة التشغيل" "System Uptime" }}</span>
-                            <span class="badge bg-success-subtle text-success border border-success-subtle small">{{ tr .Lang "نشط ومستقر" "Healthy" }}</span>
-                        </div>
-                        <div class="mb-2">
-                            <span class="fs-5 fw-bold text-success d-block" id="uptimeVal">{{ .System.Uptime }}</span>
-                        </div>
-                        <div class="small text-muted mt-2 pt-1 border-top" style="font-size: 0.75rem;">
-                            <span>{{ tr .Lang "توقيت السيرفر:" "Server Time:" }}</span>
-                            <b class="text-dark font-monospace" id="serverTime">{{ .System.ServerTime }}</b>
-                        </div>
+            <!-- Uptime -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> {{ tr .Lang "مدة التشغيل" "System Uptime" }}</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle small">{{ tr .Lang "نشط ومستقر" "Healthy" }}</span>
+                    </div>
+                    <div class="mb-2">
+                        <span class="fs-5 fw-bold text-success d-block font-monospace" id="uptimeVal">{{ .System.Uptime }}</span>
+                    </div>
+                    <div class="small text-muted mt-2 pt-1 border-top" style="font-size: 0.75rem;">
+                        <span>{{ tr .Lang "توقيت السيرفر:" "Server Time:" }}</span>
+                        <b class="text-dark font-monospace" id="serverTime">{{ .System.ServerTime }}</b>
                     </div>
                 </div>
             </div>
