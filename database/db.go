@@ -7241,8 +7241,13 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	if year < 2000 || year > now.Year()+2 {
 		year = now.Year()
 	}
-	if month < 1 || month > 12 {
-		month = int(now.Month())
+	if month < 0 || month > 12 {
+		month = 0 // 0 = Full Year Mode
+	}
+
+	monthName := "تقرير سنة كاملة (كافة شهور السنة)"
+	if month >= 1 && month <= 12 {
+		monthName = arabicMonthNamesFull[month]
 	}
 
 	report := &models.SubscriberTrafficReport{
@@ -7250,7 +7255,7 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 		FullName:          username,
 		SelectedYear:      year,
 		SelectedMonth:     month,
-		SelectedMonthName: arabicMonthNamesFull[month],
+		SelectedMonthName: monthName,
 	}
 
 	// 1. Fetch Subscriber Details
@@ -7353,7 +7358,43 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	var yearTotalDown int64
 	var yearTotalDurationSec int64
 
-	// Build 12-month array
+	// 5. Query daily usage for ALL months in the year in one fast query
+	type dayData struct {
+		upBytes   int64
+		downBytes int64
+		totBytes  int64
+		sessions  int
+		duration  int64
+	}
+	yearDaysMap := make(map[int]map[int]dayData) // month -> day -> data
+
+	dRows, err := d.Query(`SELECT 
+		MONTH(acctstarttime) as m,
+		DAY(acctstarttime) as d,
+		COALESCE(SUM(acctinputoctets), 0),
+		COALESCE(SUM(acctoutputoctets), 0),
+		COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
+		COUNT(*),
+		COALESCE(SUM(acctsessiontime), 0)
+	FROM radacct
+	WHERE username = ? AND YEAR(acctstarttime) = ?
+	GROUP BY MONTH(acctstarttime), DAY(acctstarttime)`, username, year)
+
+	if err == nil {
+		defer dRows.Close()
+		for dRows.Next() {
+			var m, d int
+			var dd dayData
+			if err := dRows.Scan(&m, &d, &dd.upBytes, &dd.downBytes, &dd.totBytes, &dd.sessions, &dd.duration); err == nil {
+				if yearDaysMap[m] == nil {
+					yearDaysMap[m] = make(map[int]dayData)
+				}
+				yearDaysMap[m][d] = dd
+			}
+		}
+	}
+
+	// Build 12-month array with attached daily lists
 	for m := 1; m <= 12; m++ {
 		md := monthMap[m]
 		upGB := float64(md.upBytes) / (1024 * 1024 * 1024)
@@ -7364,12 +7405,17 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 		yearTotalDown += md.downBytes
 		yearTotalDurationSec += md.duration
 
-		var pct float64
+		var pctPeak float64
 		if maxMonthBytes > 0 {
-			pct = (float64(md.totBytes) / float64(maxMonthBytes)) * 100.0
+			pctPeak = (float64(md.totBytes) / float64(maxMonthBytes)) * 100.0
 		}
 
-		item := models.SubscriberMonthlyTraffic{
+		var pctYear float64
+		if report.YearTotalBytes > 0 {
+			pctYear = (float64(md.totBytes) / float64(report.YearTotalBytes)) * 100.0
+		}
+
+		monthItem := models.SubscriberMonthlyTraffic{
 			Year:            year,
 			Month:           m,
 			MonthName:       fmt.Sprintf("%02d", m),
@@ -7386,9 +7432,65 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 			SessionCount:    md.sessions,
 			TotalTimeSec:    md.duration,
 			DurationString:  FormatDurationArabic(md.duration),
-			PercentOfPeak:   pct,
+			PercentOfPeak:   pctPeak,
+			PercentOfYear:   pctYear,
 		}
-		report.MonthlyList = append(report.MonthlyList, item)
+
+		// Calculate days of month m
+		daysInMonth := time.Date(year, time.Month(m+1), 0, 0, 0, 0, 0, time.Local).Day()
+		var maxDayBytesInMonth int64
+		monthDaysMap := yearDaysMap[m]
+
+		if monthDaysMap != nil {
+			for d := 1; d <= daysInMonth; d++ {
+				if dd, ok := monthDaysMap[d]; ok {
+					if dd.totBytes > maxDayBytesInMonth {
+						maxDayBytesInMonth = dd.totBytes
+					}
+				}
+			}
+		}
+
+		for d := 1; d <= daysInMonth; d++ {
+			var dd dayData
+			if monthDaysMap != nil {
+				dd = monthDaysMap[d]
+			}
+			dateObj := time.Date(year, time.Month(m), d, 0, 0, 0, 0, time.Local)
+			dayNameAr := arabicDayNames[dateObj.Weekday()]
+			dateStr := dateObj.Format("2006-01-02")
+
+			dUpGB := float64(dd.upBytes) / (1024 * 1024 * 1024)
+			dDownGB := float64(dd.downBytes) / (1024 * 1024 * 1024)
+			dTotGB := float64(dd.totBytes) / (1024 * 1024 * 1024)
+
+			var dPct float64
+			if maxDayBytesInMonth > 0 {
+				dPct = (float64(dd.totBytes) / float64(maxDayBytesInMonth)) * 100.0
+			}
+
+			dayItem := models.SubscriberDailyTraffic{
+				Date:            dateStr,
+				DayNum:          d,
+				DayNameAr:       dayNameAr,
+				UploadBytes:     dd.upBytes,
+				DownloadBytes:   dd.downBytes,
+				TotalBytes:      dd.totBytes,
+				UploadGB:        dUpGB,
+				DownloadGB:      dDownGB,
+				TotalGB:         dTotGB,
+				TotalDisplay:    FormatBytesHuman(dd.totBytes),
+				UploadDisplay:   FormatBytesHuman(dd.upBytes),
+				DownloadDisplay: FormatBytesHuman(dd.downBytes),
+				SessionCount:    dd.sessions,
+				TotalTimeSec:    dd.duration,
+				DurationString:  FormatDurationArabic(dd.duration),
+				PercentOfPeak:   dPct,
+			}
+			monthItem.DailyList = append(monthItem.DailyList, dayItem)
+		}
+
+		report.MonthlyList = append(report.MonthlyList, monthItem)
 	}
 
 	report.YearTotalGB = float64(report.YearTotalBytes) / (1024 * 1024 * 1024)
@@ -7396,109 +7498,45 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	report.YearTotalDownGB = float64(yearTotalDown) / (1024 * 1024 * 1024)
 	report.YearTotalDuration = FormatDurationArabic(yearTotalDurationSec)
 
-	// 5. Daily Usage for Selected Month
-	type dayData struct {
-		upBytes   int64
-		downBytes int64
-		totBytes  int64
-		sessions  int
-		duration  int64
-	}
-	dayMap := make(map[int]dayData)
+	// If a specific month is selected (1..12), bind its daily list and stats
+	if month >= 1 && month <= 12 {
+		selectedMonthItem := report.MonthlyList[month-1]
+		report.DailyList = selectedMonthItem.DailyList
+		report.MonthTotalBytes = selectedMonthItem.TotalBytes
+		report.MonthTotalGB = selectedMonthItem.TotalGB
+		report.MonthTotalUpload = selectedMonthItem.UploadGB
+		report.MonthTotalDown = selectedMonthItem.DownloadGB
+		report.MonthSessions = selectedMonthItem.SessionCount
+		report.MonthDuration = selectedMonthItem.DurationString
 
-	dRows, err := d.Query(`SELECT 
-		DAY(acctstarttime) as d,
-		COALESCE(SUM(acctinputoctets), 0),
-		COALESCE(SUM(acctoutputoctets), 0),
-		COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
-		COUNT(*),
-		COALESCE(SUM(acctsessiontime), 0)
-	FROM radacct
-	WHERE username = ? AND YEAR(acctstarttime) = ? AND MONTH(acctstarttime) = ?
-	GROUP BY DAY(acctstarttime)`, username, year, month)
+		daysInMonth := len(selectedMonthItem.DailyList)
+		if daysInMonth > 0 {
+			report.MonthDailyAvgGB = report.MonthTotalGB / float64(daysInMonth)
+		}
 
-	if err == nil {
-		defer dRows.Close()
-		for dRows.Next() {
-			var d int
-			var dd dayData
-			if err := dRows.Scan(&d, &dd.upBytes, &dd.downBytes, &dd.totBytes, &dd.sessions, &dd.duration); err == nil {
-				dayMap[d] = dd
+		var maxDayBytes int64
+		var peakDayNum int
+		for _, d := range selectedMonthItem.DailyList {
+			if d.TotalBytes > maxDayBytes {
+				maxDayBytes = d.TotalBytes
+				peakDayNum = d.DayNum
 			}
 		}
-	}
-
-	// Calculate number of days in selected month
-	daysInMonth := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.Local).Day()
-	var maxDayBytes int64
-	var peakDayNum int
-
-	var monthUpBytes int64
-	var monthDownBytes int64
-	var monthDurationSec int64
-
-	for d := 1; d <= daysInMonth; d++ {
-		if dd, ok := dayMap[d]; ok {
-			report.MonthTotalBytes += dd.totBytes
-			report.MonthSessions += dd.sessions
-			monthUpBytes += dd.upBytes
-			monthDownBytes += dd.downBytes
-			monthDurationSec += dd.duration
-			if dd.totBytes > maxDayBytes {
-				maxDayBytes = dd.totBytes
-				peakDayNum = d
-			}
-		}
-	}
-
-	if maxDayBytes > 0 {
-		report.MonthPeakDay = fmt.Sprintf("%02d/%02d/%d", peakDayNum, month, year)
-		report.MonthPeakDayGB = float64(maxDayBytes) / (1024 * 1024 * 1024)
-	}
-
-	report.MonthTotalGB = float64(report.MonthTotalBytes) / (1024 * 1024 * 1024)
-	report.MonthTotalUpload = float64(monthUpBytes) / (1024 * 1024 * 1024)
-	report.MonthTotalDown = float64(monthDownBytes) / (1024 * 1024 * 1024)
-	report.MonthDuration = FormatDurationArabic(monthDurationSec)
-	if daysInMonth > 0 {
-		report.MonthDailyAvgGB = report.MonthTotalGB / float64(daysInMonth)
-	}
-
-	// Build day-by-day continuous list
-	for d := 1; d <= daysInMonth; d++ {
-		dd := dayMap[d]
-		dateObj := time.Date(year, time.Month(month), d, 0, 0, 0, 0, time.Local)
-		dayNameAr := arabicDayNames[dateObj.Weekday()]
-		dateStr := dateObj.Format("2006-01-02")
-
-		upGB := float64(dd.upBytes) / (1024 * 1024 * 1024)
-		downGB := float64(dd.downBytes) / (1024 * 1024 * 1024)
-		totGB := float64(dd.totBytes) / (1024 * 1024 * 1024)
-
-		var pct float64
 		if maxDayBytes > 0 {
-			pct = (float64(dd.totBytes) / float64(maxDayBytes)) * 100.0
+			report.MonthPeakDay = fmt.Sprintf("%02d/%02d/%d", peakDayNum, month, year)
+			report.MonthPeakDayGB = float64(maxDayBytes) / (1024 * 1024 * 1024)
 		}
-
-		item := models.SubscriberDailyTraffic{
-			Date:            dateStr,
-			DayNum:          d,
-			DayNameAr:       dayNameAr,
-			UploadBytes:     dd.upBytes,
-			DownloadBytes:   dd.downBytes,
-			TotalBytes:      dd.totBytes,
-			UploadGB:        upGB,
-			DownloadGB:      downGB,
-			TotalGB:         totGB,
-			TotalDisplay:    FormatBytesHuman(dd.totBytes),
-			UploadDisplay:   FormatBytesHuman(dd.upBytes),
-			DownloadDisplay: FormatBytesHuman(dd.downBytes),
-			SessionCount:    dd.sessions,
-			TotalTimeSec:    dd.duration,
-			DurationString:  FormatDurationArabic(dd.duration),
-			PercentOfPeak:   pct,
-		}
-		report.DailyList = append(report.DailyList, item)
+	} else {
+		// Full Year Mode (month == 0):
+		report.MonthTotalBytes = report.YearTotalBytes
+		report.MonthTotalGB = report.YearTotalGB
+		report.MonthTotalUpload = report.YearTotalUploadGB
+		report.MonthTotalDown = report.YearTotalDownGB
+		report.MonthSessions = report.YearTotalSessions
+		report.MonthDuration = report.YearTotalDuration
+		report.MonthPeakDay = report.YearPeakMonth
+		report.MonthPeakDayGB = report.YearPeakMonthGB
+		report.MonthDailyAvgGB = report.YearTotalGB / 365.0
 	}
 
 	return report, nil

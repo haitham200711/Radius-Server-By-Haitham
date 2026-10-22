@@ -198,8 +198,10 @@ type SubscriberMonthlyTraffic struct {
 	DownloadDisplay string  `json:"download_display"`
 	SessionCount    int     `json:"session_count"`
 	TotalTimeSec    int64   `json:"total_time_sec"`
-	DurationString  string  `json:"duration_string"`
-	PercentOfPeak   float64 `json:"percent_of_peak"`
+	DurationString  string                   `json:"duration_string"`
+	PercentOfPeak   float64                  `json:"percent_of_peak"`
+	PercentOfYear   float64                  `json:"percent_of_year"`
+	DailyList       []SubscriberDailyTraffic `json:"daily_list"`
 }
 
 // SubscriberDailyTraffic represents aggregated daily usage for a selected month

@@ -204,12 +204,20 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	// 1.2 Handle Traffic Report Export & JSON Live Search
 	trafficUser := strings.TrimSpace(r.URL.Query().Get("user"))
 	trafficYear, _ := strconv.Atoi(r.URL.Query().Get("year"))
-	trafficMonth, _ := strconv.Atoi(r.URL.Query().Get("month"))
+	var trafficMonth int
+	if r.URL.Query().Has("month") {
+		m, err := strconv.Atoi(r.URL.Query().Get("month"))
+		if err == nil && m >= 0 && m <= 12 {
+			trafficMonth = m
+		} else {
+			trafficMonth = 0
+		}
+	} else {
+		// When no month specified, default to 0 (Full Year Mode)
+		trafficMonth = 0
+	}
 	if trafficYear <= 0 {
 		trafficYear = now.Year()
-	}
-	if trafficMonth <= 0 {
-		trafficMonth = int(now.Month())
 	}
 
 	if tab == "traffic" && r.URL.Query().Get("format") == "json" {
@@ -223,33 +231,63 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		rep, err := bp.db.GetSubscriberTrafficReport(trafficUser, trafficYear, trafficMonth)
 		if err == nil && rep != nil {
 			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=traffic_%s_%d_%02d.csv", trafficUser, trafficYear, trafficMonth))
-			_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
-			writer := csv.NewWriter(w)
-			_ = writer.Write([]string{
-				"اليوم",
-				"التاريخ",
-				"اليوم من الأسبوع",
-				"الرفع (Upload)",
-				"التحميل (Download)",
-				"إجمالي الاستهلاك (Total)",
-				"عدد الجلسات",
-				"مدة الاتصال",
-			})
-			for _, d := range rep.DailyList {
+			if trafficMonth == 0 {
+				w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=traffic_%s_annual_%d.csv", trafficUser, trafficYear))
+				_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+				writer := csv.NewWriter(w)
 				_ = writer.Write([]string{
-					fmt.Sprintf("%02d", d.DayNum),
-					d.Date,
-					d.DayNameAr,
-					d.UploadDisplay,
-					d.DownloadDisplay,
-					d.TotalDisplay,
-					fmt.Sprintf("%d", d.SessionCount),
-					d.DurationString,
+					"رقم الشهر",
+					"اسم الشهر",
+					"الرفع (Upload)",
+					"التحميل (Download)",
+					"إجمالي الاستهلاك",
+					"نسبة الاستهلاك من السنة",
+					"عدد الجلسات",
+					"مدة الاتصال",
 				})
+				for _, m := range rep.MonthlyList {
+					_ = writer.Write([]string{
+						fmt.Sprintf("%02d", m.Month),
+						m.MonthNameAr,
+						m.UploadDisplay,
+						m.DownloadDisplay,
+						m.TotalDisplay,
+						fmt.Sprintf("%.1f%%", m.PercentOfYear),
+						fmt.Sprintf("%d", m.SessionCount),
+						m.DurationString,
+					})
+				}
+				writer.Flush()
+				return
+			} else {
+				w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=traffic_%s_%d_%02d.csv", trafficUser, trafficYear, trafficMonth))
+				_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+				writer := csv.NewWriter(w)
+				_ = writer.Write([]string{
+					"اليوم",
+					"التاريخ",
+					"اليوم من الأسبوع",
+					"الرفع (Upload)",
+					"التحميل (Download)",
+					"إجمالي الاستهلاك (Total)",
+					"عدد الجلسات",
+					"مدة الاتصال",
+				})
+				for _, d := range rep.DailyList {
+					_ = writer.Write([]string{
+						fmt.Sprintf("%02d", d.DayNum),
+						d.Date,
+						d.DayNameAr,
+						d.UploadDisplay,
+						d.DownloadDisplay,
+						d.TotalDisplay,
+						fmt.Sprintf("%d", d.SessionCount),
+						d.DurationString,
+					})
+				}
+				writer.Flush()
+				return
 			}
-			writer.Flush()
-			return
 		}
 	}
 

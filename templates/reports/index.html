@@ -1049,7 +1049,7 @@ function fillSmartFullDebt() {
         <form method="GET" action="/reports" class="row g-2 align-items-center">
             <input type="hidden" name="tab" value="traffic">
 
-            <div class="col-md-5 col-sm-12">
+            <div class="col-md-4 col-sm-12">
                 <label class="form-label fw-bold small text-muted mb-1">
                     <i class="bi bi-person-search me-1 text-primary"></i> اسم المشترك / اسم المستخدم:
                 </label>
@@ -1059,7 +1059,7 @@ function fillSmartFullDebt() {
                 </div>
             </div>
 
-            <div class="col-md-3 col-sm-6">
+            <div class="col-md-2 col-sm-6">
                 <label class="form-label fw-bold small text-muted mb-1">
                     <i class="bi bi-calendar-event me-1 text-primary"></i> سنة الاستهلاك:
                 </label>
@@ -1078,23 +1078,24 @@ function fillSmartFullDebt() {
                 </select>
             </div>
 
-            <div class="col-md-2 col-sm-6">
+            <div class="col-md-4 col-sm-6">
                 <label class="form-label fw-bold small text-muted mb-1">
-                    <i class="bi bi-calendar-month me-1 text-primary"></i> الشهر:
+                    <i class="bi bi-calendar-month me-1 text-primary"></i> نطاق التقرير (السنة / الشهر):
                 </label>
                 <select name="month" class="form-select fw-bold">
-                    <option value="1" {{ if eq .TrafficMonth 1 }}selected{{ end }}>01 - يناير</option>
-                    <option value="2" {{ if eq .TrafficMonth 2 }}selected{{ end }}>02 - فبراير</option>
-                    <option value="3" {{ if eq .TrafficMonth 3 }}selected{{ end }}>03 - مارس</option>
-                    <option value="4" {{ if eq .TrafficMonth 4 }}selected{{ end }}>04 - أبريل</option>
-                    <option value="5" {{ if eq .TrafficMonth 5 }}selected{{ end }}>05 - مايو</option>
-                    <option value="6" {{ if eq .TrafficMonth 6 }}selected{{ end }}>06 - يونيو</option>
-                    <option value="7" {{ if eq .TrafficMonth 7 }}selected{{ end }}>07 - يوليو</option>
-                    <option value="8" {{ if eq .TrafficMonth 8 }}selected{{ end }}>08 - أغسطس</option>
-                    <option value="9" {{ if eq .TrafficMonth 9 }}selected{{ end }}>09 - سبتمبر</option>
-                    <option value="10" {{ if eq .TrafficMonth 10 }}selected{{ end }}>10 - أكتوبر</option>
-                    <option value="11" {{ if eq .TrafficMonth 11 }}selected{{ end }}>11 - نوفمبر</option>
-                    <option value="12" {{ if eq .TrafficMonth 12 }}selected{{ end }}>12 - ديسمبر</option>
+                    <option value="0" {{ if eq .TrafficMonth 0 }}selected{{ end }}>📅 تقرير سنة كاملة (استعراض كافة الشهور الـ 12)</option>
+                    <option value="1" {{ if eq .TrafficMonth 1 }}selected{{ end }}>01 - شهر يناير</option>
+                    <option value="2" {{ if eq .TrafficMonth 2 }}selected{{ end }}>02 - شهر فبراير</option>
+                    <option value="3" {{ if eq .TrafficMonth 3 }}selected{{ end }}>03 - شهر مارس</option>
+                    <option value="4" {{ if eq .TrafficMonth 4 }}selected{{ end }}>04 - شهر أبريل</option>
+                    <option value="5" {{ if eq .TrafficMonth 5 }}selected{{ end }}>05 - شهر مايو</option>
+                    <option value="6" {{ if eq .TrafficMonth 6 }}selected{{ end }}>06 - شهر يونيو</option>
+                    <option value="7" {{ if eq .TrafficMonth 7 }}selected{{ end }}>07 - شهر يوليو</option>
+                    <option value="8" {{ if eq .TrafficMonth 8 }}selected{{ end }}>08 - شهر أغسطس</option>
+                    <option value="9" {{ if eq .TrafficMonth 9 }}selected{{ end }}>09 - شهر سبتمبر</option>
+                    <option value="10" {{ if eq .TrafficMonth 10 }}selected{{ end }}>10 - شهر أكتوبر</option>
+                    <option value="11" {{ if eq .TrafficMonth 11 }}selected{{ end }}>11 - شهر نوفمبر</option>
+                    <option value="12" {{ if eq .TrafficMonth 12 }}selected{{ end }}>12 - شهر ديسمبر</option>
                 </select>
             </div>
 
@@ -1251,6 +1252,26 @@ function fillSmartFullDebt() {
     </div>
 </div>
 
+<!-- Quick Switcher Bar between Full Year & Months -->
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small fw-bold"><i class="bi bi-funnel-fill text-primary me-1"></i>العرض السريع:</span>
+            <a href="/reports?tab=traffic&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month=0" class="btn btn-sm {{ if eq .TrafficReport.SelectedMonth 0 }}btn-primary fw-bold text-white shadow-xs{{ else }}btn-outline-primary{{ end }}">
+                <i class="bi bi-calendar3 me-1"></i> 📅 تقرير سنة كاملة (12 شهراً)
+            </a>
+        </div>
+        <div class="d-flex flex-wrap gap-1">
+            {{ range .TrafficReport.MonthlyList }}
+            <a href="/reports?tab=traffic&user={{ $.TrafficUser }}&year={{ $.TrafficYear }}&month={{ .Month }}" class="btn btn-sm py-1 px-2.5 font-monospace {{ if eq .Month $.TrafficReport.SelectedMonth }}btn-success fw-bold text-white shadow-xs{{ else if gt .TotalGB 0.0 }}btn-outline-secondary text-dark fw-bold{{ else }}btn-light text-muted border{{ end }}" title="{{ .MonthNameAr }}: {{ printf "%.2f" .TotalGB }} GB">
+                {{ .MonthNameAr }}
+                {{ if gt .TotalGB 0.0 }}<small class="badge bg-primary-subtle text-primary ms-1" style="font-size: 0.65rem;">{{ printf "%.0f" .TotalGB }}G</small>{{ end }}
+            </a>
+            {{ end }}
+        </div>
+    </div>
+</div>
+
 <!-- ============================================== -->
 <!-- 12-MONTH CONSUMPTION GRID (شهور السنة الـ 12)  -->
 <!-- ============================================== -->
@@ -1258,9 +1279,16 @@ function fillSmartFullDebt() {
     <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center justify-content-between">
         <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
             <i class="bi bi-calendar3 text-primary"></i>
-            <span>استهلاك المشترك شهرياً لسنة {{ .TrafficReport.SelectedYear }} (اختر الشهر لعرض استهلاكه اليومي)</span>
+            <span>استهلاك المشترك شهرياً لسنة {{ .TrafficReport.SelectedYear }} (اضغط على أي شهر لعرض أيامه 1/1 - 1/31)</span>
         </h6>
-        <span class="badge bg-light text-muted border small">12 شهراً</span>
+        <div class="d-flex align-items-center gap-2">
+            {{ if gt .TrafficReport.SelectedMonth 0 }}
+            <a href="/reports?tab=traffic&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month=0" class="btn btn-sm btn-outline-primary fw-bold">
+                <i class="bi bi-arrow-return-right me-1"></i> تقرير السنة كاملة
+            </a>
+            {{ end }}
+            <span class="badge bg-light text-muted border small">12 شهراً</span>
+        </div>
     </div>
     <div class="card-body p-3">
         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2.5">
@@ -1275,7 +1303,9 @@ function fillSmartFullDebt() {
                                     {{ .MonthNameAr }}
                                 </span>
                                 {{ if eq .Month $.TrafficReport.SelectedMonth }}
-                                <span class="badge bg-primary text-white font-monospace small"><i class="bi bi-check-lg me-1"></i>المحدد</span>
+                                <span class="badge bg-primary text-white font-monospace small"><i class="bi bi-check-lg me-1"></i>المحدد الآن</span>
+                                {{ else if gt .TotalGB 0.0 }}
+                                <span class="badge bg-light text-secondary border font-monospace small">{{ printf "%.1f%%" .PercentOfYear }}</span>
                                 {{ end }}
                             </div>
 
@@ -1303,8 +1333,8 @@ function fillSmartFullDebt() {
                         </div>
 
                         <div>
-                            <a href="/reports?tab=traffic&user={{ $.TrafficUser }}&year={{ $.TrafficYear }}&month={{ .Month }}" class="btn btn-sm {{ if eq .Month $.TrafficReport.SelectedMonth }}btn-primary text-white{{ else }}btn-outline-primary{{ end }} w-100 fw-bold py-1">
-                                <i class="bi bi-calendar2-range me-1"></i> عرض استهلاك الأيام
+                            <a href="/reports?tab=traffic&user={{ $.TrafficUser }}&year={{ $.TrafficYear }}&month={{ .Month }}" class="btn btn-sm {{ if eq .Month $.TrafficReport.SelectedMonth }}btn-primary text-white{{ else }}btn-outline-primary{{ end }} w-100 fw-bold py-1 shadow-xs">
+                                <i class="bi bi-calendar2-range me-1"></i> استعراض استهلاك الأيام
                             </a>
                         </div>
                     </div>
@@ -1315,9 +1345,200 @@ function fillSmartFullDebt() {
     </div>
 </div>
 
+{{ if eq .TrafficReport.SelectedMonth 0 }}
 <!-- ============================================================== -->
-<!-- DAILY BREAKDOWN FOR SELECTED MONTH (الاستهلاك اليومي لشهر X) -->
+<!-- MODE A: FULL YEAR OVERVIEW & MONTH-BY-MONTH DAYS ACCORDION    -->
 <!-- ============================================================== -->
+
+<!-- 1. Annual Months Summary Table -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center justify-content-between">
+        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+            <i class="bi bi-table text-primary"></i>
+            <span>جدول مقارنة استهلاك شهور سنة {{ .TrafficReport.SelectedYear }} (كافة الـ 12 شهراً)</span>
+        </h6>
+        <a href="/reports?tab=traffic&export=csv&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month=0" class="btn btn-sm btn-outline-success fw-bold" title="تصدير كشف السنة إلى Excel">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> تصدير Excel للسنة
+        </a>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light small">
+                <tr>
+                    <th style="width: 50px;">الشهر</th>
+                    <th>اسم الشهر</th>
+                    <th>الرفع (Upload)</th>
+                    <th>التحميل (Download)</th>
+                    <th class="fw-bold text-primary">إجمالي الاستهلاك</th>
+                    <th style="min-width: 140px;">النسبة من استهلاك السنة</th>
+                    <th>عدد الجلسات</th>
+                    <th>مدة الاتصال</th>
+                    <th class="text-end">استعراض الأيام</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                {{ range .TrafficReport.MonthlyList }}
+                <tr class="{{ if gt .TotalGB 0.0 }}table-active-row{{ end }}">
+                    <td class="font-monospace fw-bold">
+                        <span class="badge {{ if gt .TotalGB 0.0 }}bg-dark{{ else }}bg-light text-muted border{{ end }} rounded-pill">
+                            {{ printf "%02d" .Month }}
+                        </span>
+                    </td>
+                    <td><strong class="text-dark fs-6">{{ .MonthNameAr }}</strong></td>
+                    <td class="font-monospace text-info">{{ if gt .UploadBytes 0 }}↑ {{ .UploadDisplay }}{{ else }}0 MB{{ end }}</td>
+                    <td class="font-monospace text-primary">{{ if gt .DownloadBytes 0 }}↓ {{ .DownloadDisplay }}{{ else }}0 MB{{ end }}</td>
+                    <td>
+                        {{ if gt .TotalGB 0.0 }}
+                        <span class="badge bg-primary fs-6 font-monospace fw-bold px-2.5 py-1">
+                            {{ printf "%.2f" .TotalGB }} جيجا
+                        </span>
+                        {{ else }}
+                        <span class="text-muted font-monospace">0.00 GB</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1" style="height: 7px;">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ .PercentOfYear }}%" aria-valuenow="{{ .PercentOfYear }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <span class="text-muted font-monospace small" style="width: 45px; font-size: 0.72rem;">{{ printf "%.1f%%" .PercentOfYear }}</span>
+                        </div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ .SessionCount }} جلسة</span></td>
+                    <td class="font-monospace text-muted">{{ if .DurationString }}{{ .DurationString }}{{ else }}-{{ end }}</td>
+                    <td class="text-end">
+                        <a href="/reports?tab=traffic&user={{ $.TrafficUser }}&year={{ $.TrafficYear }}&month={{ .Month }}" class="btn btn-sm btn-primary fw-bold shadow-xs">
+                            <i class="bi bi-calendar2-range me-1"></i> استعراض الأيام (1/1 - 1/31)
+                        </a>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 2. Interactive Month-by-Month Days Accordion -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 px-3 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+            <h5 class="fw-bold mb-1 text-dark d-flex align-items-center gap-2">
+                <i class="bi bi-calendar-week-fill text-success"></i>
+                <span>استعراض أيام كل شهر لسنة {{ .TrafficReport.SelectedYear }} (اضغط على أي شهر لفتح أيامه يوماً بيوم):</span>
+            </h5>
+            <small class="text-muted">انقر على اسم الشهر لفتح جدول أيامه (من يوم 1 وحتى نهاية الشهر) فوراً دون مغادرة الصفحة</small>
+        </div>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">استعراض الأيام فوري</span>
+    </div>
+    <div class="card-body p-3">
+        <div class="accordion" id="accordionYearMonths">
+            {{ range .TrafficReport.MonthlyList }}
+            <div class="accordion-item mb-2 border rounded shadow-xs overflow-hidden">
+                <h2 class="accordion-header" id="headingMonth{{ .Month }}">
+                    <button class="accordion-button collapsed py-2.5 px-3 bg-light-subtle fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMonthDaily{{ .Month }}" aria-expanded="false" aria-controls="collapseMonthDaily{{ .Month }}">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between w-100 me-3">
+                            <span class="fs-6 text-dark d-flex align-items-center gap-2">
+                                <i class="bi bi-calendar-month text-primary"></i>
+                                شهر {{ .MonthNameAr }} (شهر {{ printf "%02d" .Month }})
+                            </span>
+                            <div class="d-flex align-items-center gap-2 font-monospace">
+                                <span class="badge {{ if gt .TotalGB 0.0 }}bg-primary{{ else }}bg-light text-muted border{{ end }} fs-6">
+                                    {{ printf "%.2f" .TotalGB }} جيجا
+                                </span>
+                                <span class="text-muted small d-none d-md-inline">↑ {{ printf "%.1f" .UploadGB }} GB | ↓ {{ printf "%.1f" .DownloadGB }} GB</span>
+                                <span class="badge bg-light text-secondary border d-none d-sm-inline">{{ .SessionCount }} جلسة</span>
+                            </div>
+                        </div>
+                    </button>
+                </h2>
+                <div id="collapseMonthDaily{{ .Month }}" class="accordion-collapse collapse" aria-labelledby="headingMonth{{ .Month }}" data-bs-parent="#accordionYearMonths">
+                    <div class="accordion-body p-0">
+                        <div class="p-2 bg-light border-bottom d-flex align-items-center justify-content-between">
+                            <span class="text-muted small fw-bold">استهلاك أيام شهر {{ .MonthNameAr }} يوماً بيوم:</span>
+                            <a href="/reports?tab=traffic&user={{ $.TrafficUser }}&year={{ $.TrafficYear }}&month={{ .Month }}" class="btn btn-sm btn-outline-primary fw-bold">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> فتح كصفحة مخصصة وتصدير كشف Excel
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0 text-nowrap">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th style="width: 45px;">اليوم</th>
+                                        <th>التاريخ</th>
+                                        <th>اليوم من الأسبوع</th>
+                                        <th>الرفع (Upload)</th>
+                                        <th>التحميل (Download)</th>
+                                        <th class="fw-bold text-primary">إجمالي الاستهلاك</th>
+                                        <th style="min-width: 120px;">كثافة الاستهلاك</th>
+                                        <th>الجلسات</th>
+                                        <th>مدة الاتصال</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="small">
+                                    {{ range .DailyList }}
+                                    <tr class="{{ if gt .TotalGB 0.0 }}table-active-row{{ end }}">
+                                        <td class="font-monospace fw-bold">
+                                            <span class="badge {{ if gt .TotalGB 0.0 }}bg-dark{{ else }}bg-light text-muted border{{ end }} rounded-pill">
+                                                {{ printf "%02d" .DayNum }}
+                                            </span>
+                                        </td>
+                                        <td class="font-monospace">{{ .Date }}</td>
+                                        <td><span class="fw-bold text-secondary">{{ .DayNameAr }}</span></td>
+                                        <td class="font-monospace text-info">{{ if gt .UploadBytes 0 }}↑ {{ .UploadDisplay }}{{ else }}0 MB{{ end }}</td>
+                                        <td class="font-monospace text-primary">{{ if gt .DownloadBytes 0 }}↓ {{ .DownloadDisplay }}{{ else }}0 MB{{ end }}</td>
+                                        <td>
+                                            {{ if gt .TotalGB 0.0 }}
+                                            <span class="badge bg-primary fs-6 font-monospace fw-bold px-2 py-0.5">
+                                                {{ printf "%.2f" .TotalGB }} جيجا
+                                            </span>
+                                            {{ else }}
+                                            <span class="text-muted font-monospace">0.00 GB</span>
+                                            {{ end }}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 6px;">
+                                                <div class="progress-bar {{ if gt .PercentOfPeak 75.0 }}bg-danger{{ else if gt .PercentOfPeak 40.0 }}bg-primary{{ else }}bg-info{{ end }}" role="progressbar" style="width: {{ .PercentOfPeak }}%" aria-valuenow="{{ .PercentOfPeak }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </td>
+                                        <td><span class="font-monospace">{{ .SessionCount }}</span></td>
+                                        <td class="font-monospace text-muted">{{ if .DurationString }}{{ .DurationString }}{{ else }}-{{ end }}</td>
+                                    </tr>
+                                    {{ else }}
+                                    <tr>
+                                        <td colspan="9" class="text-center py-3 text-muted">لا توجد بيانات استهلاك مسجلة لهذا الشهر</td>
+                                    </tr>
+                                    {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+    </div>
+</div>
+
+{{ else }}
+<!-- ============================================================== -->
+<!-- MODE B: SINGLE MONTH FOCUS & DEDICATED DAILY BREAKDOWN        -->
+<!-- ============================================================== -->
+
+<div class="alert alert-primary d-flex flex-wrap align-items-center justify-content-between p-3 mb-3 shadow-xs border-0">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle-fill fs-4 text-primary"></i>
+        <div>
+            <strong class="fs-6 d-block text-primary-emphasis">أنت الآن تستعرض التقرير اليومي المفصل لشهر {{ .TrafficReport.SelectedMonthName }} (سنة {{ .TrafficReport.SelectedYear }})</strong>
+            <small class="text-muted">يعرض هذا الكشف استهلاك المشترك يوماً بيوم (1/{{ .TrafficReport.SelectedMonth }} وحتى آخر يوم في الشهر)</small>
+        </div>
+    </div>
+    <div class="d-flex gap-2 mt-2 mt-md-0">
+        <a href="/reports?tab=traffic&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month=0" class="btn btn-sm btn-outline-primary fw-bold bg-white">
+            <i class="bi bi-arrow-return-right me-1"></i> العودة لتقرير السنة كاملة (كافة الشهور)
+        </a>
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white py-3 px-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>
@@ -1446,6 +1667,7 @@ function fillSmartFullDebt() {
         </table>
     </div>
 </div>
+{{ end }}
 
 {{ else }}
 <!-- ============================================== -->
