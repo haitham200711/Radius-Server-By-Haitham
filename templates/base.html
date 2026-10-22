@@ -301,17 +301,8 @@
                         </div>
                     </div>
 
-                    <!-- 9. الواتساب -->
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "whatsapp" }}active{{ end }}" href="/whatsapp">
-                        <span class="sidebar-nav-content">
-                            <i class="bi bi-whatsapp text-success"></i>
-                            <span>{{ tr .Lang "الواتساب" "WhatsApp Bot" }}</span>
-                        </span>
-                        {{ if eq .ActiveMenu "whatsapp" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
-                    </a>
-
                     {{ if eq .CurrentUser.Role "admin" }}
-                    <!-- 10. الموزعين -->
+                    <!-- 9. الموزعين -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "resellers" }}active{{ end }}" href="/resellers">
                         <span class="sidebar-nav-content">
                             <i class="bi bi-shop-window text-primary"></i>
@@ -321,18 +312,22 @@
                     </a>
                     {{ end }}
 
-                    <!-- 11. الإعدادات (Dropdown) -->
+                    <!-- 10. الإعدادات (Dropdown) -->
                     <div class="sidebar-nav-group">
-                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if eq .ActiveMenu "settings" }}active-parent{{ end }}" 
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "settings") (eq .ActiveMenu "whatsapp") }}active-parent{{ end }}" 
                            data-bs-toggle="collapse" href="#settingsSubmenu" role="button" 
-                           aria-expanded="{{ if eq .ActiveMenu "settings" }}true{{ else }}false{{ end }}">
+                           aria-expanded="{{ if or (eq .ActiveMenu "settings") (eq .ActiveMenu "whatsapp") }}true{{ else }}false{{ end }}">
                             <span class="sidebar-nav-content">
                                 <i class="bi bi-gear-wide-connected text-secondary"></i>
                                 <span>{{ tr .Lang "الإعدادات" "Settings" }}</span>
                             </span>
                             <i class="bi bi-chevron-down submenu-arrow"></i>
                         </a>
-                        <div class="collapse {{ if eq .ActiveMenu "settings" }}show{{ end }} sidebar-submenu flex-column" id="settingsSubmenu">
+                        <div class="collapse {{ if or (eq .ActiveMenu "settings") (eq .ActiveMenu "whatsapp") }}show{{ end }} sidebar-submenu flex-column" id="settingsSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "whatsapp" }}active{{ end }}" href="/whatsapp">
+                                <i class="bi bi-whatsapp text-success"></i>
+                                <span>{{ tr .Lang "إعدادات وبوت الواتساب" "WhatsApp Bot & Alerts" }}</span>
+                            </a>
                             <a class="sidebar-sub-link" href="/settings#system">
                                 <i class="bi bi-shield-lock-fill text-primary"></i>
                                 <span>{{ tr .Lang "إعدادات النظام والأمان" "System & Security" }}</span>
