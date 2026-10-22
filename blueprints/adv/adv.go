@@ -53,6 +53,38 @@ type ManagerData struct {
 	IsAdmin  int
 }
 
+// CardBatchData parsed from ADV card_users table
+type CardBatchData struct {
+	ID             int
+	Price          float64
+	ProfileID      int
+	ProfileName    string
+	OwnerID        int
+	OwnerName      string
+	NumSer         int
+	Year           int
+	Name           string
+	Notes          string
+	CreatedOn      int64
+	Qty            int
+	CardsCount     int
+	AvailableCount int
+	UsedCount      int
+}
+
+// CardItemData parsed from ADV radcheck (is_card = 1)
+type CardItemData struct {
+	Username    string
+	Password    string
+	BatchID     int
+	ProfileID   int
+	ProfileName string
+	Status      string // "available", "used", "expired"
+	Price       float64
+	ExpTime     int64
+	OwnerID     int
+}
+
 // AdvRadacctSession parsed from ADV radacct table
 type AdvRadacctSession struct {
 	SessionID        string
@@ -127,6 +159,12 @@ type BackupAnalysis struct {
 	Managers            []ManagerData
 	Subscribers         []SubscriberData
 	HotspotCards        int
+	Batches             []CardBatchData
+	Cards               []CardItemData
+	TotalBatches        int
+	TotalCardsCount     int
+	AvailableCardsCount int
+	UsedCardsCount      int
 	ActiveSubsCount     int
 	ExpSubsCount        int
 	TotalDebt           float64
@@ -290,6 +328,7 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	importResellers := r.FormValue("import_resellers") == "1"
 	importSubscribers := r.FormValue("import_subscribers") == "1"
 	importAccounting := r.FormValue("import_accounting") == "1"
+	importCards := r.FormValue("import_cards") == "1"
 
 	defaultPassword := strings.TrimSpace(r.FormValue("default_password"))
 	if defaultPassword == "" {
@@ -304,6 +343,8 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 	importedResellersCount := 0
 	importedSubscribersCount := 0
 	importedSessionsCount := 0
+	importedBatchesCount := 0
+	importedCardsCount := 0
 
 	// Speed optimization: disable integrity checks for bulk ingestion
 	_, _ = bp.db.Exec("SET foreign_key_checks = 0")
@@ -561,97 +602,138 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Batch FreeRADIUS radcheck (passwords & expiration)
-		var radcheckArgs []interface{}
-		var radcheckPlaceholders []string
-		for _, sr := range subRows {
-			radcheckPlaceholders = append(radcheckPlaceholders, "(?, 'Cleartext-Password', ':=', ?)")
-			radcheckArgs = append(radcheckArgs, sr.Username, sr.Password)
-
-			expStr := sr.ExpDate.Format("02 Jan 2006 15:04:05")
-			radcheckPlaceholders = append(radcheckPlaceholders, "(?, 'Expiration', ':=', ?)")
-			radcheckArgs = append(radcheckArgs, sr.Username, expStr)
+		type RadCheckItem struct {
+			Username  string
+			Attribute string
+			Op        string
+			Value     string
 		}
-
-		const radBatchSize = 400
-		for i := 0; i < len(radcheckPlaceholders); i += radBatchSize {
-			end := i + radBatchSize
-			if end > len(radcheckPlaceholders) {
-				end = len(radcheckPlaceholders)
+		var rcItems []RadCheckItem
+		for _, sr := range subRows {
+			rcItems = append(rcItems, RadCheckItem{sr.Username, "Cleartext-Password", ":=", sr.Password})
+			rcItems = append(rcItems, RadCheckItem{sr.Username, "Expiration", ":=", sr.ExpDate.Format("02 Jan 2006 15:04:05")})
+		}
+		for i := 0; i < len(rcItems); i += 300 {
+			end := i + 300
+			if end > len(rcItems) {
+				end = len(rcItems)
 			}
-			chunkPl := radcheckPlaceholders[i:end]
-			chunkArgs := radcheckArgs[i*2 : end*2]
-			q := fmt.Sprintf("INSERT INTO radcheck (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(chunkPl, ","))
-			if _, err := tx.Exec(q, chunkArgs...); err != nil {
-				log.Printf("[ADV-IMPORT] Error batch inserting radcheck: %v", err)
+			chunk := rcItems[i:end]
+			var pl []string
+			var args []interface{}
+			for _, item := range chunk {
+				pl = append(pl, "(?, ?, ?, ?)")
+				args = append(args, item.Username, item.Attribute, item.Op, item.Value)
 			}
+			q := fmt.Sprintf("INSERT INTO radcheck (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(pl, ","))
+			_, _ = tx.Exec(q, args...)
 		}
 
 		// Batch FreeRADIUS radusergroup
-		var grpPlaceholders []string
-		var grpArgs []interface{}
+		type RadGroupItem struct {
+			Username  string
+			GroupName string
+		}
+		var rgItems []RadGroupItem
 		for _, sr := range subRows {
 			if sr.ProfileName != "" && sr.ProfileName != "غير محدد" {
-				grpPlaceholders = append(grpPlaceholders, "(?, ?, 1)")
-				grpArgs = append(grpArgs, sr.Username, sr.ProfileName)
+				rgItems = append(rgItems, RadGroupItem{sr.Username, sr.ProfileName})
 			}
 		}
-		for i := 0; i < len(grpPlaceholders); i += radBatchSize {
-			end := i + radBatchSize
-			if end > len(grpPlaceholders) {
-				end = len(grpPlaceholders)
+		for i := 0; i < len(rgItems); i += 300 {
+			end := i + 300
+			if end > len(rgItems) {
+				end = len(rgItems)
 			}
-			chunkPl := grpPlaceholders[i:end]
-			chunkArgs := grpArgs[i*2 : end*2]
-			q := fmt.Sprintf("INSERT INTO radusergroup (username, groupname, priority) VALUES %s ON DUPLICATE KEY UPDATE groupname = VALUES(groupname)", strings.Join(chunkPl, ","))
-			if _, err := tx.Exec(q, chunkArgs...); err != nil {
-				log.Printf("[ADV-IMPORT] Error batch inserting radusergroup: %v", err)
+			chunk := rgItems[i:end]
+			var pl []string
+			var args []interface{}
+			for _, item := range chunk {
+				pl = append(pl, "(?, ?, 1)")
+				args = append(args, item.Username, item.GroupName)
 			}
+			q := fmt.Sprintf("INSERT INTO radusergroup (username, groupname, priority) VALUES %s ON DUPLICATE KEY UPDATE groupname = VALUES(groupname)", strings.Join(pl, ","))
+			_, _ = tx.Exec(q, args...)
 		}
 
 		// Batch FreeRADIUS radreply (quota limit)
-		var repPlaceholders []string
-		var repArgs []interface{}
+		type RadReplyItem struct {
+			Username string
+			Value    string
+		}
+		var rrItems []RadReplyItem
 		for _, sr := range subRows {
 			if sr.QuotaBytes > 0 {
-				repPlaceholders = append(repPlaceholders, "(?, 'Mikrotik-Total-Limit', ':=', ?)")
-				repArgs = append(repArgs, sr.Username, fmt.Sprintf("%d", sr.QuotaBytes))
+				rrItems = append(rrItems, RadReplyItem{sr.Username, fmt.Sprintf("%d", sr.QuotaBytes)})
 			}
 		}
-		for i := 0; i < len(repPlaceholders); i += radBatchSize {
-			end := i + radBatchSize
-			if end > len(repPlaceholders) {
-				end = len(repPlaceholders)
+		for i := 0; i < len(rrItems); i += 300 {
+			end := i + 300
+			if end > len(rrItems) {
+				end = len(rrItems)
 			}
-			chunkPl := repPlaceholders[i:end]
-			chunkArgs := repArgs[i*2 : end*2]
-			q := fmt.Sprintf("INSERT INTO radreply (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(chunkPl, ","))
-			if _, err := tx.Exec(q, chunkArgs...); err != nil {
-				log.Printf("[ADV-IMPORT] Error batch inserting radreply: %v", err)
+			chunk := rrItems[i:end]
+			var pl []string
+			var args []interface{}
+			for _, item := range chunk {
+				pl = append(pl, "(?, 'Mikrotik-Total-Limit', ':=', ?)")
+				args = append(args, item.Username, item.Value)
 			}
+			q := fmt.Sprintf("INSERT INTO radreply (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(pl, ","))
+			_, _ = tx.Exec(q, args...)
 		}
 
 		// Batch Billing Transactions for debt / deposit balances
-		var billPl []string
-		var billArgs []interface{}
+		type BillItem struct {
+			Username   string
+			ContractNo string
+			FullName   string
+			Type       string
+			Desc       string
+			Amount     float64
+		}
+		var billItems []BillItem
 		for _, sr := range subRows {
 			if sr.Debt > 0 {
-				billPl = append(billPl, "(?, ?, ?, 'debt', ?, ?, 'pending', 'system', 'رصيد مديونية مرحل من نظام ADV القديم', 'admin')")
-				billArgs = append(billArgs, sr.Username, sr.Username, sr.FullName, fmt.Sprintf("مديونية سابقة مرحلة من ADV: %.2f ج.م", sr.Debt), sr.Debt)
+				billItems = append(billItems, BillItem{
+					Username:   sr.Username,
+					ContractNo: sr.Username,
+					FullName:   sr.FullName,
+					Type:       "debt",
+					Desc:       fmt.Sprintf("مديونية سابقة مرحلة من ADV: %.2f ج.م", sr.Debt),
+					Amount:     sr.Debt,
+				})
 			}
 			if sr.Balance > 0 {
-				billPl = append(billPl, "(?, ?, ?, 'deposit', ?, ?, 'paid', 'system', 'رصيد محفظة مرحل من نظام ADV القديم', 'admin')")
-				billArgs = append(billArgs, sr.Username, sr.Username, sr.FullName, fmt.Sprintf("رصيد محفظة مرحل من ADV: %.2f ج.م", sr.Balance), sr.Balance)
+				billItems = append(billItems, BillItem{
+					Username:   sr.Username,
+					ContractNo: sr.Username,
+					FullName:   sr.FullName,
+					Type:       "deposit",
+					Desc:       fmt.Sprintf("رصيد محفظة مرحل من ADV: %.2f ج.م", sr.Balance),
+					Amount:     sr.Balance,
+				})
 			}
 		}
-		for i := 0; i < len(billPl); i += 200 {
-			end := i + 200
-			if end > len(billPl) {
-				end = len(billPl)
+
+		for i := 0; i < len(billItems); i += 100 {
+			end := i + 100
+			if end > len(billItems) {
+				end = len(billItems)
 			}
-			chunkPl := billPl[i:end]
-			chunkArgs := billArgs[i*6 : end*6]
-			q := fmt.Sprintf("INSERT INTO billing_transactions (username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by) VALUES %s", strings.Join(chunkPl, ","))
-			_, _ = tx.Exec(q, chunkArgs...)
+			chunk := billItems[i:end]
+			var pl []string
+			var args []interface{}
+			for _, bi := range chunk {
+				status := "paid"
+				if bi.Type == "debt" {
+					status = "pending"
+				}
+				pl = append(pl, "(?, ?, ?, ?, ?, ?, ?, 'system', 'رصيد مرحل من نظام ADV القديم', 'admin')")
+				args = append(args, bi.Username, bi.ContractNo, bi.FullName, bi.Type, bi.Desc, bi.Amount, status)
+			}
+			q := fmt.Sprintf("INSERT INTO billing_transactions (username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by) VALUES %s", strings.Join(pl, ","))
+			_, _ = tx.Exec(q, args...)
 		}
 
 		// 4. Batch Radacct Accounting Sessions (if selected)
@@ -724,14 +806,178 @@ func (bp *Blueprint) ImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 4. Import Card Batches and Cards (Batched for instant speed)
+	if importCards && len(analysis.Batches) > 0 {
+		profNameToIDMap := make(map[string]int)
+		pRows, err := tx.Query("SELECT id, name FROM profiles")
+		if err == nil {
+			for pRows.Next() {
+				var pid int
+				var pname string
+				if err := pRows.Scan(&pid, &pname); err == nil {
+					profNameToIDMap[pname] = pid
+				}
+			}
+			pRows.Close()
+		}
+
+		// First, insert batches and map advBatchID -> ourBatchID
+		batchIDMap := make(map[int]int64)
+		for _, b := range analysis.Batches {
+			ourProfID := profNameToIDMap[b.ProfileName]
+			ourResellerID := resellerIDMap[b.OwnerID]
+
+			batchCode := fmt.Sprintf("ADV-%d-%d", b.Year, b.NumSer)
+			if b.Year == 0 && b.NumSer == 0 {
+				batchCode = fmt.Sprintf("ADV-B%d", b.ID)
+			}
+			batchName := b.Name
+			if batchName == "" {
+				batchName = fmt.Sprintf("دفعة %d #%d", b.Year, b.NumSer)
+			}
+			cardCount := b.CardsCount
+			if cardCount == 0 {
+				cardCount = b.Qty
+			}
+			totalPrice := float64(cardCount) * b.Price
+			createdAt := time.Now()
+			if b.CreatedOn > 0 {
+				createdAt = time.Unix(b.CreatedOn, 0)
+			}
+
+			res, err := tx.Exec(`INSERT INTO batches (
+				batch_code, batch_name, profile_id, reseller_id, count, cost_price_per_card, price_per_card,
+				total_cost_price, total_price, card_type, created_at
+			) VALUES (?, ?, ?, ?, ?, 0.0, ?, 0.0, ?, 'charge', ?)
+			ON DUPLICATE KEY UPDATE
+				batch_name = VALUES(batch_name),
+				count = VALUES(count),
+				price_per_card = VALUES(price_per_card),
+				total_price = VALUES(total_price)`,
+				batchCode, batchName, ourProfID, ourResellerID, cardCount, b.Price, totalPrice, createdAt)
+			if err == nil {
+				ourBID, _ := res.LastInsertId()
+				if ourBID == 0 {
+					_ = tx.QueryRow("SELECT id FROM batches WHERE batch_code = ?", batchCode).Scan(&ourBID)
+				}
+				batchIDMap[b.ID] = ourBID
+				importedBatchesCount++
+			} else {
+				log.Printf("[ADV-IMPORT] Error inserting batch %s: %v", batchCode, err)
+			}
+		}
+
+		// Second, batch insert cards into cards table in chunks of 400
+		type CardInsertRow struct {
+			BatchID    int64
+			Username   string
+			Password   string
+			ProfileID  int
+			ResellerID int64
+			Status     string
+			Price      float64
+			CreatedAt  time.Time
+		}
+
+		var cardInsertRows []CardInsertRow
+		now := time.Now()
+		for _, c := range analysis.Cards {
+			ourBID := batchIDMap[c.BatchID]
+			ourPID := profNameToIDMap[c.ProfileName]
+			ourRID := resellerIDMap[c.OwnerID]
+			createdAt := now
+
+			cardInsertRows = append(cardInsertRows, CardInsertRow{
+				BatchID:    ourBID,
+				Username:   c.Username,
+				Password:   c.Password,
+				ProfileID:  ourPID,
+				ResellerID: ourRID,
+				Status:     c.Status,
+				Price:      c.Price,
+				CreatedAt:  createdAt,
+			})
+		}
+
+		const cardBatchSize = 400
+		for i := 0; i < len(cardInsertRows); i += cardBatchSize {
+			end := i + cardBatchSize
+			if end > len(cardInsertRows) {
+				end = len(cardInsertRows)
+			}
+			chunk := cardInsertRows[i:end]
+
+			var valPlaceholders []string
+			var valArgs []interface{}
+			for _, cr := range chunk {
+				valPlaceholders = append(valPlaceholders, "(?, ?, ?, ?, ?, ?, ?, 'charge', ?)")
+				valArgs = append(valArgs,
+					cr.BatchID, cr.Username, cr.Password, cr.ProfileID, cr.ResellerID, cr.Status, cr.Price, cr.CreatedAt)
+			}
+
+			q := fmt.Sprintf(`INSERT INTO cards (
+				batch_id, username, password, profile_id, reseller_id, status, price, card_type, created_at
+			) VALUES %s
+			ON DUPLICATE KEY UPDATE
+				batch_id = VALUES(batch_id),
+				password = VALUES(password),
+				status = VALUES(status),
+				price = VALUES(price)`, strings.Join(valPlaceholders, ","))
+
+			if _, err := tx.Exec(q, valArgs...); err != nil {
+				log.Printf("[ADV-IMPORT] Error batch inserting cards: %v", err)
+			} else {
+				importedCardsCount += len(chunk)
+			}
+		}
+
+		// Also ensure available cards are in radcheck & radusergroup
+		var radcheckPl []string
+		var radcheckArgs []interface{}
+		var radusergrpPl []string
+		var radusergrpArgs []interface{}
+		for _, c := range analysis.Cards {
+			if c.Status == "available" {
+				radcheckPl = append(radcheckPl, "(?, 'Cleartext-Password', ':=', ?)")
+				radcheckArgs = append(radcheckArgs, c.Username, c.Password)
+				if c.ProfileName != "" {
+					radusergrpPl = append(radusergrpPl, "(?, ?, 1)")
+					radusergrpArgs = append(radusergrpArgs, c.Username, c.ProfileName)
+				}
+			}
+		}
+
+		for i := 0; i < len(radcheckPl); i += 400 {
+			end := i + 400
+			if end > len(radcheckPl) {
+				end = len(radcheckPl)
+			}
+			chunkPl := radcheckPl[i:end]
+			chunkArgs := radcheckArgs[i*2 : end*2]
+			q := fmt.Sprintf("INSERT INTO radcheck (username, attribute, op, value) VALUES %s ON DUPLICATE KEY UPDATE value = VALUES(value)", strings.Join(chunkPl, ","))
+			_, _ = tx.Exec(q, chunkArgs...)
+		}
+
+		for i := 0; i < len(radusergrpPl); i += 400 {
+			end := i + 400
+			if end > len(radusergrpPl) {
+				end = len(radusergrpPl)
+			}
+			chunkPl := radusergrpPl[i:end]
+			chunkArgs := radusergrpArgs[i*2 : end*2]
+			q := fmt.Sprintf("INSERT INTO radusergroup (username, groupname, priority) VALUES %s ON DUPLICATE KEY UPDATE groupname = VALUES(groupname)", strings.Join(chunkPl, ","))
+			_, _ = tx.Exec(q, chunkArgs...)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		http.Redirect(w, r, fmt.Sprintf("/settings?adv_error=فشل+تأكيد+البيانات+في+السيرفر:+%v#adv", err), http.StatusFound)
 		return
 	}
 
-	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بسرعة+فائقة!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع،+و+%d+جلسة+استهلاك.",
-		importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount)
-	http.Redirect(w, r, fmt.Sprintf("/settings?adv_success=%s&subs=%d&profs=%d&resellers=%d&sessions=%d#adv", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount, importedSessionsCount), http.StatusFound)
+	msg := fmt.Sprintf("تم+استرداد+ونقل+البيانات+بسرعة+فائقة!+تم+استيراد+%d+مشترك،+و+%d+باقة،+و+%d+موزع،+و+%d+باتشة+كروت،+و+%d+كارت+شحن،+و+%d+جلسة+استهلاك.",
+		importedSubscribersCount, importedProfilesCount, importedResellersCount, importedBatchesCount, importedCardsCount, importedSessionsCount)
+	http.Redirect(w, r, fmt.Sprintf("/settings?adv_success=%s&subs=%d&profs=%d&resellers=%d&batches=%d&cards=%d&sessions=%d#adv", msg, importedSubscribersCount, importedProfilesCount, importedResellersCount, importedBatchesCount, importedCardsCount, importedSessionsCount), http.StatusFound)
 }
 
 // formatRateLimit formats up and down speeds from ADV into MikroTik "rx/tx" rate limit
@@ -786,6 +1032,16 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 	userinfoUpdatesDebt := make(map[string]float64)
 	userinfoUpdatesPaid := make(map[string]float64)
 	cardsCount := 0
+
+	batchesMap := make(map[int]*CardBatchData)
+	usedCardsMap := make(map[string]bool)
+	type rawCard struct {
+		username string
+		password string
+		batchID  int
+		expTime  int64
+	}
+	var rawCards []rawCard
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -854,9 +1110,73 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 					if len(r) > 6 {
 						isCard, _ = strconv.Atoi(r[6])
 					}
-					if isCard == 1 {
+					if isCard == 1 && attr == "Cleartext-Password" {
 						cardsCount++
+						idCard := 0
+						if len(r) > 7 {
+							idCard, _ = strconv.Atoi(r[7])
+						}
+						var expTime int64
+						if len(r) > 12 {
+							expTime, _ = strconv.ParseInt(r[12], 10, 64)
+						}
+						cardPass := val
+						if cardPass == "" {
+							cardPass = uname
+						}
+						rawCards = append(rawCards, rawCard{
+							username: uname,
+							password: cardPass,
+							batchID:  idCard,
+							expTime:  expTime,
+						})
 					}
+				}
+			}
+
+		case "card_users":
+			rows := parseSQLValues(line)
+			for _, r := range rows {
+				if len(r) > 10 {
+					id, _ := strconv.Atoi(r[0])
+					price, _ := strconv.ParseFloat(r[1], 64)
+					cdate, _ := strconv.ParseInt(r[2], 10, 64)
+					profID, _ := strconv.Atoi(r[3])
+					ownerID, _ := strconv.Atoi(r[4])
+					numSer, _ := strconv.Atoi(r[8])
+					yr, _ := strconv.Atoi(r[9])
+					name := ""
+					if len(r) > 28 {
+						name = r[28]
+					}
+					notes := ""
+					if len(r) > 29 {
+						notes = r[29]
+					}
+					qty := 0
+					if len(r) > 30 {
+						qty, _ = strconv.Atoi(r[30])
+					}
+					batchesMap[id] = &CardBatchData{
+						ID:        id,
+						Price:     price,
+						ProfileID: profID,
+						OwnerID:   ownerID,
+						NumSer:    numSer,
+						Year:      yr,
+						Name:      name,
+						Notes:     notes,
+						CreatedOn: cdate,
+						Qty:       qty,
+					}
+				}
+			}
+
+		case "rep_cards":
+			rows := parseSQLValues(line)
+			for _, r := range rows {
+				if len(r) > 1 {
+					usedCardsMap[r[1]] = true
 				}
 			}
 
@@ -1121,6 +1441,80 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 		return mgrList[i].ID < mgrList[j].ID
 	})
 
+	// Match profiles and managers for Card Batches
+	profileIDToName := make(map[int]string)
+	for _, p := range profilesMap {
+		profileIDToName[p.ID] = p.Name
+	}
+
+	for _, b := range batchesMap {
+		b.ProfileName = profileIDToName[b.ProfileID]
+		if m, ok := managersMap[b.OwnerID]; ok {
+			b.OwnerName = m.FullName
+			if b.OwnerName == "" {
+				b.OwnerName = m.Username
+			}
+		} else {
+			b.OwnerName = "المدير العام"
+		}
+	}
+
+	var cardsList []CardItemData
+	totalAvailCards := 0
+	totalUsedCards := 0
+	nowUnix = time.Now().Unix()
+
+	for _, rc := range rawCards {
+		status := "available"
+		if usedCardsMap[rc.username] {
+			status = "used"
+		} else if rc.expTime > 0 && nowUnix > rc.expTime {
+			status = "expired"
+		}
+
+		price := 0.0
+		profName := usergroupMap[rc.username]
+		ownerID := 1
+		if b, ok := batchesMap[rc.batchID]; ok {
+			price = b.Price
+			if profName == "" {
+				profName = b.ProfileName
+			}
+			ownerID = b.OwnerID
+			b.CardsCount++
+			if status == "available" {
+				b.AvailableCount++
+			} else {
+				b.UsedCount++
+			}
+		}
+
+		if status == "available" {
+			totalAvailCards++
+		} else {
+			totalUsedCards++
+		}
+
+		cardsList = append(cardsList, CardItemData{
+			Username:    rc.username,
+			Password:    rc.password,
+			BatchID:     rc.batchID,
+			ProfileName: profName,
+			Status:      status,
+			Price:       price,
+			ExpTime:     rc.expTime,
+			OwnerID:     ownerID,
+		})
+	}
+
+	var batchList []CardBatchData
+	for _, b := range batchesMap {
+		batchList = append(batchList, *b)
+	}
+	sort.Slice(batchList, func(i, j int) bool {
+		return batchList[i].ID < batchList[j].ID
+	})
+
 	return &BackupAnalysis{
 		FileName:            filepath.Base(filePath),
 		FileSize:            fileSizeMB,
@@ -1129,6 +1523,12 @@ func ParseAdvSQL(filePath string) (*BackupAnalysis, error) {
 		Managers:            mgrList,
 		Subscribers:         subList,
 		HotspotCards:        cardsCount,
+		Batches:             batchList,
+		Cards:               cardsList,
+		TotalBatches:        len(batchList),
+		TotalCardsCount:     len(cardsList),
+		AvailableCardsCount: totalAvailCards,
+		UsedCardsCount:      totalUsedCards,
 		ActiveSubsCount:     activeCount,
 		ExpSubsCount:        expCount,
 		TotalDebt:           totalDebt,

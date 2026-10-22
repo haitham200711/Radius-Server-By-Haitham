@@ -991,6 +991,11 @@
                             <i class="bi bi-shop-window text-info me-1"></i> الموزعين ({{ len .AdvAnalysis.Managers }})
                         </button>
                     </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-bold text-dark" id="adv-cards-tab" data-bs-toggle="tab" data-bs-target="#tab-adv-cards" type="button" role="tab">
+                            <i class="bi bi-credit-card-2-front-fill text-primary me-1"></i> باتشات الكروت ({{ .AdvAnalysis.TotalBatches }})
+                        </button>
+                    </li>
                 </ul>
             </div>
             <div class="card-body p-0">
@@ -1153,6 +1158,41 @@
                             </table>
                         </div>
                     </div>
+                    <!-- 4. Card Batches Sub-Tab -->
+                    <div class="tab-pane fade p-3" id="tab-adv-cards" role="tabpanel">
+                        <div class="table-responsive" style="max-height: 480px;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>كود وسيريال الباتشة</th>
+                                        <th>اسم الباتشة</th>
+                                        <th>الباقة المرتبطة</th>
+                                        <th>الموزع</th>
+                                        <th>سعر الكارت</th>
+                                        <th>إجمالي الكروت</th>
+                                        <th>المتاح للبيع</th>
+                                        <th>المستخدم / المنتهي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{ range .AdvAnalysis.Batches }}
+                                    <tr>
+                                        <td class="text-muted small font-monospace">{{ .ID }}</td>
+                                        <td class="font-monospace fw-bold text-primary">ADV-{{ .Year }}-{{ .NumSer }}</td>
+                                        <td class="fw-semibold">{{ if .Name }}{{ .Name }}{{ else }}<span class="text-muted">دفعة غير معنونة</span>{{ end }}</td>
+                                        <td><span class="badge bg-secondary font-monospace">{{ if .ProfileName }}{{ .ProfileName }}{{ else }}افتراضية{{ end }}</span></td>
+                                        <td><span class="badge bg-info text-dark">{{ .OwnerName }}</span></td>
+                                        <td class="fw-bold text-success">{{ printf "%.2f" .Price }} ج.م</td>
+                                        <td class="fw-bold font-monospace">{{ .CardsCount }}</td>
+                                        <td><span class="badge bg-success shadow-sm">{{ .AvailableCount }} كارت متاح</span></td>
+                                        <td><span class="badge bg-secondary">{{ .UsedCount }} مستخدم</span></td>
+                                    </tr>
+                                    {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1195,6 +1235,13 @@
                                     <i class="bi bi-bar-chart-fill me-1"></i> استيراد ونقل سجلات الاستهلاك والجلسات (Accounting / Traffic Usage) - <span class="fw-bold">{{ .AdvAnalysis.TotalSubSessions }} جلسة ({{ .AdvAnalysis.TotalTrafficDisplay }})</span>
                                 </label>
                                 <div class="text-muted small ms-4">يقوم بنقل جلسات الرفع والتحميل السابقة لكل مشترك في جدول radacct لاحتساب الكوتة المستهلكة والمتبقية بدقة تامة.</div>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="import_cards" value="1" id="chkCards" checked>
+                                <label class="form-check-label fw-semibold text-warning-emphasis" for="chkCards">
+                                    <i class="bi bi-credit-card-2-front-fill me-1 text-warning"></i> استيراد كروت الشحن والباتشات (Hotspot Batches & Cards) - <span class="fw-bold">{{ .AdvAnalysis.TotalBatches }} باتشة ({{ .AdvAnalysis.TotalCardsCount }} كارت)</span>
+                                </label>
+                                <div class="text-muted small ms-4">يقوم بنقل كافة باتشات الكروت وأسعارها وتوليد كروت الشحن القديمة (المتاحة والمستخدمة) وربطها براديوس.</div>
                             </div>
                         </div>
 
