@@ -417,10 +417,11 @@ else
     rm -rf "$TMP_CLONE"
     CLONE_SUCCESS=false
     
-    # Check if GITHUB_TOKEN is provided or clone anonymously
+    # Check if GITHUB_TOKEN or GH_TOKEN is provided or clone anonymously
     CLONE_TARGET="$REPO_URL"
-    if [[ -n "$GITHUB_TOKEN" ]]; then
-        CLONE_TARGET="https://${GITHUB_TOKEN}@github.com/haitham200711/Radius-Server-By-Haitham.git"
+    TOKEN="${GITHUB_TOKEN:-$GH_TOKEN}"
+    if [[ -n "$TOKEN" ]]; then
+        CLONE_TARGET="https://${TOKEN}@github.com/haitham200711/Radius-Server-By-Haitham.git"
     fi
 
     if git clone --depth 1 "$CLONE_TARGET" "$TMP_CLONE" 2>/dev/null; then
