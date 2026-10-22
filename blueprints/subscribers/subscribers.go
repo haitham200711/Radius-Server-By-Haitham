@@ -139,34 +139,36 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	var onlineCount int
 	_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT username) FROM radacct WHERE acctstoptime IS NULL`).Scan(&onlineCount)
 
-	// 3. Count total matching subscribers
-	countQuery := `SELECT COUNT(DISTINCT rc.username)
-	FROM radcheck rc
-	LEFT JOIN subscribers s ON rc.username = s.username
-	WHERE rc.attribute = 'Cleartext-Password'`
-
+	// 3. Count total matching subscribers (Fast query driving from subscribers table)
+	countQuery := `SELECT COUNT(*) FROM subscribers s`
+	var countWhere []string
 	var countArgs []interface{}
+
 	if search != "" {
-		countQuery += " AND (rc.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?)"
+		countWhere = append(countWhere, "(s.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?)")
 		searchArg := "%" + search + "%"
 		countArgs = append(countArgs, searchArg, searchArg, searchArg, searchArg)
 	}
 
 	if statusFilter == "online" {
-		countQuery += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+		countWhere = append(countWhere, "s.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)")
 	} else if statusFilter == "offline" {
-		countQuery += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+		countWhere = append(countWhere, "s.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)")
 	} else if statusFilter == "expired_time" {
-		countQuery += " AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)"
+		countWhere = append(countWhere, "((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)")
 	} else if statusFilter == "expired_quota" {
-		countQuery += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
+		countWhere = append(countWhere, "s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND (s.last_renewed_at IS NULL OR acctstarttime >= s.last_renewed_at)) >= s.quota_bytes")
 	} else if statusFilter == "loan" {
-		countQuery += " AND s.loan_active = 1"
+		countWhere = append(countWhere, "s.loan_active = 1")
 	}
 
 	if resellerFilter > 0 {
-		countQuery += " AND s.reseller_id = ?"
+		countWhere = append(countWhere, "s.reseller_id = ?")
 		countArgs = append(countArgs, resellerFilter)
+	}
+
+	if len(countWhere) > 0 {
+		countQuery += " WHERE " + strings.Join(countWhere, " AND ")
 	}
 
 	var totalCount int
@@ -184,19 +186,19 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	// 4. Query paginated subscribers
+	// 4. Query paginated subscribers directly from subscribers table
 	query := `SELECT 
-		COALESCE(s.id, 0),
+		s.id,
 		COALESCE(s.contract_no, '-'),
-		COALESCE(s.full_name, rc.username),
-		rc.username,
+		COALESCE(s.full_name, s.username),
+		s.username,
 		COALESCE(rc.value, ''),
 		COALESCE(s.phone, '-'),
 		COALESCE(s.address, '-'),
 		COALESCE(s.debt, 0.00),
 		COALESCE(s.balance, 0.00),
-		COALESCE(s.profile_name, COALESCE(rug.groupname, '')),
-		COALESCE(s.static_ip, COALESCE(rr.value, '')),
+		COALESCE(s.profile_name, ''),
+		COALESCE(s.static_ip, ''),
 		COALESCE(s.quota_bytes, 0),
 		s.expiration_date,
 		COALESCE(s.status, 'active'),
@@ -208,42 +210,45 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		COALESCE(s.loan_hours, 0),
 		COALESCE(s.loan_quota_bytes, 0),
 		COALESCE(s.loan_deduction_type, 'full')
-	FROM radcheck rc
-	LEFT JOIN subscribers s ON rc.username = s.username
-	LEFT JOIN resellers res ON s.reseller_id = res.id
-	LEFT JOIN radusergroup rug ON rc.username = rug.username
-	LEFT JOIN radreply rr ON rc.username = rr.username AND rr.attribute = 'Framed-IP-Address'
-	WHERE rc.attribute = 'Cleartext-Password'`
+	FROM subscribers s
+	LEFT JOIN radcheck rc ON s.username = rc.username AND rc.attribute = 'Cleartext-Password'
+	LEFT JOIN resellers res ON s.reseller_id = res.id`
 
+	var whereClauses []string
 	var args []interface{}
 	if search != "" {
-		query += " AND (rc.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?)"
+		whereClauses = append(whereClauses, "(s.username LIKE ? OR s.full_name LIKE ? OR s.contract_no LIKE ? OR s.phone LIKE ?)")
 		searchArg := "%" + search + "%"
 		args = append(args, searchArg, searchArg, searchArg, searchArg)
 	}
 
 	if statusFilter == "online" {
-		query += " AND rc.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+		whereClauses = append(whereClauses, "s.username IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)")
 	} else if statusFilter == "offline" {
-		query += " AND rc.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)"
+		whereClauses = append(whereClauses, "s.username NOT IN (SELECT username FROM radacct WHERE acctstoptime IS NULL)")
 	} else if statusFilter == "expired_time" {
-		query += " AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)"
+		whereClauses = append(whereClauses, "((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)")
 	} else if statusFilter == "expired_quota" {
-		query += " AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = rc.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes"
+		whereClauses = append(whereClauses, "s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND (s.last_renewed_at IS NULL OR acctstarttime >= s.last_renewed_at)) >= s.quota_bytes")
 	} else if statusFilter == "loan" {
-		query += " AND s.loan_active = 1"
+		whereClauses = append(whereClauses, "s.loan_active = 1")
 	}
 
 	if resellerFilter > 0 {
-		query += " AND s.reseller_id = ?"
+		whereClauses = append(whereClauses, "s.reseller_id = ?")
 		args = append(args, resellerFilter)
 	}
 
-	query += " GROUP BY rc.username ORDER BY COALESCE(s.id, rc.id) DESC LIMIT ? OFFSET ?"
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	query += " ORDER BY s.id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
 	rows, err := bp.db.Query(query, args...)
 	var list []SubscriberItem
+	now := time.Now()
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -293,36 +298,6 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 					s.QuotaDisplay = "مفتوح ∞"
 				}
 
-				// Query traffic consumed from radacct
-				var usedBytes int64
-				if lastRenewed.Valid {
-					_ = bp.db.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ? AND acctstarttime >= ?`, s.Username, lastRenewed.Time).Scan(&usedBytes)
-				} else {
-					_ = bp.db.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ?`, s.Username).Scan(&usedBytes)
-				}
-				s.UsedBytes = usedBytes
-				s.UsedGB = float64(usedBytes) / (1024 * 1024 * 1024)
-				s.UsedDisplay = database.FormatBytesHuman(usedBytes)
-
-				if s.QuotaBytes > 0 {
-					remBytes := s.QuotaBytes - usedBytes
-					if remBytes < 0 {
-						remBytes = 0
-					}
-					s.RemainingBytes = remBytes
-					s.RemainingGB = float64(remBytes) / (1024 * 1024 * 1024)
-					s.RemainingDisplay = database.FormatBytesHuman(remBytes)
-					s.UsagePercent = (float64(usedBytes) / float64(s.QuotaBytes)) * 100.0
-					if s.UsagePercent > 100.0 {
-						s.UsagePercent = 100.0
-					}
-				} else {
-					s.RemainingBytes = -1
-					s.RemainingGB = -1
-					s.RemainingDisplay = "مفتوح ∞"
-					s.UsagePercent = 0.0
-				}
-
 				if exp.Valid {
 					s.ExpirationDate = exp.Time.Format("2006-01-02 15:04")
 				} else {
@@ -335,39 +310,88 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 					s.OnlineIP = liveIP
 				}
 
-				// Calculate exact real-time status: active, expired_time, expired_quota, expired_both, disabled
-				now := time.Now()
-				isTimeExpired := (exp.Valid && now.After(exp.Time)) || s.LoanActive
-				isQuotaExpired := s.QuotaBytes > 0 && s.RemainingBytes <= 0
-
-				s.IsTimeExpired = isTimeExpired
-				s.IsQuotaExpired = isQuotaExpired
-
-				if s.Status == "disabled" || s.Status == "suspended" {
-					s.StatusCode = "disabled"
-					s.StatusText = "معطل"
-				} else if s.LoanActive {
-					// Subscribers on active loan are expired subscribers granted emergency grace period
-					s.StatusCode = "expired_time"
-					s.StatusText = "منتهي وقت"
-				} else if isTimeExpired && isQuotaExpired {
-					s.StatusCode = "expired_both"
-					s.StatusText = "منتهي وقت وكوتة"
-				} else if isTimeExpired {
-					s.StatusCode = "expired_time"
-					s.StatusText = "منتهي وقت"
-				} else if isQuotaExpired {
-					s.StatusCode = "expired_quota"
-					s.StatusText = "منتهي كوتة"
-				} else if s.Status == "expired" {
-					s.StatusCode = "expired_time"
-					s.StatusText = "منتهي وقت"
-				} else {
-					s.StatusCode = "active"
-					s.StatusText = "نشط"
-				}
+				s.IsTimeExpired = (exp.Valid && now.After(exp.Time)) || s.LoanActive
 
 				list = append(list, s)
+			}
+		}
+	}
+
+	// 5. BULK FETCH USAGE (1 single bulk query for all subscribers on page - eliminates N+1 latency!)
+	if len(list) > 0 {
+		uArgs := make([]interface{}, len(list))
+		placeholders := make([]string, len(list))
+		for i, it := range list {
+			uArgs[i] = it.Username
+			placeholders[i] = "?"
+		}
+
+		bulkQ := fmt.Sprintf(`SELECT r.username, COALESCE(SUM(r.acctinputoctets + r.acctoutputoctets), 0)
+			FROM radacct r
+			WHERE r.username IN (%s)
+			GROUP BY r.username`, strings.Join(placeholders, ","))
+
+		uRows, err := bp.db.Query(bulkQ, uArgs...)
+		if err == nil {
+			usageMap := make(map[string]int64)
+			for uRows.Next() {
+				var u string
+				var b int64
+				if err := uRows.Scan(&u, &b); err == nil {
+					usageMap[u] = b
+				}
+			}
+			uRows.Close()
+
+			for i := range list {
+				usedBytes := usageMap[list[i].Username]
+				list[i].UsedBytes = usedBytes
+				list[i].UsedGB = float64(usedBytes) / (1024 * 1024 * 1024)
+				list[i].UsedDisplay = database.FormatBytesHuman(usedBytes)
+
+				if list[i].QuotaBytes > 0 {
+					remBytes := list[i].QuotaBytes - usedBytes
+					if remBytes < 0 {
+						remBytes = 0
+					}
+					list[i].RemainingBytes = remBytes
+					list[i].RemainingGB = float64(remBytes) / (1024 * 1024 * 1024)
+					list[i].RemainingDisplay = database.FormatBytesHuman(remBytes)
+					list[i].UsagePercent = (float64(usedBytes) / float64(list[i].QuotaBytes)) * 100.0
+					if list[i].UsagePercent > 100.0 {
+						list[i].UsagePercent = 100.0
+					}
+					list[i].IsQuotaExpired = remBytes <= 0
+				} else {
+					list[i].RemainingBytes = -1
+					list[i].RemainingGB = -1
+					list[i].RemainingDisplay = "مفتوح ∞"
+					list[i].UsagePercent = 0.0
+					list[i].IsQuotaExpired = false
+				}
+
+				if list[i].Status == "disabled" || list[i].Status == "suspended" {
+					list[i].StatusCode = "disabled"
+					list[i].StatusText = "معطل"
+				} else if list[i].LoanActive {
+					list[i].StatusCode = "expired_time"
+					list[i].StatusText = "منتهي وقت"
+				} else if list[i].IsTimeExpired && list[i].IsQuotaExpired {
+					list[i].StatusCode = "expired_both"
+					list[i].StatusText = "منتهي وقت وكوتة"
+				} else if list[i].IsTimeExpired {
+					list[i].StatusCode = "expired_time"
+					list[i].StatusText = "منتهي وقت"
+				} else if list[i].IsQuotaExpired {
+					list[i].StatusCode = "expired_quota"
+					list[i].StatusText = "منتهي كوتة"
+				} else if list[i].Status == "expired" {
+					list[i].StatusCode = "expired_time"
+					list[i].StatusText = "منتهي وقت"
+				} else {
+					list[i].StatusCode = "active"
+					list[i].StatusText = "نشط"
+				}
 			}
 		}
 	}

@@ -29,6 +29,24 @@ type DB struct {
 	Driver string
 }
 
+var (
+	metricsMu         sync.RWMutex
+	cachedMetrics     *models.DashboardMetrics
+	cachedMetricsTime time.Time
+
+	loginSummaryMu         sync.RWMutex
+	cachedLoginSummary     *models.SubscriberLoginSummary
+	cachedLoginSummaryTime time.Time
+
+	topConsumersMu         sync.RWMutex
+	cachedTopConsumers     = make(map[string][]models.TopConsumerItem)
+	cachedTopConsumersTime = make(map[string]time.Time)
+
+	totalLoginsMu         sync.RWMutex
+	cachedTotalLogins     int
+	cachedTotalLoginsTime time.Time
+)
+
 func Connect(cfg *config.Config) (*DB, error) {
 	driver := cfg.DBDriver
 	dsn := cfg.DBDSN
@@ -38,8 +56,9 @@ func Connect(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	db.SetMaxOpenConns(50)
-	db.SetMaxIdleConns(15)
+	db.SetMaxOpenConns(100)
+	db.SetMaxIdleConns(30)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 	db.SetConnMaxLifetime(30 * time.Minute)
 
 	if err := db.Ping(); err != nil {
@@ -783,28 +802,48 @@ func (d *DB) InitSchema() error {
 // --- Metrics & Dashboard ---
 
 func (d *DB) GetMetrics() (*models.DashboardMetrics, error) {
+	metricsMu.RLock()
+	if cachedMetrics != nil && time.Since(cachedMetricsTime) < 3*time.Second {
+		cp := *cachedMetrics
+		metricsMu.RUnlock()
+		return &cp, nil
+	}
+	metricsMu.RUnlock()
+
 	m := &models.DashboardMetrics{}
 
-	// 1. Subscribers
-	var subsCount int64
-	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers").Scan(&subsCount)
-	if subsCount > 0 {
-		m.TotalSubscribers = subsCount
-	} else {
+	// 1. Consolidated Subscribers Query
+	_ = d.QueryRow(`SELECT 
+		COUNT(*),
+		COALESCE(SUM(CASE WHEN status = 'active' AND (expiration_date IS NULL OR expiration_date >= NOW()) THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status = 'expired' OR (expiration_date IS NOT NULL AND expiration_date < NOW()) THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status = 'active' AND expiration_date IS NOT NULL AND expiration_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 3 DAY) THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(debt), 0)
+	FROM subscribers`).Scan(
+		&m.TotalSubscribers,
+		&m.ActiveSubscribers,
+		&m.ExpiredSubscribers,
+		&m.ExpiringSoonSubscribers,
+		&m.TotalDebts,
+	)
+
+	// Fallback to radcheck if subscribers table is empty
+	if m.TotalSubscribers == 0 {
 		_ = d.QueryRow("SELECT COUNT(DISTINCT username) FROM radcheck").Scan(&m.TotalSubscribers)
 	}
 
-	// Active / Expired / Expiring soon
-	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE status = 'active' AND (expiration_date IS NULL OR expiration_date >= NOW())").Scan(&m.ActiveSubscribers)
-	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE status = 'expired' OR (expiration_date IS NOT NULL AND expiration_date < NOW())").Scan(&m.ExpiredSubscribers)
-	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE status = 'active' AND expiration_date IS NOT NULL AND expiration_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 3 DAY)").Scan(&m.ExpiringSoonSubscribers)
-
-	// Online Sessions
+	// 2. Active Online Sessions (uses idx_radacct_active)
 	_ = d.QueryRow("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL").Scan(&m.OnlineSessions)
 
-	// Online Subscribers vs Online Cards
-	_ = d.QueryRow("SELECT COUNT(DISTINCT r.username) FROM radacct r JOIN subscribers s ON r.username = s.username WHERE r.acctstoptime IS NULL").Scan(&m.OnlineSubscribers)
-	_ = d.QueryRow("SELECT COUNT(DISTINCT r.username) FROM radacct r JOIN cards c ON r.username = c.username WHERE r.acctstoptime IS NULL").Scan(&m.OnlineCards)
+	// Online Subscribers vs Online Cards (scans only active sessions, NOT 220k rows!)
+	_ = d.QueryRow(`SELECT 
+		COALESCE(SUM(CASE WHEN s.username IS NOT NULL THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN c.username IS NOT NULL THEN 1 ELSE 0 END), 0)
+	FROM radacct r
+	LEFT JOIN subscribers s ON r.username = s.username
+	LEFT JOIN cards c ON r.username = c.username
+	WHERE r.acctstoptime IS NULL`).Scan(&m.OnlineSubscribers, &m.OnlineCards)
+
 	if m.OnlineSubscribers == 0 && m.OnlineSessions > 0 {
 		if m.OnlineCards > 0 {
 			m.OnlineSubscribers = m.OnlineSessions - m.OnlineCards
@@ -816,23 +855,27 @@ func (d *DB) GetMetrics() (*models.DashboardMetrics, error) {
 		}
 	}
 
-	// 2. Cards
-	_ = d.QueryRow("SELECT COUNT(*) FROM cards").Scan(&m.TotalCards)
-	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE status = 'available'").Scan(&m.ActiveCards)
+	// 3. Consolidated Cards Query
+	_ = d.QueryRow(`SELECT 
+		COUNT(*),
+		COALESCE(SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END), 0)
+	FROM cards`).Scan(&m.TotalCards, &m.ActiveCards)
 
-	// 3. Financials (Today's Revenue & Debts)
+	// 4. Financials (Today's Revenue)
 	_ = d.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM billing_transactions WHERE DATE(created_at) = CURDATE() AND payment_status = 'paid'").Scan(&m.TodayRevenue)
 	if m.TodayRevenue == 0 {
-		// Fallback to today's batches if billing_transactions is empty
 		_ = d.QueryRow("SELECT COALESCE(SUM(total_price), 0) FROM batches WHERE DATE(created_at) = CURDATE()").Scan(&m.TodayRevenue)
 	}
-	_ = d.QueryRow("SELECT COALESCE(SUM(debt), 0) FROM subscribers WHERE debt > 0").Scan(&m.TotalDebts)
 
-	// 4. Infrastructure & General
+	// 5. Infrastructure & General
 	_ = d.QueryRow("SELECT COUNT(*) FROM resellers WHERE is_active = 1").Scan(&m.TotalResellers)
 	_ = d.QueryRow("SELECT COUNT(*) FROM nas").Scan(&m.TotalRouters)
-	_ = d.QueryRow("SELECT COALESCE(SUM(acctinputoctets), 0), COALESCE(SUM(acctoutputoctets), 0) FROM radacct").Scan(&m.TotalDownload, &m.TotalUpload)
 	_ = d.QueryRow("SELECT COALESCE(SUM(total_price), 0) FROM batches").Scan(&m.TotalRevenue)
+
+	metricsMu.Lock()
+	cachedMetrics = m
+	cachedMetricsTime = time.Now()
+	metricsMu.Unlock()
 
 	return m, nil
 }
@@ -2037,6 +2080,7 @@ func (d *DB) GetProfiles() ([]models.Profile, error) {
 			list = append(list, p)
 		}
 	}
+
 	return list, nil
 }
 
@@ -2856,6 +2900,7 @@ func (d *DB) GetCardTemplates() ([]models.CardTemplate, error) {
 			list = append(list, t)
 		}
 	}
+
 	return list, nil
 }
 
@@ -3043,6 +3088,7 @@ func (d *DB) GetSSTPClients() ([]models.SSTPClient, error) {
 			list = append(list, c)
 		}
 	}
+
 	return list, nil
 }
 
@@ -3214,6 +3260,7 @@ func (d *DB) GetSSTPStaticRoutes() ([]models.SSTPStaticRoute, error) {
 			list = append(list, sr)
 		}
 	}
+
 	return list, nil
 }
 
@@ -4186,6 +4233,7 @@ func (d *DB) GetWhatsAppTemplates() ([]models.WhatsAppTemplate, error) {
 			list = append(list, t)
 		}
 	}
+
 	return list, nil
 }
 
@@ -4606,6 +4654,7 @@ func (d *DB) GetProfileBaseSpeeds() ([]models.ProfileBaseSpeed, error) {
 			list = append(list, item)
 		}
 	}
+
 	return list, nil
 }
 
@@ -5013,6 +5062,7 @@ func (d *DB) GetCafeRouters() ([]models.NAS, error) {
 			list = append(list, n)
 		}
 	}
+
 	return list, nil
 }
 
@@ -5086,6 +5136,7 @@ func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 			list = append(list, b)
 		}
 	}
+
 	return list, nil
 }
 
@@ -5438,7 +5489,7 @@ func (d *DB) DisconnectCard(code string) (bool, error) {
 // and cards table: tracking first logins, binding & locking to client MAC address, and auto-disabling expired cards.
 func (d *DB) StartCardSyncDaemon() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -5449,107 +5500,112 @@ func (d *DB) StartCardSyncDaemon() {
 
 func (d *DB) syncActiveCards() {
 	// 1. MAC Conversion After First Session (التحويل لماك أدرس بعد انتهاء أول جلسة عند تسجيل الخروج):
-	// For cards with convert_mac_after_session=1 and is_mac_converted=0,
-	// when the customer finished at least one session in radacct (acctstoptime IS NOT NULL)
-	// and currently has NO active session running (acctstoptime IS NULL).
-	rowsConvert, err := d.Query(`SELECT c.id, c.username,
-		(SELECT r.callingstationid 
-		 FROM radacct r 
-		 WHERE (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
-		   AND r.callingstationid != '' AND r.acctstoptime IS NOT NULL
-		 ORDER BY r.radacctid DESC LIMIT 1) AS last_mac
-		FROM cards c
-		WHERE c.convert_mac_after_session = 1 
-		  AND c.is_mac_converted = 0
-		  AND EXISTS (
-		      SELECT 1 FROM radacct r1 
-		      WHERE (r1.username = c.username OR (c.original_code != '' AND r1.username = c.original_code))
-		        AND r1.acctstoptime IS NOT NULL
-		  )
-		  AND NOT EXISTS (
-		      SELECT 1 FROM radacct r2 
-		      WHERE (r2.username = c.username OR (c.original_code != '' AND r2.username = c.original_code))
-		        AND r2.acctstoptime IS NULL
-		  )`)
-	if err == nil {
-		type convertEntry struct {
-			cardID   int64
-			username string
-			mac      string
-		}
-		var toConvert []convertEntry
-		for rowsConvert.Next() {
-			var ce convertEntry
-			var sqlMac sql.NullString
-			if err := rowsConvert.Scan(&ce.cardID, &ce.username, &sqlMac); err == nil && sqlMac.Valid && sqlMac.String != "" {
-				ce.mac = strings.TrimSpace(sqlMac.String)
-				toConvert = append(toConvert, ce)
+	var needConvert int
+	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE convert_mac_after_session = 1 AND is_mac_converted = 0").Scan(&needConvert)
+	if needConvert > 0 {
+		rowsConvert, err := d.Query(`SELECT c.id, c.username,
+			(SELECT r.callingstationid 
+			 FROM radacct r 
+			 WHERE r.username = c.username
+			   AND r.callingstationid != '' AND r.acctstoptime IS NOT NULL
+			 ORDER BY r.radacctid DESC LIMIT 1) AS last_mac
+			FROM cards c
+			WHERE c.convert_mac_after_session = 1 
+			  AND c.is_mac_converted = 0
+			  AND EXISTS (
+			      SELECT 1 FROM radacct r1 
+			      WHERE r1.username = c.username
+			        AND r1.acctstoptime IS NOT NULL
+			  )
+			  AND NOT EXISTS (
+			      SELECT 1 FROM radacct r2 
+			      WHERE r2.username = c.username
+			        AND r2.acctstoptime IS NULL
+			  )`)
+		if err == nil {
+			type convertEntry struct {
+				cardID   int64
+				username string
+				mac      string
 			}
-		}
-		rowsConvert.Close()
+			var toConvert []convertEntry
+			for rowsConvert.Next() {
+				var ce convertEntry
+				var sqlMac sql.NullString
+				if err := rowsConvert.Scan(&ce.cardID, &ce.username, &sqlMac); err == nil && sqlMac.Valid && sqlMac.String != "" {
+					ce.mac = strings.TrimSpace(sqlMac.String)
+					toConvert = append(toConvert, ce)
+				}
+			}
+			rowsConvert.Close()
 
-		for _, item := range toConvert {
-			mac := item.mac
-			oldUser := item.username
+			for _, item := range toConvert {
+				mac := item.mac
+				oldUser := item.username
 
-			// If any other card currently holds this MAC as username, revert it to its original_code
-			// This completely prevents MySQL "Duplicate entry for key username" and allows multiple cards on same MAC
-			_, _ = d.Exec(`UPDATE cards SET username = original_code WHERE username = ? AND id != ?`, mac, item.cardID)
+				// If any other card currently holds this MAC as username, revert it to its original_code
+				// This completely prevents MySQL "Duplicate entry for key username" and allows multiple cards on same MAC
+				_, _ = d.Exec(`UPDATE cards SET username = original_code WHERE username = ? AND id != ?`, mac, item.cardID)
 
-			// Update cards table: set username to mac, update password and calling_mac, mark converted
-			_, _ = d.Exec(`UPDATE cards SET username = ?, password = ?, calling_mac = ?, is_mac_converted = 1 WHERE id = ?`, mac, mac, mac, item.cardID)
+				// Update cards table: set username to mac, update password and calling_mac, mark converted
+				_, _ = d.Exec(`UPDATE cards SET username = ?, password = ?, calling_mac = ?, is_mac_converted = 1 WHERE id = ?`, mac, mac, mac, item.cardID)
 
-			// Recreate FreeRADIUS radcheck authentication for the MAC
-			_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", oldUser)
-			_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", mac)
-			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", mac, mac)
-			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", mac, mac)
-			_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Accept')", mac)
+				// Recreate FreeRADIUS radcheck authentication for the MAC
+				_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", oldUser)
+				_, _ = d.Exec("DELETE FROM radcheck WHERE username = ?", mac)
+				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", mac, mac)
+				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", mac, mac)
+				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Accept')", mac)
 
-			// Migrate radreply and radusergroup to the MAC username
-			_, _ = d.Exec("UPDATE radreply SET username = ? WHERE username = ?", mac, oldUser)
-			_, _ = d.Exec("DELETE FROM radusergroup WHERE username = ?", mac)
-			_, _ = d.Exec("UPDATE radusergroup SET username = ? WHERE username = ?", mac, oldUser)
+				// Migrate radreply and radusergroup to the MAC username
+				_, _ = d.Exec("UPDATE radreply SET username = ? WHERE username = ?", mac, oldUser)
+				_, _ = d.Exec("DELETE FROM radusergroup WHERE username = ?", mac)
+				_, _ = d.Exec("UPDATE radusergroup SET username = ? WHERE username = ?", mac, oldUser)
+			}
 		}
 	}
 
 	// 2. MAC Binding & Locking: For cards with bind_mac=1 or lock_mac=1 that have not captured calling_mac yet
-	rowsMAC, err := d.Query(`SELECT c.id, c.username, c.lock_mac, r.callingstationid
-		FROM cards c
-		JOIN radacct r ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
-		WHERE (c.bind_mac = 1 OR c.lock_mac = 1) AND (c.calling_mac = '' OR c.calling_mac IS NULL)
-		  AND r.callingstationid != ''
-		GROUP BY c.id, c.username, c.lock_mac, r.callingstationid`)
-	if err == nil {
-		type macEntry struct {
-			cardID   int64
-			username string
-			lockMAC  bool
-			mac      string
-		}
-		var list []macEntry
-		for rowsMAC.Next() {
-			var me macEntry
-			if err := rowsMAC.Scan(&me.cardID, &me.username, &me.lockMAC, &me.mac); err == nil {
-				list = append(list, me)
+	var needBind int
+	_ = d.QueryRow("SELECT COUNT(*) FROM cards WHERE (bind_mac = 1 OR lock_mac = 1) AND (calling_mac = '' OR calling_mac IS NULL)").Scan(&needBind)
+	if needBind > 0 {
+		rowsMAC, err := d.Query(`SELECT c.id, c.username, c.lock_mac, r.callingstationid
+			FROM cards c
+			JOIN radacct r ON r.username = c.username
+			WHERE (c.bind_mac = 1 OR c.lock_mac = 1) AND (c.calling_mac = '' OR c.calling_mac IS NULL)
+			  AND r.callingstationid != ''
+			GROUP BY c.id, c.username, c.lock_mac, r.callingstationid`)
+		if err == nil {
+			type macEntry struct {
+				cardID   int64
+				username string
+				lockMAC  bool
+				mac      string
 			}
-		}
-		rowsMAC.Close()
+			var list []macEntry
+			for rowsMAC.Next() {
+				var me macEntry
+				if err := rowsMAC.Scan(&me.cardID, &me.username, &me.lockMAC, &me.mac); err == nil {
+					list = append(list, me)
+				}
+			}
+			rowsMAC.Close()
 
-		for _, item := range list {
-			_, _ = d.Exec("UPDATE cards SET calling_mac = ? WHERE id = ?", item.mac, item.cardID)
-			if item.lockMAC {
-				// Lock FreeRADIUS strictly to this MAC address
-				_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", item.username)
-				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", item.username, item.mac)
+			for _, item := range list {
+				_, _ = d.Exec("UPDATE cards SET calling_mac = ? WHERE id = ?", item.mac, item.cardID)
+				if item.lockMAC {
+					// Lock FreeRADIUS strictly to this MAC address
+					_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", item.username)
+					_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", item.username, item.mac)
+				}
 			}
 		}
 	}
 
-	// 3. First Login Tracking for Calendar/First-Login time calculation mode
+	// 3. First Login Tracking for Calendar/First-Login time calculation mode (Direct index join)
 	rowsLogin, err := d.Query(`SELECT c.id, c.username, c.time_limit_seconds, c.time_calc_mode, MIN(r.acctstarttime)
 		FROM cards c
-		JOIN radacct r ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
+		JOIN radacct r ON r.username = c.username
 		WHERE c.first_login_at IS NULL
 		GROUP BY c.id, c.username, c.time_limit_seconds, c.time_calc_mode`)
 	if err == nil {
@@ -5608,10 +5664,10 @@ func (d *DB) syncActiveCards() {
 		}
 	}
 
-	// Check quota-exhausted cards
+	// Check quota-exhausted cards (Direct index join)
 	rowsQuota, err := d.Query(`SELECT c.id, c.username, c.quota_bytes, COALESCE(SUM(r.acctinputoctets + r.acctoutputoctets), 0)
 		FROM cards c
-		JOIN radacct r ON (r.username = c.username OR (c.original_code != '' AND r.username = c.original_code))
+		JOIN radacct r ON r.username = c.username
 		WHERE c.status = 'available' AND c.stop_on_quota = 1 AND c.quota_bytes > 0
 		GROUP BY c.id, c.username, c.quota_bytes
 		HAVING SUM(r.acctinputoctets + r.acctoutputoctets) >= c.quota_bytes`)
@@ -6645,10 +6701,31 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 
 	whereSQL := strings.Join(whereClauses, " AND ")
 
-	// 1. Total Count
+	// 1. Total Count (cached when unfiltered for instant response)
 	var total int
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM radacct r LEFT JOIN subscribers s ON r.username = s.username WHERE %s", whereSQL)
-	_ = d.QueryRow(countQuery, args...).Scan(&total)
+	isUnfiltered := (search == "" && status == "" && nasIP == "" && fromDate == "" && toDate == "")
+	if isUnfiltered {
+		totalLoginsMu.RLock()
+		if cachedTotalLogins > 0 && time.Since(cachedTotalLoginsTime) < 30*time.Second {
+			total = cachedTotalLogins
+			totalLoginsMu.RUnlock()
+		} else {
+			totalLoginsMu.RUnlock()
+			_ = d.QueryRow("SELECT COUNT(*) FROM radacct").Scan(&total)
+			totalLoginsMu.Lock()
+			cachedTotalLogins = total
+			cachedTotalLoginsTime = time.Now()
+			totalLoginsMu.Unlock()
+		}
+	} else {
+		var countQuery string
+		if search != "" {
+			countQuery = fmt.Sprintf("SELECT COUNT(*) FROM radacct r LEFT JOIN subscribers s ON r.username = s.username WHERE %s", whereSQL)
+		} else {
+			countQuery = fmt.Sprintf("SELECT COUNT(*) FROM radacct r WHERE %s", whereSQL)
+		}
+		_ = d.QueryRow(countQuery, args...).Scan(&total)
+	}
 
 	// 2. Data Query
 	dataQuery := fmt.Sprintf(`SELECT 
@@ -6674,10 +6751,9 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 	LEFT JOIN nas n ON r.nasipaddress = n.nasname
 	WHERE %s
 	ORDER BY r.radacctid DESC
-	LIMIT ? OFFSET ?`, whereSQL)
+	LIMIT %d OFFSET %d`, whereSQL, limit, offset)
 
-	queryArgs := append(args, limit, offset)
-	rows, err := d.Query(dataQuery, queryArgs...)
+	rows, err := d.Query(dataQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -6768,6 +6844,17 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 }
 
 func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate string) (*models.SubscriberLoginSummary, error) {
+	isUnfiltered := (search == "" && status == "" && nasIP == "" && fromDate == "" && toDate == "")
+	if isUnfiltered {
+		loginSummaryMu.RLock()
+		if cachedLoginSummary != nil && time.Since(cachedLoginSummaryTime) < 60*time.Second {
+			cp := *cachedLoginSummary
+			loginSummaryMu.RUnlock()
+			return &cp, nil
+		}
+		loginSummaryMu.RUnlock()
+	}
+
 	whereClauses := []string{"1=1"}
 	var args []interface{}
 
@@ -6811,17 +6898,31 @@ func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate s
 
 	whereSQL := strings.Join(whereClauses, " AND ")
 
-	query := fmt.Sprintf(`SELECT 
-		COUNT(*),
-		COUNT(DISTINCT r.username),
-		COALESCE(SUM(CASE WHEN r.acctstoptime IS NULL THEN 1 ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN r.acctstoptime IS NOT NULL THEN 1 ELSE 0 END), 0),
-		COALESCE(SUM(r.acctoutputoctets), 0),
-		COALESCE(SUM(r.acctinputoctets), 0),
-		COALESCE(AVG(r.acctsessiontime), 0)
-	FROM radacct r
-	LEFT JOIN subscribers s ON r.username = s.username
-	WHERE %s`, whereSQL)
+	var query string
+	if search != "" {
+		query = fmt.Sprintf(`SELECT 
+			COUNT(*),
+			COUNT(DISTINCT r.username),
+			COALESCE(SUM(CASE WHEN r.acctstoptime IS NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN r.acctstoptime IS NOT NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(r.acctoutputoctets), 0),
+			COALESCE(SUM(r.acctinputoctets), 0),
+			COALESCE(AVG(r.acctsessiontime), 0)
+		FROM radacct r
+		LEFT JOIN subscribers s ON r.username = s.username
+		WHERE %s`, whereSQL)
+	} else {
+		query = fmt.Sprintf(`SELECT 
+			COUNT(*),
+			COUNT(DISTINCT r.username),
+			COALESCE(SUM(CASE WHEN r.acctstoptime IS NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN r.acctstoptime IS NOT NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(r.acctoutputoctets), 0),
+			COALESCE(SUM(r.acctinputoctets), 0),
+			COALESCE(AVG(r.acctsessiontime), 0)
+		FROM radacct r
+		WHERE %s`, whereSQL)
+	}
 
 	var (
 		totalSessions, uniqueUsers, onlineCount, closedCount int64
@@ -6846,6 +6947,13 @@ func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate s
 		TotalTrafficDisplay:  FormatBytesHuman(totalTraffic),
 		AvgDurationSeconds:   int64(avgSec),
 		AvgDurationDisplay:   FormatDurationArabic(int64(avgSec)),
+	}
+
+	if isUnfiltered {
+		loginSummaryMu.Lock()
+		cachedLoginSummary = summary
+		cachedLoginSummaryTime = time.Now()
+		loginSummaryMu.Unlock()
 	}
 
 	return summary, nil
@@ -7385,7 +7493,7 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	sort.Sort(sort.Reverse(sort.IntSlice(sortedYears)))
 	report.AvailableYears = sortedYears
 
-	// 4. Monthly Usage for Selected Year
+	// 4. Monthly Usage for Selected Year (Direct range on idx_radacct_user_start)
 	type monthData struct {
 		upBytes   int64
 		downBytes int64
@@ -7395,6 +7503,9 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	}
 	monthMap := make(map[int]monthData)
 
+	startOfYear := fmt.Sprintf("%04d-01-01 00:00:00", year)
+	endOfYear := fmt.Sprintf("%04d-01-01 00:00:00", year+1)
+
 	mRows, err := d.Query(`SELECT 
 		MONTH(acctstarttime) as m,
 		COALESCE(SUM(acctinputoctets), 0),
@@ -7403,8 +7514,8 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 		COUNT(*),
 		COALESCE(SUM(acctsessiontime), 0)
 	FROM radacct
-	WHERE username = ? AND YEAR(acctstarttime) = ?
-	GROUP BY MONTH(acctstarttime)`, username, year)
+	WHERE username = ? AND acctstarttime >= ? AND acctstarttime < ?
+	GROUP BY MONTH(acctstarttime)`, username, startOfYear, endOfYear)
 
 	if err == nil {
 		defer mRows.Close()
@@ -7439,7 +7550,7 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	var yearTotalDown int64
 	var yearTotalDurationSec int64
 
-	// 5. Query daily usage for ALL months in the year in one fast query
+	// 5. Query daily usage for ALL months in the year in one fast query (Direct range on idx_radacct_user_start)
 	type dayData struct {
 		upBytes   int64
 		downBytes int64
@@ -7458,8 +7569,8 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 		COUNT(*),
 		COALESCE(SUM(acctsessiontime), 0)
 	FROM radacct
-	WHERE username = ? AND YEAR(acctstarttime) = ?
-	GROUP BY MONTH(acctstarttime), DAY(acctstarttime)`, username, year)
+	WHERE username = ? AND acctstarttime >= ? AND acctstarttime < ?
+	GROUP BY MONTH(acctstarttime), DAY(acctstarttime)`, username, startOfYear, endOfYear)
 
 	if err == nil {
 		defer dRows.Close()
@@ -7635,6 +7746,19 @@ func (d *DB) GetTopConsumers(year, month int, limit int) ([]models.TopConsumerIt
 		month = int(now.Month())
 	}
 
+	cacheKey := fmt.Sprintf("%d-%d-%d", year, month, limit)
+	topConsumersMu.RLock()
+	if cached, ok := cachedTopConsumers[cacheKey]; ok {
+		if t, okT := cachedTopConsumersTime[cacheKey]; okT && time.Since(t) < 3*time.Minute {
+			topConsumersMu.RUnlock()
+			return cached, nil
+		}
+	}
+	topConsumersMu.RUnlock()
+
+	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
+	endOfMonth := startOfMonth.AddDate(0, 1, 0)
+
 	query := `SELECT 
 		ra.username,
 		COALESCE(s.full_name, ra.username),
@@ -7648,12 +7772,12 @@ func (d *DB) GetTopConsumers(year, month int, limit int) ([]models.TopConsumerIt
 	FROM radacct ra
 	LEFT JOIN subscribers s ON ra.username = s.username
 	LEFT JOIN resellers r ON s.reseller_id = r.id
-	WHERE YEAR(ra.acctstarttime) = ? AND MONTH(ra.acctstarttime) = ?
+	WHERE ra.acctstarttime >= ? AND ra.acctstarttime < ?
 	GROUP BY ra.username, s.full_name, s.contract_no, s.profile_name, r.name
 	ORDER BY tot_b DESC
 	LIMIT ?`
 
-	rows, err := d.Query(query, year, month, limit)
+	rows, err := d.Query(query, startOfMonth, endOfMonth, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -7676,6 +7800,12 @@ func (d *DB) GetTopConsumers(year, month int, limit int) ([]models.TopConsumerIt
 			list = append(list, item)
 		}
 	}
+
+	topConsumersMu.Lock()
+	cachedTopConsumers[cacheKey] = list
+	cachedTopConsumersTime[cacheKey] = time.Now()
+	topConsumersMu.Unlock()
+
 	return list, nil
 }
 
@@ -7700,6 +7830,7 @@ func (d *DB) SearchSubscribersForTraffic(query string, limit int) ([]models.Subs
 			list = append(list, s)
 		}
 	}
+
 	return list, nil
 }
 
