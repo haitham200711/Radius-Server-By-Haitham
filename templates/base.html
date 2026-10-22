@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Unified Modern SaaS Theme -->
-    <link rel="stylesheet" href="/static/css/style.css?v=20261021_bilingual">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261022_clean_sidebar">
 </head>
 <body>
 {{ if .CurrentUser }}
@@ -147,7 +147,7 @@
     <div class="container-fluid px-0">
         <div class="d-flex flex-column flex-lg-row">
             <!-- Sidebar Navigation -->
-            <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex" style="width: 250px; min-width: 250px; max-width: 250px; flex: 0 0 250px;">
+            <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex" style="width: 260px; min-width: 260px; max-width: 260px; flex: 0 0 260px;">
                 <div class="nav flex-column">
                     <!-- 1. الرئيسية -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "dashboard" }}active{{ end }}" href="/dashboard">
@@ -263,31 +263,31 @@
                         <div class="collapse {{ if eq .ActiveMenu "reports" }}show{{ end }} sidebar-submenu flex-column" id="reportsSubmenu">
                             <a class="sidebar-sub-link {{ if and (eq .ActiveMenu "reports") (eq .ActiveTab "traffic") }}active{{ end }}" href="/reports?tab=traffic">
                                 <i class="bi bi-speedometer2 text-primary"></i>
-                                <span>{{ tr .Lang "استهلاك المشترك (شهري ويومي)" "Subscriber Traffic" }}</span>
+                                <span>{{ tr .Lang "استهلاك المشتركين" "Subscriber Traffic" }}</span>
                             </a>
                             <a class="sidebar-sub-link {{ if and (eq .ActiveMenu "reports") (eq .ActiveTab "logins") }}active{{ end }}" href="/reports?tab=logins">
                                 <i class="bi bi-journal-text text-success"></i>
-                                <span>{{ tr .Lang "سجل تسجيل الدخول والجلسات" "Logins & Sessions" }}</span>
+                                <span>{{ tr .Lang "سجل الجلسات" "Logins & Sessions" }}</span>
                             </a>
                             <a class="sidebar-sub-link {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}active{{ end }}" href="/cards">
                                 <i class="bi bi-credit-card-2-front-fill text-warning"></i>
-                                <span>{{ tr .Lang "تقارير ومبيعات الكروت" "Cards & Cafe Reports" }}</span>
+                                <span>{{ tr .Lang "تقارير الكروت" "Cards Reports" }}</span>
                             </a>
                             <a class="sidebar-sub-link {{ if or (eq .ActiveMenu "profiles") (eq .ActiveMenu "speed_control") }}active{{ end }}" href="/profiles">
                                 <i class="bi bi-tags-fill text-info"></i>
-                                <span>{{ tr .Lang "تقارير الباقات والعروض" "Packages & Offers" }}</span>
+                                <span>{{ tr .Lang "تقارير الباقات" "Packages Reports" }}</span>
                             </a>
                             <a class="sidebar-sub-link {{ if and (eq .ActiveMenu "reports") (eq .ActiveTab "reseller_debts") }}active{{ end }}" href="/reports?tab=reseller_debts">
                                 <i class="bi bi-person-exclamation text-danger"></i>
-                                <span>{{ tr .Lang "ديون المشتركين والتسوية" "Subscriber Debts" }}</span>
+                                <span>{{ tr .Lang "ديون المشتركين" "Subscriber Debts" }}</span>
                             </a>
                             <a class="sidebar-sub-link {{ if and (eq .ActiveMenu "reports") (eq .ActiveTab "billing") }}active{{ end }}" href="/reports?tab=billing">
                                 <i class="bi bi-cash-stack text-success"></i>
-                                <span>{{ tr .Lang "سجل العمليات المالية" "Billing & Payments" }}</span>
+                                <span>{{ tr .Lang "العمليات المالية" "Billing & Payments" }}</span>
                             </a>
                             <a class="sidebar-sub-link {{ if and (eq .ActiveMenu "reports") (eq .ActiveTab "radius") }}active{{ end }}" href="/reports?tab=radius">
                                 <i class="bi bi-hdd-network text-secondary"></i>
-                                <span>{{ tr .Lang "سجلات الراديوس الخام" "Raw RADIUS Logs" }}</span>
+                                <span>{{ tr .Lang "سجلات الراديوس" "Raw RADIUS Logs" }}</span>
                             </a>
                         </div>
                     </div>

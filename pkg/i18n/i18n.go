@@ -68,9 +68,13 @@ var translations = map[string]map[string]string{
 		"ar": "SSTP Server",
 		"en": "SSTP Server",
 	},
+	"تقارير النظام": {
+		"ar": "تقارير النظام",
+		"en": "System Reports",
+	},
 	"التقارير": {
-		"ar": "التقارير",
-		"en": "Reports",
+		"ar": "تقارير النظام",
+		"en": "System Reports",
 	},
 	"الواتساب": {
 		"ar": "الواتساب",

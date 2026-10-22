@@ -58,7 +58,7 @@
     --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.08);
     
     /* Dimensions */
-    --sidebar-w: 250px;
+    --sidebar-w: 260px;
     --header-h: 62px;
     --radius-base: 8px;
     --radius-sm: 6px;
@@ -331,8 +331,8 @@ body {
 }
 
 .sidebar-submenu {
-    margin-right: 20px;
-    padding-right: 12px;
+    margin-right: 12px;
+    padding-right: 8px;
     margin-top: 4px;
     margin-bottom: 6px;
     border-right: 2px solid #e2e8f0;
@@ -353,11 +353,11 @@ body {
     display: flex !important;
     flex-direction: row !important;
     align-items: center;
-    gap: 10px;
-    padding: 7px 12px;
+    gap: 8px;
+    padding: 6px 10px;
     color: #64748b;
     text-decoration: none;
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
     transition: all 0.12s ease-in-out;
@@ -370,16 +370,15 @@ body {
 .sidebar-sub-link:hover {
     color: #0d6efd;
     background-color: #f1f5f9;
-    padding-right: 15px;
 }
 
 .sidebar-sub-link.active {
     color: #0d6efd !important;
-    background-color: rgba(13, 110, 253, 0.08) !important;
+    background-color: rgba(13, 110, 253, 0.1) !important;
     font-weight: 700;
     border-right: 3px solid #0d6efd;
-    margin-right: -14px;
-    padding-right: 11px;
+    margin-right: 0 !important;
+    padding-right: 10px !important;
 }
 
 .sidebar-sub-link i {
@@ -817,25 +816,25 @@ html[dir="ltr"] .sidebar-nav-link.active {
 
 html[dir="ltr"] .sidebar-submenu {
     margin-right: 0;
-    margin-left: 20px;
+    margin-left: 12px;
     padding-right: 0;
-    padding-left: 12px;
+    padding-left: 8px;
     border-right: none;
     border-left: 2px solid #e2e8f0;
 }
 
 html[dir="ltr"] .sidebar-sub-link:hover {
-    padding-right: 12px;
-    padding-left: 15px;
+    padding-right: 10px;
+    padding-left: 10px;
 }
 
 html[dir="ltr"] .sidebar-sub-link.active {
     border-right: none;
     border-left: 3px solid #0d6efd;
     margin-right: 0;
-    margin-left: -14px;
-    padding-right: 12px;
-    padding-left: 11px;
+    margin-left: 0 !important;
+    padding-right: 10px;
+    padding-left: 10px !important;
 }
 
 html[dir="ltr"] .submenu-arrow {
