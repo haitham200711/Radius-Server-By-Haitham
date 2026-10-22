@@ -1,67 +1,274 @@
 {{ define "auth_content" }}
-<div class="auth-wrapper">
-    <div class="auth-card position-relative">
-        <!-- Language Switcher in Login Card -->
-        <div class="position-absolute top-0 end-0 m-3">
-            <div class="dropdown">
-                <button class="btn btn-sm btn-light border d-flex align-items-center gap-1 px-2 py-1 shadow-sm rounded-pill fw-semibold text-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.78rem;">
-                    <i class="bi bi-globe2 text-primary"></i>
-                    <span>{{ if eq .Lang "en" }}English{{ else }}العربية{{ end }}</span>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 p-1 mt-1" style="border-radius: 10px; min-width: 140px; font-size: 0.85rem;">
-                    <li>
-                        <a class="dropdown-item py-1 rounded {{ if ne .Lang "en" }}active fw-bold{{ end }}" href="/set-lang?lang=ar">🇪🇬 العربية</a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-1 rounded {{ if eq .Lang "en" }}active fw-bold{{ end }}" href="/set-lang?lang=en">🇺🇸 English</a>
-                    </li>
-                </ul>
+<style>
+/* Exact Adv Radius Login Styles */
+body.login-page, .login-page-wrapper {
+    min-height: 100vh;
+    background: url('/static/img/city-wallpaper-18.jpg') no-repeat center center fixed !important;
+    background-size: cover !important;
+    -webkit-font-smoothing: antialiased;
+    font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 10px;
+    font-family: 'Cairo', 'Inter', -apple-system, sans-serif;
+    position: relative;
+}
+
+.login-page-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 1;
+}
+
+.login-box {
+    width: 360px;
+    max-width: 95vw;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+}
+
+.login-logo {
+    font-size: 35px;
+    text-align: center;
+    margin-bottom: 25px;
+    font-weight: 300;
+}
+
+.login-logo img {
+    max-width: 280px;
+    height: auto;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+}
+
+.login-box-body {
+    background: #ffffff;
+    padding: 25px 25px 20px 25px;
+    border-top: 0;
+    color: #666;
+    border-radius: 6px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+}
+
+.login-box-body .form-control {
+    border-radius: 4px;
+    box-shadow: none;
+    border-color: #d2d6de;
+    height: 38px;
+    font-size: 14px;
+    padding-left: 35px;
+}
+
+html[dir="rtl"] .login-box-body .form-control {
+    padding-left: 12px;
+    padding-right: 35px;
+}
+
+.form-control-feedback {
+    position: absolute;
+    top: 0;
+    height: 38px;
+    line-height: 38px;
+    width: 34px;
+    text-align: center;
+    color: #007bff;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+html[dir="rtl"] .form-control-feedback {
+    right: 0;
+}
+html[dir="ltr"] .form-control-feedback {
+    left: 0;
+}
+
+.form-control-feedback.feedback-end {
+    left: 0;
+    right: auto;
+    cursor: pointer;
+}
+html[dir="rtl"] .form-control-feedback.feedback-end {
+    left: 0;
+    right: auto;
+}
+html[dir="ltr"] .form-control-feedback.feedback-end {
+    right: 0;
+    left: auto;
+}
+
+/* Primary Button exact Adv Radius styling */
+.btn-primary.btn-flat {
+    background-color: #0056b3;
+    border-color: #004d9e;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+
+.btn-primary.btn-flat:hover {
+    background-color: #004085;
+    border-color: #00376f;
+}
+
+.btn-ucp {
+    background-color: #3598dc;
+    border-color: #2980b9;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: 4px;
+    padding: 8px 16px;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+}
+.btn-ucp:hover {
+    background-color: #258cd1;
+    color: #ffffff;
+}
+
+.social-auth-links {
+    margin: 18px 0 5px 0;
+}
+
+.login-copyright-bar {
+    position: relative;
+    margin-top: 15px;
+    padding: 8px 12px;
+    background: rgba(220, 220, 220, 0.88);
+    border-radius: 4px;
+    color: #222;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+</style>
+
+<div class="login-page-wrapper">
+    <div class="login-box">
+        <!-- Logo -->
+        <div class="login-logo">
+            <a href="/auth/login" class="text-decoration-none">
+                <img src="/static/img/logo.png" alt="Adv Radius Logo" width="280" height="80">
+            </a>
+        </div>
+
+        <!-- Login Card Body -->
+        <div class="login-box-body">
+            {{ if .Error }}
+            <div class="alert alert-danger py-2 px-3 small d-flex align-items-center gap-2 mb-3 border-0" role="alert" style="border-radius: 4px; font-size: 13px;">
+                <i class="bi bi-exclamation-triangle-fill fs-6 text-danger"></i>
+                <span class="fw-bold">{{ tr .Lang .Error "اسم المستخدم أو كلمة المرور غير صحيحة" }}</span>
             </div>
-        </div>
+            {{ end }}
 
-        <div class="text-center mb-4 mt-2">
-            <div class="auth-brand-icon mb-3">
-                <i class="bi bi-router-fill"></i>
-            </div>
-            <h3 class="fw-bold mb-1">{{ tr .Lang "تسجيل الدخول" "Sign In" }}</h3>
-            <p class="text-muted small">{{ tr .Lang "راديوس مايكروتك PRO - لوحة الإدارة السحابية" "RADIUS MikroTik PRO - Cloud Control Panel" }}</p>
-        </div>
-
-        {{ if .Error }}
-        <div class="alert alert-danger py-2 small d-flex align-items-center gap-2 border-0 shadow-sm" role="alert">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <span>{{ tr .Lang .Error "Invalid username or password" }}</span>
-        </div>
-        {{ end }}
-
-        <form method="POST" action="/auth/login">
-            <div class="mb-3">
-                <label class="form-label fw-bold small text-secondary">{{ tr .Lang "اسم المستخدم:" "Username:" }}</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person text-muted"></i></span>
-                    <input type="text" name="username" class="form-control" placeholder="{{ tr .Lang "اسم المستخدم" "Username" }}" required autofocus>
+            <form method="POST" action="/auth/login" id="loginForm" autocomplete="off">
+                <!-- User Name -->
+                <div class="position-relative mb-3">
+                    <input type="text" id="username" name="username" class="form-control" placeholder="{{ tr .Lang "اسم المستخدم / User Name" "User Name" }}" required autofocus autocomplete="off">
+                    <span class="form-control-feedback">
+                        <i class="bi bi-person-fill fs-5"></i>
+                    </span>
                 </div>
-            </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-bold small text-secondary">{{ tr .Lang "كلمة المرور:" "Password:" }}</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-lock text-muted"></i></span>
-                    <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                <!-- Password with eye toggle -->
+                <div class="position-relative mb-3">
+                    <input type="password" id="password" name="password" class="form-control" placeholder="{{ tr .Lang "كلمة المرور / Password" "Password" }}" required autocomplete="current-password">
+                    <span class="form-control-feedback">
+                        <i class="bi bi-lock-fill fs-5"></i>
+                    </span>
+                    <span class="form-control-feedback feedback-end" id="togglePassword" title="{{ tr .Lang "إظهار/إخفاء كلمة المرور" "Show/Hide Password" }}">
+                        <i class="bi bi-eye-slash-fill fs-6 text-muted" id="togglePasswordIcon"></i>
+                    </span>
                 </div>
-            </div>
 
-            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow">
-                <i class="bi bi-box-arrow-in-left"></i>
-                <span>{{ tr .Lang "تسجيل الدخول للنظام" "Login to Platform" }}</span>
-            </button>
-        </form>
+                <!-- Language Selection -->
+                <div class="mb-3">
+                    <select id="langSelect" name="lang" class="form-select form-control" style="font-size: 13px; font-weight: 600;" onchange="changeLang(this.value)">
+                        <option value="ar" {{ if ne .Lang "en" }}selected{{ end }}>🇪🇬 العربية (Arabic)</option>
+                        <option value="en" {{ if eq .Lang "en" }}selected{{ end }}>🇺🇸 English</option>
+                    </select>
+                </div>
 
-        <div class="text-center mt-4 border-top pt-3">
-            <small class="text-muted">{{ tr .Lang "بيانات الدخول الافتراضية:" "Default Credentials:" }} <code>admin</code> / <code>admin123</code></small>
+                <!-- Remember Me & Submit -->
+                <div class="row align-items-center g-2 mb-3">
+                    <div class="col-7">
+                        <div class="form-check m-0">
+                            <input class="form-check-input" type="checkbox" id="rememberMe" name="remember" checked>
+                            <label class="form-check-label text-dark small fw-semibold" for="rememberMe" style="font-size: 13px;">
+                                {{ tr .Lang "تذكرني" "Remember Me" }}
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-5">
+                        <button type="submit" class="btn btn-primary btn-flat w-100">
+                            {{ tr .Lang "دخول" "Sign In" }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Or Go To User Control Panel -->
+                <div class="social-auth-links text-center pt-2 border-top">
+                    <p class="text-muted small mb-2" style="font-size: 12px; font-weight: 700;">- {{ tr .Lang "أو الانتقال إلى" "Or GO To" }} -</p>
+                    <a href="/ucp" class="btn btn-ucp">
+                        <i class="bi bi-person-bounding-box me-1"></i>
+                        {{ tr .Lang "بوابة المشتركين (User Control Panel)" "User Control Panel" }}
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- All Rights Reserved Footer Bar -->
+        <div class="login-copyright-bar">
+            <span>All Right Reserved &copy;</span>
+            <a href="https://www.advradius.com/" target="_blank" style="text-decoration:none;" class="d-inline-flex align-items-center">
+                <img src="/static/img/copy.png" alt="Adv Radius" width="100" height="18">
+            </a>
         </div>
     </div>
 </div>
+
+<script>
+// Password toggle functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('togglePassword');
+    const pwdInput = document.getElementById('password');
+    const pwdIcon = document.getElementById('togglePasswordIcon');
+
+    if (toggleBtn && pwdInput) {
+        toggleBtn.addEventListener('click', function() {
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                pwdIcon.classList.remove('bi-eye-slash-fill');
+                pwdIcon.classList.add('bi-eye-fill', 'text-primary');
+            } else {
+                pwdInput.type = 'password';
+                pwdIcon.classList.remove('bi-eye-fill', 'text-primary');
+                pwdIcon.classList.add('bi-eye-slash-fill');
+            }
+        });
+    }
+});
+
+function changeLang(lang) {
+    window.location.href = '/set-lang?lang=' + encodeURIComponent(lang);
+}
+</script>
 {{ end }}
 
 {{ define "content" }}{{ end }}
