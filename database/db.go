@@ -5069,7 +5069,7 @@ func (d *DB) GetCafeRouters() ([]models.NAS, error) {
 func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
 		b.count, COALESCE(b.cost_price_per_card, 0.0), b.price_per_card, COALESCE(b.total_cost_price, 0.0), b.total_price,
-		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'ط§ظ„ظپط±ط¹ ط§ظ„ط±ط¦ظٹط³ظٹ')
+		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN nas n ON b.nas_id = n.id
@@ -5105,7 +5105,7 @@ func (d *DB) GetActiveCafeBatch(nasID int64) (*models.Batch, error) {
 func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 	query := `SELECT b.id, b.batch_code, COALESCE(b.batch_name, ''), b.profile_id, COALESCE(p.display_name, ''),
 		b.count, COALESCE(b.cost_price_per_card, 0.0), b.price_per_card, COALESCE(b.total_cost_price, 0.0), b.total_price,
-		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'ط§ظ„ظپط±ط¹ ط§ظ„ط±ط¦ظٹط³ظٹ')
+		b.created_at, COALESCE(b.nas_id, 0), COALESCE(n.shortname, 'الفرع الرئيسي')
 		FROM batches b
 		LEFT JOIN profiles p ON b.profile_id = p.id
 		LEFT JOIN nas n ON b.nas_id = n.id
@@ -5116,7 +5116,7 @@ func (d *DB) GetCafeBatches(nasID int64) ([]models.Batch, error) {
 		query += " AND b.nas_id = ?"
 		args = append(args, nasID)
 	}
-	query += " ORDER BY b.id DESC LIMIT 500"
+	query += " ORDER BY b.id DESC LIMIT 2000"
 
 	rows, err := d.Query(query, args...)
 	if err != nil {

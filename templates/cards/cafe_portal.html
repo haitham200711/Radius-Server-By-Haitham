@@ -501,17 +501,35 @@
 
 <!-- 4. Cafe Batches Table (سجل دفعات الكروت السابقة للكافيه) -->
 <div class="card border-0 shadow-sm bg-white">
-    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-ticket-detailed text-primary fs-5"></i>
             <h6 class="fw-bold mb-0 text-dark">سجل دفعات كروت الكافيه (Batches History)</h6>
+            <span class="badge bg-light text-secondary border">
+                {{ len .Batches }} دفعة مسجلة
+            </span>
         </div>
-        <span class="badge bg-light text-secondary border">
-            {{ len .Batches }} دفعة مسجلة
-        </span>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Live Search -->
+            <div class="input-group input-group-sm" style="min-width: 200px; max-width: 260px;">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="cafeBatchSearch" class="form-control border-start-0" placeholder="بحث في الدفعات (الكود، الباقة، الفرع)...">
+            </div>
+            <!-- Page Size Selector -->
+            <div class="d-flex align-items-center gap-1">
+                <label for="cafeBatchPageSize" class="small text-muted text-nowrap mb-0 fw-semibold">عرض:</label>
+                <select id="cafeBatchPageSize" class="form-select form-select-sm" style="width: auto; min-width: 110px;">
+                    <option value="10" selected>10 دفعات</option>
+                    <option value="25">25 دفعة</option>
+                    <option value="50">50 دفعة</option>
+                    <option value="100">100 دفعة</option>
+                    <option value="all">عرض الكل</option>
+                </select>
+            </div>
+        </div>
     </div>
     <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap">
+        <table id="cafeBatchesTable" class="table table-hover align-middle mb-0 text-nowrap">
             <thead class="table-light">
                 <tr>
                     <th>كود الدفعة</th>
@@ -530,7 +548,7 @@
             </thead>
             <tbody>
                 {{ range .Batches }}
-                <tr>
+                <tr class="cafe-batch-row">
                     <td><strong class="font-monospace text-primary">{{ .BatchCode }}</strong></td>
                     <td><span class="badge bg-light text-dark border">{{ .NASName }}</span></td>
                     <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ .ProfileName }}</span></td>
@@ -549,14 +567,34 @@
                     </td>
                 </tr>
                 {{ else }}
-                <tr>
+                <tr id="cafeBatchesEmptyRow">
                     <td colspan="12" class="text-center py-5 text-muted">
                         لا توجد أي دفعات كروت مسجلة لهذا الكافيه حتى الآن.
                     </td>
                 </tr>
                 {{ end }}
+                <tr id="cafeBatchesNoMatchRow" style="display: none;">
+                    <td colspan="12" class="text-center py-4 text-muted">
+                        <i class="bi bi-search text-secondary d-block fs-4 mb-1"></i>
+                        لا توجد دفعات تطابق كلمة البحث الحالية.
+                    </td>
+                </tr>
             </tbody>
         </table>
+    </div>
+    <!-- Batches Pagination Footer -->
+    <div class="card-footer bg-white py-2 px-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2" id="cafeBatchPaginationContainer">
+        <div class="text-muted small">
+            عرض <b class="text-dark" id="cafeBatchRangeStart">0</b> إلى <b class="text-dark" id="cafeBatchRangeEnd">0</b> من إجمالي <b class="text-primary" id="cafeBatchTotalCount">{{ len .Batches }}</b> دفعة
+            <span id="cafeBatchPageInfo" class="ms-1 text-secondary">(صفحة <b class="text-dark" id="cafeBatchCurrentPage">1</b> من <b class="text-dark" id="cafeBatchTotalPages">1</b>)</span>
+        </div>
+        <div>
+            <nav aria-label="Batches pagination">
+                <ul class="pagination pagination-sm mb-0" id="cafeBatchPaginationNav">
+                    <!-- Dynamic pagination items rendered by JS -->
+                </ul>
+            </nav>
+        </div>
     </div>
 </div>
 
@@ -908,6 +946,182 @@ document.getElementById('searchDeviceSessionsInput')?.addEventListener('input', 
         tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
     });
 });
+
+// ==========================================
+// Cafe Batches Dynamic Pagination & Live Search
+// ==========================================
+(function() {
+    var searchInput = document.getElementById('cafeBatchSearch');
+    var pageSizeSelect = document.getElementById('cafeBatchPageSize');
+    var tableBody = document.querySelector('#cafeBatchesTable tbody');
+    if (!tableBody) return;
+
+    var rows = Array.from(tableBody.querySelectorAll('tr.cafe-batch-row'));
+    var noMatchRow = document.getElementById('cafeBatchesNoMatchRow');
+    var rangeStartEl = document.getElementById('cafeBatchRangeStart');
+    var rangeEndEl = document.getElementById('cafeBatchRangeEnd');
+    var totalCountEl = document.getElementById('cafeBatchTotalCount');
+    var currentPageEl = document.getElementById('cafeBatchCurrentPage');
+    var totalPagesEl = document.getElementById('cafeBatchTotalPages');
+    var pageInfoEl = document.getElementById('cafeBatchPageInfo');
+    var paginationNav = document.getElementById('cafeBatchPaginationNav');
+
+    if (rows.length === 0) {
+        var footer = document.getElementById('cafeBatchPaginationContainer');
+        if (footer) footer.style.display = 'none';
+        return;
+    }
+
+    // Load saved page size
+    var savedSize = localStorage.getItem('cafe_batches_page_size') || '10';
+    if (pageSizeSelect) {
+        if (['10', '25', '50', '100', 'all'].includes(savedSize)) {
+            pageSizeSelect.value = savedSize;
+        } else {
+            pageSizeSelect.value = '10';
+        }
+    }
+
+    var currentPage = 1;
+
+    function getFilteredRows() {
+        var query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        if (!query) return rows;
+        return rows.filter(function(row) {
+            return row.innerText.toLowerCase().includes(query);
+        });
+    }
+
+    function renderPaginationButtons(totalPages) {
+        if (!paginationNav) return;
+        paginationNav.innerHTML = '';
+
+        function createItem(text, pageNum, disabled, active, icon) {
+            var li = document.createElement('li');
+            li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+            var a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            if (icon) {
+                a.innerHTML = icon;
+            } else {
+                a.textContent = text;
+            }
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!disabled && !active) {
+                    currentPage = pageNum;
+                    render();
+                    document.getElementById('cafeBatchesTable')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+            li.appendChild(a);
+            return li;
+        }
+
+        // First & Prev
+        paginationNav.appendChild(createItem('الأول', 1, currentPage === 1, false, '<i class="bi bi-chevron-double-right"></i>'));
+        paginationNav.appendChild(createItem('السابق', currentPage - 1, currentPage === 1, false, null));
+
+        // Window of page numbers
+        var maxButtons = 5;
+        var startPage = Math.max(1, currentPage - 2);
+        var endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if (endPage - startPage < maxButtons - 1) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        if (startPage > 1) {
+            paginationNav.appendChild(createItem('1', 1, false, currentPage === 1, null));
+            if (startPage > 2) {
+                var elip = document.createElement('li');
+                elip.className = 'page-item disabled';
+                elip.innerHTML = '<span class="page-link">...</span>';
+                paginationNav.appendChild(elip);
+            }
+        }
+
+        for (var p = startPage; p <= endPage; p++) {
+            paginationNav.appendChild(createItem(p.toString(), p, false, p === currentPage, null));
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                var elip2 = document.createElement('li');
+                elip2.className = 'page-item disabled';
+                elip2.innerHTML = '<span class="page-link">...</span>';
+                paginationNav.appendChild(elip2);
+            }
+            paginationNav.appendChild(createItem(totalPages.toString(), totalPages, false, currentPage === totalPages, null));
+        }
+
+        // Next & Last
+        paginationNav.appendChild(createItem('التالي', currentPage + 1, currentPage === totalPages, false, null));
+        paginationNav.appendChild(createItem('الأخير', totalPages, currentPage === totalPages, false, '<i class="bi bi-chevron-double-left"></i>'));
+    }
+
+    function render() {
+        var filtered = getFilteredRows();
+        var pageSizeVal = pageSizeSelect ? pageSizeSelect.value : '10';
+        var isAll = (pageSizeVal === 'all');
+        var pageSize = isAll ? filtered.length : parseInt(pageSizeVal, 10);
+        if (isNaN(pageSize) || pageSize <= 0) pageSize = 10;
+
+        var totalPages = isAll ? 1 : Math.ceil(filtered.length / pageSize);
+        if (totalPages === 0) totalPages = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var startIndex = (currentPage - 1) * pageSize;
+        var endIndex = isAll ? filtered.length : Math.min(startIndex + pageSize, filtered.length);
+
+        // Hide all rows
+        rows.forEach(function(r) { r.style.display = 'none'; });
+
+        // Show slice
+        if (filtered.length === 0) {
+            if (noMatchRow) noMatchRow.style.display = '';
+        } else {
+            if (noMatchRow) noMatchRow.style.display = 'none';
+            for (var i = startIndex; i < endIndex; i++) {
+                filtered[i].style.display = '';
+            }
+        }
+
+        // Update range display
+        if (rangeStartEl) rangeStartEl.textContent = filtered.length === 0 ? '0' : (startIndex + 1);
+        if (rangeEndEl) rangeEndEl.textContent = endIndex;
+        if (totalCountEl) totalCountEl.textContent = filtered.length;
+        if (currentPageEl) currentPageEl.textContent = currentPage;
+        if (totalPagesEl) totalPagesEl.textContent = totalPages;
+
+        if (isAll || totalPages <= 1) {
+            if (pageInfoEl) pageInfoEl.style.display = isAll ? 'none' : '';
+            if (paginationNav) paginationNav.innerHTML = '';
+        } else {
+            if (pageInfoEl) pageInfoEl.style.display = '';
+            renderPaginationButtons(totalPages);
+        }
+    }
+
+    // Event listeners
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            localStorage.setItem('cafe_batches_page_size', this.value);
+            currentPage = 1;
+            render();
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            currentPage = 1;
+            render();
+        });
+    }
+
+    render();
+})();
 </script>
 {{ end }}
 
