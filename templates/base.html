@@ -258,14 +258,14 @@
                         {{ if eq .ActiveMenu "sstp" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
 
-                    <!-- 8. التقارير (قائمة رئيسية وفرعياتها) -->
+                    <!-- 8. تقارير النظام (قائمة رئيسية وفرعياتها) -->
                     <div class="sidebar-nav-group">
                         <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if eq .ActiveMenu "reports" }}active-parent{{ end }}" 
                            data-bs-toggle="collapse" href="#reportsSubmenu" role="button" 
                            aria-expanded="{{ if eq .ActiveMenu "reports" }}true{{ else }}false{{ end }}">
                             <span class="sidebar-nav-content">
                                 <i class="bi bi-file-earmark-bar-graph-fill text-primary"></i>
-                                <span>{{ tr .Lang "التقارير" "Reports" }}</span>
+                                <span>{{ tr .Lang "تقارير النظام" "System Reports" }}</span>
                             </span>
                             <i class="bi bi-chevron-down submenu-arrow"></i>
                         </a>
