@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -7356,27 +7357,33 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 		report.OnlineIP = onlineIP
 	}
 
-	// 3. Available Years for this Subscriber
+	// 3. Available Years for this Subscriber (ensure comprehensive full years list)
+	yearsMap := make(map[int]bool)
+	currYear := now.Year()
+	// Always include future year down to 2018
+	for y := currYear + 1; y >= 2018; y-- {
+		yearsMap[y] = true
+	}
+	yearsMap[year] = true
+
+	// Also merge any other years from radacct for this subscriber
 	yearRows, err := d.Query("SELECT DISTINCT YEAR(acctstarttime) as yr FROM radacct WHERE username = ? AND acctstarttime IS NOT NULL ORDER BY yr DESC", username)
 	if err == nil {
 		defer yearRows.Close()
-		hasSelectedYear := false
 		for yearRows.Next() {
 			var yr int
 			if err := yearRows.Scan(&yr); err == nil && yr > 2000 {
-				report.AvailableYears = append(report.AvailableYears, yr)
-				if yr == year {
-					hasSelectedYear = true
-				}
+				yearsMap[yr] = true
 			}
 		}
-		if !hasSelectedYear {
-			report.AvailableYears = append([]int{year}, report.AvailableYears...)
-		}
 	}
-	if len(report.AvailableYears) == 0 {
-		report.AvailableYears = []int{year}
+
+	var sortedYears []int
+	for yr := range yearsMap {
+		sortedYears = append(sortedYears, yr)
 	}
+	sort.Sort(sort.Reverse(sort.IntSlice(sortedYears)))
+	report.AvailableYears = sortedYears
 
 	// 4. Monthly Usage for Selected Year
 	type monthData struct {

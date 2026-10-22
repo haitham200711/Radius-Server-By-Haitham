@@ -1074,15 +1074,24 @@ function fillSmartFullDebt() {
                     <i class="bi bi-calendar-event me-1 text-primary"></i> السنة:
                 </label>
                 <select name="year" class="form-select fw-bold">
-                    {{ if .TrafficReport }}
+                    {{ if and .TrafficReport .TrafficReport.AvailableYears }}
                         {{ range .TrafficReport.AvailableYears }}
                         <option value="{{ . }}" {{ if eq . $.TrafficYear }}selected{{ end }}>سنة {{ . }}</option>
                         {{ end }}
                     {{ else }}
+                        <option value="2030" {{ if eq .TrafficYear 2030 }}selected{{ end }}>سنة 2030</option>
+                        <option value="2029" {{ if eq .TrafficYear 2029 }}selected{{ end }}>سنة 2029</option>
+                        <option value="2028" {{ if eq .TrafficYear 2028 }}selected{{ end }}>سنة 2028</option>
+                        <option value="2027" {{ if eq .TrafficYear 2027 }}selected{{ end }}>سنة 2027</option>
                         <option value="2026" {{ if eq .TrafficYear 2026 }}selected{{ end }}>سنة 2026</option>
                         <option value="2025" {{ if eq .TrafficYear 2025 }}selected{{ end }}>سنة 2025</option>
                         <option value="2024" {{ if eq .TrafficYear 2024 }}selected{{ end }}>سنة 2024</option>
                         <option value="2023" {{ if eq .TrafficYear 2023 }}selected{{ end }}>سنة 2023</option>
+                        <option value="2022" {{ if eq .TrafficYear 2022 }}selected{{ end }}>سنة 2022</option>
+                        <option value="2021" {{ if eq .TrafficYear 2021 }}selected{{ end }}>سنة 2021</option>
+                        <option value="2020" {{ if eq .TrafficYear 2020 }}selected{{ end }}>سنة 2020</option>
+                        <option value="2019" {{ if eq .TrafficYear 2019 }}selected{{ end }}>سنة 2019</option>
+                        <option value="2018" {{ if eq .TrafficYear 2018 }}selected{{ end }}>سنة 2018</option>
                     {{ end }}
                 </select>
             </div>
