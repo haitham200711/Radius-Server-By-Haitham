@@ -1,7 +1,11 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"log"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -14,6 +18,50 @@ type Config struct {
 	DBDSN            string
 	SessionSecret    string
 	FreeRadiusDir    string
+}
+
+func getOrGenerateSessionSecret() string {
+	secret := strings.TrimSpace(os.Getenv("SESSION_SECRET"))
+	if secret != "" && secret != "haitham-radius-enterprise-secret-key-2026" {
+		return secret
+	}
+
+	// Try reading from .env file
+	envPaths := []string{"/opt/radius-server/.env", ".env"}
+	for _, p := range envPaths {
+		if data, err := os.ReadFile(p); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "SESSION_SECRET=") {
+					val := strings.TrimPrefix(line, "SESSION_SECRET=")
+					val = strings.Trim(val, `"' `)
+					if val != "" && val != "haitham-radius-enterprise-secret-key-2026" {
+						return val
+					}
+				}
+			}
+		}
+	}
+
+	// Generate secure random 256-bit (32 bytes) hex string
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Fatalf("Fatal: failed to generate secure session secret: %v", err)
+	}
+	newSecret := hex.EncodeToString(bytes)
+
+	// Persist to .env file with 0600 permissions
+	for _, p := range envPaths {
+		f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		if err == nil {
+			_, _ = f.WriteString("\nSESSION_SECRET=" + newSecret + "\n")
+			_ = f.Close()
+			log.Printf("[Security] Generated and persisted new random SESSION_SECRET to %s", p)
+			break
+		}
+	}
+
+	return newSecret
 }
 
 func LoadConfig() *Config {
@@ -52,10 +100,7 @@ func LoadConfig() *Config {
 		dbDSN = "radius:radiuspass@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4"
 	}
 
-	secret := os.Getenv("SESSION_SECRET")
-	if secret == "" {
-		secret = "haitham-radius-enterprise-secret-key-2026"
-	}
+	secret := getOrGenerateSessionSecret()
 
 	return &Config{
 		WebAddr:          webAddr,

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
@@ -36,6 +37,28 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
+	setSessionCookie := func(token string) {
+		isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+		http.SetCookie(w, &http.Cookie{
+			Name:     middleware.CookieName,
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   isSecure,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   int(middleware.SessionDuration.Seconds()),
+			Expires:  time.Now().Add(middleware.SessionDuration),
+		})
+	}
+
+	sanitizeNext := func(next string) string {
+		next = strings.TrimSpace(next)
+		if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.Contains(next, `\`) {
+			return "/dashboard"
+		}
+		return next
+	}
+
 	// 1. Check Admins table
 	var admin models.Admin
 	err := bp.db.QueryRow("SELECT id, username, password_hash, role, is_active FROM admins WHERE username = ?", username).Scan(
@@ -48,18 +71,9 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Role:     admin.Role,
 		}, bp.secret)
 
-		http.SetCookie(w, &http.Cookie{
-			Name:     middleware.CookieName,
-			Value:    token,
-			Path:     "/",
-			HttpOnly: true,
-			Expires:  time.Now().Add(7 * 24 * time.Hour),
-		})
+		setSessionCookie(token)
 
-		next := r.URL.Query().Get("next")
-		if next == "" {
-			next = "/dashboard"
-		}
+		next := sanitizeNext(r.URL.Query().Get("next"))
 		http.Redirect(w, r, next, http.StatusFound)
 		return
 	}
@@ -76,13 +90,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Role:     "reseller",
 		}, bp.secret)
 
-		http.SetCookie(w, &http.Cookie{
-			Name:     middleware.CookieName,
-			Value:    token,
-			Path:     "/",
-			HttpOnly: true,
-			Expires:  time.Now().Add(7 * 24 * time.Hour),
-		})
+		setSessionCookie(token)
 
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 		return
@@ -100,13 +108,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 				Role:     "subscriber",
 			}, bp.secret)
 
-			http.SetCookie(w, &http.Cookie{
-				Name:     middleware.CookieName,
-				Value:    token,
-				Path:     "/",
-				HttpOnly: true,
-				Expires:  time.Now().Add(7 * 24 * time.Hour),
-			})
+			setSessionCookie(token)
 
 			http.Redirect(w, r, "/portal", http.StatusFound)
 			return
@@ -121,12 +123,15 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (bp *Blueprint) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	http.SetCookie(w, &http.Cookie{
 		Name:     middleware.CookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   isSecure,
+		SameSite: http.SameSiteLaxMode,
 	})
 	http.Redirect(w, r, "/auth/login", http.StatusFound)
 }

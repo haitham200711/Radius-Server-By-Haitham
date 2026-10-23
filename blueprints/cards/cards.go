@@ -268,6 +268,14 @@ func (bp *Blueprint) PrintHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	u := middleware.GetUser(r)
+	if u != nil && u.Role == "reseller" {
+		if !bp.db.OwnsBatch(u.ID, batchCode) {
+			http.Error(w, "غير مسموح لك بطباعة أو استعراض هذا الباتش", http.StatusForbidden)
+			return
+		}
+	}
+
 	rows, err := bp.db.Query(`SELECT c.id, c.username, c.password, COALESCE(p.display_name, ''), c.price
 		FROM cards c
 		JOIN batches b ON c.batch_id = b.id
@@ -388,7 +396,19 @@ func (bp *Blueprint) CafeGenerateHandler(w http.ResponseWriter, r *http.Request)
 	sendWhatsApp := r.FormValue("send_whatsapp") == "1"
 	cafePhone := strings.TrimSpace(r.FormValue("cafe_phone"))
 
-	batchCode, created, err := bp.db.GenerateAdvancedBatch(opts)
+	u := middleware.GetUser(r)
+	var batchCode string
+	var created int
+	var err error
+
+	if u != nil && u.Role == "reseller" {
+		opts.ResellerID = u.ID
+		batchCode, created, err = bp.db.ResellerGenerateCards(u.ID, opts, u.Username)
+	} else if opts.ResellerID > 0 && (r.FormValue("charge_reseller") == "1" || r.FormValue("charge_reseller") == "on" || r.FormValue("charge_reseller") == "true") {
+		batchCode, created, err = bp.db.ResellerGenerateCards(opts.ResellerID, opts, u.Username)
+	} else {
+		batchCode, created, err = bp.db.GenerateAdvancedBatch(opts)
+	}
 	if err != nil {
 		http.Redirect(w, r, fmt.Sprintf("/cards/cafe?router_id=%d&err=%s", opts.NASID, url.QueryEscape(err.Error())), http.StatusFound)
 		return

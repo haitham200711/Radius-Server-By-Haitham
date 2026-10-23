@@ -25,6 +25,27 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 	return &Blueprint{db: db, renderer: r}
 }
 
+// checkSubscriberAccess verifies if the authenticated user has permission to manage the subscriber
+func (bp *Blueprint) checkSubscriberAccess(w http.ResponseWriter, r *http.Request, username string) bool {
+	u := middleware.GetUser(r)
+	if u == nil {
+		http.Redirect(w, r, "/auth/login", http.StatusFound)
+		return false
+	}
+	if u.Role == "admin" || u.Role == "staff" {
+		return true
+	}
+	if u.Role == "reseller" {
+		if bp.db.OwnsSubscriber(u.ID, username) {
+			return true
+		}
+		http.Error(w, "غير مصرح: هذا المشترك غير مسجل في نطاق حسابك كموزع", http.StatusForbidden)
+		return false
+	}
+	http.Error(w, "غير مصرح", http.StatusForbidden)
+	return false
+}
+
 type SubscriberItem struct {
 	ID                int64
 	ContractNo        string
@@ -475,6 +496,21 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s", limit, page, q)
 
+	currentUser := middleware.GetUser(r)
+	if currentUser != nil && currentUser.Role == "reseller" {
+		var owned []string
+		for _, u := range usernames {
+			if bp.db.OwnsSubscriber(currentUser.ID, u) {
+				owned = append(owned, u)
+			}
+		}
+		if len(owned) == 0 {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("ليس لديك صلاحية على أي من المشتركين المحددين"), http.StatusFound)
+			return
+		}
+		usernames = owned
+	}
+
 	if len(usernames) == 0 {
 		http.Redirect(w, r, redirectURL, http.StatusFound)
 		return
@@ -487,28 +523,38 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 		profile := strings.TrimSpace(r.FormValue("profile"))
 		isPaid := r.FormValue("payment_status") != "unpaid"
 		adminUser := "admin"
-		if u := middleware.GetUser(r); u != nil {
-			adminUser = u.Username
+		if currentUser != nil {
+			adminUser = currentUser.Username
 		}
 		for _, u := range usernames {
-			_ = bp.db.RenewSubscriberBilling(u, profile, 0, isPaid, "bulk", "تجديد اشتراك جماعي", adminUser)
+			if currentUser != nil && currentUser.Role == "reseller" {
+				_ = bp.db.ResellerRenewSubscriber(currentUser.ID, u, profile, isPaid, currentUser.Username)
+			} else {
+				_ = bp.db.RenewSubscriberBilling(u, profile, 0, isPaid, "bulk", "تجديد اشتراك جماعي", adminUser)
+			}
 		}
 	case "add_quota":
 		quotaGB, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("quota_gb")), 64)
 		price, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("price")), 64)
 		isPaid := r.FormValue("payment_status") != "unpaid"
 		adminUser := "admin"
-		if u := middleware.GetUser(r); u != nil {
-			adminUser = u.Username
+		if currentUser != nil {
+			adminUser = currentUser.Username
 		}
 		if quotaGB > 0 {
 			for _, u := range usernames {
-				_ = bp.db.AddQuotaBilling(u, quotaGB, price, isPaid, "bulk", "إضافة كوتة جماعية", adminUser)
+				if currentUser != nil && currentUser.Role == "reseller" {
+					_ = bp.db.ResellerAddQuota(currentUser.ID, u, quotaGB, price, isPaid, currentUser.Username)
+				} else {
+					_ = bp.db.AddQuotaBilling(u, quotaGB, price, isPaid, "bulk", "إضافة كوتة جماعية", adminUser)
+				}
 			}
 		}
 	case "add_debt":
 		amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("debt_amount")), 64)
-		_ = bp.db.BulkAddDebt(usernames, amount)
+		if amount > 0 {
+			_ = bp.db.BulkAddDebt(usernames, amount)
+		}
 	case "settle_loan":
 		settleType := r.FormValue("settle_type") // "renew" or "close"
 		isPaid := r.FormValue("payment_status") != "unpaid"
@@ -517,20 +563,24 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 			paymentMethod = "cash"
 		}
 		adminUser := "admin"
-		if u := middleware.GetUser(r); u != nil {
-			adminUser = u.Username
+		if currentUser != nil {
+			adminUser = currentUser.Username
 		}
 		for _, u := range usernames {
 			if settleType == "close" {
 				_ = bp.db.CloseSubscriberLoan(u, adminUser)
 			} else {
-				_ = bp.db.RenewSubscriberBilling(u, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد جماعي", adminUser)
+				if currentUser != nil && currentUser.Role == "reseller" {
+					_ = bp.db.ResellerRenewSubscriber(currentUser.ID, u, "", isPaid, currentUser.Username)
+				} else {
+					_ = bp.db.RenewSubscriberBilling(u, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد جماعي", adminUser)
+				}
 			}
 		}
 	case "terminate":
 		adminUser := "admin"
-		if u := middleware.GetUser(r); u != nil {
-			adminUser = u.Username
+		if currentUser != nil {
+			adminUser = currentUser.Username
 		}
 		for _, u := range usernames {
 			_ = bp.db.TerminateSubscription(u, adminUser)
@@ -539,9 +589,9 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 		newProfile := strings.TrimSpace(r.FormValue("new_profile"))
 		adminUser := "admin"
 		isAdmin := false
-		if u := middleware.GetUser(r); u != nil {
-			adminUser = u.Username
-			isAdmin = (u.Role == "admin")
+		if currentUser != nil {
+			adminUser = currentUser.Username
+			isAdmin = (currentUser.Role == "admin")
 		}
 		for _, u := range usernames {
 			_ = bp.db.ChangeSubscriberProfile(u, newProfile, adminUser, isAdmin)
@@ -567,6 +617,9 @@ func (bp *Blueprint) TerminateHandler(w http.ResponseWriter, r *http.Request) {
 
 	if username == "" {
 		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك مطلوب"), http.StatusFound)
+		return
+	}
+	if !bp.checkSubscriberAccess(w, r, username) {
 		return
 	}
 
@@ -601,6 +654,9 @@ func (bp *Blueprint) ChangeProfileHandler(w http.ResponseWriter, r *http.Request
 
 	if username == "" || newProfile == "" {
 		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك والبروفايل الجديد مطلوبان"), http.StatusFound)
+		return
+	}
+	if !bp.checkSubscriberAccess(w, r, username) {
 		return
 	}
 
@@ -643,6 +699,9 @@ func (bp *Blueprint) SettleLoanHandler(w http.ResponseWriter, r *http.Request) {
 
 	if username == "" {
 		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("اسم المشترك مطلوب"), http.StatusFound)
+		return
+	}
+	if !bp.checkSubscriberAccess(w, r, username) {
 		return
 	}
 
@@ -762,14 +821,27 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := bp.db.AddSubscriberCRM(sub, password); err != nil {
 		fmt.Printf("[Subscribers] Error creating subscriber: %v\n", err)
+		http.Redirect(w, r, "/subscribers/add?error="+url.QueryEscape(err.Error()), http.StatusFound)
+		return
 	}
 
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
 }
 
 func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	username := r.URL.Query().Get("username")
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+
+	username := strings.TrimSpace(r.FormValue("username"))
+	if username == "" {
+		username = strings.TrimSpace(r.URL.Query().Get("username"))
+	}
 	if username != "" {
+		if !bp.checkSubscriberAccess(w, r, username) {
+			return
+		}
 		_ = bp.db.DeleteSubscriber(username)
 	}
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
@@ -777,6 +849,12 @@ func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
+	if username == "" {
+		username = strings.TrimSpace(r.URL.Query().Get("username"))
+	}
+	if username != "" && !bp.checkSubscriberAccess(w, r, username) {
+		return
+	}
 	profile := strings.TrimSpace(r.FormValue("profile"))
 	if username == "" {
 		username = strings.TrimSpace(r.URL.Query().Get("username"))
@@ -850,6 +928,9 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 
 	if username != "" && amount > 0 {
+		if !bp.checkSubscriberAccess(w, r, username) {
+			return
+		}
 		if currentUser != nil && currentUser.Role == "reseller" {
 			newBal, newDebt, settled, err := bp.db.ResellerAddSubscriberBalance(currentUser.ID, username, amount, notes, currentUser.Username, settleDebtFirst)
 			if err != nil {
@@ -901,9 +982,12 @@ func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Req
 
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 
-	creditReseller := r.FormValue("credit_reseller") == "1" || r.FormValue("credit_reseller") == "true" || r.FormValue("credit_reseller") == "on" || (currentUser != nil && currentUser.Role == "admin")
+	creditReseller := (currentUser != nil && currentUser.Role == "admin") && (r.FormValue("credit_reseller") == "1" || r.FormValue("credit_reseller") == "true")
 
 	if username != "" {
+		if !bp.checkSubscriberAccess(w, r, username) {
+			return
+		}
 		newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
@@ -939,6 +1023,9 @@ func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 
 	if username != "" && quotaGB > 0 {
+		if !bp.checkSubscriberAccess(w, r, username) {
+			return
+		}
 		if currentUser != nil && currentUser.Role == "reseller" {
 			if err := bp.db.ResellerAddQuota(currentUser.ID, username, quotaGB, price, isPaid, currentUser.Username); err != nil {
 				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
@@ -958,11 +1045,17 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
-	creditReseller := r.FormValue("credit_reseller") == "1" || r.FormValue("credit_reseller") == "true" || r.FormValue("credit_reseller") == "on"
 
+	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
-	if u := middleware.GetUser(r); u != nil {
-		adminUser = u.Username
+	if currentUser != nil {
+		adminUser = currentUser.Username
+	}
+
+	// Resellers can NEVER credit themselves when collecting debt from their subscriber
+	creditReseller := false
+	if currentUser != nil && currentUser.Role == "admin" {
+		creditReseller = (r.FormValue("credit_reseller") == "1" || r.FormValue("credit_reseller") == "true" || r.FormValue("credit_reseller") == "on")
 	}
 
 	limit := r.FormValue("limit")
@@ -981,6 +1074,9 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if username != "" && amount > 0 {
+		if !bp.checkSubscriberAccess(w, r, username) {
+			return
+		}
 		if paymentMethod == "balance" {
 			_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller)
 			if err != nil {
@@ -1009,6 +1105,13 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.URL.Query().Get("username"))
 	if username == "" {
 		username = strings.TrimSpace(r.FormValue("username"))
+	}
+	if username == "" {
+		http.Redirect(w, r, "/subscribers", http.StatusFound)
+		return
+	}
+	if !bp.checkSubscriberAccess(w, r, username) {
+		return
 	}
 
 	if r.Method == http.MethodGet {
@@ -1187,6 +1290,15 @@ func (bp *Blueprint) LiveTrafficHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	u := middleware.GetUser(r)
+	if u != nil && u.Role == "reseller" && !bp.db.OwnsSubscriber(u.ID, username) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": "غير مصرح لك بعرض بيانات هذا المشترك",
+		})
+		return
+	}
+
 	traffic, err := bp.db.GetSubscriberLiveTraffic(username)
 	if err != nil {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1213,6 +1325,15 @@ func (bp *Blueprint) DisconnectSessionHandler(w http.ResponseWriter, r *http.Req
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "error",
 			"message": "اسم المستخدم مطلوب",
+		})
+		return
+	}
+
+	u := middleware.GetUser(r)
+	if u != nil && u.Role == "reseller" && !bp.db.OwnsSubscriber(u.ID, username) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": "غير مصرح لك بفصل جلسة هذا المشترك",
 		})
 		return
 	}

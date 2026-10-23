@@ -25,26 +25,33 @@ func New(db *database.DB, r *web.Renderer, secret string) *Blueprint {
 	return &Blueprint{db: db, renderer: r, secret: secret}
 }
 
-// extractClientIP retrieves the real client IP address from proxy headers or RemoteAddr
+// extractClientIP retrieves the client IP address. To prevent IP spoofing,
+// proxy headers (X-Forwarded-For, X-Real-IP) are ONLY trusted if the direct connection
+// comes from loopback (127.0.0.1, ::1) representing a trusted local reverse proxy.
 func extractClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		ip := strings.TrimSpace(parts[0])
-		if ip != "" {
-			return ip
+	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		remoteHost = strings.TrimSpace(r.RemoteAddr)
+	}
+
+	// Only trust forwarding headers if the immediate peer is loopback (trusted reverse proxy)
+	isTrustedProxy := remoteHost == "127.0.0.1" || remoteHost == "::1"
+	if isTrustedProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			ip := strings.TrimSpace(parts[0])
+			if ip != "" {
+				return ip
+			}
+		}
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			ip := strings.TrimSpace(xri)
+			if ip != "" {
+				return ip
+			}
 		}
 	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		ip := strings.TrimSpace(xri)
-		if ip != "" {
-			return ip
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil && host != "" {
-		return host
-	}
-	return strings.TrimSpace(r.RemoteAddr)
+	return remoteHost
 }
 
 // LoginHandler renders and handles subscriber portal login
@@ -685,16 +692,14 @@ func (bp *Blueprint) ApplyExpiredLoanHandler(w http.ResponseWriter, r *http.Requ
 		redirectPath = "/expired/time-loan"
 	}
 
-	// 1. Identify Subscriber strictly by IP (or authenticated subscriber session)
-	var sub *models.Subscriber
-	var err error
-
+	// 1. Identify Subscriber: strictly require authenticated subscriber session
 	user := middleware.GetUser(r)
-	if user != nil && user.Role == "subscriber" {
-		sub, err = bp.db.GetSubscriber(user.Username)
-	} else {
-		sub, err = bp.db.FindSubscriberForExpiredPortal(clientIP)
+	if user == nil || user.Role != "subscriber" {
+		http.Redirect(w, r, "/portal/login?error="+url.QueryEscape("يرجى تسجيل الدخول إلى حساب المشترك الخاص بك لتفعيل السلفة بأمان"), http.StatusFound)
+		return
 	}
+
+	sub, err := bp.db.GetSubscriber(user.Username)
 
 	if err != nil || sub == nil {
 		http.Redirect(w, r, redirectPath+"?error="+url.QueryEscape("تعذر التحقق من حسابك عبر عنوان الآيبي الخاص بك ("+clientIP+"). يرجى تسجيل الدخول أو التواصل مع الموزع."), http.StatusFound)

@@ -937,12 +937,15 @@ func (d *DB) AddSubscriberCRM(sub *models.Subscriber, password string) error {
 		}
 	}
 
-	// 1. Insert or update in subscribers table
+	// 1. Prevent duplicate entry overwriting existing subscriber data
+	var existingID int64
+	err = tx.QueryRow("SELECT id FROM subscribers WHERE username = ?", sub.Username).Scan(&existingID)
+	if err == nil && existingID > 0 {
+		return fmt.Errorf("اسم المشترك '%s' مسجل بالفعل في النظام، لا يمكن تكراره", sub.Username)
+	}
+
 	query := `INSERT INTO subscribers (username, contract_no, full_name, phone, address, debt, balance, profile_name, static_ip, calling_mac, quota_bytes, expiration_date, status, reseller_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE contract_no = VALUES(contract_no), full_name = VALUES(full_name), phone = VALUES(phone),
-		address = VALUES(address), debt = VALUES(debt), balance = VALUES(balance), profile_name = VALUES(profile_name), static_ip = VALUES(static_ip),
-		calling_mac = VALUES(calling_mac), quota_bytes = VALUES(quota_bytes), expiration_date = VALUES(expiration_date), status = VALUES(status), reseller_id = VALUES(reseller_id)`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	var expDate interface{}
 	if sub.ExpirationDate.Valid {
@@ -1027,7 +1030,7 @@ func randomNumeric(n int) string {
 
 func (d *DB) GenerateAdvancedBatch(opts models.GenerateBatchOptions) (string, int, error) {
 	if opts.Count <= 0 || opts.Count > 50000 {
-		opts.Count = 100
+		return "", 0, fmt.Errorf("عدد الكروت غير صحيح (يجب أن يكون بين 1 و 50000)")
 	}
 	if opts.CharLen < 4 {
 		opts.CharLen = 6
@@ -1834,19 +1837,23 @@ func (d *DB) ResellerGenerateCards(resellerID int64, opts models.GenerateBatchOp
 		return "", 0, fmt.Errorf("الباقة غير موجودة")
 	}
 
-	pricePerCard := opts.PricePerCard
-	if pricePerCard <= 0 {
-		pricePerCard = prof.Price
+	if opts.Count <= 0 || opts.Count > 10000 {
+		return "", 0, fmt.Errorf("عدد الكروت غير صحيح (يجب أن يكون بين 1 و 10000)")
 	}
-	costPerCard := opts.CostPricePerCard
-	if costPerCard <= 0 {
-		if res.CommissionPercent > 0 {
-			costPerCard = pricePerCard * (1.0 - (res.CommissionPercent / 100.0))
-		} else if prof.CostPrice > 0 {
-			costPerCard = prof.CostPrice
-		} else {
-			costPerCard = pricePerCard
-		}
+
+	pricePerCard := prof.Price
+	if opts.PricePerCard > 0 {
+		pricePerCard = opts.PricePerCard
+	}
+
+	// Server-side authoritative cost calculation - NEVER trust client costPricePerCard
+	var costPerCard float64
+	if res.CommissionPercent > 0 {
+		costPerCard = pricePerCard * (1.0 - (res.CommissionPercent / 100.0))
+	} else if prof.CostPrice > 0 {
+		costPerCard = prof.CostPrice
+	} else {
+		costPerCard = pricePerCard
 	}
 	opts.PricePerCard = pricePerCard
 	opts.CostPricePerCard = costPerCard
@@ -1914,6 +1921,13 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 		return fmt.Errorf("ليس لديك صلاحية إضافة كوتة للمشتركين")
 	}
 
+	if quotaGB <= 0 {
+		return fmt.Errorf("كمية الكوتة المضافة يجب أن تكون أكبر من الصفر")
+	}
+	if price <= 0 {
+		return fmt.Errorf("سعر الكوتة الإضافية غير صحيح ويجب أن يكون أكبر من الصفر")
+	}
+
 	var subResellerID int64
 	var subID int64
 	err = d.QueryRow("SELECT id, reseller_id FROM subscribers WHERE username = ?", username).Scan(&subID, &subResellerID)
@@ -1925,7 +1939,7 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 	}
 
 	cost := price
-	if res.CommissionPercent > 0 && price > 0 {
+	if res.CommissionPercent > 0 {
 		cost = price * (1.0 - (res.CommissionPercent / 100.0))
 	}
 	if cost <= 0 {
@@ -3487,6 +3501,9 @@ func (d *DB) BulkAddDebt(usernames []string, amount float64) error {
 	if len(usernames) == 0 {
 		return nil
 	}
+	if amount <= 0 {
+		return fmt.Errorf("مبلغ المديونية يجب أن يكون أكبر من الصفر")
+	}
 	tx, err := d.Begin()
 	if err != nil {
 		return err
@@ -3502,6 +3519,20 @@ func (d *DB) BulkAddDebt(usernames []string, amount float64) error {
 	}
 
 	return tx.Commit()
+}
+
+// OwnsSubscriber returns true if the subscriber belongs to the given reseller
+func (d *DB) OwnsSubscriber(resellerID int64, username string) bool {
+	var count int
+	_ = d.QueryRow("SELECT COUNT(*) FROM subscribers WHERE username = ? AND reseller_id = ?", username, resellerID).Scan(&count)
+	return count > 0
+}
+
+// OwnsBatch returns true if the batch belongs to the given reseller
+func (d *DB) OwnsBatch(resellerID int64, batchCode string) bool {
+	var count int
+	_ = d.QueryRow("SELECT COUNT(*) FROM batches WHERE batch_code = ? AND reseller_id = ?", batchCode, resellerID).Scan(&count)
+	return count > 0
 }
 
 // --- Billing & Financial Operations ---

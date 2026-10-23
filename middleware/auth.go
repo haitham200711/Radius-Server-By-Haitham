@@ -17,12 +17,13 @@ type contextKey string
 const (
 	UserContextKey contextKey = "user"
 	CookieName                = "radius_session"
+	SessionDuration           = 12 * time.Hour
 )
 
 type SessionUser struct {
 	ID       int64  `json:"id"`
 	Username string `json:"username"`
-	Role     string `json:"role"` // "admin", "staff", "reseller"
+	Role     string `json:"role"` // "admin", "staff", "reseller", "subscriber"
 }
 
 // GenerateToken creates signed session string: ID:Username:Role:Timestamp:Signature
@@ -37,7 +38,7 @@ func GenerateToken(u SessionUser, secret string) string {
 	return fmt.Sprintf("%s:%s", payload, sig)
 }
 
-// ParseToken verifies and extracts SessionUser
+// ParseToken verifies HMAC signature and checks timestamp expiration
 func ParseToken(token string, secret string) (*SessionUser, error) {
 	parts := strings.Split(token, ":")
 	if len(parts) != 5 {
@@ -53,6 +54,20 @@ func ParseToken(token string, secret string) (*SessionUser, error) {
 
 	if !hmac.Equal([]byte(sig), []byte(expectedSig)) {
 		return nil, fmt.Errorf("invalid token signature")
+	}
+
+	// Validate timestamp and session expiry
+	issuedAt, err := strconv.ParseInt(parts[3], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid token timestamp")
+	}
+
+	now := time.Now().Unix()
+	if now-issuedAt > int64(SessionDuration.Seconds()) {
+		return nil, fmt.Errorf("session expired")
+	}
+	if issuedAt > now+300 {
+		return nil, fmt.Errorf("token timestamp in the future")
 	}
 
 	id, err := strconv.ParseInt(parts[0], 10, 64)
@@ -79,6 +94,15 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
+				// Clear invalid or expired session cookie
+				http.SetCookie(w, &http.Cookie{
+					Name:     CookieName,
+					Value:    "",
+					Path:     "/",
+					MaxAge:   -1,
+					HttpOnly: true,
+					SameSite: http.SameSiteLaxMode,
+				})
 			}
 			next.ServeHTTP(w, r)
 		})
