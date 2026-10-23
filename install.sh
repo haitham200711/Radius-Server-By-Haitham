@@ -449,7 +449,20 @@ fi
 
 mkdir -p "$INSTALL_DIR/uploads" "$INSTALL_DIR/static" "$INSTALL_DIR/templates" "$INSTALL_DIR/backups"
 chmod -R 755 "$INSTALL_DIR"
-chmod 777 "$INSTALL_DIR/uploads" "$INSTALL_DIR/backups" 2>/dev/null || true
+chmod 750 "$INSTALL_DIR/uploads" 2>/dev/null || true
+chmod 700 "$INSTALL_DIR/backups" 2>/dev/null || true
+
+# Securely generate random SESSION_SECRET if not already configured
+ENV_FILE="$INSTALL_DIR/.env"
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo -e "${CYAN}[INFO] Generating cryptographically secure SESSION_SECRET (256-bit)...${NC}"
+    RAND_SESSION_SECRET=$(openssl rand -hex 32 2>/dev/null || tr -dc 'a-f0-9' < /dev/urandom | head -c 64)
+    cat << EOF > "$ENV_FILE"
+SESSION_SECRET=${RAND_SESSION_SECRET}
+EOF
+    chmod 600 "$ENV_FILE"
+    echo -e "${GREEN}[OK] Secure .env file initialized with 0600 permissions.${NC}"
+fi
 
 echo -e "${GREEN}[OK] Binary compiled successfully: $INSTALL_DIR/radius-platform${NC}"
 echo ""
@@ -470,6 +483,7 @@ After=network.target mariadb.service freeradius.service
 Type=simple
 User=root
 WorkingDirectory=/opt/radius-server
+EnvironmentFile=-/opt/radius-server/.env
 Environment=WEB_ADDR=:443
 Environment=HTTP_REDIRECT_ADDR=:80
 Environment=ENABLE_HTTPS=true
