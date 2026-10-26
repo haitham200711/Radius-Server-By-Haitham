@@ -87,11 +87,11 @@ if [[ ! -f "$ENV_FILE" ]]; then
     fi
     RAND_NAS_SECRET=$(openssl rand -hex 16 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 24)
     cat << EOF > "$ENV_FILE"
-SESSION_SECRET=${RAND_SESSION_SECRET}
-INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD}
-DB_DRIVER=mysql
-DB_DSN=${DB_USER}:${DB_PASS}@tcp(127.0.0.1:3306)/${DB_NAME}?parseTime=true&charset=utf8mb4
-RADIUS_SECRET=${RAND_NAS_SECRET}
+SESSION_SECRET="${RAND_SESSION_SECRET}"
+INITIAL_ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD}"
+DB_DRIVER="mysql"
+DB_DSN="${DB_USER}:${DB_PASS}@tcp(127.0.0.1:3306)/${DB_NAME}?parseTime=true&charset=utf8mb4"
+RADIUS_SECRET="${RAND_NAS_SECRET}"
 EOF
     chmod 600 "$ENV_FILE"
 fi
@@ -508,11 +508,11 @@ if [[ ! -f "$ENV_FILE" ]]; then
     fi
     RAND_NAS_SECRET=$(openssl rand -hex 16 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 24)
     cat << EOF > "$ENV_FILE"
-SESSION_SECRET=${RAND_SESSION_SECRET}
-INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD}
-DB_DRIVER=mysql
-DB_DSN=${DB_USER}:${DB_PASS}@tcp(127.0.0.1:3306)/${DB_NAME}?parseTime=true&charset=utf8mb4
-RADIUS_SECRET=${RAND_NAS_SECRET}
+SESSION_SECRET="${RAND_SESSION_SECRET}"
+INITIAL_ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD}"
+DB_DRIVER="mysql"
+DB_DSN="${DB_USER}:${DB_PASS}@tcp(127.0.0.1:3306)/${DB_NAME}?parseTime=true&charset=utf8mb4"
+RADIUS_SECRET="${RAND_NAS_SECRET}"
 EOF
     chmod 600 "$ENV_FILE"
     echo -e "${GREEN}[OK] Secure .env file initialized with 0600 permissions.${NC}"
