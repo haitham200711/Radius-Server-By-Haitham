@@ -71,12 +71,29 @@ fi
 
 # Load or generate cryptographically secure database password
 ENV_FILE="$INSTALL_DIR/.env"
+mkdir -p "$INSTALL_DIR"
 if [[ -f "$ENV_FILE" ]] && grep -q "DB_DSN=" "$ENV_FILE" 2>/dev/null; then
     DB_PASS=$(grep "DB_DSN=" "$ENV_FILE" | sed -E 's/.*:([^@]+)@.*/\1/' | head -n1)
 fi
 
 if [[ -z "$DB_PASS" ]]; then
     DB_PASS=$(openssl rand -hex 16 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 24)
+fi
+
+if [[ ! -f "$ENV_FILE" ]]; then
+    RAND_SESSION_SECRET=$(openssl rand -hex 32 2>/dev/null || tr -dc 'a-f0-9' < /dev/urandom | head -c 64)
+    if [[ -z "$INITIAL_ADMIN_PASSWORD" ]]; then
+        INITIAL_ADMIN_PASSWORD=$(openssl rand -base64 12 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
+    fi
+    RAND_NAS_SECRET=$(openssl rand -hex 16 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 24)
+    cat << EOF > "$ENV_FILE"
+SESSION_SECRET=${RAND_SESSION_SECRET}
+INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD}
+DB_DRIVER=mysql
+DB_DSN=${DB_USER}:${DB_PASS}@tcp(127.0.0.1:3306)/${DB_NAME}?parseTime=true&charset=utf8mb4
+RADIUS_SECRET=${RAND_NAS_SECRET}
+EOF
+    chmod 600 "$ENV_FILE"
 fi
 
 # Detect Public / Local IP
@@ -139,8 +156,10 @@ fi
 
 $MYSQL_CMD -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 $MYSQL_CMD -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+$MYSQL_CMD -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
 $MYSQL_CMD -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
 $MYSQL_CMD -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';"
+$MYSQL_CMD -e "ALTER USER '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';"
 $MYSQL_CMD -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'127.0.0.1';"
 $MYSQL_CMD -e "FLUSH PRIVILEGES;"
 
@@ -156,13 +175,16 @@ echo -e "${BLUE}================================================================
 
 apt-get install -y freeradius freeradius-mysql freeradius-utils
 
+FR_BASE="/etc/freeradius/3.0"
+[[ ! -d "$FR_BASE" && -d "/etc/freeradius" ]] && FR_BASE="/etc/freeradius"
+
 # Check if tables exist; if not, import FreeRADIUS standard schema
 TABLE_COUNT=$($MYSQL_CMD -u ${DB_USER} -p${DB_PASS} -D ${DB_NAME} -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${DB_NAME}' AND table_name = 'radcheck';" 2>/dev/null || echo "0")
 if [[ "$TABLE_COUNT" -eq "0" ]]; then
     echo -e "${CYAN}[INFO] Importing standard FreeRADIUS MySQL schema...${NC}"
     SCHEMA_PATH=""
-    if [[ -f "/etc/freeradius/3.0/mods-config/sql/main/mysql/schema.sql" ]]; then
-        SCHEMA_PATH="/etc/freeradius/3.0/mods-config/sql/main/mysql/schema.sql"
+    if [[ -f "${FR_BASE}/mods-config/sql/main/mysql/schema.sql" ]]; then
+        SCHEMA_PATH="${FR_BASE}/mods-config/sql/main/mysql/schema.sql"
     elif [[ -f "/etc/freeradius/mods-config/sql/main/mysql/schema.sql" ]]; then
         SCHEMA_PATH="/etc/freeradius/mods-config/sql/main/mysql/schema.sql"
     else
@@ -175,18 +197,18 @@ if [[ "$TABLE_COUNT" -eq "0" ]]; then
 fi
 
 # Configure FreeRADIUS SQL module
-SQL_CONF="/etc/freeradius/3.0/mods-available/sql"
+SQL_CONF="${FR_BASE}/mods-available/sql"
 if [[ -f "$SQL_CONF" ]]; then
     echo -e "${CYAN}[INFO] Configuring ${SQL_CONF}...${NC}"
-    sed -i 's/^[[:space:]]*dialect = .*/\tdialect = "mysql"/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*driver = .*/\tdriver = "rlm_sql_mysql"/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*server = .*/\tserver = "127.0.0.1"/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*port = .*/\tport = 3306/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*login = .*/\tlogin = "'"${DB_USER}"'"/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*password = .*/\tpassword = "'"${DB_PASS}"'"/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*radius_db = .*/\tradius_db = "'"${DB_NAME}"'"/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*read_clients = .*/\tread_clients = yes/' "$SQL_CONF"
-    sed -i 's/^[[:space:]]*client_table = .*/\tclient_table = "nas"/' "$SQL_CONF"
+    sed -i 's/^[#[:space:]]*dialect = .*/\tdialect = "mysql"/' "$SQL_CONF"
+    sed -i 's/^[#[:space:]]*driver = "rlm_sql_.*/\tdriver = "rlm_sql_mysql"/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*server = "(localhost|127\.0\.0\.1)".*/\tserver = "127.0.0.1"/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*port = [0-9]+.*/\tport = 3306/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*login = ".*"/\tlogin = "'"${DB_USER}"'"/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*password = ".*"/\tpassword = "'"${DB_PASS}"'"/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*radius_db = "(radius|radiusdb)"/\tradius_db = "'"${DB_NAME}"'"/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*read_clients = (yes|no)/\tread_clients = yes/' "$SQL_CONF"
+    sed -i -E 's/^[#[:space:]]*client_table = "nas"/\tclient_table = "nas"/' "$SQL_CONF"
 
     # Disable TLS config in sql file to avoid connection errors on localhost
     sed -i 's/^[[:space:]]*ca_file =/#\tca_file =/' "$SQL_CONF"
@@ -196,11 +218,12 @@ if [[ -f "$SQL_CONF" ]]; then
     sed -i 's/^[[:space:]]*tls_required =/#\ttls_required =/' "$SQL_CONF"
 
     # Enable sql module symlink
-    ln -sf /etc/freeradius/3.0/mods-available/sql /etc/freeradius/3.0/mods-enabled/sql
+    mkdir -p "${FR_BASE}/mods-enabled"
+    ln -sf "$SQL_CONF" "${FR_BASE}/mods-enabled/sql"
 fi
 
 # Enable SQL in default site and inner-tunnel site
-DEFAULT_SITE="/etc/freeradius/3.0/sites-available/default"
+DEFAULT_SITE="${FR_BASE}/sites-available/default"
 if [[ -f "$DEFAULT_SITE" ]]; then
     echo -e "${CYAN}[INFO] Enabling SQL handlers in sites-available/default...${NC}"
     sed -i '/authorize {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$DEFAULT_SITE"
@@ -209,7 +232,7 @@ if [[ -f "$DEFAULT_SITE" ]]; then
     sed -i '/post-auth {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$DEFAULT_SITE"
 fi
 
-INNER_TUNNEL="/etc/freeradius/3.0/sites-available/inner-tunnel"
+INNER_TUNNEL="${FR_BASE}/sites-available/inner-tunnel"
 if [[ -f "$INNER_TUNNEL" ]]; then
     echo -e "${CYAN}[INFO] Enabling SQL handlers in sites-available/inner-tunnel...${NC}"
     sed -i '/authorize {/,/}/ { s/^[[:space:]]*#[[:space:]]*sql$/\tsql/ }' "$INNER_TUNNEL"
@@ -218,7 +241,7 @@ if [[ -f "$INNER_TUNNEL" ]]; then
 fi
 
 # Set proper ownership and restart
-chown -R freerad:freerad /etc/freeradius/3.0/ 2>/dev/null || true
+chown -R freerad:freerad "$FR_BASE" 2>/dev/null || true
 systemctl restart freeradius
 systemctl enable freeradius
 
@@ -522,11 +545,6 @@ ExecStart=/opt/radius-server/radius-platform
 Restart=always
 RestartSec=3
 LimitNOFILE=65535
-ProtectSystem=full
-ProtectHome=true
-NoNewPrivileges=true
-PrivateTmp=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target
@@ -574,6 +592,8 @@ check_service "freeradius"
 check_service "accel-ppp"
 check_service "radius-server"
 
+ADMIN_PASS=$(grep -E '^INITIAL_ADMIN_PASSWORD=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || echo "")
+
 echo ""
 echo -e "${GREEN}${BOLD}===================================================================${NC}"
 echo -e "${GREEN}${BOLD}      🎉 HAITHAM RADIUS ENTERPRISE INSTALLED SUCCESSFULLY!         ${NC}"
@@ -583,6 +603,10 @@ echo -e "${BOLD}📌 Web Control-Plane Dashboard:${NC}"
 echo -e "   HTTPS Portal:   ${CYAN}https://${SERVER_IP}${NC} (Port 443)"
 echo -e "   HTTP Redirect:  ${CYAN}http://${SERVER_IP}${NC} (Port 80 -> 443)"
 echo -e "   Legacy Port:    ${CYAN}http://${SERVER_IP}:5000${NC} (Port 5000 -> 443)"
+echo -e "   Default User:   ${GREEN}admin${NC}"
+if [[ -n "$ADMIN_PASS" ]]; then
+echo -e "   Admin Password: ${GREEN}${ADMIN_PASS}${NC}"
+fi
 echo -e "   Credentials:    ${YELLOW}Stored securely in ${ENV_FILE}${NC} (chmod 0600)"
 echo -e "   Inspect:        ${YELLOW}sudo cat ${ENV_FILE}${NC}"
 echo ""
