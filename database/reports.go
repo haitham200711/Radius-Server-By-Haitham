@@ -510,6 +510,19 @@ func (d *DB) GetSubscriberLoginSessionsReport(
 		}
 	}
 
+	// Detect duplicate/multiple concurrent online sessions for the same user
+	onlineCounts := make(map[string]int)
+	for _, sess := range sessions {
+		if sess.IsOnline && sess.UserName != "" {
+			onlineCounts[sess.UserName]++
+		}
+	}
+	for i := range sessions {
+		if sessions[i].IsOnline && onlineCounts[sessions[i].UserName] > 1 {
+			sessions[i].MultipleActive = true
+		}
+	}
+
 	return sessions, total, nil
 }
 
@@ -594,6 +607,22 @@ func (d *DB) GetTopConsumersReport(resellerID int64, year, month, limit int) ([]
 			list = append(list, item)
 		}
 	}
+
+	maxGB := 0.0
+	for _, it := range list {
+		if it.TotalGB > maxGB {
+			maxGB = it.TotalGB
+		}
+	}
+	for i := range list {
+		list[i].Rank = i + 1
+		if maxGB > 0 {
+			list[i].PercentOfTop = (list[i].TotalGB / maxGB) * 100.0
+		} else {
+			list[i].PercentOfTop = 0
+		}
+	}
+
 	return list, nil
 }
 
@@ -1081,6 +1110,7 @@ func (d *DB) GetSubscriberDebtsReport(
 				item.DebtStatusBadgeClass = "bg-info-subtle text-info-emphasis border border-info-subtle"
 			}
 
+			item.DebtBadgeClass = item.DebtStatusBadgeClass
 			list = append(list, item)
 		}
 	}

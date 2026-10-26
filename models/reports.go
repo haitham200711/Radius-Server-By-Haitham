@@ -224,6 +224,7 @@ type SubscriberDebtItem struct {
 	DebtAgeDays          int     `json:"debt_age_days"`
 	DebtStatus           string  `json:"debt_status"` // "none", "minor", "overdue", "critical"
 	DebtStatusBadgeClass string  `json:"debt_status_badge_class"`
+	DebtBadgeClass       string  `json:"debt_badge_class"`
 	DebtStatusText       string  `json:"debt_status_text"`
 	LastPaymentAmount    float64 `json:"last_payment_amount"`
 	LastPaymentDate      string  `json:"last_payment_date"`

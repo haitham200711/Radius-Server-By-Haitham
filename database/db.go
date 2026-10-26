@@ -9987,6 +9987,12 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 		report.MonthDailyAvgGB = report.YearTotalGB / 365.0
 	}
 
+	if month >= 1 && month <= 12 {
+		report.TotalPeriodGB = report.MonthTotalGB
+	} else {
+		report.TotalPeriodGB = report.YearTotalGB
+	}
+
 	return report, nil
 }
 

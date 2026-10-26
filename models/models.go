@@ -226,6 +226,7 @@ type SubscriberDailyTraffic struct {
 
 // TopConsumerItem represents a top consuming user in the selected period
 type TopConsumerItem struct {
+	Rank         int     `json:"rank"`
 	Username     string  `json:"username"`
 	FullName     string  `json:"full_name"`
 	ContractNo   string  `json:"contract_no"`
@@ -236,6 +237,7 @@ type TopConsumerItem struct {
 	TotalDisplay string  `json:"total_display"`
 	UploadGB     float64 `json:"upload_gb"`
 	DownloadGB   float64 `json:"download_gb"`
+	PercentOfTop float64 `json:"percent_of_top"`
 	SessionCount int     `json:"session_count"`
 	IsOnline     bool    `json:"is_online"`
 }
@@ -272,6 +274,7 @@ type SubscriberTrafficReport struct {
 	MonthPeakDay      string                     `json:"month_peak_day"`
 	MonthPeakDayGB    float64                    `json:"month_peak_day_gb"`
 	MonthDailyAvgGB   float64                    `json:"month_daily_avg_gb"`
+	TotalPeriodGB     float64                    `json:"total_period_gb"`
 	MonthlyList       []SubscriberMonthlyTraffic `json:"monthly_list"`
 	DailyList         []SubscriberDailyTraffic   `json:"daily_list"`
 }
@@ -911,6 +914,7 @@ type SubscriberLoginSession struct {
 	IsOnline            bool       `json:"is_online"`
 	StatusBadgeClass    string     `json:"status_badge_class"`
 	StatusText          string     `json:"status_text"`
+	MultipleActive      bool       `json:"multiple_active"`
 	AcctTerminateCause  string     `json:"acctterminatecause"`
 	TerminateCauseText  string     `json:"terminate_cause_text"`
 }
