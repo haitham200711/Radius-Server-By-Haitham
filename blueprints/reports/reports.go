@@ -133,6 +133,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل ملخص المتابعة: " + err.Error()
 		}
+		if summary == nil {
+			summary = &models.ReportsExecutiveSummary{}
+		}
 		data["ExecutiveSummary"] = summary
 
 		// Include top 10 consumers this month
@@ -142,6 +145,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Include router health status
 		nasHealth, nasSummary, _ := bp.db.GetNASHealthReport()
+		if nasSummary == nil {
+			nasSummary = &models.NASHealthSummary{}
+		}
 		data["NASHealthList"] = nasHealth
 		data["NASHealthSummary"] = nasSummary
 
@@ -162,6 +168,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		authLogs, total, authSummary, topFailures, err := bp.db.GetAuthLogReport(searchQuery, authReplyFilter, fromDate, toDate, effectiveResellerID, limit, offset)
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل سجل المصادقة: " + err.Error()
+		}
+		if authSummary == nil {
+			authSummary = &models.AuthLogSummary{}
 		}
 		data["AuthLogs"] = authLogs
 		data["AuthSummary"] = authSummary
@@ -188,6 +197,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 			data["ErrorMessage"] = "فشل تحميل سجل الجلسات: " + err.Error()
 		}
 		summary, _ := bp.db.GetSubscriberLoginSummary(searchQuery, statusFilter, nasFilter, fromDate, toDate)
+		if summary == nil {
+			summary = &models.SubscriberLoginSummary{}
+		}
 
 		data["Sessions"] = sessions
 		data["SessionsSummary"] = summary
@@ -249,6 +261,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير الكوتة والصلاحية: " + err.Error()
 		}
+		if quotaSummary == nil {
+			quotaSummary = &models.QuotaExpirySummary{}
+		}
 		data["QuotaItems"] = quotaItems
 		data["QuotaSummary"] = quotaSummary
 		data["TotalRecords"] = total
@@ -272,6 +287,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير حالة الخدمة: " + err.Error()
 		}
+		if srvSummary == nil {
+			srvSummary = &models.ServiceStatusSummary{}
+		}
 		data["ServiceItems"] = services
 		data["ServiceSummary"] = srvSummary
 		data["TotalRecords"] = total
@@ -284,6 +302,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		byProfile, byReseller, growthSummary, err := bp.db.GetSubscribersGrowthReport(effectiveResellerID)
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل إحصائيات المشتركين والنمو: " + err.Error()
+		}
+		if growthSummary == nil {
+			growthSummary = &models.SubscribersGrowthSummary{}
 		}
 		data["SubscribersByProfile"] = byProfile
 		data["SubscribersByReseller"] = byReseller
@@ -311,6 +332,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		debts, total, debtsSummary, err := bp.db.GetSubscriberDebtsReport(searchQuery, debtStatusFilter, effectiveResellerID, limit, offset)
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير ديون العملاء: " + err.Error()
+		}
+		if debtsSummary == nil {
+			debtsSummary = &models.SubscriberDebtsSummary{}
 		}
 		data["Debts"] = debts
 		data["DebtsSummary"] = debtsSummary
@@ -343,6 +367,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير أرصدة الموزعين: " + err.Error()
 		}
+		if resSummary == nil {
+			resSummary = &models.ResellerBalancesSummary{}
+		}
 		data["ResellersBalances"] = resellers
 		data["ResellerSummary"] = resSummary
 		data["ResellerLedger"] = ledgerItems
@@ -367,6 +394,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير أرصدة العملاء: " + err.Error()
 		}
+		if subSummary == nil {
+			subSummary = &models.SubscriberBalancesSummary{}
+		}
 		data["SubscribersBalances"] = subs
 		data["SubscriberSummary"] = subSummary
 		data["SubscriberLedger"] = ledgerItems
@@ -381,6 +411,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		byProfile, byReseller, revSummary, err := bp.db.GetRevenueProfitReport(effectiveResellerID)
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير الإيرادات والأرباح: " + err.Error()
+		}
+		if revSummary == nil {
+			revSummary = &models.RevenueProfitSummary{}
 		}
 		data["RevenueByProfile"] = byProfile
 		data["RevenueByReseller"] = byReseller
@@ -399,6 +432,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير الراوترات: " + err.Error()
 		}
+		if nasSummary == nil {
+			nasSummary = &models.NASHealthSummary{}
+		}
 		data["NASHealthList"] = nasList
 		data["NASHealthSummary"] = nasSummary
 
@@ -414,6 +450,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		capacityList, capSummary, err := bp.db.GetCapacityPeakReport(effectiveResellerID)
 		if err != nil {
 			data["ErrorMessage"] = "فشل تحميل تقرير سعة الشبكة: " + err.Error()
+		}
+		if capSummary == nil {
+			capSummary = &models.CapacitySummary{}
 		}
 		data["CapacityHourlyList"] = capacityList
 		data["CapacitySummary"] = capSummary
