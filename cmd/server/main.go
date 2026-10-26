@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/adv"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/auth"
@@ -95,6 +96,12 @@ func main() {
 	}
 
 	log.Println("[INIT] Database connected and schema synchronized successfully.")
+
+	// 1.5 Enforce security checks on startup - reject default credentials
+	if err := db.VerifyNoDefaultCredentials(); err != nil {
+		log.Fatalf("[FATAL] Security verification failed: %v", err)
+	}
+
 	db.EnsureAllSSTPClientsHaveSequentialIP()
 
 	// 2. Initialize HTML/CSS Renderer
@@ -173,56 +180,55 @@ func main() {
 
 	// Dashboard Blueprint
 	dashBP := dashboard.New(db, renderer)
-	mux.HandleFunc("/dashboard", middleware.RequireAuth(dashBP.IndexHandler))
-	mux.HandleFunc("/dashboard/api/resources", middleware.RequireAuth(dashBP.APIResourcesHandler))
+	mux.HandleFunc("/dashboard", middleware.RequireAdminOrReseller(dashBP.IndexHandler))
+	mux.HandleFunc("/dashboard/api/resources", middleware.RequireAdminOrReseller(dashBP.APIResourcesHandler))
 
-
-	// Subscribers Blueprint
+	// Subscribers Blueprint (Admin & Reseller with strict ownership checks)
 	subBP := subscribers.New(db, renderer)
-	mux.HandleFunc("/subscribers", middleware.RequireAuth(subBP.ListHandler))
-	mux.HandleFunc("/subscribers/add", middleware.RequireAuth(subBP.AddHandler))
-	mux.HandleFunc("/subscribers/edit", middleware.RequireAuth(subBP.EditHandler))
-	mux.HandleFunc("/subscribers/delete", middleware.RequireAuth(subBP.DeleteHandler))
-	mux.HandleFunc("/subscribers/renew", middleware.RequireAuth(subBP.RenewHandler))
-	mux.HandleFunc("/subscribers/grant-loan", middleware.RequireAuth(subBP.GrantLoanHandler))
-	mux.HandleFunc("/subscribers/settle-loan", middleware.RequireAuth(subBP.SettleLoanHandler))
-	mux.HandleFunc("/subscribers/terminate", middleware.RequireAuth(subBP.TerminateHandler))
-	mux.HandleFunc("/subscribers/change-profile", middleware.RequireAuth(subBP.ChangeProfileHandler))
-	mux.HandleFunc("/subscribers/add-quota", middleware.RequireAuth(subBP.AddQuotaHandler))
-	mux.HandleFunc("/subscribers/pay-debt", middleware.RequireAuth(subBP.PayDebtHandler))
-	mux.HandleFunc("/subscribers/add-balance", middleware.RequireAuth(subBP.AddBalanceHandler))
-	mux.HandleFunc("/subscribers/settle-debt-balance", middleware.RequireAuth(subBP.SettleDebtBalanceHandler))
-	mux.HandleFunc("/subscribers/bulk", middleware.RequireAuth(subBP.BulkHandler))
-	mux.HandleFunc("/subscribers/live-traffic", middleware.RequireAuth(subBP.LiveTrafficHandler))
-	mux.HandleFunc("/subscribers/disconnect-session", middleware.RequireAuth(subBP.DisconnectSessionHandler))
+	mux.HandleFunc("/subscribers", middleware.RequireAdminOrReseller(subBP.ListHandler))
+	mux.HandleFunc("/subscribers/add", middleware.RequireAdminOrReseller(subBP.AddHandler))
+	mux.HandleFunc("/subscribers/edit", middleware.RequireAdminOrReseller(subBP.EditHandler))
+	mux.HandleFunc("/subscribers/delete", middleware.RequireAdminOrReseller(subBP.DeleteHandler))
+	mux.HandleFunc("/subscribers/renew", middleware.RequireAdminOrReseller(subBP.RenewHandler))
+	mux.HandleFunc("/subscribers/grant-loan", middleware.RequireAdminOrReseller(subBP.GrantLoanHandler))
+	mux.HandleFunc("/subscribers/settle-loan", middleware.RequireAdminOrReseller(subBP.SettleLoanHandler))
+	mux.HandleFunc("/subscribers/terminate", middleware.RequireAdminOrReseller(subBP.TerminateHandler))
+	mux.HandleFunc("/subscribers/change-profile", middleware.RequireAdminOrReseller(subBP.ChangeProfileHandler))
+	mux.HandleFunc("/subscribers/add-quota", middleware.RequireAdminOrReseller(subBP.AddQuotaHandler))
+	mux.HandleFunc("/subscribers/pay-debt", middleware.RequireAdminOrReseller(subBP.PayDebtHandler))
+	mux.HandleFunc("/subscribers/add-balance", middleware.RequireAdminOrReseller(subBP.AddBalanceHandler))
+	mux.HandleFunc("/subscribers/settle-debt-balance", middleware.RequireAdminOrReseller(subBP.SettleDebtBalanceHandler))
+	mux.HandleFunc("/subscribers/bulk", middleware.RequireAdminOrReseller(subBP.BulkHandler))
+	mux.HandleFunc("/subscribers/live-traffic", middleware.RequireAdminOrReseller(subBP.LiveTrafficHandler))
+	mux.HandleFunc("/subscribers/disconnect-session", middleware.RequireAdminOrReseller(subBP.DisconnectSessionHandler))
 	db.StartSubscriberSyncDaemon()
 
-	// Cards Blueprint
+	// Cards Blueprint (Admin & Reseller with strict batch ownership checks)
 	cardsBP := cards.New(db, renderer)
 	db.StartCardSyncDaemon()
-	mux.HandleFunc("/cards", middleware.RequireAuth(cardsBP.ListHandler))
-	mux.HandleFunc("/cards/generate", middleware.RequireAuth(cardsBP.GenerateHandler))
-	mux.HandleFunc("/cards/print", middleware.RequireAuth(cardsBP.PrintHandler))
-	mux.HandleFunc("/cards/cafe", middleware.RequireAuth(cardsBP.CafePortalHandler))
-	mux.HandleFunc("/cards/cafe/generate", middleware.RequireAuth(cardsBP.CafeGenerateHandler))
-	mux.HandleFunc("/cards/cafe/disconnect", middleware.RequireAuth(cardsBP.CafeDisconnectHandler))
+	mux.HandleFunc("/cards", middleware.RequireAdminOrReseller(cardsBP.ListHandler))
+	mux.HandleFunc("/cards/generate", middleware.RequireAdminOrReseller(cardsBP.GenerateHandler))
+	mux.HandleFunc("/cards/print", middleware.RequireAdminOrReseller(cardsBP.PrintHandler))
+	mux.HandleFunc("/cards/cafe", middleware.RequireAdminOrReseller(cardsBP.CafePortalHandler))
+	mux.HandleFunc("/cards/cafe/generate", middleware.RequireAdminOrReseller(cardsBP.CafeGenerateHandler))
+	mux.HandleFunc("/cards/cafe/disconnect", middleware.RequireAdminOrReseller(cardsBP.CafeDisconnectHandler))
 
-	// Card Templates Blueprint
+	// Card Templates Blueprint (Management restricted to Admin, Viewing allowed for Resellers)
 	tmplBP := card_templates.New(db, renderer)
-	mux.HandleFunc("/card-templates", middleware.RequireAuth(tmplBP.ListHandler))
-	mux.HandleFunc("/card-templates/add", middleware.RequireAuth(tmplBP.AddHandler))
-	mux.HandleFunc("/card-templates/edit", middleware.RequireAuth(tmplBP.EditHandler))
-	mux.HandleFunc("/card-templates/update", middleware.RequireAuth(tmplBP.UpdateHandler))
-	mux.HandleFunc("/card-templates/delete", middleware.RequireAuth(tmplBP.DeleteHandler))
-	mux.HandleFunc("/card-templates/set-default", middleware.RequireAuth(tmplBP.SetDefaultHandler))
-	mux.HandleFunc("/card-templates/set_default", middleware.RequireAuth(tmplBP.SetDefaultHandler))
+	mux.HandleFunc("/card-templates", middleware.RequireAdminOrReseller(tmplBP.ListHandler))
+	mux.HandleFunc("/card-templates/add", middleware.RequireAdmin(tmplBP.AddHandler))
+	mux.HandleFunc("/card-templates/edit", middleware.RequireAdmin(tmplBP.EditHandler))
+	mux.HandleFunc("/card-templates/update", middleware.RequireAdmin(tmplBP.UpdateHandler))
+	mux.HandleFunc("/card-templates/delete", middleware.RequireAdmin(tmplBP.DeleteHandler))
+	mux.HandleFunc("/card-templates/set-default", middleware.RequireAdmin(tmplBP.SetDefaultHandler))
+	mux.HandleFunc("/card-templates/set_default", middleware.RequireAdmin(tmplBP.SetDefaultHandler))
 
 	// Aliases for /templates
-	mux.HandleFunc("/templates", middleware.RequireAuth(tmplBP.ListHandler))
-	mux.HandleFunc("/templates/add", middleware.RequireAuth(tmplBP.AddHandler))
-	mux.HandleFunc("/templates/update", middleware.RequireAuth(tmplBP.UpdateHandler))
-	mux.HandleFunc("/templates/delete", middleware.RequireAuth(tmplBP.DeleteHandler))
-	mux.HandleFunc("/templates/set_default", middleware.RequireAuth(tmplBP.SetDefaultHandler))
+	mux.HandleFunc("/templates", middleware.RequireAdminOrReseller(tmplBP.ListHandler))
+	mux.HandleFunc("/templates/add", middleware.RequireAdmin(tmplBP.AddHandler))
+	mux.HandleFunc("/templates/update", middleware.RequireAdmin(tmplBP.UpdateHandler))
+	mux.HandleFunc("/templates/delete", middleware.RequireAdmin(tmplBP.DeleteHandler))
+	mux.HandleFunc("/templates/set_default", middleware.RequireAdmin(tmplBP.SetDefaultHandler))
 
 	// Profiles Blueprint
 	profBP := profiles.New(db, renderer)
@@ -280,13 +286,13 @@ func main() {
 
 	// Reports Blueprint
 	repBP := reports.New(db, renderer)
-	mux.HandleFunc("/reports", middleware.RequireAuth(repBP.IndexHandler))
-	mux.HandleFunc("/reports/logins", middleware.RequireAuth(repBP.LoginsRedirectHandler))
+	mux.HandleFunc("/reports", middleware.RequireAdminOrReseller(repBP.IndexHandler))
+	mux.HandleFunc("/reports/logins", middleware.RequireAdminOrReseller(repBP.LoginsRedirectHandler))
 
 	// Settings Blueprint
 	settBP := settings.New(db, renderer)
-	mux.HandleFunc("/settings", middleware.RequireAuth(settBP.IndexHandler))
-	mux.HandleFunc("/settings/change-password", middleware.RequireAuth(settBP.ChangePasswordHandler))
+	mux.HandleFunc("/settings", middleware.RequireAdminOrReseller(settBP.IndexHandler))
+	mux.HandleFunc("/settings/change-password", middleware.RequireAdminOrReseller(settBP.ChangePasswordHandler))
 	mux.HandleFunc("/settings/portal", middleware.RequireAdmin(settBP.SavePortalSettingsHandler))
 	mux.HandleFunc("/settings/maintenance/reboot", middleware.RequireAdmin(settBP.RebootOSHandler))
 	mux.HandleFunc("/settings/maintenance/restart-radius", middleware.RequireAdmin(settBP.RestartRadiusHandler))
@@ -308,14 +314,14 @@ func main() {
 	mux.HandleFunc("/expired/time", portalBP.ExpiredTimeHandler)
 	mux.HandleFunc("/expired/quota-loan", portalBP.ExpiredQuotaLoanHandler)
 	mux.HandleFunc("/expired/time-loan", portalBP.ExpiredTimeLoanHandler)
-	mux.HandleFunc("/expired/loan", portalBP.ApplyExpiredLoanHandler)
+	mux.HandleFunc("/expired/loan", middleware.RequireSubscriberAuth(portalBP.ApplyExpiredLoanHandler))
 
 	// Aliases under /portal/expired/...
 	mux.HandleFunc("/portal/expired/quota", portalBP.ExpiredQuotaHandler)
 	mux.HandleFunc("/portal/expired/time", portalBP.ExpiredTimeHandler)
 	mux.HandleFunc("/portal/expired/quota-loan", portalBP.ExpiredQuotaLoanHandler)
 	mux.HandleFunc("/portal/expired/time-loan", portalBP.ExpiredTimeLoanHandler)
-	mux.HandleFunc("/portal/expired/loan", portalBP.ApplyExpiredLoanHandler)
+	mux.HandleFunc("/portal/expired/loan", middleware.RequireSubscriberAuth(portalBP.ApplyExpiredLoanHandler))
 
 	// WhatsApp Blueprint (Admin Only)
 	waBP := whatsappBP.New(db, renderer)
@@ -348,8 +354,12 @@ func main() {
 	mux.HandleFunc("/adv/analyze-server", middleware.RequireAdmin(advBP.AnalyzeServerFileHandler))
 	mux.HandleFunc("/adv/import", middleware.RequireAdmin(advBP.ImportHandler))
 
-	// Wrap mux with Session Authentication middleware
-	handler := middleware.AuthMiddleware(cfg.SessionSecret)(mux)
+	// Wrap mux with Session Authentication, CSRF Protection, and HTTP Security Headers
+	handler := middleware.SecurityHeadersMiddleware(cfg.EnableHTTPS)(
+		middleware.CSRFMiddleware(
+			middleware.AuthMiddleware(cfg.SessionSecret)(mux),
+		),
+	)
 
 	// Determine public TLS port string if not default 443
 	targetPort := ""
@@ -373,10 +383,15 @@ func main() {
 			log.Fatalf("[FATAL] Failed to configure TLS certificates: %v", err)
 		}
 
-		// HTTPS Main Server (:443)
+		// HTTPS Main Server (:443) with hardened timeouts and max header limits
 		server = &http.Server{
-			Addr:    cfg.WebAddr,
-			Handler: handler,
+			Addr:              cfg.WebAddr,
+			Handler:           handler,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			MaxHeaderBytes:    1 << 20, // 1 MB
 		}
 
 		go func() {
@@ -392,19 +407,29 @@ func main() {
 			// RouterOS script fetch compatibility over HTTP
 			httpMux.HandleFunc("/sstp/script", sstpBP.ScriptHandler)
 			httpMux.HandleFunc("/sstp/routes/hook-up", sstpBP.HookUpHandler)
-			// Redirect all other HTTP traffic to HTTPS
+			// Redirect all other HTTP traffic to HTTPS (with Host header sanitization to prevent open redirects)
 			httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				host, _, err := net.SplitHostPort(r.Host)
 				if err != nil {
 					host = r.Host
+				}
+				host = strings.TrimSpace(host)
+				if strings.ContainsAny(host, "/\\ \r\n\t") {
+					http.Error(w, "Invalid Host header", http.StatusBadRequest)
+					return
 				}
 				target := "https://" + host + targetPort + r.RequestURI
 				http.Redirect(w, r, target, http.StatusMovedPermanently)
 			})
 
 			httpServer = &http.Server{
-				Addr:    cfg.HTTPRedirectAddr,
-				Handler: httpMux,
+				Addr:              cfg.HTTPRedirectAddr,
+				Handler:           httpMux,
+				ReadHeaderTimeout: 5 * time.Second,
+				ReadTimeout:       10 * time.Second,
+				WriteTimeout:      10 * time.Second,
+				IdleTimeout:       30 * time.Second,
+				MaxHeaderBytes:    1 << 20,
 			}
 
 			go func() {
@@ -425,13 +450,23 @@ func main() {
 				if err != nil {
 					host = r.Host
 				}
+				host = strings.TrimSpace(host)
+				if strings.ContainsAny(host, "/\\ \r\n\t") {
+					http.Error(w, "Invalid Host header", http.StatusBadRequest)
+					return
+				}
 				target := "https://" + host + targetPort + r.RequestURI
 				http.Redirect(w, r, target, http.StatusMovedPermanently)
 			})
 
 			legacyServer = &http.Server{
-				Addr:    ":5000",
-				Handler: legacyMux,
+				Addr:              ":5000",
+				Handler:           legacyMux,
+				ReadHeaderTimeout: 5 * time.Second,
+				ReadTimeout:       10 * time.Second,
+				WriteTimeout:      10 * time.Second,
+				IdleTimeout:       30 * time.Second,
+				MaxHeaderBytes:    1 << 20,
 			}
 
 			go func() {
@@ -443,9 +478,17 @@ func main() {
 		}
 	} else {
 		// Plain HTTP Server
+		if os.Getenv("APP_ENV") == "production" {
+			log.Println("[WARN] Running plain HTTP in production is insecure. Consider setting ENABLE_HTTPS=true.")
+		}
 		server = &http.Server{
-			Addr:    cfg.WebAddr,
-			Handler: handler,
+			Addr:              cfg.WebAddr,
+			Handler:           handler,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			MaxHeaderBytes:    1 << 20,
 		}
 
 		go func() {

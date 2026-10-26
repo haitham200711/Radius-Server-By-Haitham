@@ -1,7 +1,6 @@
 package portal
 
 import (
-	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
@@ -93,12 +92,16 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Role:     "subscriber",
 		}, bp.secret)
 
+		isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 		http.SetCookie(w, &http.Cookie{
 			Name:     middleware.CookieName,
 			Value:    token,
 			Path:     "/",
 			HttpOnly: true,
-			Expires:  time.Now().Add(7 * 24 * time.Hour),
+			Secure:   isSecure,
+			SameSite: http.SameSiteStrictMode,
+			MaxAge:   int(middleware.SessionDuration.Seconds()),
+			Expires:  time.Now().Add(middleware.SessionDuration),
 		})
 
 		http.Redirect(w, r, "/portal?autologin=1", http.StatusFound)
@@ -169,12 +172,16 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Role:     "subscriber",
 	}, bp.secret)
 
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	http.SetCookie(w, &http.Cookie{
 		Name:     middleware.CookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Expires:  time.Now().Add(7 * 24 * time.Hour),
+		Secure:   isSecure,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   int(middleware.SessionDuration.Seconds()),
+		Expires:  time.Now().Add(middleware.SessionDuration),
 	})
 
 	http.Redirect(w, r, "/portal", http.StatusFound)
@@ -182,12 +189,18 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 // LogoutHandler logs out subscriber
 func (bp *Blueprint) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if u := middleware.GetUser(r); u != nil {
+		middleware.RevokeUserSessions(u.Username)
+	}
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	http.SetCookie(w, &http.Cookie{
 		Name:     middleware.CookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   isSecure,
+		SameSite: http.SameSiteStrictMode,
 	})
 	http.Redirect(w, r, "/portal/login?logout=1", http.StatusFound)
 }
@@ -334,7 +347,7 @@ func (bp *Blueprint) DisconnectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = bp.db.DisconnectSubscriberSession(user.Username)
+	_, _, _ = bp.db.DisconnectSubscriberSession(user.Username)
 	http.Redirect(w, r, "/portal?success="+url.QueryEscape("تم إرسال أمر إعادة تشغيل الجلسة بنجاح، جاري إعادة الاتصال..."), http.StatusFound)
 }
 
@@ -383,6 +396,8 @@ func (bp *Blueprint) ChangePasswordHandler(w http.ResponseWriter, r *http.Reques
 		http.Redirect(w, r, "/portal?error="+url.QueryEscape("حدث خطأ أثناء تحديث كلمة المرور: "+err.Error()), http.StatusFound)
 		return
 	}
+
+	middleware.RevokeUserSessions(user.Username)
 
 	http.Redirect(w, r, "/portal?success="+url.QueryEscape("تم تغيير كلمة المرور بنجاح!"), http.StatusFound)
 }
@@ -434,17 +449,17 @@ func (bp *Blueprint) RenewFromBalanceHandler(w http.ResponseWriter, r *http.Requ
 
 // ExpiredPageViewData holds all rendering context for the 4 expired portals
 type ExpiredPageViewData struct {
-	Title               string
-	PageType            string // "quota", "time", "quota_loan", "time_loan"
-	IsQuotaMode         bool
-	IsTimeMode          bool
-	ShowLoanOption      bool
-	ClientIP            string
-	Subscriber          *models.Subscriber
-	Profile             *models.Profile
-	Reseller            *models.Reseller
-	Settings            *models.SubscriberPortalSettings
-	IsIdentified        bool
+	Title          string
+	PageType       string // "quota", "time", "quota_loan", "time_loan"
+	IsQuotaMode    bool
+	IsTimeMode     bool
+	ShowLoanOption bool
+	ClientIP       string
+	Subscriber     *models.Subscriber
+	Profile        *models.Profile
+	Reseller       *models.Reseller
+	Settings       *models.SubscriberPortalSettings
+	IsIdentified   bool
 
 	// FreeRADIUS / Database verified flags:
 	IsQuotaExpired      bool
@@ -453,9 +468,9 @@ type ExpiredPageViewData struct {
 	IneligibilityReason string
 
 	// Loan Parameters:
-	LoanHours           int
-	LoanQuotaGB         float64
-	LoanDeductionText   string
+	LoanHours         int
+	LoanQuotaGB       float64
+	LoanDeductionText string
 
 	// Wallet & Balance:
 	CanRenewFromBalance bool
@@ -467,9 +482,10 @@ type ExpiredPageViewData struct {
 	TotalQuotaGB        float64
 	ExpiryDateFormatted string
 
-	SuccessMsg          string
-	ErrorMsg            string
-	IsPreview           bool
+	SuccessMsg string
+	ErrorMsg   string
+	IsPreview  bool
+	CSRFToken  string
 }
 
 // buildExpiredViewData prepares comprehensive context for expired pages with strict IP and quota/time verification
@@ -492,6 +508,7 @@ func (bp *Blueprint) buildExpiredViewData(r *http.Request, pageType string, allo
 		Settings:       settings,
 		SuccessMsg:     r.URL.Query().Get("success"),
 		ErrorMsg:       r.URL.Query().Get("error"),
+		CSRFToken:      middleware.GetCSRFToken(r),
 	}
 
 	if r.URL.Query().Get("loan_success") == "1" && data.SuccessMsg == "" {
@@ -570,20 +587,16 @@ func (bp *Blueprint) buildExpiredViewData(r *http.Request, pageType string, allo
 		}
 		data.TotalQuotaGB = float64(totalQuotaBytes) / (1024 * 1024 * 1024)
 
-		cycleStart := sub.CreatedAt
-		var lastRenewed sql.NullTime
-		_ = bp.db.QueryRow("SELECT last_renewed_at FROM subscribers WHERE username = ?", sub.Username).Scan(&lastRenewed)
-		if lastRenewed.Valid {
-			cycleStart = lastRenewed.Time
+		uc, err := bp.db.GetSubscriberUsageCycle(sub.Username)
+		if err == nil && uc != nil {
+			data.UsedQuotaGB = float64(uc.UsedBytes) / (1024 * 1024 * 1024)
+			data.IsQuotaExpired = uc.IsExhausted
+		} else {
+			data.UsedQuotaGB = 0
+			data.IsQuotaExpired = false
 		}
 
-		var usedBytes int64
-		_ = bp.db.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
-			FROM radacct WHERE username = ? AND acctstarttime >= ?`, sub.Username, cycleStart).Scan(&usedBytes)
-		data.UsedQuotaGB = float64(usedBytes) / (1024 * 1024 * 1024)
-
 		now := time.Now()
-		data.IsQuotaExpired = (totalQuotaBytes > 0 && usedBytes >= totalQuotaBytes)
 		data.IsTimeExpired = (sub.ExpirationDate.Valid && now.After(sub.ExpirationDate.Time))
 
 		if sub.ExpirationDate.Valid {

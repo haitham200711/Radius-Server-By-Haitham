@@ -55,7 +55,8 @@ func (bp *Blueprint) DisconnectHandler(w http.ResponseWriter, r *http.Request) {
 	var coaPort int
 	_ = bp.db.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP).Scan(&secret, &coaPort)
 	if secret == "" {
-		secret = "radius123"
+		http.Error(w, "الراوتر غير مسجل أو لا يحتوي على secret صالح", http.StatusBadRequest)
+		return
 	}
 	if coaPort <= 0 {
 		coaPort = 3799
@@ -66,10 +67,11 @@ func (bp *Blueprint) DisconnectHandler(w http.ResponseWriter, r *http.Request) {
 		framedIP = net.ParseIP(framedIPStr)
 	}
 
-	_, _ = radius.SendDisconnectRequest(nasIP, coaPort, []byte(secret), username, sessionID, framedIP)
-
-	_, _ = bp.db.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
-		WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, sessionID, nasIP)
+	res, err := radius.SendDisconnectRequest(nasIP, coaPort, []byte(secret), username, sessionID, framedIP)
+	if err == nil && res != nil && res.Success {
+		_, _ = bp.db.Exec(`UPDATE radacct SET disconnect_status = 'pending', disconnect_pending_at = CURRENT_TIMESTAMP
+			WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, sessionID, nasIP)
+	}
 
 	http.Redirect(w, r, "/sessions", http.StatusFound)
 }

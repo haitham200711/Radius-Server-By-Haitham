@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -227,8 +228,12 @@ func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit upload size to 250 MB
-	_ = r.ParseMultipartForm(250 << 20)
+	// Strictly limit upload size to 500 MB to prevent DoS
+	r.Body = http.MaxBytesReader(w, r.Body, 500<<20)
+	if err := r.ParseMultipartForm(500 << 20); err != nil {
+		http.Redirect(w, r, "/settings?adv_error="+url.QueryEscape("حجم الملف المرفوع تجاوز الحد المسموح به (500 ميجابايت)")+"#adv", http.StatusFound)
+		return
+	}
 
 	file, header, err := r.FormFile("backup_file")
 	if err != nil {
@@ -237,19 +242,34 @@ func (bp *Blueprint) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext != ".sql" && ext != ".gz" {
+		http.Redirect(w, r, "/settings?adv_error="+url.QueryEscape("نوع الملف غير مسموح به، يرجى رفع ملف .sql أو .sql.gz فقط")+"#adv", http.StatusFound)
+		return
+	}
+
 	uploadDir := "./uploads/adv"
 	_ = os.MkdirAll(uploadDir, 0755)
 	destPath := filepath.Join(uploadDir, "adv_uploaded.sql")
+	tmpPath := filepath.Join(uploadDir, "tmp_adv_uploaded.sql")
 
-	dst, err := os.Create(destPath)
+	dst, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		http.Redirect(w, r, "/settings?adv_error=فشل+حفظ+الملف+على+السيرفر#adv", http.StatusFound)
 		return
 	}
-	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
+		_ = dst.Close()
+		_ = os.Remove(tmpPath)
 		http.Redirect(w, r, "/settings?adv_error=فشل+رفع+الملف#adv", http.StatusFound)
+		return
+	}
+	_ = dst.Close()
+
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		_ = os.Remove(tmpPath)
+		http.Redirect(w, r, "/settings?adv_error=فشل+نقل+الملف#adv", http.StatusFound)
 		return
 	}
 

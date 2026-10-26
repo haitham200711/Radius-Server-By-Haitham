@@ -89,9 +89,15 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		toDate = now.Format("2006-01-02")
 	}
 
+	currentUser := middleware.GetUser(r)
+	var resellerID int64
+	if currentUser != nil && currentUser.Role == "reseller" {
+		resellerID = currentUser.ID
+	}
+
 	// 1. Handle CSV Export for Logins
 	if tab == "logins" && r.URL.Query().Get("export") == "csv" {
-		sessions, _, err := bp.db.GetSubscriberLoginSessions(search, statusFilter, nasFilter, fromDate, toDate, 5000, 0)
+		sessions, _, err := bp.db.GetSubscriberLoginSessions(search, statusFilter, nasFilter, fromDate, toDate, resellerID, 5000, 0)
 		if err == nil {
 			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=subscriber_logins_%s.csv", now.Format("20060102_1504")))
@@ -314,7 +320,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	var routersList []models.NAS
 
 	if tab == "logins" {
-		loginSessions, totalLogins, _ = bp.db.GetSubscriberLoginSessions(search, statusFilter, nasFilter, fromDate, toDate, limit, offset)
+		loginSessions, totalLogins, _ = bp.db.GetSubscriberLoginSessions(search, statusFilter, nasFilter, fromDate, toDate, resellerID, limit, offset)
 		loginSummary, _ = bp.db.GetSubscriberLoginSummary(search, statusFilter, nasFilter, fromDate, toDate)
 
 		// Fetch Routers for NAS filter dropdown

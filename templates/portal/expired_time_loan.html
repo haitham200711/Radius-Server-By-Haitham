@@ -261,6 +261,7 @@
             </div>
 
             <form method="POST" action="/expired/loan">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <input type="hidden" name="type" value="time">
                 <input type="hidden" name="client_ip" value="{{ .ClientIP }}">
                 {{ if .Subscriber.Username }}
@@ -292,6 +293,7 @@
             </div>
             <small class="text-secondary d-block mb-2.5">يمكنك تجديد اشتراكك الآن فوراً خصماً من رصيدك المتاح دون انتظار.</small>
             <form method="POST" action="/portal/renew-balance">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <button type="submit" class="btn btn-renew w-100 shadow-sm">
                     <i class="bi bi-check-circle-fill me-1"></i> تجديد الاشتراك الآن من رصيد المحفظة
                 </button>

@@ -108,7 +108,7 @@ func ExecuteBackup(db *database.DB, cfg *config.Config, triggerSource string) (*
 	return rec, nil
 }
 
-// dumpWithCLI executes mariadb-dump / mysqldump and pipes through gzip
+// dumpWithCLI executes mariadb-dump / mysqldump and pipes through gzip securely without leaking credentials in ps
 func dumpWithCLI(user, pass, host, port, dbname, targetPath string) error {
 	dumpBin := ""
 	for _, bin := range []string{"mariadb-dump", "mysqldump", "/usr/bin/mariadb-dump", "/usr/bin/mysqldump"} {
@@ -122,6 +122,21 @@ func dumpWithCLI(user, pass, host, port, dbname, targetPath string) error {
 		return fmt.Errorf("mariadb-dump or mysqldump not found in PATH")
 	}
 
+	// Create a secure temporary MySQL options file (0600) to avoid exposing credentials in process table
+	optFile, err := os.CreateTemp("", "radius_dump_*.cnf")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary options file: %w", err)
+	}
+	defer os.Remove(optFile.Name())
+	_ = optFile.Chmod(0600)
+
+	optContent := fmt.Sprintf("[client]\nuser=%s\npassword=%s\nhost=%s\nport=%s\n", user, pass, host, port)
+	if _, err := optFile.WriteString(optContent); err != nil {
+		_ = optFile.Close()
+		return fmt.Errorf("failed to write options file: %w", err)
+	}
+	_ = optFile.Close()
+
 	outFile, err := os.Create(targetPath)
 	if err != nil {
 		return err
@@ -132,10 +147,7 @@ func dumpWithCLI(user, pass, host, port, dbname, targetPath string) error {
 	defer gzWriter.Close()
 
 	args := []string{
-		"-u" + user,
-		"-p" + pass,
-		"-h", host,
-		"-P", port,
+		fmt.Sprintf("--defaults-extra-file=%s", optFile.Name()),
 		"--single-transaction",
 		"--quick",
 		"--routines",
@@ -300,30 +312,34 @@ func sendBackupViaWhatsApp(db *database.DB, rec *models.BackupRecord, phone stri
 	}
 }
 
-// RestoreBackup restores database tables from a compressed .sql.gz or plain .sql file
-func RestoreBackup(db *database.DB, cfg *config.Config, filepath string) error {
+// RestoreBackup restores database tables from a compressed .sql.gz or plain .sql file safely
+func RestoreBackup(db *database.DB, cfg *config.Config, backupFilePath string) error {
 	backupMu.Lock()
 	defer backupMu.Unlock()
 
-	f, err := os.Open(filepath)
+	cleanedPath := filepath.Clean(backupFilePath)
+	f, err := os.Open(cleanedPath)
 	if err != nil {
 		return fmt.Errorf("تعذر فتح ملف النسخة: %w", err)
 	}
 	defer f.Close()
 
-	var reader io.Reader = f
-	if strings.HasSuffix(strings.ToLower(filepath), ".gz") {
+	var rawReader io.Reader = f
+	if strings.HasSuffix(strings.ToLower(cleanedPath), ".gz") {
 		gz, err := gzip.NewReader(f)
 		if err != nil {
 			return fmt.Errorf("فشل فك ضغط النسخة: %w", err)
 		}
 		defer gz.Close()
-		reader = gz
+		rawReader = gz
 	}
+
+	// Protect against decompression bombs: enforce strict 2GB decompressed stream limit
+	reader := io.LimitReader(rawReader, 2<<30)
 
 	dbUser, dbPass, dbHost, dbPort, dbName := parseMySQLDSN(cfg.DBDSN)
 
-	// Try CLI restore first
+	// Try CLI restore first using secure temporary options file (0600)
 	restoreBin := ""
 	for _, bin := range []string{"mariadb", "mysql", "/usr/bin/mariadb", "/usr/bin/mysql"} {
 		if p, err := exec.LookPath(bin); err == nil {
@@ -333,21 +349,42 @@ func RestoreBackup(db *database.DB, cfg *config.Config, filepath string) error {
 	}
 
 	if restoreBin != "" {
-		cmd := exec.Command(restoreBin, "-u"+dbUser, "-p"+dbPass, "-h", dbHost, "-P", dbPort, dbName)
+		optFile, err := os.CreateTemp("", "radius_restore_*.cnf")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary restore options file: %w", err)
+		}
+		defer os.Remove(optFile.Name())
+		_ = optFile.Chmod(0600)
+
+		optContent := fmt.Sprintf("[client]\nuser=%s\npassword=%s\nhost=%s\nport=%s\n", dbUser, dbPass, dbHost, dbPort)
+		if _, err := optFile.WriteString(optContent); err != nil {
+			_ = optFile.Close()
+			return fmt.Errorf("failed to write restore options file: %w", err)
+		}
+		_ = optFile.Close()
+
+		cmd := exec.Command(restoreBin, fmt.Sprintf("--defaults-extra-file=%s", optFile.Name()), dbName)
 		cmd.Stdin = reader
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("فشل استعادة قاعدة البيانات: %w (%s)", err, stderr.String())
 		}
+		log.Printf("[AUDIT] Database restored successfully from backup file: %s", filepath.Base(cleanedPath))
 		return nil
 	}
 
-	// Fallback pure Go restore: read SQL content and execute
+	// Fallback pure Go restore inside transaction: read SQL content and execute
 	sqlBytes, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("فشل قراءة محتوى SQL: %w", err)
 	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start database transaction for restore: %w", err)
+	}
+	defer tx.Rollback()
 
 	queries := strings.Split(string(sqlBytes), ";\n")
 	for _, q := range queries {
@@ -355,11 +392,16 @@ func RestoreBackup(db *database.DB, cfg *config.Config, filepath string) error {
 		if q == "" || strings.HasPrefix(q, "--") {
 			continue
 		}
-		if _, err := db.Exec(q); err != nil {
+		if _, err := tx.Exec(q); err != nil {
 			log.Printf("[BACKUP-RESTORE] Warning executing query: %v", err)
 		}
 	}
 
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit restored data: %w", err)
+	}
+
+	log.Printf("[AUDIT] Pure-Go fallback restore completed successfully from: %s", filepath.Base(cleanedPath))
 	return nil
 }
 
@@ -405,7 +447,7 @@ func StartBackupScheduler(db *database.DB, cfg *config.Config) {
 
 func parseMySQLDSN(dsn string) (user, pass, host, port, dbname string) {
 	user = "radius"
-	pass = "radiuspass"
+	pass = ""
 	host = "127.0.0.1"
 	port = "3306"
 	dbname = "radiusdb"

@@ -45,7 +45,7 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   isSecure,
-			SameSite: http.SameSiteLaxMode,
+			SameSite: http.SameSiteStrictMode,
 			MaxAge:   int(middleware.SessionDuration.Seconds()),
 			Expires:  time.Now().Add(middleware.SessionDuration),
 		})
@@ -123,6 +123,9 @@ func (bp *Blueprint) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (bp *Blueprint) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if u := middleware.GetUser(r); u != nil {
+		middleware.RevokeUserSessions(u.Username)
+	}
 	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	http.SetCookie(w, &http.Cookie{
 		Name:     middleware.CookieName,
@@ -131,7 +134,7 @@ func (bp *Blueprint) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isSecure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 	http.Redirect(w, r, "/auth/login", http.StatusFound)
 }

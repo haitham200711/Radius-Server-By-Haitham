@@ -186,6 +186,7 @@
 
                 {{ if and .Data.IsOnline .Settings.AllowSessionDisconnect }}
                 <form method="POST" action="/portal/disconnect" onsubmit="return confirm('هل تريد إعادة تشغيل جلسة الاتصال بالراوتر؟ سيتم قطع الاتصال لثوانٍ ثم إعادة الاتصال تلقائياً.');">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm w-100 fw-bold">
                         <i class="bi bi-arrow-clockwise me-1"></i> إعادة تشغيل الجلسة (Reconnect)
                     </button>
@@ -253,6 +254,7 @@
                         </div>
                         {{ if and .Settings.AllowBalanceRenewal (ge .Data.Subscriber.Balance .Data.Profile.Price) (gt .Data.Profile.Price 0.0) }}
                         <form method="POST" action="/portal/renew-balance" class="mt-2" onsubmit="return confirm('هل أنت متأكد من رغبتك في تجديد باقة ({{ .Data.Profile.DisplayName }}) وخصم {{ printf "%.2f" .Data.Profile.Price }} ج.م من رصيد محفظتك؟')">
+                            <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                             <button type="submit" class="btn btn-sm btn-success fw-bold w-100 shadow-sm py-2">
                                 <i class="bi bi-arrow-repeat me-1"></i> تجديد الباقة الآن من رصيدك ({{ printf "%.2f" .Data.Profile.Price }} ج.م)
                             </button>
@@ -498,6 +500,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
             </div>
             <form method="POST" action="/portal/request-loan">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <div class="modal-body p-4">
                     <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-2 mb-3 py-2">
                         <i class="bi bi-exclamation-triangle-fill fs-4 text-warning"></i>
@@ -562,6 +565,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="/portal/change-password">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">كلمة المرور الحالية: <span class="text-danger">*</span></label>

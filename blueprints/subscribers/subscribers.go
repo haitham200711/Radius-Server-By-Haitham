@@ -178,7 +178,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	} else if statusFilter == "expired_time" {
 		countWhere = append(countWhere, "((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)")
 	} else if statusFilter == "expired_quota" {
-		countWhere = append(countWhere, "s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND (s.last_renewed_at IS NULL OR acctstarttime >= s.last_renewed_at)) >= s.quota_bytes")
+		countWhere = append(countWhere, fmt.Sprintf("s.quota_bytes > 0 AND (SELECT %s FROM radacct WHERE username = s.username AND (s.last_renewed_at IS NULL OR acctstarttime >= s.last_renewed_at)) >= s.quota_bytes", database.RadacctSumBytesSQL))
 	} else if statusFilter == "loan" {
 		countWhere = append(countWhere, "s.loan_active = 1")
 	}
@@ -250,7 +250,7 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	} else if statusFilter == "expired_time" {
 		whereClauses = append(whereClauses, "((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)")
 	} else if statusFilter == "expired_quota" {
-		whereClauses = append(whereClauses, "s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND (s.last_renewed_at IS NULL OR acctstarttime >= s.last_renewed_at)) >= s.quota_bytes")
+		whereClauses = append(whereClauses, fmt.Sprintf("s.quota_bytes > 0 AND (SELECT %s FROM radacct WHERE username = s.username AND (s.last_renewed_at IS NULL OR acctstarttime >= s.last_renewed_at)) >= s.quota_bytes", database.RadacctSumBytesSQL))
 	} else if statusFilter == "loan" {
 		whereClauses = append(whereClauses, "s.loan_active = 1")
 	}
@@ -347,10 +347,10 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 			placeholders[i] = "?"
 		}
 
-		bulkQ := fmt.Sprintf(`SELECT r.username, COALESCE(SUM(r.acctinputoctets + r.acctoutputoctets), 0)
+		bulkQ := fmt.Sprintf(`SELECT r.username, %s
 			FROM radacct r
 			WHERE r.username IN (%s)
-			GROUP BY r.username`, strings.Join(placeholders, ","))
+			GROUP BY r.username`, database.RadacctAliasedSumBytesSQL, strings.Join(placeholders, ","))
 
 		uRows, err := bp.db.Query(bulkQ, uArgs...)
 		if err == nil {
@@ -430,11 +430,11 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 	var expiredTimeCount, expiredQuotaCount, loanActiveCount int
 	if resellerFilter > 0 {
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND ((s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1)`, resellerFilter).Scan(&expiredTimeCount)
-		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`, resellerFilter).Scan(&expiredQuotaCount)
+		_ = bp.db.QueryRow(fmt.Sprintf(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.quota_bytes > 0 AND (SELECT %s FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`, database.RadacctSumBytesSQL), resellerFilter).Scan(&expiredQuotaCount)
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.reseller_id = ? AND s.loan_active = 1`, resellerFilter).Scan(&loanActiveCount)
 	} else {
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE (s.expiration_date IS NOT NULL AND s.expiration_date < NOW()) OR s.loan_active = 1`).Scan(&expiredTimeCount)
-		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`).Scan(&expiredQuotaCount)
+		_ = bp.db.QueryRow(fmt.Sprintf(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.quota_bytes > 0 AND (SELECT %s FROM radacct WHERE username = s.username AND acctstarttime >= COALESCE(s.last_renewed_at, s.created_at)) >= s.quota_bytes`, database.RadacctSumBytesSQL)).Scan(&expiredQuotaCount)
 		_ = bp.db.QueryRow(`SELECT COUNT(DISTINCT s.id) FROM subscribers s WHERE s.loan_active = 1`).Scan(&loanActiveCount)
 	}
 
@@ -452,19 +452,19 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		"ExpiredTimeCount":  expiredTimeCount,
 		"ExpiredQuotaCount": expiredQuotaCount,
 		"LoanActiveCount":   loanActiveCount,
-		"Page":             page,
-		"Limit":            limit,
-		"TotalCount":       totalCount,
-		"TotalPages":       totalPages,
-		"HasPrev":          page > 1,
-		"HasNext":          page < totalPages,
-		"PrevPage":         page - 1,
-		"NextPage":         page + 1,
-		"FromIndex":        fromIndex,
-		"ToIndex":          toIndex,
-		"PageNumbers":      getPageNumbers(page, totalPages),
-		"PageSizes":        []int{10, 25, 50, 100, 200, 500},
-		"Profiles":         profiles,
+		"Page":              page,
+		"Limit":             limit,
+		"TotalCount":        totalCount,
+		"TotalPages":        totalPages,
+		"HasPrev":           page > 1,
+		"HasNext":           page < totalPages,
+		"PrevPage":          page - 1,
+		"NextPage":          page + 1,
+		"FromIndex":         fromIndex,
+		"ToIndex":           toIndex,
+		"PageNumbers":       getPageNumbers(page, totalPages),
+		"PageSizes":         []int{10, 25, 50, 100, 200, 500},
+		"Profiles":          profiles,
 	})
 }
 
@@ -744,6 +744,13 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := strings.TrimSpace(r.FormValue("password"))
+	if password == "" {
+		if existing, _ := bp.db.GetSubscriber(username); existing != nil && existing.Password != "" {
+			password = existing.Password
+		} else {
+			password = "0000"
+		}
+	}
 	fullName := strings.TrimSpace(r.FormValue("full_name"))
 	phone := strings.TrimSpace(r.FormValue("phone"))
 	address := strings.TrimSpace(r.FormValue("address"))
@@ -1148,6 +1155,11 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	password := strings.TrimSpace(r.FormValue("password"))
+	if password == "" {
+		if currentSub, _ := bp.db.GetSubscriber(username); currentSub != nil && currentSub.Password != "" {
+			password = currentSub.Password
+		}
+	}
 	fullName := strings.TrimSpace(r.FormValue("full_name"))
 	phone := strings.TrimSpace(r.FormValue("phone"))
 	address := strings.TrimSpace(r.FormValue("address"))
@@ -1338,7 +1350,7 @@ func (bp *Blueprint) DisconnectSessionHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err := bp.db.DisconnectSubscriberSession(username)
+	succ, fail, err := bp.db.DisconnectSubscriberSession(username)
 	if err != nil {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "error",
@@ -1346,9 +1358,16 @@ func (bp *Blueprint) DisconnectSessionHandler(w http.ResponseWriter, r *http.Req
 		})
 		return
 	}
+	if fail > 0 && succ == 0 {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": "تعذر فصل جلسة المشترك من الراوتر (لم يستجب الراوتر)",
+		})
+		return
+	}
 
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
-		"message": "تم قطع اتصال الجلسة وتجديد الاتصال بنجاح",
+		"message": fmt.Sprintf("تم إرسال أمر فصل الجلسة بنجاح (نجح: %d، تعذر: %d)", succ, fail),
 	})
 }

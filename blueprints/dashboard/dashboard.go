@@ -84,4 +84,3 @@ func (bp *Blueprint) APIResourcesHandler(w http.ResponseWriter, r *http.Request)
 	res := sysinfo.GetResources()
 	_ = json.NewEncoder(w).Encode(res)
 }
-

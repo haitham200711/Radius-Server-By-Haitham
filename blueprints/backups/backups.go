@@ -131,14 +131,22 @@ func (bp *Blueprint) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := os.Stat(rec.FilePath); os.IsNotExist(err) {
+	cleanPath := filepath.Clean(rec.FilePath)
+	absBackup, _ := filepath.Abs(backup.BackupDir)
+	absReq, _ := filepath.Abs(cleanPath)
+	if !strings.HasPrefix(absReq, absBackup) {
+		http.Error(w, "Access Denied: Path Traversal Detected", http.StatusForbidden)
+		return
+	}
+
+	if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
 		http.Error(w, "ملف النسخة الاحتياطية غير موجود على القرص", http.StatusNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", rec.Filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(cleanPath)))
 	w.Header().Set("Content-Type", "application/gzip")
-	http.ServeFile(w, r, rec.FilePath)
+	http.ServeFile(w, r, cleanPath)
 }
 
 func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +167,12 @@ func (bp *Blueprint) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	rec, err := bp.db.GetBackupRecord(id)
 	if err == nil && rec != nil && rec.FilePath != "" {
-		_ = os.Remove(rec.FilePath)
+		cleanPath := filepath.Clean(rec.FilePath)
+		absBackup, _ := filepath.Abs(backup.BackupDir)
+		absReq, _ := filepath.Abs(cleanPath)
+		if strings.HasPrefix(absReq, absBackup) {
+			_ = os.Remove(cleanPath)
+		}
 	}
 
 	if err := bp.db.DeleteBackupRecord(id); err != nil {
@@ -260,6 +273,8 @@ func (bp *Blueprint) RestoreHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 500<<20)
+
 	idStr := r.FormValue("id")
 	targetFilePath := ""
 
@@ -278,8 +293,20 @@ func (bp *Blueprint) RestoreHandler(w http.ResponseWriter, r *http.Request) {
 		file, handler, err := r.FormFile("backup_file")
 		if err == nil {
 			defer file.Close()
-			tmpPath := filepath.Join(backup.BackupDir, "uploaded-restore-"+strconv.FormatInt(time.Now().Unix(), 10)+"-"+handler.Filename)
-			dst, err := os.Create(tmpPath)
+			safeBase := filepath.Base(handler.Filename)
+			ext := strings.ToLower(filepath.Ext(safeBase))
+			if ext != ".sql" && ext != ".gz" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"status":  "error",
+					"message": "امتداد الملف غير صالح. يُسمح فقط بملفات .sql و .sql.gz",
+				})
+				return
+			}
+
+			tmpPath := filepath.Join(backup.BackupDir, fmt.Sprintf("uploaded-restore-%d-%s", time.Now().Unix(), safeBase))
+			dst, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 			if err != nil {
 				http.Error(w, "فشل إنشاء ملف مؤقت للاستعادة", http.StatusInternalServerError)
 				return

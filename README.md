@@ -30,11 +30,11 @@ sudo bash install.sh
 
 ---
 
-## 🚀 بيانات الدخول الافتراضية
+## 🚀 بيانات الدخول وإدارة النظام
 * **رابط لوحة التحكم (HTTPS):** `https://<SERVER_IP>` (أو البورت `443`)
 * **تحويل تلقائي:** `http://<SERVER_IP>` (البورت `80` و `5000` يتم تحويلهما تلقائياً إلى `HTTPS`)
 * **اسم المستخدم:** `admin`
-* **كلمة المرور:** `admin123`
+* **كلمة المرور:** يتم إنشاؤها عشوائياً وحفظها بأمان داخل الملف المحمي `/opt/radius-server/.env` (صلاحيات 0600) أو تعيينها عبر `INITIAL_ADMIN_PASSWORD`
 
 ---
 
@@ -48,4 +48,4 @@ sudo bash install.sh
 | **محاسبة الراديوس (Acct)** | `1813 UDP` | FreeRADIUS Accounting |
 | **أوامر الفصل والتعديل (CoA)**| `3799 UDP` | Disconnect / Change of Auth |
 | **سيرفر VPN SSTP** | `4444 TCP` | Accel-PPP SSTP Server |
-| **قاعدة البيانات** | `3306 TCP (Local)` | MariaDB (radius:radiuspass@radiusdb) |
+| **قاعدة البيانات** | `3306 TCP (Local)` | MariaDB (بيانات الاعتماد داخل `.env`) |

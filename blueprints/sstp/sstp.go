@@ -1,9 +1,11 @@
 package sstp
 
 import (
+	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"net"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -37,20 +39,23 @@ func (bp *Blueprint) startRouteWatcher() {
 }
 
 type SessionInfo struct {
-	IfName     string
-	Username   string
-	CallingIP  string
-	IP         string
-	Type       string
-	State      string
-	Uptime     string
+	IfName    string
+	Username  string
+	CallingIP string
+	IP        string
+	Type      string
+	State     string
+	Uptime    string
 }
 
 func (bp *Blueprint) getActiveSessions() ([]SessionInfo, map[string]string) {
 	var activeSessions []SessionInfo
 	ipToIf := make(map[string]string)
 
-	out, err := exec.Command("accel-cmd", "show", "sessions").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "accel-cmd", "show", "sessions").Output()
 	if err == nil {
 		lines := strings.Split(string(out), "\n")
 		for _, line := range lines {
@@ -87,7 +92,11 @@ func (bp *Blueprint) SyncAllRoutes() {
 	}
 
 	_, activeMap := bp.getActiveSessions()
-	kernelRoutesOut, _ := exec.Command("ip", "route", "show").Output()
+
+	cmdCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	kernelRoutesOut, _ := exec.CommandContext(cmdCtx, "ip", "route", "show").Output()
 	kernelRoutesStr := string(kernelRoutesOut)
 
 	for _, r := range routes {
@@ -97,9 +106,19 @@ func (bp *Blueprint) SyncAllRoutes() {
 			continue
 		}
 
+		// Strictly validate CIDR and IP to prevent parameter manipulation
+		if _, _, err := net.ParseCIDR(dest); err != nil {
+			continue
+		}
+		if net.ParseIP(gw) == nil {
+			continue
+		}
+
 		if !r.Enabled {
 			if strings.Contains(kernelRoutesStr, dest) {
-				_ = exec.Command("ip", "route", "del", dest).Run()
+				tCtx, tCancel := context.WithTimeout(context.Background(), 3*time.Second)
+				_ = exec.CommandContext(tCtx, "ip", "route", "del", dest).Run()
+				tCancel()
 			}
 			_ = bp.db.SetSSTPRouteApplied(r.ID, false)
 			continue
@@ -108,14 +127,18 @@ func (bp *Blueprint) SyncAllRoutes() {
 		// If enabled: try to apply/replace route
 		applied := false
 		if ifname, ok := activeMap[gw]; ok && ifname != "" {
-			err := exec.Command("ip", "route", "replace", dest, "via", gw, "dev", ifname).Run()
+			tCtx, tCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			err := exec.CommandContext(tCtx, "ip", "route", "replace", dest, "via", gw, "dev", ifname).Run()
+			tCancel()
 			if err == nil {
 				applied = true
 			}
 		}
 
 		if !applied {
-			err := exec.Command("ip", "route", "replace", dest, "via", gw).Run()
+			tCtx, tCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			err := exec.CommandContext(tCtx, "ip", "route", "replace", dest, "via", gw).Run()
+			tCancel()
 			if err == nil {
 				applied = true
 			}
@@ -316,9 +339,11 @@ func (bp *Blueprint) EditClientHandler(w http.ResponseWriter, r *http.Request) {
 func randomAlpha(n int) string {
 	const chars = "abcdefghjkmnpqrstuvwxyz23456789"
 	b := make([]byte, n)
-	rand.Seed(time.Now().UnixNano())
+	if _, err := cryptorand.Read(b); err != nil {
+		return ""
+	}
 	for i := range b {
-		b[i] = chars[rand.Intn(len(chars))]
+		b[i] = chars[int(b[i])%len(chars)]
 	}
 	return string(b)
 }
@@ -351,38 +376,41 @@ func (bp *Blueprint) generateRSCScript(serverHost string, sstpPort int, gatewayI
 :log info "[RADIUS-SETUP] Profile Radius-VPN created successfully."
 
 # 3. Create SSTP Client Connection (Radius-Pro)
-/interface sstp-client add name=Radius-Pro connect-to=%s:%d user="%s" password="%s" profile=Radius-VPN authentication=mschap2,chap,pap verify-server-certificate=no disabled=no comment="Haitham RADIUS SSTP Tunnel"
+/interface sstp-client add name=Radius-Pro connect-to=%s:%d user="%s" password="%s" profile=Radius-VPN authentication=mschap2,chap,pap disabled=no comment="Haitham RADIUS SSTP Tunnel"
 :log info "[RADIUS-SETUP] Connection Radius-Pro created and enabled."
 
 :log info "[RADIUS-SETUP] Configuration completed successfully!"
-`, time.Now().Format("2006-01-02 15:04:05"), serverHost, sstpPort, username, password)
+`, time.Now().Format("2006-01-02 15:04:05"), gatewayIP, serverHost, sstpPort, username, password)
 }
 
 func (bp *Blueprint) GenerateTokenHandler(w http.ResponseWriter, r *http.Request) {
 	clientID, _ := strconv.ParseInt(r.URL.Query().Get("client_id"), 10, 64)
-	username := strings.TrimSpace(r.URL.Query().Get("username"))
-	password := strings.TrimSpace(r.URL.Query().Get("password"))
-
-	if clientID > 0 {
-		client, err := bp.db.GetSSTPClientByID(clientID)
-		if err == nil && client != nil {
-			username = client.Username
-			password = client.Password
-		}
+	if clientID <= 0 {
+		clientID, _ = strconv.ParseInt(r.FormValue("client_id"), 10, 64)
 	}
 
-	if username == "" || password == "" {
+	if clientID <= 0 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "missing client credentials"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "client_id parameter is required"})
 		return
 	}
+
+	client, err := bp.db.GetSSTPClientByID(clientID)
+	if err != nil || client == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "client not found"})
+		return
+	}
+	username := client.Username
+	password := client.Password
 
 	token, err := bp.db.CreateSSTPToken(clientID, username, password)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "failed to generate token"})
 		return
 	}
 
@@ -469,6 +497,15 @@ func (bp *Blueprint) AddRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, _, err := net.ParseCIDR(dest); err != nil {
+		http.Redirect(w, r, "/sstp?err=invalid_cidr_format", http.StatusFound)
+		return
+	}
+	if net.ParseIP(gw) == nil {
+		http.Redirect(w, r, "/sstp?err=invalid_gateway_ip", http.StatusFound)
+		return
+	}
+
 	sr := &models.SSTPStaticRoute{
 		DestinationCIDR: dest,
 		GatewayIP:       gw,
@@ -504,6 +541,15 @@ func (bp *Blueprint) EditRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, _, err := net.ParseCIDR(dest); err != nil {
+		http.Redirect(w, r, "/sstp?err=invalid_cidr_format", http.StatusFound)
+		return
+	}
+	if net.ParseIP(gw) == nil {
+		http.Redirect(w, r, "/sstp?err=invalid_gateway_ip", http.StatusFound)
+		return
+	}
+
 	sr := &models.SSTPStaticRoute{
 		ID:              id,
 		DestinationCIDR: dest,
@@ -527,7 +573,11 @@ func (bp *Blueprint) DeleteRouteHandler(w http.ResponseWriter, r *http.Request) 
 	if id > 0 {
 		sr, err := bp.db.DeleteSSTPStaticRoute(id)
 		if err == nil && sr != nil {
-			_ = exec.Command("ip", "route", "del", sr.DestinationCIDR).Run()
+			if _, _, err := net.ParseCIDR(sr.DestinationCIDR); err == nil {
+				tCtx, tCancel := context.WithTimeout(context.Background(), 3*time.Second)
+				_ = exec.CommandContext(tCtx, "ip", "route", "del", sr.DestinationCIDR).Run()
+				tCancel()
+			}
 		}
 	}
 	bp.SyncAllRoutes()
@@ -540,6 +590,21 @@ func (bp *Blueprint) ApplyRoutesHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (bp *Blueprint) HookUpHandler(w http.ResponseWriter, r *http.Request) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	ip := net.ParseIP(host)
+	isLoopback := ip != nil && ip.IsLoopback()
+
+	user := middleware.GetUser(r)
+	isAdmin := user != nil && user.Role == "admin"
+
+	if !isLoopback && !isAdmin {
+		http.Error(w, "Access Denied: Localhost or Admin only", http.StatusForbidden)
+		return
+	}
+
 	bp.SyncAllRoutes()
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))

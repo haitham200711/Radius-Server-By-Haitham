@@ -1,6 +1,7 @@
 package card_templates
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/crypto"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -34,21 +36,46 @@ func saveUploadedImage(r *http.Request, fieldName string) (string, error) {
 	defer file.Close()
 
 	ext := strings.ToLower(filepath.Ext(handler.Filename))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".svg" {
-		return "", fmt.Errorf("امتداد الصورة غير مدعوم")
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" {
+		return "", fmt.Errorf("امتداد الصورة غير مدعوم، يرجى رفع ملف JPG أو PNG أو WEBP فقط (ملفات SVG ممنوعة)")
+	}
+
+	// Sniff magic bytes from header to ensure valid image format
+	headerBuf := make([]byte, 512)
+	n, err := io.ReadFull(file, headerBuf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return "", fmt.Errorf("فشل فحص محتوى الصورة")
+	}
+
+	contentType := http.DetectContentType(headerBuf[:n])
+	if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
+		return "", fmt.Errorf("نوع الملف غير متطابق مع الامتداد، تم رفض الملف لأسباب أمنية")
 	}
 
 	_ = os.MkdirAll("uploads", 0755)
-	filename := fmt.Sprintf("card_bg_%d%s", time.Now().UnixNano(), ext)
+	randomSuffix := crypto.GenerateRandomSecret(8)
+	filename := fmt.Sprintf("card_bg_%d_%s%s", time.Now().Unix(), randomSuffix, ext)
+	tmpPath := filepath.Join("uploads", "tmp_"+filename)
 	dstPath := filepath.Join("uploads", filename)
 
-	dst, err := os.Create(dstPath)
+	dst, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return "", err
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
+	// Reconstruct stream and limit to max 5MB
+	fullStream := io.MultiReader(bytes.NewReader(headerBuf[:n]), file)
+	limitedStream := io.LimitReader(fullStream, 5<<20)
+
+	if _, err := io.Copy(dst, limitedStream); err != nil {
+		_ = dst.Close()
+		_ = os.Remove(tmpPath)
+		return "", err
+	}
+	_ = dst.Close()
+
+	if err := os.Rename(tmpPath, dstPath); err != nil {
+		_ = os.Remove(tmpPath)
 		return "", err
 	}
 

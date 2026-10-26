@@ -13,6 +13,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/crypto"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/mikrotik"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
@@ -131,7 +132,7 @@ func (bp *Blueprint) AddHandler(w http.ResponseWriter, r *http.Request) {
 			shortname = nasname
 		}
 		if secret == "" {
-			secret = "radius123"
+			secret = crypto.GenerateRandomSecret(16)
 		}
 
 		if nasname != "" {
@@ -176,7 +177,7 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 			shortname = nasname
 		}
 		if secret == "" {
-			secret = "radius123"
+			secret = crypto.GenerateRandomSecret(16)
 		}
 
 		if id > 0 && nasname != "" {

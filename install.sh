@@ -53,8 +53,25 @@ INSTALL_DIR="/opt/radius-server"
 REPO_URL="https://github.com/haitham200711/Radius-Server-By-Haitham.git"
 DB_NAME="radiusdb"
 DB_USER="radius"
-DB_PASS="radiuspass"
+
+# Detect Go version from go.mod if present, fallback to stable 1.22.8
 GO_VERSION="1.22.8"
+if [[ -f "go.mod" ]]; then
+    DETECTED_GO=$(grep -E '^go [0-9]+\.[0-9]+' go.mod | awk '{print $2}' | tr -d '\r\n')
+    if [[ -n "$DETECTED_GO" ]]; then
+        GO_VERSION="${DETECTED_GO}.0"
+    fi
+fi
+
+# Load or generate cryptographically secure database password
+ENV_FILE="$INSTALL_DIR/.env"
+if [[ -f "$ENV_FILE" ]] && grep -q "DB_DSN=" "$ENV_FILE" 2>/dev/null; then
+    DB_PASS=$(grep "DB_DSN=" "$ENV_FILE" | sed -E 's/.*:([^@]+)@.*/\1/' | head -n1)
+fi
+
+if [[ -z "$DB_PASS" ]]; then
+    DB_PASS=$(openssl rand -hex 16 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 24)
+fi
 
 # Detect Public / Local IP
 SERVER_IP=$(hostname -I | awk '{print $1}')
@@ -452,13 +469,21 @@ chmod -R 755 "$INSTALL_DIR"
 chmod 750 "$INSTALL_DIR/uploads" 2>/dev/null || true
 chmod 700 "$INSTALL_DIR/backups" 2>/dev/null || true
 
-# Securely generate random SESSION_SECRET if not already configured
+# Securely initialize .env if not already configured
 ENV_FILE="$INSTALL_DIR/.env"
 if [[ ! -f "$ENV_FILE" ]]; then
-    echo -e "${CYAN}[INFO] Generating cryptographically secure SESSION_SECRET (256-bit)...${NC}"
+    echo -e "${CYAN}[INFO] Initializing secure credentials in $ENV_FILE (0600)...${NC}"
     RAND_SESSION_SECRET=$(openssl rand -hex 32 2>/dev/null || tr -dc 'a-f0-9' < /dev/urandom | head -c 64)
+    if [[ -z "$INITIAL_ADMIN_PASSWORD" ]]; then
+        INITIAL_ADMIN_PASSWORD=$(openssl rand -base64 12 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)
+    fi
+    RAND_NAS_SECRET=$(openssl rand -hex 16 2>/dev/null || tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 24)
     cat << EOF > "$ENV_FILE"
 SESSION_SECRET=${RAND_SESSION_SECRET}
+INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD}
+DB_DRIVER=mysql
+DB_DSN=${DB_USER}:${DB_PASS}@tcp(127.0.0.1:3306)/${DB_NAME}?parseTime=true&charset=utf8mb4
+RADIUS_SECRET=${RAND_NAS_SECRET}
 EOF
     chmod 600 "$ENV_FILE"
     echo -e "${GREEN}[OK] Secure .env file initialized with 0600 permissions.${NC}"
@@ -483,16 +508,19 @@ After=network.target mariadb.service freeradius.service
 Type=simple
 User=root
 WorkingDirectory=/opt/radius-server
-EnvironmentFile=-/opt/radius-server/.env
+EnvironmentFile=/opt/radius-server/.env
 Environment=WEB_ADDR=:443
 Environment=HTTP_REDIRECT_ADDR=:80
 Environment=ENABLE_HTTPS=true
-Environment=DB_DRIVER=mysql
-Environment=DB_DSN=radius:radiuspass@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4
 ExecStart=/opt/radius-server/radius-platform
 Restart=always
 RestartSec=3
 LimitNOFILE=65535
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target
@@ -549,14 +577,14 @@ echo -e "${BOLD}📌 Web Control-Plane Dashboard:${NC}"
 echo -e "   HTTPS Portal:   ${CYAN}https://${SERVER_IP}${NC} (Port 443)"
 echo -e "   HTTP Redirect:  ${CYAN}http://${SERVER_IP}${NC} (Port 80 -> 443)"
 echo -e "   Legacy Port:    ${CYAN}http://${SERVER_IP}:5000${NC} (Port 5000 -> 443)"
-echo -e "   Default User:   ${YELLOW}admin${NC}"
-echo -e "   Default Pass:   ${YELLOW}admin123${NC}"
+echo -e "   Credentials:    ${YELLOW}Stored securely in ${ENV_FILE}${NC} (chmod 0600)"
+echo -e "   Inspect:        ${YELLOW}sudo cat ${ENV_FILE}${NC}"
 echo ""
 echo -e "${BOLD}🔑 FreeRADIUS Engine Details:${NC}"
 echo -e "   Auth Port:      ${CYAN}1812 UDP${NC}"
 echo -e "   Acct Port:      ${CYAN}1813 UDP${NC}"
 echo -e "   CoA/PoD Port:   ${CYAN}3799 UDP${NC}"
-echo -e "   Database:       ${CYAN}MariaDB (radius:radiuspass@radiusdb)${NC}"
+echo -e "   Database:       ${CYAN}MariaDB (Credentials in ${ENV_FILE})${NC}"
 echo ""
 echo -e "${BOLD}🌐 Accel-PPP SSTP VPN Tunnel:${NC}"
 echo -e "   VPN Port:       ${CYAN}4444 TCP${NC}"

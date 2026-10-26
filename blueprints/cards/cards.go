@@ -68,7 +68,6 @@ func (bp *Blueprint) ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-
 	_ = bp.renderer.Render(w, r, "cards/list", map[string]interface{}{
 		"Title":       pageTitle,
 		"ActiveMenu":  activeMenu,
@@ -163,27 +162,27 @@ func parseGenerateOptions(r *http.Request) models.GenerateBatchOptions {
 	}
 
 	return models.GenerateBatchOptions{
-		BatchName:            batchName,
-		Count:                count,
-		ProfileID:            profileID,
-		ResellerID:           resellerID,
-		NASID:                nasID,
-		CardType:             cardType,
-		CostPricePerCard:     costPricePerCard,
-		PricePerCard:         pricePerCard,
-		AffixType:            affixType,
-		AffixValue:           affixVal,
-		CharLen:              charLen,
-		Format:               format,
-		QuotaBytes:           quotaBytes,
-		TimeLimitSeconds:     timeLimitSeconds,
-		TimeCalcMode:         timeCalcMode,
-		SimultaneousSessions: simultaneous,
+		BatchName:              batchName,
+		Count:                  count,
+		ProfileID:              profileID,
+		ResellerID:             resellerID,
+		NASID:                  nasID,
+		CardType:               cardType,
+		CostPricePerCard:       costPricePerCard,
+		PricePerCard:           pricePerCard,
+		AffixType:              affixType,
+		AffixValue:             affixVal,
+		CharLen:                charLen,
+		Format:                 format,
+		QuotaBytes:             quotaBytes,
+		TimeLimitSeconds:       timeLimitSeconds,
+		TimeCalcMode:           timeCalcMode,
+		SimultaneousSessions:   simultaneous,
 		StopOnQuota:            stopOnQuota,
-		BindMAC:                 bindMAC,
-		LockMAC:                 lockMAC,
-		ConvertMACAfterSession:  convertMACAfterSession,
-		ServiceName:             serviceName,
+		BindMAC:                bindMAC,
+		LockMAC:                lockMAC,
+		ConvertMACAfterSession: convertMACAfterSession,
+		ServiceName:            serviceName,
 	}
 }
 

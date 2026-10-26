@@ -7,7 +7,7 @@ import (
 )
 
 func TestPacketEncodingDecoding(t *testing.T) {
-	secret := []byte("radius123")
+	secret := []byte("testing-secret-key-32bytes-long!")
 	pkt := NewPacket(CodeAccessRequest, 1, secret)
 	pkt.AddString(AttrUserName, "testuser")
 	pkt.AddMikrotikRateLimit("10M/20M")
@@ -103,7 +103,7 @@ func TestPAPAuthentication(t *testing.T) {
 }
 
 func TestAccessAcceptEncoding(t *testing.T) {
-	secret := []byte("radius123")
+	secret := []byte("testing-secret-key-32bytes-long!")
 	var reqAuth [16]byte
 	copy(reqAuth[:], []byte("0123456789abcdef"))
 

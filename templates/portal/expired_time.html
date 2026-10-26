@@ -188,6 +188,7 @@
             </div>
             <small class="text-secondary d-block mb-2.5">يمكنك تجديد اشتراكك الآن فوراً خصماً من رصيدك المتاح دون انتظار.</small>
             <form method="POST" action="/portal/renew-balance">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <button type="submit" class="btn btn-renew w-100 shadow-sm">
                     <i class="bi bi-check-circle-fill me-1"></i> تجديد الاشتراك الآن من رصيد المحفظة
                 </button>

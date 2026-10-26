@@ -207,6 +207,7 @@ html[dir="ltr"] .form-control-feedback.feedback-end { right: 0; left: auto; }
             {{ end }}
 
             <form method="POST" action="/auth/login" id="loginForm" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <!-- Username -->
                 <div class="position-relative mb-3">
                     <input type="text" id="username" name="username" class="form-control" placeholder="{{ tr .Lang "اسم المستخدم / Username" "Username" }}" required autofocus autocomplete="off">

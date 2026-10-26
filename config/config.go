@@ -97,7 +97,10 @@ func LoadConfig() *Config {
 
 	dbDSN := os.Getenv("DB_DSN")
 	if dbDSN == "" {
-		dbDSN = "radius:radiuspass@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4"
+		if os.Getenv("APP_ENV") == "production" {
+			log.Fatal("[FATAL] DB_DSN environment variable must be specified; default credentials are strictly rejected.")
+		}
+		dbDSN = "radius@tcp(127.0.0.1:3306)/radiusdb?parseTime=true&charset=utf8mb4"
 	}
 
 	secret := getOrGenerateSessionSecret()

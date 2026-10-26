@@ -19,6 +19,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Unified Modern SaaS Theme (Tailwind & shadcn Component Architecture) -->
     <link rel="stylesheet" href="/static/css/style.css?v=20261022_component_v1">
+    <meta name="csrf-token" content="{{ .CSRFToken }}">
 </head>
 <body>
 {{ if .CurrentUser }}
@@ -440,6 +441,39 @@ window.showCopyToast = function(msg) {
         setTimeout(() => { toast.style.display = 'none'; }, 400);
     }, 2500);
 };
+
+// Global CSRF Protection Auto-Injector
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (csrfToken) {
+        document.querySelectorAll('form').forEach(form => {
+            const method = (form.getAttribute('method') || 'GET').toUpperCase();
+            if (method !== 'GET' && !form.querySelector('input[name="csrf_token"]')) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = csrfToken;
+                form.appendChild(input);
+            }
+        });
+
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+            const method = (options.method || 'GET').toUpperCase();
+            if (method !== 'GET' && method !== 'HEAD') {
+                options.headers = options.headers || {};
+                if (options.headers instanceof Headers) {
+                    if (!options.headers.has('X-CSRF-Token')) {
+                        options.headers.set('X-CSRF-Token', csrfToken);
+                    }
+                } else if (!options.headers['X-CSRF-Token']) {
+                    options.headers['X-CSRF-Token'] = csrfToken;
+                }
+            }
+            return originalFetch(url, options);
+        };
+    }
+});
 </script>
 
 {{ template "scripts" . }}

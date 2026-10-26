@@ -13,6 +13,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/crypto"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/sysinfo"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
@@ -28,13 +29,14 @@ func New(db *database.DB, r *web.Renderer) *Blueprint {
 }
 
 func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	serverIP := r.URL.Query().Get("server_ip")
-	if serverIP == "" {
+	serverIP := strings.Split(r.Host, ":")[0]
+	if serverIP == "" || serverIP == "localhost" || serverIP == "127.0.0.1" {
 		serverIP = "192.168.2.90"
 	}
-	secret := r.URL.Query().Get("secret")
+	var secret string
+	_ = bp.db.QueryRow("SELECT secret FROM nas ORDER BY id ASC LIMIT 1").Scan(&secret)
 	if secret == "" {
-		secret = "radius123"
+		secret = crypto.GenerateRandomSecret(16)
 	}
 
 	status := r.URL.Query().Get("status")
@@ -220,6 +222,8 @@ func (bp *Blueprint) ChangePasswordHandler(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		middleware.RevokeUserSessions(admin.Username)
+
 		respond("success", "تم تغيير كلمة المرور بنجاح! يمكنك الآن استخدام كلمة المرور الجديدة لتسجيل الدخول.", http.StatusOK)
 		return
 	} else if user.Role == "reseller" {
@@ -246,6 +250,8 @@ func (bp *Blueprint) ChangePasswordHandler(w http.ResponseWriter, r *http.Reques
 			respond("error", "فشل حفظ كلمة المرور الجديدة في قاعدة البيانات", http.StatusInternalServerError)
 			return
 		}
+
+		middleware.RevokeUserSessions(reseller.Username)
 
 		respond("success", "تم تغيير كلمة المرور بنجاح!", http.StatusOK)
 		return
@@ -400,11 +406,11 @@ func (bp *Blueprint) DisconnectAllSessionsHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	count, err := bp.db.DisconnectAllActiveSessions()
+	succ, fail, err := bp.db.DisconnectAllActiveSessions()
 	restartRadius := r.FormValue("restart_radius") == "1" || r.FormValue("restart_radius") == "true"
 
 	status := "success"
-	msg := fmt.Sprintf("تم إرسال أوامر فصل وطرد جميع الجلسات النشطة (%d جلسة) بنجاح، وتحديث وإغلاق كافة الجلسات المعلقة!", count)
+	msg := fmt.Sprintf("تم إرسال أوامر فصل الجلسات النشطة (نجح %d، تعذر %d) بنجاح!", succ, fail)
 
 	if restartRadius {
 		cmd := exec.Command("systemctl", "restart", "freeradius")
@@ -424,7 +430,8 @@ func (bp *Blueprint) DisconnectAllSessionsHandler(w http.ResponseWriter, r *http
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  status,
 			"message": msg,
-			"count":   count,
+			"count":   succ,
+			"failed":  fail,
 		})
 		return
 	}

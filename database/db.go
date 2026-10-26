@@ -17,11 +17,25 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/haitham200711/Radius-Server-By-Haitham/config"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/crypto"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/mikrotik"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/radius"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/speedutil"
 	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/whatsapp"
-	_ "modernc.org/sqlite"
+)
+
+const (
+	// RadacctRowBytesSQL calculates total 64-bit octets for a single radacct row including gigawords and null safety
+	RadacctRowBytesSQL = `((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED) + (CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED))`
+
+	// RadacctAliasedRowBytesSQL calculates total 64-bit octets for an aliased (r.) radacct row
+	RadacctAliasedRowBytesSQL = `((CAST(COALESCE(r.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctinputoctets, 0) AS UNSIGNED) + (CAST(COALESCE(r.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctoutputoctets, 0) AS UNSIGNED))`
+
+	// RadacctSumBytesSQL aggregates total consumed bytes across radacct sessions
+	RadacctSumBytesSQL = `COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED) + (CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0)`
+
+	// RadacctAliasedSumBytesSQL aggregates total consumed bytes across aliased (r.) radacct sessions
+	RadacctAliasedSumBytesSQL = `COALESCE(SUM((CAST(COALESCE(r.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctinputoctets, 0) AS UNSIGNED) + (CAST(COALESCE(r.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctoutputoctets, 0) AS UNSIGNED)), 0)`
 )
 
 type DB struct {
@@ -242,7 +256,7 @@ func (d *DB) InitSchema() error {
 			acctuniqueid VARCHAR(32) NOT NULL DEFAULT '',
 			username VARCHAR(64) NOT NULL DEFAULT '',
 			realm VARCHAR(64) DEFAULT '',
-			nasipaddress VARCHAR(15) NOT NULL DEFAULT '',
+			nasipaddress VARCHAR(45) NOT NULL DEFAULT '',
 			nasportid VARCHAR(32) DEFAULT NULL,
 			nasporttype VARCHAR(32) DEFAULT NULL,
 			acctstarttime DATETIME NULL DEFAULT NULL,
@@ -253,17 +267,35 @@ func (d *DB) InitSchema() error {
 			acctauthentic VARCHAR(32) DEFAULT NULL,
 			connectinfo_start VARCHAR(50) DEFAULT NULL,
 			connectinfo_stop VARCHAR(50) DEFAULT NULL,
-			acctinputoctets BIGINT DEFAULT NULL,
-			acctoutputoctets BIGINT DEFAULT NULL,
+			acctinputoctets BIGINT DEFAULT 0,
+			acctoutputoctets BIGINT DEFAULT 0,
+			acctinputgigawords INT UNSIGNED DEFAULT 0,
+			acctoutputgigawords INT UNSIGNED DEFAULT 0,
+			normalized_input_bytes BIGINT UNSIGNED DEFAULT 0,
+			normalized_output_bytes BIGINT UNSIGNED DEFAULT 0,
 			calledstationid VARCHAR(50) NOT NULL DEFAULT '',
 			callingstationid VARCHAR(50) NOT NULL DEFAULT '',
 			acctterminatecause VARCHAR(32) NOT NULL DEFAULT '',
 			servicetype VARCHAR(32) DEFAULT NULL,
 			framedprotocol VARCHAR(32) DEFAULT NULL,
-			framedipaddress VARCHAR(15) NOT NULL DEFAULT '',
+			framedipaddress VARCHAR(45) NOT NULL DEFAULT '',
+			disconnect_status VARCHAR(32) DEFAULT '',
+			disconnect_pending_at DATETIME NULL,
 			INDEX idx_radacct_active (acctstoptime, username),
 			INDEX idx_radacct_session (acctsessionid),
-			INDEX idx_radacct_user (username)
+			INDEX idx_radacct_user (username),
+			INDEX idx_radacct_disconnect (disconnect_status, disconnect_pending_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+
+		`CREATE TABLE IF NOT EXISTS subscriber_session_baselines (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			username VARCHAR(64) NOT NULL,
+			acctsessionid VARCHAR(64) NOT NULL,
+			baseline_input_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			baseline_output_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_ssb_user (username),
+			INDEX idx_ssb_user_sess (username, acctsessionid)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 		// 8. Subscribers CRM Table (ط§ظ„ط¹ظ…ظ„ط§ط، ظˆط§ظ„ط¹ظ‚ظˆط¯)
 		`CREATE TABLE IF NOT EXISTS subscribers (
@@ -589,6 +621,24 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS balance DECIMAL(10, 2) DEFAULT 0.00;`,
 		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS show_balance TINYINT(1) DEFAULT 1;`,
 		`ALTER TABLE subscriber_portal_settings ADD COLUMN IF NOT EXISTS allow_balance_renewal TINYINT(1) DEFAULT 1;`,
+		`ALTER TABLE radacct MODIFY COLUMN nasipaddress VARCHAR(45) NOT NULL DEFAULT '';`,
+		`ALTER TABLE radacct MODIFY COLUMN framedipaddress VARCHAR(45) NOT NULL DEFAULT '';`,
+		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS acctinputgigawords INT UNSIGNED DEFAULT 0;`,
+		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS acctoutputgigawords INT UNSIGNED DEFAULT 0;`,
+		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS normalized_input_bytes BIGINT UNSIGNED DEFAULT 0;`,
+		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS normalized_output_bytes BIGINT UNSIGNED DEFAULT 0;`,
+		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS disconnect_status VARCHAR(32) DEFAULT '';`,
+		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS disconnect_pending_at DATETIME NULL;`,
+		`CREATE TABLE IF NOT EXISTS subscriber_session_baselines (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			username VARCHAR(64) NOT NULL,
+			acctsessionid VARCHAR(64) NOT NULL,
+			baseline_input_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			baseline_output_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_ssb_user (username),
+			INDEX idx_ssb_user_sess (username, acctsessionid)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -689,12 +739,26 @@ func (d *DB) InitSchema() error {
 	var adminCount int
 	_ = d.QueryRow("SELECT COUNT(*) FROM admins").Scan(&adminCount)
 	if adminCount == 0 {
+		initAdminPass := strings.TrimSpace(os.Getenv("INITIAL_ADMIN_PASSWORD"))
+		if initAdminPass == "" {
+			initAdminPass = crypto.GenerateRandomPassword(16)
+			envPath := ".env"
+			if _, err := os.Stat("/opt/radius-server/.env"); err == nil {
+				envPath = "/opt/radius-server/.env"
+			}
+			f, err := os.OpenFile(envPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+			if err == nil {
+				_, _ = f.WriteString(fmt.Sprintf("\nINITIAL_ADMIN_PASSWORD=%s\n", initAdminPass))
+				_ = f.Close()
+			}
+			log.Printf("[SECURITY] Created initial admin with random password. Stored securely in %s", envPath)
+		}
 		admin := &models.Admin{
 			Username: "admin",
 			Role:     "admin",
 			IsActive: true,
 		}
-		_ = admin.SetPassword("admin123")
+		_ = admin.SetPassword(initAdminPass)
 		_, _ = d.Exec("INSERT INTO admins (username, password_hash, role, is_active) VALUES (?, ?, ?, ?)",
 			admin.Username, admin.PasswordHash, admin.Role, admin.IsActive)
 	}
@@ -771,7 +835,7 @@ func (d *DB) InitSchema() error {
     </div>
 </div>`
 
-		_, _ = d.Exec(`INSERT INTO card_templates (name, is_default, header_title, footer_text, theme_color, html_content, card_width, card_height, cols, ` + "`rows`" + `, card_gap) VALUES
+		_, _ = d.Exec(`INSERT INTO card_templates (name, is_default, header_title, footer_text, theme_color, html_content, card_width, card_height, cols, `+"`rows`"+`, card_gap) VALUES
 			('القالب الأزرق الحديث (افتراضي)', 1, 'كارت إنترنت', 'أهلاً بكم - نتمنى لكم وقتاً ممتعاً', '#0d6efd', ?, '240px', '140px', 3, 7, '2mm'),
 			('قالب كافيه فخم (ذهبي داكن)', 0, 'VIP Wi-Fi Voucher', 'Welcome to our cafe - Enjoy high speed internet', '#d4af37', ?, '240px', '140px', 3, 7, '2mm'),
 			('قالب رول كاشير (حراري POS)', 0, 'إيصال شبكة واي فاي', 'يرجى الاحتفاظ بالكود لحين انتهاء الجلسة', '#212529', ?, '240px', '140px', 3, 7, '2mm'),
@@ -787,16 +851,73 @@ func (d *DB) InitSchema() error {
 			VALUES (1, 4444, '10.10.10.1', '10.10.10.2-254')`)
 	}
 
-	// Seed default NAS
+	// Seed default NAS with cryptographically random secrets
 	var nasCount int
 	_ = d.QueryRow("SELECT COUNT(*) FROM nas").Scan(&nasCount)
 	if nasCount == 0 {
+		mainSecret := crypto.GenerateRandomSecret(16)
+		localSecret := crypto.GenerateRandomSecret(16)
 		_, _ = d.Exec(`INSERT INTO nas (nasname, shortname, type, secret, description, coa_port)
-			VALUES ('192.168.2.1', 'MikroTik-Main', 'mikrotik', 'radius123', 'Default MikroTik CCR/RB', 3799),
-			       ('127.0.0.1', 'Localhost', 'other', 'radius123', 'Testing NAS', 3799);`)
+			VALUES ('192.168.2.1', 'MikroTik-Main', 'mikrotik', ?, 'Default MikroTik CCR/RB', 3799),
+			       ('127.0.0.1', 'Localhost', 'other', ?, 'Testing NAS', 3799);`, mainSecret, localSecret)
 	}
 
+	d.RotateLegacyDefaultSecrets()
+
 	return nil
+}
+
+// VerifyNoDefaultCredentials ensures that no default credentials remain active
+func (d *DB) VerifyNoDefaultCredentials() error {
+	rows, err := d.Query("SELECT id, username, password_hash FROM admins")
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int64
+		var username, hash string
+		if err := rows.Scan(&id, &username, &hash); err == nil {
+			admin := models.Admin{PasswordHash: hash}
+			if admin.CheckPassword("admin123") {
+				return fmt.Errorf("CRITICAL SECURITY ERROR: Admin '%s' is still using the default password 'admin123'. System startup refused. Please set a secure password.", username)
+			}
+		}
+	}
+	return nil
+}
+
+// RotateLegacyDefaultSecrets replaces any legacy hardcoded secrets (e.g. radius123) with secure random secrets
+func (d *DB) RotateLegacyDefaultSecrets() int {
+	rows, err := d.Query("SELECT id, nasname FROM nas WHERE secret = 'radius123' OR secret = ''")
+	if err != nil {
+		return 0
+	}
+	defer rows.Close()
+
+	rotated := 0
+	type item struct {
+		id      int64
+		nasname string
+	}
+	var items []item
+	for rows.Next() {
+		var it item
+		if err := rows.Scan(&it.id, &it.nasname); err == nil {
+			items = append(items, it)
+		}
+	}
+	rows.Close()
+
+	for _, it := range items {
+		newSecret := crypto.GenerateRandomSecret(16)
+		if _, err := d.Exec("UPDATE nas SET secret = ? WHERE id = ?", newSecret, it.id); err == nil {
+			log.Printf("[SECURITY] Rotated insecure default secret on NAS '%s' to random secure secret.", it.nasname)
+			rotated++
+		}
+	}
+	return rotated
 }
 
 // --- Metrics & Dashboard ---
@@ -2218,13 +2339,30 @@ func (d *DB) SaveProfile(p *models.Profile) error {
 		}
 	}
 
-	// Update FreeRADIUS radgroupreply for Rate-Limit and Pool
-	_, _ = tx.Exec("DELETE FROM radgroupreply WHERE groupname = ? AND attribute IN ('Mikrotik-Rate-Limit', 'Framed-Pool')", p.Name)
+	// Update FreeRADIUS radgroupcheck for Simultaneous-Use
+	_, _ = tx.Exec("DELETE FROM radgroupcheck WHERE groupname = ? AND attribute = 'Simultaneous-Use'", p.Name)
+	sharedUsers := p.SharedUsers
+	if sharedUsers <= 0 {
+		sharedUsers = 1
+	}
+	_, _ = tx.Exec("INSERT INTO radgroupcheck (groupname, attribute, op, value) VALUES (?, 'Simultaneous-Use', ':=', ?)", p.Name, fmt.Sprintf("%d", sharedUsers))
+
+	// Update FreeRADIUS radgroupreply for Rate-Limit, Pool, Address-List, Session-Timeout, Mikrotik-Total-Limit
+	_, _ = tx.Exec("DELETE FROM radgroupreply WHERE groupname = ? AND attribute IN ('Mikrotik-Rate-Limit', 'Framed-Pool', 'Mikrotik-Address-List', 'Session-Timeout', 'Mikrotik-Total-Limit')", p.Name)
 	if p.RateLimit != "" {
 		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Mikrotik-Rate-Limit', ':=', ?)", p.Name, p.RateLimit)
 	}
 	if p.PoolName != "" {
 		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Framed-Pool', ':=', ?)", p.Name, p.PoolName)
+	}
+	if p.MikrotikAddressList != "" {
+		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Mikrotik-Address-List', ':=', ?)", p.Name, p.MikrotikAddressList)
+	}
+	if p.UptimeSeconds > 0 {
+		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Session-Timeout', ':=', ?)", p.Name, fmt.Sprintf("%d", p.UptimeSeconds))
+	}
+	if p.QuotaBytes > 0 {
+		_, _ = tx.Exec("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", p.Name, fmt.Sprintf("%d", p.QuotaBytes))
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -2296,8 +2434,8 @@ func (d *DB) CalculateLoanDeductionTx(tx *sql.Tx, username string, p *models.Pro
 		// 2. Partial quota deduction: only traffic consumed since loan grant
 		if loanGrantedAt.Valid {
 			var usedDuringLoan int64
-			_ = tx.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
-				FROM radacct WHERE username = ? AND acctstarttime >= ?`, username, loanGrantedAt.Time).Scan(&usedDuringLoan)
+			_ = tx.QueryRow(fmt.Sprintf(`SELECT %s
+				FROM radacct WHERE username = ? AND acctstarttime >= ?`, RadacctSumBytesSQL), username, loanGrantedAt.Time).Scan(&usedDuringLoan)
 			if usedDuringLoan > loanQuotaBytes {
 				usedDuringLoan = loanQuotaBytes
 			}
@@ -2390,7 +2528,7 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 	}
 
 	if oldProfile != "" && oldProfile != p.Name {
-		_ = d.DisconnectSubscriberSession(username)
+		_, _, _ = d.DisconnectSubscriberSession(username)
 	} else {
 		_ = d.RestoreActiveSubscriberCoA(username)
 	}
@@ -2442,7 +2580,7 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 
 	// Calculate initial used bytes from radacct so far as baseline for partial quota
 	var currentUsedBytes int64
-	_ = d.QueryRow("SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = ?", username).Scan(&currentUsedBytes)
+	_ = d.QueryRow(fmt.Sprintf("SELECT %s FROM radacct WHERE username = ?", RadacctSumBytesSQL), username).Scan(&currentUsedBytes)
 
 	if adminUser == "self-service" {
 		nowCheck := time.Now()
@@ -2589,7 +2727,7 @@ func (d *DB) CloseSubscriberLoan(username, adminUser string) error {
 	}
 
 	// 4. Disconnect user session via CoA
-	_ = d.DisconnectSubscriberSession(username)
+	_, _, _ = d.DisconnectSubscriberSession(username)
 
 	return nil
 }
@@ -2653,7 +2791,7 @@ func (d *DB) TerminateSubscription(username, adminUser string) error {
 	}
 
 	// Disconnect session via CoA immediately
-	_ = d.DisconnectSubscriberSession(username)
+	_, _, _ = d.DisconnectSubscriberSession(username)
 
 	return nil
 }
@@ -2735,7 +2873,7 @@ func (d *DB) ChangeSubscriberProfile(username, newProfileName, adminUser string,
 	}
 
 	// Disconnect session via CoA immediately
-	_ = d.DisconnectSubscriberSession(username)
+	_, _, _ = d.DisconnectSubscriberSession(username)
 
 	return nil
 }
@@ -2931,7 +3069,7 @@ func (d *DB) GetCardTemplate(id int64) (*models.CardTemplate, error) {
 		COALESCE(card_width, '240px'), 
 		COALESCE(card_height, '140px'), 
 		COALESCE(cols, 3), 
-		COALESCE(` + "`rows`" + `, 7), 
+		COALESCE(`+"`rows`"+`, 7), 
 		COALESCE(card_gap, '2mm'), 
 		COALESCE(overlay_config, ''), 
 		created_at
@@ -2987,7 +3125,7 @@ func (d *DB) SaveCardTemplate(t *models.CardTemplate) error {
 		res, err := tx.Exec(`INSERT INTO card_templates (
 			name, is_default, header_title, footer_text, theme_color,
 			html_content, css_content, bg_image, card_width, card_height,
-			cols, ` + "`rows`" + `, card_gap, overlay_config, created_at
+			cols, `+"`rows`"+`, card_gap, overlay_config, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 			t.Name, isDef, t.HeaderTitle, t.FooterText, t.ThemeColor,
 			t.HTMLContent, t.CSSContent, t.BgImage, t.CardWidth, t.CardHeight,
@@ -3000,7 +3138,7 @@ func (d *DB) SaveCardTemplate(t *models.CardTemplate) error {
 		_, err = tx.Exec(`UPDATE card_templates SET
 			name = ?, is_default = ?, header_title = ?, footer_text = ?, theme_color = ?,
 			html_content = ?, css_content = ?, bg_image = ?, card_width = ?, card_height = ?,
-			cols = ?, ` + "`rows`" + ` = ?, card_gap = ?, overlay_config = ?
+			cols = ?, `+"`rows`"+` = ?, card_gap = ?, overlay_config = ?
 			WHERE id = ?`,
 			t.Name, isDef, t.HeaderTitle, t.FooterText, t.ThemeColor,
 			t.HTMLContent, t.CSSContent, t.BgImage, t.CardWidth, t.CardHeight,
@@ -3238,16 +3376,36 @@ func (d *DB) CreateSSTPToken(clientID int64, username, password string) (string,
 }
 
 func (d *DB) ConsumeSSTPToken(token string) (clientID int64, username, password string, err error) {
-	var used int
-	err = d.QueryRow(`SELECT client_id, username, password, used FROM sstp_tokens WHERE token = ?`, token).Scan(&clientID, &username, &password, &used)
-	if err != nil {
-		return 0, "", "", fmt.Errorf("token not found")
-	}
-	if used == 1 {
-		return 0, "", "", fmt.Errorf("token already used")
+	if token == "" {
+		return 0, "", "", fmt.Errorf("token cannot be empty")
 	}
 
-	_, _ = d.Exec(`UPDATE sstp_tokens SET used = 1, used_at = NOW() WHERE token = ?`, token)
+	tx, err := d.Begin()
+	if err != nil {
+		return 0, "", "", fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Atomic update: only marks used if it was not used and within 10 minutes lifetime
+	res, err := tx.Exec(`UPDATE sstp_tokens SET used = 1, used_at = NOW() WHERE token = ? AND used = 0 AND created_at >= NOW() - INTERVAL 10 MINUTE`, token)
+	if err != nil {
+		return 0, "", "", fmt.Errorf("failed to consume token: %v", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil || rows == 0 {
+		return 0, "", "", fmt.Errorf("invalid, expired, or already used token")
+	}
+
+	err = tx.QueryRow(`SELECT client_id, username, password FROM sstp_tokens WHERE token = ?`, token).Scan(&clientID, &username, &password)
+	if err != nil {
+		return 0, "", "", fmt.Errorf("failed to retrieve token data: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, "", "", fmt.Errorf("failed to commit token consumption: %v", err)
+	}
+
 	return clientID, username, password, nil
 }
 
@@ -3584,12 +3742,41 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", username)
 	_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", username, expStr)
 
+	// Clear any previous rejection or lockout
+	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Auth-Type'", username)
+
 	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", username)
 	_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", username, p.Name)
 
-	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", username)
+	// Clean up any fallback attributes and apply new quota limit
+	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Mikrotik-Total-Limit', 'Mikrotik-Rate-Limit', 'Mikrotik-Address-List', 'Framed-Pool')", username)
 	if finalQuota > 0 {
 		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", finalQuota))
+	}
+
+	// Capture baselines for all active sessions to ensure seamless quota calculation across renewal
+	rowsActive, errSess := tx.Query(`SELECT acctsessionid,
+		((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)),
+		((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED))
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL`, username)
+	if errSess == nil {
+		type sessBase struct {
+			sid string
+			in  uint64
+			out uint64
+		}
+		var bases []sessBase
+		for rowsActive.Next() {
+			var sb sessBase
+			if errScan := rowsActive.Scan(&sb.sid, &sb.in, &sb.out); errScan == nil {
+				bases = append(bases, sb)
+			}
+		}
+		rowsActive.Close()
+		for _, sb := range bases {
+			_, _ = tx.Exec(`INSERT INTO subscriber_session_baselines (username, acctsessionid, baseline_input_bytes, baseline_output_bytes)
+				VALUES (?, ?, ?, ?)`, username, sb.sid, sb.in, sb.out)
+		}
 	}
 
 	var contractNo, fullName string
@@ -3659,7 +3846,7 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 	}
 
 	if oldProfile != "" && oldProfile != p.Name {
-		_ = d.DisconnectSubscriberSession(username)
+		_, _, _ = d.DisconnectSubscriberSession(username)
 	} else {
 		_ = d.RestoreActiveSubscriberCoA(username)
 	}
@@ -4302,15 +4489,15 @@ func (d *DB) TriggerWhatsAppEvent(eventKey string, sub *models.Subscriber, extra
 	}
 
 	vars := map[string]string{
-		"{name}":            sub.FullName,
-		"{username}":        sub.Username,
-		"{contract_no}":     sub.ContractNo,
-		"{phone}":           sub.Phone,
-		"{profile}":         sub.ProfileName,
-		"{debt}":            fmt.Sprintf("%.2f", sub.Debt),
-		"{quota_total}":     fmt.Sprintf("%.1f", float64(sub.QuotaBytes)/(1024*1024*1024)),
-		"{date}":            time.Now().Format("2006-01-02"),
-		"{time}":            time.Now().Format("15:04"),
+		"{name}":        sub.FullName,
+		"{username}":    sub.Username,
+		"{contract_no}": sub.ContractNo,
+		"{phone}":       sub.Phone,
+		"{profile}":     sub.ProfileName,
+		"{debt}":        fmt.Sprintf("%.2f", sub.Debt),
+		"{quota_total}": fmt.Sprintf("%.1f", float64(sub.QuotaBytes)/(1024*1024*1024)),
+		"{date}":        time.Now().Format("2006-01-02"),
+		"{time}":        time.Now().Format("15:04"),
 	}
 	if sub.ExpirationDate.Valid {
 		vars["{expiry_date}"] = sub.ExpirationDate.Time.Format("2006-01-02")
@@ -4486,25 +4673,18 @@ func (d *DB) CheckQuotaAndExpiryAutomations() error {
 			}
 
 			for _, sq := range subList {
-				cycleStart := sq.CreatedAt
-				if sq.LastRenewedAt.Valid {
-					cycleStart = sq.LastRenewedAt.Time
-				}
-
-				var usedBytes int64
-				_ = d.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
-					FROM radacct
-					WHERE username = ? AND acctstarttime >= ?`, sq.Username, cycleStart).Scan(&usedBytes)
-
 				if sq.QuotaBytes <= 0 {
 					continue
 				}
 
-				usagePercent := (float64(usedBytes) / float64(sq.QuotaBytes)) * 100.0
-				remainingBytes := sq.QuotaBytes - usedBytes
-				if remainingBytes < 0 {
-					remainingBytes = 0
+				uc, err := d.GetSubscriberUsageCycle(sq.Username)
+				if err != nil || uc == nil {
+					continue
 				}
+
+				usedBytes := uc.UsedBytes
+				usagePercent := uc.PercentUsed
+				remainingBytes := uc.RemainingBytes
 
 				extraVars := map[string]string{
 					"{quota_total}":     fmt.Sprintf("%.1f", float64(sq.QuotaBytes)/(1024*1024*1024)),
@@ -4826,13 +5006,13 @@ func (d *DB) RestoreSingleProfileBaseSpeed(profileID int64, disconnectUsers bool
 	return nil
 }
 
-func (d *DB) DisconnectProfileActiveSessions(profileName string) (int, error) {
+func (d *DB) DisconnectProfileActiveSessions(profileName string) (int, int, error) {
 	rows, err := d.Query(`SELECT r.acctsessionid, r.username, r.nasipaddress, r.framedipaddress
 		FROM radacct r
 		JOIN radusergroup ug ON r.username = ug.username
 		WHERE r.acctstoptime IS NULL AND ug.groupname = ?`, profileName)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer rows.Close()
 
@@ -4849,13 +5029,15 @@ func (d *DB) DisconnectProfileActiveSessions(profileName string) (int, error) {
 		sessions = append(sessions, s)
 	}
 
-	count := 0
+	successCount := 0
+	failCount := 0
 	for _, s := range sessions {
 		var secret string
 		var coaPort int
 		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
 		if secret == "" {
-			secret = "radius123"
+			failCount++
+			continue // Skip unregistered NAS without secret
 		}
 		if coaPort <= 0 {
 			coaPort = 3799
@@ -4866,17 +5048,23 @@ func (d *DB) DisconnectProfileActiveSessions(profileName string) (int, error) {
 			fIP = net.ParseIP(s.framedIP)
 		}
 
-		_, _ = radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, fIP)
-		count++
+		res, err := radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), s.username, s.sessionID, fIP)
+		if err == nil && res != nil && res.Success {
+			successCount++
+			_, _ = d.Exec(`UPDATE radacct SET disconnect_status = 'pending', disconnect_pending_at = CURRENT_TIMESTAMP
+				WHERE acctsessionid = ? AND acctstoptime IS NULL`, s.sessionID)
+		} else {
+			failCount++
+		}
 	}
-	return count, nil
+	return successCount, failCount, nil
 }
 
-func (d *DB) DisconnectAllActiveSessions() (int, error) {
+func (d *DB) DisconnectAllActiveSessions() (int, int, error) {
 	rows, err := d.Query(`SELECT acctsessionid, username, nasipaddress, framedipaddress
 		FROM radacct WHERE acctstoptime IS NULL`)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer rows.Close()
 
@@ -4904,7 +5092,7 @@ func (d *DB) DisconnectAllActiveSessions() (int, error) {
 			var cp int
 			if err := nasRows.Scan(&nName, &sec, &cp); err == nil {
 				if sec == "" {
-					sec = "radius123"
+					continue
 				}
 				if cp <= 0 {
 					cp = 3799
@@ -4918,36 +5106,46 @@ func (d *DB) DisconnectAllActiveSessions() (int, error) {
 		nasRows.Close()
 	}
 
-	var wg sync.WaitGroup
+	var (
+		mu           sync.Mutex
+		successCount int
+		failCount    int
+		wg           sync.WaitGroup
+	)
+
 	for _, s := range sessions {
 		wg.Add(1)
 		go func(sess sess) {
 			defer wg.Done()
 			nasInfo, ok := nasMap[sess.nasIP]
-			secret := "radius123"
-			coaPort := 3799
-			if ok {
-				secret = nasInfo.secret
-				coaPort = nasInfo.coaPort
+			if !ok || nasInfo.secret == "" {
+				mu.Lock()
+				failCount++
+				mu.Unlock()
+				return
 			}
+			secret := nasInfo.secret
+			coaPort := nasInfo.coaPort
 
 			var fIP net.IP
 			if sess.framedIP != "" {
 				fIP = net.ParseIP(sess.framedIP)
 			}
 
-			_, _ = radius.SendDisconnectRequest(sess.nasIP, coaPort, []byte(secret), sess.username, sess.sessionID, fIP)
+			res, err := radius.SendDisconnectRequest(sess.nasIP, coaPort, []byte(secret), sess.username, sess.sessionID, fIP)
+			mu.Lock()
+			if err == nil && res != nil && res.Success {
+				successCount++
+				_, _ = d.Exec(`UPDATE radacct SET disconnect_status = 'pending', disconnect_pending_at = CURRENT_TIMESTAMP
+					WHERE acctsessionid = ? AND acctstoptime IS NULL`, sess.sessionID)
+			} else {
+				failCount++
+			}
+			mu.Unlock()
 		}(s)
 	}
 
-	// Update all active sessions in radacct to terminated
-	_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset' WHERE acctstoptime IS NULL`)
-
-	subTrafficMu.Lock()
-	subTrafficHistory = make(map[string]*subTrafficPoint)
-	subTrafficMu.Unlock()
-
-	// Wait up to 3 seconds for CoA UDP packets to transmit
+	// Wait up to 5 seconds for CoA UDP packets to transmit
 	c := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -4955,10 +5153,14 @@ func (d *DB) DisconnectAllActiveSessions() (int, error) {
 	}()
 	select {
 	case <-c:
-	case <-time.After(3 * time.Second):
+	case <-time.After(5 * time.Second):
 	}
 
-	return len(sessions), nil
+	subTrafficMu.Lock()
+	subTrafficHistory = make(map[string]*subTrafficPoint)
+	subTrafficMu.Unlock()
+
+	return successCount, failCount, nil
 }
 
 // CloseAllDatabaseSessions marks all active sessions as closed in radacct WITHOUT kicking out users from NAS routers.
@@ -5277,7 +5479,10 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 	var minStart sql.NullTime
 	var lastMAC, lastIP sql.NullString
 
-	_ = d.QueryRow(`SELECT SUM(acctinputoctets), SUM(acctoutputoctets), SUM(acctsessiontime),
+	_ = d.QueryRow(`SELECT 
+		COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM(acctsessiontime), 0),
 		MIN(acctstarttime), MAX(callingstationid), MAX(framedipaddress)
 		FROM radacct 
 		WHERE username = ? OR (username != '' AND username = ?)`, c.Username, c.OriginalCode).Scan(&sumIn, &sumOut, &sumTime, &minStart, &lastMAC, &lastIP)
@@ -5431,7 +5636,10 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 					// Calculate consumption for this specific card from radacct
 					var cardIn, cardOut, cardSec sql.NullInt64
 					var sessCount int
-					_ = d.QueryRow(`SELECT SUM(acctinputoctets), SUM(acctoutputoctets), SUM(acctsessiontime), COUNT(*)
+					_ = d.QueryRow(`SELECT 
+						COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)), 0),
+						COALESCE(SUM((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0),
+						COALESCE(SUM(acctsessiontime), 0), COUNT(*)
 						FROM radacct
 						WHERE username = ? OR (username != '' AND username = ?)`, currentU, origCode).Scan(&cardIn, &cardOut, &cardSec, &sessCount)
 
@@ -5514,34 +5722,67 @@ func (d *DB) InspectCard(code string) (*models.CafeCardTracker, error) {
 }
 
 func (d *DB) DisconnectCard(code string) (bool, error) {
-	var sessionID, nasIP, framedIPStr sql.NullString
-	err := d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress
-		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, code).Scan(
-		&sessionID, &nasIP, &framedIPStr)
-	if err != nil || !sessionID.Valid {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return false, fmt.Errorf("كود الكارت مطلوب")
+	}
+
+	rows, err := d.Query(`SELECT acctsessionid, nasipaddress, framedipaddress
+		FROM radacct 
+		WHERE (username = ? OR (username != '' AND username = (SELECT original_code FROM cards WHERE username = ? OR original_code = ? LIMIT 1))) 
+		  AND acctstoptime IS NULL`, code, code, code)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	type sessInfo struct {
+		sessionID string
+		nasIP     string
+		framedIP  string
+	}
+	var sessions []sessInfo
+	for rows.Next() {
+		var s sessInfo
+		var fIP sql.NullString
+		if errScan := rows.Scan(&s.sessionID, &s.nasIP, &fIP); errScan == nil {
+			if fIP.Valid {
+				s.framedIP = fIP.String
+			}
+			sessions = append(sessions, s)
+		}
+	}
+
+	if len(sessions) == 0 {
 		return false, fmt.Errorf("الكارت غير متصل أونلاين حالياً")
 	}
 
-	var secret string
-	var coaPort int
-	_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP.String).Scan(&secret, &coaPort)
-	if secret == "" {
-		secret = "radius123"
-	}
-	if coaPort <= 0 {
-		coaPort = 3799
+	successCount := 0
+	for _, s := range sessions {
+		var secret string
+		var coaPort int
+		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
+		if secret == "" {
+			continue
+		}
+		if coaPort <= 0 {
+			coaPort = 3799
+		}
+
+		var framedIP net.IP
+		if s.framedIP != "" {
+			framedIP = net.ParseIP(s.framedIP)
+		}
+
+		res, err := radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), code, s.sessionID, framedIP)
+		if err == nil && res != nil && res.Success {
+			successCount++
+			_, _ = d.Exec(`UPDATE radacct SET disconnect_status = 'pending', disconnect_pending_at = CURRENT_TIMESTAMP
+				WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, s.sessionID, s.nasIP)
+		}
 	}
 
-	var framedIP net.IP
-	if framedIPStr.Valid && framedIPStr.String != "" {
-		framedIP = net.ParseIP(framedIPStr.String)
-	}
-
-	_, _ = radius.SendDisconnectRequest(nasIP.String, coaPort, []byte(secret), code, sessionID.String, framedIP)
-	_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
-		WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, sessionID.String, nasIP.String)
-
-	return true, nil
+	return successCount > 0, nil
 }
 
 // StartCardSyncDaemon handles real-time synchronization between active accounting sessions (radacct)
@@ -5687,13 +5928,13 @@ func (d *DB) syncActiveCards() {
 		for _, le := range logins {
 			if le.calcMode == "first_login" && le.timeLimit > 0 {
 				expDate := le.firstLogin.Add(time.Duration(le.timeLimit) * time.Second)
-				_, _ = d.Exec("UPDATE cards SET first_login_at = ?, expired_at = ? WHERE id = ?", le.firstLogin, expDate, le.cardID)
+				_, _ = d.Exec("UPDATE cards SET first_login_at = ?, expired_at = ?, status = 'used' WHERE id = ?", le.firstLogin, expDate, le.cardID)
 				// Set Expiration attribute in FreeRADIUS radcheck
 				expStr := expDate.Format("02 Jan 2006 15:04:05")
 				_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", le.username)
 				_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", le.username, expStr)
 			} else {
-				_, _ = d.Exec("UPDATE cards SET first_login_at = ? WHERE id = ?", le.firstLogin, le.cardID)
+				_, _ = d.Exec("UPDATE cards SET first_login_at = ?, status = 'used' WHERE id = ?", le.firstLogin, le.cardID)
 			}
 		}
 	}
@@ -5701,7 +5942,7 @@ func (d *DB) syncActiveCards() {
 	// 4. Auto-Expiry Enforcement for Quota & Time Limits
 	// Check calendar-expired cards
 	rowsExp, err := d.Query(`SELECT c.id, c.username FROM cards c
-		WHERE c.status = 'available' AND c.expired_at IS NOT NULL AND c.expired_at < CURRENT_TIMESTAMP`)
+		WHERE (c.status = 'available' OR c.status = 'used') AND c.expired_at IS NOT NULL AND c.expired_at < CURRENT_TIMESTAMP`)
 	if err == nil {
 		var expCards []string
 		var expIDs []int64
@@ -5723,13 +5964,13 @@ func (d *DB) syncActiveCards() {
 		}
 	}
 
-	// Check quota-exhausted cards (Direct index join)
-	rowsQuota, err := d.Query(`SELECT c.id, c.username, c.quota_bytes, COALESCE(SUM(r.acctinputoctets + r.acctoutputoctets), 0)
+	// Check quota-exhausted cards using gigaword-aware calculation
+	rowsQuota, err := d.Query(fmt.Sprintf(`SELECT c.id, c.username, c.quota_bytes, %s
 		FROM cards c
 		JOIN radacct r ON r.username = c.username
-		WHERE c.status = 'available' AND c.stop_on_quota = 1 AND c.quota_bytes > 0
+		WHERE (c.status = 'available' OR c.status = 'used') AND c.stop_on_quota = 1 AND c.quota_bytes > 0
 		GROUP BY c.id, c.username, c.quota_bytes
-		HAVING SUM(r.acctinputoctets + r.acctoutputoctets) >= c.quota_bytes`)
+		HAVING %s >= c.quota_bytes`, RadacctAliasedSumBytesSQL, RadacctAliasedSumBytesSQL))
 	if err == nil {
 		var quotaCards []string
 		var quotaIDs []int64
@@ -5909,9 +6150,9 @@ func (d *DB) GetSubscriberLiveTraffic(username string) (*models.SubscriberLiveTr
 
 	// 3. Check Live Session in radacct
 	var (
-		sessID, nasIP, framedIP, callingMAC  sql.NullString
-		sessStart, sessUpdate                sql.NullTime
-		sessTime, inOctets, outOctets        sql.NullInt64
+		sessID, nasIP, framedIP, callingMAC sql.NullString
+		sessStart, sessUpdate               sql.NullTime
+		sessTime, inOctets, outOctets       sql.NullInt64
 	)
 
 	_ = d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress, callingstationid,
@@ -6117,32 +6358,27 @@ func (d *DB) GetSubscriberLiveTraffic(username string) (*models.SubscriberLiveTr
 		}
 	}
 
-	// 4. All-time / Monthly Traffic Aggregation
-	var sumIn, sumOut sql.NullInt64
-	_ = d.QueryRow("SELECT SUM(acctinputoctets), SUM(acctoutputoctets) FROM radacct WHERE username = ?", username).Scan(&sumIn, &sumOut)
-	if sumIn.Valid {
-		traffic.TotalUploadBytes = sumIn.Int64
-	}
-	if sumOut.Valid {
-		traffic.TotalDownloadBytes = sumOut.Int64
-	}
-	traffic.TotalBytes = traffic.TotalUploadBytes + traffic.TotalDownloadBytes
-	traffic.TotalBytesDisplay = FormatBytesHuman(traffic.TotalBytes)
+	// 4. Accounting Cycle Consumption via UsageCycle
+	uc, errUC := d.GetSubscriberUsageCycle(username)
+	if errUC == nil && uc != nil {
+		traffic.TotalUploadBytes = uc.UsedInputBytes
+		traffic.TotalDownloadBytes = uc.UsedOutputBytes
+		traffic.TotalBytes = uc.UsedBytes
+		traffic.TotalBytesDisplay = FormatBytesHuman(uc.UsedBytes)
 
-	// 5. Quota Calculations
-	if traffic.QuotaBytes > 0 {
-		traffic.QuotaDisplay = FormatBytesHuman(traffic.QuotaBytes)
-		rem := traffic.QuotaBytes - traffic.TotalBytes
-		if rem < 0 {
-			rem = 0
-		}
-		traffic.QuotaRemainingBytes = rem
-		traffic.QuotaRemainingDisplay = FormatBytesHuman(rem)
-		traffic.QuotaUsagePercent = (float64(traffic.TotalBytes) / float64(traffic.QuotaBytes)) * 100.0
-		if traffic.QuotaUsagePercent > 100.0 {
-			traffic.QuotaUsagePercent = 100.0
+		// 5. Quota Calculations
+		if traffic.QuotaBytes > 0 {
+			traffic.QuotaDisplay = FormatBytesHuman(traffic.QuotaBytes)
+			traffic.QuotaRemainingBytes = uc.RemainingBytes
+			traffic.QuotaRemainingDisplay = FormatBytesHuman(uc.RemainingBytes)
+			traffic.QuotaUsagePercent = uc.PercentUsed
+		} else {
+			traffic.QuotaDisplay = "غير محدود ∞"
+			traffic.QuotaRemainingDisplay = "مفتوح ∞"
+			traffic.QuotaUsagePercent = 0.0
 		}
 	} else {
+		traffic.TotalBytesDisplay = "0 B"
 		traffic.QuotaDisplay = "غير محدود ∞"
 		traffic.QuotaRemainingDisplay = "مفتوح ∞"
 		traffic.QuotaUsagePercent = 0.0
@@ -6199,45 +6435,318 @@ func (d *DB) GetAllSubscribersForLiveMonitor() ([]models.SubscriberTrafficOption
 	return result, nil
 }
 
-func (d *DB) DisconnectSubscriberSession(username string) error {
+// GetSubscriberUsageCycle calculates the unified and gigaword-aware accounting cycle
+// consumption for a subscriber, accounting for renewal baselines and active sessions.
+func (d *DB) GetSubscriberUsageCycle(username string) (*models.UsageCycle, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
-		return fmt.Errorf("اسم المستخدم مطلوب")
+		return nil, fmt.Errorf("اسم المشترك مطلوب")
 	}
 
-	var sessionID, nasIP, framedIPStr sql.NullString
-	err := d.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress
-		FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(
-		&sessionID, &nasIP, &framedIPStr)
-	if err != nil || !sessionID.Valid {
-		return fmt.Errorf("المشترك غير متصل أونلاين حالياً")
+	sub, err := d.GetSubscriber(username)
+	if err != nil {
+		return nil, fmt.Errorf("المشترك غير موجود: %w", err)
 	}
 
-	var secret string
-	var coaPort int
-	_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP.String).Scan(&secret, &coaPort)
-	if secret == "" {
-		secret = "radius123"
-	}
-	if coaPort <= 0 {
-		coaPort = 3799
-	}
-
-	var framedIP net.IP
-	if framedIPStr.Valid && framedIPStr.String != "" {
-		framedIP = net.ParseIP(framedIPStr.String)
+	cycleStart := sub.CreatedAt
+	var renewalTS *time.Time
+	var lastRenewed sql.NullTime
+	_ = d.QueryRow("SELECT last_renewed_at FROM subscribers WHERE username = ?", username).Scan(&lastRenewed)
+	if lastRenewed.Valid {
+		cycleStart = lastRenewed.Time
+		t := lastRenewed.Time
+		renewalTS = &t
 	}
 
-	_, _ = radius.SendDisconnectRequest(nasIP.String, coaPort, []byte(secret), username, sessionID.String, framedIP)
+	quotaLimit := sub.QuotaBytes
+	if sub.LoanActive && sub.LoanGrantedAt.Valid {
+		cycleStart = sub.LoanGrantedAt.Time
+		if sub.LoanQuotaBytes > 0 {
+			quotaLimit = sub.LoanQuotaBytes
+		}
+	}
 
-	_, _ = d.Exec(`UPDATE radacct SET acctstoptime = CURRENT_TIMESTAMP, acctterminatecause = 'Admin-Reset'
+	// 1. Calculate bytes from completed sessions that started on or after cycleStart
+	var closedIn, closedOut int64
+	_ = d.QueryRow(`SELECT 
+		COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0)
+		FROM radacct 
+		WHERE username = ? 
+		  AND acctstoptime IS NOT NULL 
+		  AND acctstarttime >= ?`, username, cycleStart).Scan(&closedIn, &closedOut)
+
+	// Check any completed sessions that started before cycleStart but stopped on or after cycleStart
+	rowsCross, err := d.Query(`SELECT acctsessionid,
+		((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)),
+		((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED))
+		FROM radacct
+		WHERE username = ? 
+		  AND acctstoptime IS NOT NULL 
+		  AND acctstarttime < ? 
+		  AND acctstoptime >= ?`, username, cycleStart, cycleStart)
+	if err == nil {
+		for rowsCross.Next() {
+			var sessID string
+			var totIn, totOut int64
+			if errScan := rowsCross.Scan(&sessID, &totIn, &totOut); errScan == nil {
+				var baseIn, baseOut uint64
+				_ = d.QueryRow("SELECT baseline_input_bytes, baseline_output_bytes FROM subscriber_session_baselines WHERE username = ? AND acctsessionid = ? ORDER BY id DESC LIMIT 1", username, sessID).Scan(&baseIn, &baseOut)
+				deltaIn := totIn - int64(baseIn)
+				if deltaIn < 0 {
+					deltaIn = 0
+				}
+				deltaOut := totOut - int64(baseOut)
+				if deltaOut < 0 {
+					deltaOut = 0
+				}
+				closedIn += deltaIn
+				closedOut += deltaOut
+			}
+		}
+		rowsCross.Close()
+	}
+
+	// 2. Add active (online) sessions (acctstoptime IS NULL)
+	var activeIn, activeOut int64
+	rowsActive, err := d.Query(`SELECT acctsessionid, acctstarttime,
+		((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)),
+		((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED))
+		FROM radacct
 		WHERE username = ? AND acctstoptime IS NULL`, username)
+	if err == nil {
+		for rowsActive.Next() {
+			var sessID string
+			var startTime time.Time
+			var totIn, totOut int64
+			if errScan := rowsActive.Scan(&sessID, &startTime, &totIn, &totOut); errScan == nil {
+				if startTime.Before(cycleStart) {
+					var baseIn, baseOut uint64
+					_ = d.QueryRow("SELECT baseline_input_bytes, baseline_output_bytes FROM subscriber_session_baselines WHERE username = ? AND acctsessionid = ? ORDER BY id DESC LIMIT 1", username, sessID).Scan(&baseIn, &baseOut)
+					deltaIn := totIn - int64(baseIn)
+					if deltaIn < 0 {
+						deltaIn = 0
+					}
+					deltaOut := totOut - int64(baseOut)
+					if deltaOut < 0 {
+						deltaOut = 0
+					}
+					activeIn += deltaIn
+					activeOut += deltaOut
+				} else {
+					activeIn += totIn
+					activeOut += totOut
+				}
+			}
+		}
+		rowsActive.Close()
+	}
+
+	totalIn := closedIn + activeIn
+	totalOut := closedOut + activeOut
+	totalUsed := totalIn + totalOut
+
+	var remaining int64
+	var percentUsed float64
+	var isExhausted bool
+
+	if quotaLimit > 0 {
+		remaining = quotaLimit - totalUsed
+		if remaining < 0 {
+			remaining = 0
+		}
+		percentUsed = (float64(totalUsed) / float64(quotaLimit)) * 100.0
+		if percentUsed > 100.0 {
+			percentUsed = 100.0
+		}
+		isExhausted = totalUsed >= quotaLimit
+	} else {
+		remaining = 0
+		percentUsed = 0.0
+		isExhausted = false
+	}
+
+	return &models.UsageCycle{
+		Username:         username,
+		CycleStart:       cycleStart,
+		RenewalTimestamp: renewalTS,
+		QuotaLimitBytes:  quotaLimit,
+		UsedInputBytes:   totalIn,
+		UsedOutputBytes:  totalOut,
+		UsedBytes:        totalUsed,
+		RemainingBytes:   remaining,
+		PercentUsed:      percentUsed,
+		IsExhausted:      isExhausted,
+	}, nil
+}
+
+// GetCardUsageCycle calculates the unified and gigaword-aware accounting cycle consumption for a hotspot/cafe card.
+func (d *DB) GetCardUsageCycle(cardCode string) (*models.UsageCycle, error) {
+	cardCode = strings.TrimSpace(cardCode)
+	if cardCode == "" {
+		return nil, fmt.Errorf("كود الكارت مطلوب")
+	}
+
+	var quotaLimit int64
+	var firstLogin sql.NullTime
+	var createdAt time.Time
+	var origCode string
+	err := d.QueryRow("SELECT quota_bytes, first_login_at, created_at, COALESCE(original_code, '') FROM cards WHERE username = ? OR original_code = ? LIMIT 1", cardCode, cardCode).Scan(&quotaLimit, &firstLogin, &createdAt, &origCode)
+	if err != nil {
+		return nil, fmt.Errorf("الكارت غير موجود: %w", err)
+	}
+
+	cycleStart := createdAt
+	if firstLogin.Valid {
+		cycleStart = firstLogin.Time
+	}
+
+	var totalIn, totalOut int64
+	_ = d.QueryRow(`SELECT 
+		COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0)
+		FROM radacct 
+		WHERE username = ? OR (username != '' AND username = ?)`, cardCode, origCode).Scan(&totalIn, &totalOut)
+
+	totalUsed := totalIn + totalOut
+	var remaining int64
+	var percentUsed float64
+	var isExhausted bool
+
+	if quotaLimit > 0 {
+		remaining = quotaLimit - totalUsed
+		if remaining < 0 {
+			remaining = 0
+		}
+		percentUsed = (float64(totalUsed) / float64(quotaLimit)) * 100.0
+		if percentUsed > 100.0 {
+			percentUsed = 100.0
+		}
+		isExhausted = totalUsed >= quotaLimit
+	}
+
+	return &models.UsageCycle{
+		Username:        cardCode,
+		CycleStart:      cycleStart,
+		QuotaLimitBytes: quotaLimit,
+		UsedInputBytes:  totalIn,
+		UsedOutputBytes: totalOut,
+		UsedBytes:       totalUsed,
+		RemainingBytes:  remaining,
+		PercentUsed:     percentUsed,
+		IsExhausted:     isExhausted,
+	}, nil
+}
+
+// ReconcileStaleSessions marks pending disconnects that never received Accounting-Stop,
+// or sessions with no interim updates for extended period, as closed.
+func (d *DB) ReconcileStaleSessions(maxPendingAge, maxInterimAge time.Duration) (int64, error) {
+	if maxPendingAge <= 0 {
+		maxPendingAge = 5 * time.Minute
+	}
+	if maxInterimAge <= 0 {
+		maxInterimAge = 24 * time.Hour
+	}
+
+	cutoffPending := time.Now().Add(-maxPendingAge)
+	cutoffInterim := time.Now().Add(-maxInterimAge)
+
+	res1, err := d.Exec(`UPDATE radacct 
+		SET acctstoptime = COALESCE(disconnect_pending_at, CURRENT_TIMESTAMP), 
+		    acctterminatecause = 'Admin-Disconnect-Timeout',
+		    disconnect_status = 'timeout'
+		WHERE acctstoptime IS NULL 
+		  AND disconnect_status = 'pending' 
+		  AND disconnect_pending_at <= ?`, cutoffPending)
+	if err != nil {
+		return 0, err
+	}
+	c1, _ := res1.RowsAffected()
+
+	res2, err := d.Exec(`UPDATE radacct 
+		SET acctstoptime = COALESCE(acctupdatetime, acctstarttime, CURRENT_TIMESTAMP), 
+		    acctterminatecause = 'Lost-Carrier-Stale'
+		WHERE acctstoptime IS NULL 
+		  AND (acctupdatetime <= ? OR (acctupdatetime IS NULL AND acctstarttime <= ?))`, cutoffInterim, cutoffInterim)
+	if err != nil {
+		return c1, err
+	}
+	c2, _ := res2.RowsAffected()
+
+	return c1 + c2, nil
+}
+
+func (d *DB) DisconnectSubscriberSession(username string) (int, int, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return 0, 0, fmt.Errorf("اسم المستخدم مطلوب")
+	}
+
+	rows, err := d.Query(`SELECT acctsessionid, nasipaddress, framedipaddress
+		FROM radacct WHERE username = ? AND acctstoptime IS NULL`, username)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+
+	type sessInfo struct {
+		sessionID string
+		nasIP     string
+		framedIP  string
+	}
+	var sessions []sessInfo
+	for rows.Next() {
+		var s sessInfo
+		var fIP sql.NullString
+		if errScan := rows.Scan(&s.sessionID, &s.nasIP, &fIP); errScan == nil {
+			if fIP.Valid {
+				s.framedIP = fIP.String
+			}
+			sessions = append(sessions, s)
+		}
+	}
+
+	if len(sessions) == 0 {
+		return 0, 0, fmt.Errorf("المشترك غير متصل أونلاين حالياً")
+	}
+
+	successCount := 0
+	failCount := 0
+
+	for _, s := range sessions {
+		var secret string
+		var coaPort int
+		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
+		if secret == "" {
+			failCount++
+			continue
+		}
+		if coaPort <= 0 {
+			coaPort = 3799
+		}
+
+		var framedIP net.IP
+		if s.framedIP != "" {
+			framedIP = net.ParseIP(s.framedIP)
+		}
+
+		res, err := radius.SendDisconnectRequest(s.nasIP, coaPort, []byte(secret), username, s.sessionID, framedIP)
+		if err == nil && res != nil && res.Success {
+			successCount++
+			// Mark as pending disconnect without prematurely setting acctstoptime
+			_, _ = d.Exec(`UPDATE radacct SET disconnect_status = 'pending', disconnect_pending_at = CURRENT_TIMESTAMP
+				WHERE acctsessionid = ? AND nasipaddress = ? AND acctstoptime IS NULL`, s.sessionID, s.nasIP)
+		} else {
+			failCount++
+			log.Printf("[Disconnect] Failed to disconnect session %s on NAS %s: %v", s.sessionID, s.nasIP, err)
+		}
+	}
 
 	subTrafficMu.Lock()
 	delete(subTrafficHistory, username)
 	subTrafficMu.Unlock()
 
-	return nil
+	return successCount, failCount, nil
 }
 
 // SendSubscriberCoA sends a dynamic CoA-Request (Code 43) to the subscriber's NAS
@@ -6260,7 +6769,7 @@ func (d *DB) SendSubscriberCoA(username string, opts radius.CoAOptions) error {
 	var coaPort int
 	_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", nasIP.String).Scan(&secret, &coaPort)
 	if secret == "" {
-		secret = "radius123"
+		return fmt.Errorf("الراوتر %s غير مسجل أو لا يحتوي على secret صالح", nasIP.String)
 	}
 	if coaPort <= 0 {
 		coaPort = 3799
@@ -6291,6 +6800,10 @@ func (d *DB) RestoreActiveSubscriberCoA(username string) error {
 		return err
 	}
 
+	// Remove reject lockout and fallback attributes
+	_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Auth-Type'", username)
+	_, _ = d.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Mikrotik-Rate-Limit', 'Mikrotik-Address-List', 'Framed-Pool')", username)
+
 	prof, _ := d.GetProfileByName(profileName)
 	if prof == nil {
 		return nil
@@ -6320,8 +6833,10 @@ func (d *DB) ApplySubscriberQuotaExpiration(username string) error {
 	}
 
 	if prof.OnQuotaAction == "disconnect" {
-		_ = d.DisconnectSubscriberSession(username)
+		_, _, _ = d.DisconnectSubscriberSession(username)
 		_, _ = d.Exec("UPDATE subscribers SET status = 'expired_quota' WHERE username = ?", username)
+		_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Auth-Type'", username)
+		_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Reject')", username)
 		return nil
 	}
 
@@ -6385,8 +6900,10 @@ func (d *DB) ApplySubscriberTimeExpiration(username string) error {
 	}
 
 	if prof.OnTimeAction == "disconnect" {
-		_ = d.DisconnectSubscriberSession(username)
+		_, _, _ = d.DisconnectSubscriberSession(username)
 		_, _ = d.Exec("UPDATE subscribers SET status = 'expired_time' WHERE username = ?", username)
+		_, _ = d.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Auth-Type'", username)
+		_, _ = d.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Auth-Type', ':=', 'Reject')", username)
 		return nil
 	}
 
@@ -6468,7 +6985,7 @@ func (d *DB) ApplyCoARateLimitToProfileActiveSessions(profileName string, rateLi
 		var coaPort int
 		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
 		if secret == "" {
-			secret = "radius123"
+			continue // Skip unregistered NAS without secret
 		}
 		if coaPort <= 0 {
 			coaPort = 3799
@@ -6525,7 +7042,7 @@ func (d *DB) ApplyCoARateLimitToAllActiveSessions() (int, error) {
 		var coaPort int
 		_ = d.QueryRow("SELECT secret, coa_port FROM nas WHERE nasname = ?", s.nasIP).Scan(&secret, &coaPort)
 		if secret == "" {
-			secret = "radius123"
+			continue // Skip unregistered NAS without secret
 		}
 		if coaPort <= 0 {
 			coaPort = 3799
@@ -6576,7 +7093,7 @@ func (d *DB) syncActiveSubscribers() {
 		}
 		rowsDisabled.Close()
 		for _, u := range toKick {
-			_ = d.DisconnectSubscriberSession(u)
+			_, _, _ = d.DisconnectSubscriberSession(u)
 		}
 	}
 
@@ -6616,18 +7133,11 @@ func (d *DB) syncActiveSubscribers() {
 		// A. Check Time Expiration
 		isTimeExpired := s.expDate.Valid && now.After(s.expDate.Time)
 
-		// B. Check Quota Expiration
+		// B. Check Quota Expiration via unified UsageCycle
 		isQuotaExpired := false
 		if s.quotaBytes > 0 {
-			cycleStart := s.createdAt
-			if s.lastRenewedAt.Valid {
-				cycleStart = s.lastRenewedAt.Time
-			}
-			var usedBytes int64
-			_ = d.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
-				FROM radacct WHERE username = ? AND acctstarttime >= ?`, s.username, cycleStart).Scan(&usedBytes)
-			if usedBytes >= s.quotaBytes {
-				isQuotaExpired = true
+			if uc, err := d.GetSubscriberUsageCycle(s.username); err == nil && uc != nil {
+				isQuotaExpired = uc.IsExhausted
 			}
 		}
 
@@ -6709,7 +7219,7 @@ func FormatDurationArabic(sec int64) string {
 	return fmt.Sprintf("%d ثانية", s)
 }
 
-func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate string, limit, offset int) ([]models.SubscriberLoginSession, int, error) {
+func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate string, resellerID int64, limit, offset int) ([]models.SubscriberLoginSession, int, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -6719,6 +7229,11 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 
 	whereClauses := []string{"1=1"}
 	var args []interface{}
+
+	if resellerID > 0 {
+		whereClauses = append(whereClauses, "s.reseller_id = ?")
+		args = append(args, resellerID)
+	}
 
 	search = strings.TrimSpace(search)
 	if search != "" {
@@ -6762,7 +7277,7 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 
 	// 1. Total Count (cached when unfiltered for instant response)
 	var total int
-	isUnfiltered := (search == "" && status == "" && nasIP == "" && fromDate == "" && toDate == "")
+	isUnfiltered := (search == "" && status == "" && nasIP == "" && fromDate == "" && toDate == "" && resellerID == 0)
 	if isUnfiltered {
 		totalLoginsMu.RLock()
 		if cachedTotalLogins > 0 && time.Since(cachedTotalLoginsTime) < 30*time.Second {
@@ -6778,7 +7293,7 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 		}
 	} else {
 		var countQuery string
-		if search != "" {
+		if search != "" || resellerID > 0 {
 			countQuery = fmt.Sprintf("SELECT COUNT(*) FROM radacct r LEFT JOIN subscribers s ON r.username = s.username WHERE %s", whereSQL)
 		} else {
 			countQuery = fmt.Sprintf("SELECT COUNT(*) FROM radacct r WHERE %s", whereSQL)
@@ -6802,8 +7317,8 @@ func (d *DB) GetSubscriberLoginSessions(search, status, nasIP, fromDate, toDate 
 		r.acctstarttime,
 		r.acctstoptime,
 		COALESCE(r.acctsessiontime, 0),
-		COALESCE(r.acctinputoctets, 0),
-		COALESCE(r.acctoutputoctets, 0),
+		((CAST(COALESCE(r.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctinputoctets, 0) AS UNSIGNED)),
+		((CAST(COALESCE(r.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctoutputoctets, 0) AS UNSIGNED)),
 		COALESCE(r.acctterminatecause, '')
 	FROM radacct r
 	LEFT JOIN subscribers s ON r.username = s.username
@@ -6964,8 +7479,8 @@ func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate s
 			COUNT(DISTINCT r.username),
 			COALESCE(SUM(CASE WHEN r.acctstoptime IS NULL THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN r.acctstoptime IS NOT NULL THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(r.acctoutputoctets), 0),
-			COALESCE(SUM(r.acctinputoctets), 0),
+			COALESCE(SUM((CAST(COALESCE(r.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctoutputoctets, 0) AS UNSIGNED)), 0),
+			COALESCE(SUM((CAST(COALESCE(r.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctinputoctets, 0) AS UNSIGNED)), 0),
 			COALESCE(AVG(r.acctsessiontime), 0)
 		FROM radacct r
 		LEFT JOIN subscribers s ON r.username = s.username
@@ -6976,8 +7491,8 @@ func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate s
 			COUNT(DISTINCT r.username),
 			COALESCE(SUM(CASE WHEN r.acctstoptime IS NULL THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN r.acctstoptime IS NOT NULL THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(r.acctoutputoctets), 0),
-			COALESCE(SUM(r.acctinputoctets), 0),
+			COALESCE(SUM((CAST(COALESCE(r.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctoutputoctets, 0) AS UNSIGNED)), 0),
+			COALESCE(SUM((CAST(COALESCE(r.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctinputoctets, 0) AS UNSIGNED)), 0),
 			COALESCE(AVG(r.acctsessiontime), 0)
 		FROM radacct r
 		WHERE %s`, whereSQL)
@@ -7285,39 +7800,29 @@ func (d *DB) GetSubscriberPortalData(username string) (*models.SubscriberPortalV
 		Settings:   *settings,
 	}
 
-	// 1. Quota & Consumption
+	// 1. Quota & Consumption via unified UsageCycle
 	if sub.QuotaBytes > 0 {
 		view.QuotaGB = float64(sub.QuotaBytes) / (1024 * 1024 * 1024)
 	} else if prof.QuotaBytes > 0 {
 		view.QuotaGB = float64(prof.QuotaBytes) / (1024 * 1024 * 1024)
 	}
 
-	// Calculate traffic used since cycle start (LastRenewedAt or CreatedAt)
-	cycleStart := sub.CreatedAt
-	var lastRenewed sql.NullTime
-	_ = d.QueryRow("SELECT last_renewed_at FROM subscribers WHERE username = ?", username).Scan(&lastRenewed)
-	if lastRenewed.Valid {
-		cycleStart = lastRenewed.Time
-	}
-
-	var usedBytes int64
-	_ = d.QueryRow(`SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0)
-		FROM radacct WHERE username = ? AND acctstarttime >= ?`, username, cycleStart).Scan(&usedBytes)
-	view.UsedBytes = usedBytes
-	view.UsedGB = float64(usedBytes) / (1024 * 1024 * 1024)
-
-	if sub.QuotaBytes > 0 {
-		rem := sub.QuotaBytes - usedBytes
-		if rem < 0 {
-			rem = 0
-		}
-		view.RemainingBytes = rem
-		view.RemainingGB = float64(rem) / (1024 * 1024 * 1024)
-		view.UsagePercent = (float64(usedBytes) / float64(sub.QuotaBytes)) * 100.0
-		if view.UsagePercent > 100.0 {
-			view.UsagePercent = 100.0
+	uc, err := d.GetSubscriberUsageCycle(username)
+	if err == nil && uc != nil {
+		view.UsedBytes = uc.UsedBytes
+		view.UsedGB = float64(uc.UsedBytes) / (1024 * 1024 * 1024)
+		if sub.QuotaBytes > 0 {
+			view.RemainingBytes = uc.RemainingBytes
+			view.RemainingGB = float64(uc.RemainingBytes) / (1024 * 1024 * 1024)
+			view.UsagePercent = uc.PercentUsed
+		} else {
+			view.RemainingBytes = -1
+			view.RemainingGB = -1
+			view.UsagePercent = 0.0
 		}
 	} else {
+		view.UsedBytes = 0
+		view.UsedGB = 0
 		view.RemainingBytes = -1
 		view.RemainingGB = -1
 		view.UsagePercent = 0.0
@@ -7439,7 +7944,7 @@ func (d *DB) UpdateSubscriberPassword(username, newPass string) error {
 	}
 
 	// Disconnect session via CoA so subscriber reconnects with new password
-	_ = d.DisconnectSubscriberSession(username)
+	_, _, _ = d.DisconnectSubscriberSession(username)
 	return nil
 }
 
@@ -7565,16 +8070,16 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	startOfYear := fmt.Sprintf("%04d-01-01 00:00:00", year)
 	endOfYear := fmt.Sprintf("%04d-01-01 00:00:00", year+1)
 
-	mRows, err := d.Query(`SELECT 
+	mRows, err := d.Query(fmt.Sprintf(`SELECT 
 		MONTH(acctstarttime) as m,
-		COALESCE(SUM(acctinputoctets), 0),
-		COALESCE(SUM(acctoutputoctets), 0),
-		COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
+		COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0),
+		%s,
 		COUNT(*),
 		COALESCE(SUM(acctsessiontime), 0)
 	FROM radacct
 	WHERE username = ? AND acctstarttime >= ? AND acctstarttime < ?
-	GROUP BY MONTH(acctstarttime)`, username, startOfYear, endOfYear)
+	GROUP BY MONTH(acctstarttime)`, RadacctSumBytesSQL), username, startOfYear, endOfYear)
 
 	if err == nil {
 		defer mRows.Close()
@@ -7619,17 +8124,17 @@ func (d *DB) GetSubscriberTrafficReport(username string, year int, month int) (*
 	}
 	yearDaysMap := make(map[int]map[int]dayData) // month -> day -> data
 
-	dRows, err := d.Query(`SELECT 
+	dRows, err := d.Query(fmt.Sprintf(`SELECT 
 		MONTH(acctstarttime) as m,
 		DAY(acctstarttime) as d,
-		COALESCE(SUM(acctinputoctets), 0),
-		COALESCE(SUM(acctoutputoctets), 0),
-		COALESCE(SUM(acctinputoctets + acctoutputoctets), 0),
+		COALESCE(SUM((CAST(COALESCE(acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctinputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(acctoutputoctets, 0) AS UNSIGNED)), 0),
+		%s,
 		COUNT(*),
 		COALESCE(SUM(acctsessiontime), 0)
 	FROM radacct
 	WHERE username = ? AND acctstarttime >= ? AND acctstarttime < ?
-	GROUP BY MONTH(acctstarttime), DAY(acctstarttime)`, username, startOfYear, endOfYear)
+	GROUP BY MONTH(acctstarttime), DAY(acctstarttime)`, RadacctSumBytesSQL), username, startOfYear, endOfYear)
 
 	if err == nil {
 		defer dRows.Close()
@@ -7824,9 +8329,9 @@ func (d *DB) GetTopConsumers(year, month int, limit int) ([]models.TopConsumerIt
 		COALESCE(s.contract_no, ''),
 		COALESCE(s.profile_name, ''),
 		COALESCE(r.name, 'المركز الرئيسي'),
-		COALESCE(SUM(ra.acctinputoctets), 0),
-		COALESCE(SUM(ra.acctoutputoctets), 0),
-		COALESCE(SUM(ra.acctinputoctets + ra.acctoutputoctets), 0) as tot_b,
+		COALESCE(SUM((CAST(COALESCE(ra.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(ra.acctinputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(ra.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(ra.acctoutputoctets, 0) AS UNSIGNED)), 0),
+		COALESCE(SUM((CAST(COALESCE(ra.acctinputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(ra.acctinputoctets, 0) AS UNSIGNED) + (CAST(COALESCE(ra.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(ra.acctoutputoctets, 0) AS UNSIGNED)), 0) as tot_b,
 		COUNT(*)
 	FROM radacct ra
 	LEFT JOIN subscribers s ON ra.username = s.username
@@ -7892,8 +8397,3 @@ func (d *DB) SearchSubscribersForTraffic(query string, limit int) ([]models.Subs
 
 	return list, nil
 }
-
-
-
-
-
