@@ -192,8 +192,8 @@ func GetRegisteredMigrations() []Migration {
 					   AND r1.radacctid < r2.radacctid;`,
 					`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS active_session_key VARCHAR(160)
 					 GENERATED ALWAYS AS (CASE WHEN acctstoptime IS NULL
-					 THEN CONCAT(acctsessionid, '|', nasipaddress, '|ACTIVE')
-					 ELSE CONCAT(acctsessionid, '|', nasipaddress, '|', radacctid) END) STORED;`,
+					 THEN CONCAT(acctsessionid, '|', nasipaddress)
+					 ELSE NULL END) STORED;`,
 					`ALTER TABLE radacct ADD UNIQUE KEY IF NOT EXISTS uq_radacct_active_session (active_session_key);`,
 				},
 			},
