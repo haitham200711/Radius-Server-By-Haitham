@@ -207,6 +207,16 @@ func GetRegisteredMigrations() []Migration {
 				`CREATE INDEX IF NOT EXISTS idx_ledger_acct_created ON financial_ledger (account_type, created_at);`,
 			},
 		},
+		{
+			Version:     "20261026_07_unify_collation",
+			Description: "Unify database collation to utf8mb4_unicode_ci across core tables to prevent collation join conflicts",
+			SQL: []string{
+				`ALTER TABLE subscribers CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+				`ALTER TABLE financial_ledger CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+				`ALTER TABLE billing_transactions CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+				`ALTER TABLE resellers CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+			},
+		},
 	}
 }
 

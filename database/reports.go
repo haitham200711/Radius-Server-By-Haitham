@@ -133,7 +133,7 @@ func (d *DB) GetSubscriberLoginSessionsReport(
 	var total int
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) 
 		FROM radacct r 
-		LEFT JOIN subscribers s ON r.username = s.username 
+		LEFT JOIN subscribers s ON r.username = s.username COLLATE utf8mb4_unicode_ci
 		WHERE %s`, whereSQL)
 	_ = d.QueryRow(countQuery, args...).Scan(&total)
 
@@ -168,7 +168,7 @@ func (d *DB) GetSubscriberLoginSessionsReport(
 		((CAST(COALESCE(r.acctoutputgigawords, 0) AS UNSIGNED) * 4294967296) + CAST(COALESCE(r.acctoutputoctets, 0) AS UNSIGNED)),
 		COALESCE(r.acctterminatecause, '')
 	FROM radacct r
-	LEFT JOIN subscribers s ON r.username = s.username
+	LEFT JOIN subscribers s ON r.username = s.username COLLATE utf8mb4_unicode_ci
 	LEFT JOIN resellers res ON s.reseller_id = res.id
 	LEFT JOIN nas n ON r.nasipaddress = n.nasname
 	WHERE %s
@@ -315,7 +315,7 @@ func (d *DB) GetTopConsumersReport(resellerID int64, year, month, limit int) ([]
 		COUNT(*) as sessions,
 		COALESCE(SUM(r.acctsessiontime), 0) as duration
 	FROM radacct r
-	LEFT JOIN subscribers s ON r.username = s.username
+	LEFT JOIN subscribers s ON r.username = s.username COLLATE utf8mb4_unicode_ci
 	LEFT JOIN resellers res ON s.reseller_id = res.id
 	WHERE %s
 	GROUP BY r.username
@@ -853,7 +853,7 @@ func (d *DB) GetSubscriberBalancesReport(
 		fl.created_by,
 		fl.created_at
 	FROM financial_ledger fl
-	LEFT JOIN subscribers s ON fl.subscriber_username = s.username
+	LEFT JOIN subscribers s ON fl.subscriber_username = s.username COLLATE utf8mb4_unicode_ci
 	LEFT JOIN billing_transactions bt ON fl.reference_id = bt.notes
 	WHERE %s
 	ORDER BY fl.id DESC
