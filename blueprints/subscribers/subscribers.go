@@ -516,9 +516,18 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	successCount := 0
+	failCount := 0
+	var lastErr string
+
 	switch action {
 	case "delete":
-		_ = bp.db.BulkDeleteSubscribers(usernames)
+		if err := bp.db.BulkDeleteSubscribers(usernames); err != nil {
+			failCount = len(usernames)
+			lastErr = err.Error()
+		} else {
+			successCount = len(usernames)
+		}
 	case "renew":
 		profile := strings.TrimSpace(r.FormValue("profile"))
 		isPaid := r.FormValue("payment_status") != "unpaid"
@@ -527,10 +536,17 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 			adminUser = currentUser.Username
 		}
 		for _, u := range usernames {
+			var err error
 			if currentUser != nil && currentUser.Role == "reseller" {
-				_ = bp.db.ResellerRenewSubscriber(currentUser.ID, u, profile, isPaid, currentUser.Username)
+				err = bp.db.ResellerRenewSubscriber(currentUser.ID, u, profile, isPaid, currentUser.Username)
 			} else {
-				_ = bp.db.RenewSubscriberBilling(u, profile, 0, isPaid, "bulk", "تجديد اشتراك جماعي", adminUser)
+				err = bp.db.RenewSubscriberBilling(u, profile, 0, isPaid, "bulk", "تجديد اشتراك جماعي", adminUser)
+			}
+			if err != nil {
+				failCount++
+				lastErr = err.Error()
+			} else {
+				successCount++
 			}
 		}
 	case "add_quota":
@@ -543,17 +559,29 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if quotaGB > 0 {
 			for _, u := range usernames {
+				var err error
 				if currentUser != nil && currentUser.Role == "reseller" {
-					_ = bp.db.ResellerAddQuota(currentUser.ID, u, quotaGB, price, isPaid, currentUser.Username)
+					err = bp.db.ResellerAddQuota(currentUser.ID, u, quotaGB, price, isPaid, currentUser.Username)
 				} else {
-					_ = bp.db.AddQuotaBilling(u, quotaGB, price, isPaid, "bulk", "إضافة كوتة جماعية", adminUser)
+					err = bp.db.AddQuotaBilling(u, quotaGB, price, isPaid, "bulk", "إضافة كوتة جماعية", adminUser)
+				}
+				if err != nil {
+					failCount++
+					lastErr = err.Error()
+				} else {
+					successCount++
 				}
 			}
 		}
 	case "add_debt":
 		amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("debt_amount")), 64)
 		if amount > 0 {
-			_ = bp.db.BulkAddDebt(usernames, amount)
+			summary, err := bp.db.BulkAddDebt(usernames, amount)
+			successCount = summary.Successful
+			failCount = summary.Failed
+			if err != nil {
+				lastErr = err.Error()
+			}
 		}
 	case "settle_loan":
 		settleType := r.FormValue("settle_type") // "renew" or "close"
@@ -567,14 +595,21 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 			adminUser = currentUser.Username
 		}
 		for _, u := range usernames {
+			var err error
 			if settleType == "close" {
-				_ = bp.db.CloseSubscriberLoan(u, adminUser)
+				err = bp.db.CloseSubscriberLoan(u, adminUser)
 			} else {
 				if currentUser != nil && currentUser.Role == "reseller" {
-					_ = bp.db.ResellerRenewSubscriber(currentUser.ID, u, "", isPaid, currentUser.Username)
+					err = bp.db.ResellerRenewSubscriber(currentUser.ID, u, "", isPaid, currentUser.Username)
 				} else {
-					_ = bp.db.RenewSubscriberBilling(u, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد جماعي", adminUser)
+					err = bp.db.RenewSubscriberBilling(u, "", 0, isPaid, paymentMethod, "سداد سلفة وتجديد جماعي", adminUser)
 				}
+			}
+			if err != nil {
+				failCount++
+				lastErr = err.Error()
+			} else {
+				successCount++
 			}
 		}
 	case "terminate":
@@ -583,7 +618,12 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 			adminUser = currentUser.Username
 		}
 		for _, u := range usernames {
-			_ = bp.db.TerminateSubscription(u, adminUser)
+			if err := bp.db.TerminateSubscription(u, adminUser); err != nil {
+				failCount++
+				lastErr = err.Error()
+			} else {
+				successCount++
+			}
 		}
 	case "change_profile":
 		newProfile := strings.TrimSpace(r.FormValue("new_profile"))
@@ -594,11 +634,20 @@ func (bp *Blueprint) BulkHandler(w http.ResponseWriter, r *http.Request) {
 			isAdmin = (currentUser.Role == "admin")
 		}
 		for _, u := range usernames {
-			_ = bp.db.ChangeSubscriberProfile(u, newProfile, adminUser, isAdmin)
+			if err := bp.db.ChangeSubscriberProfile(u, newProfile, adminUser, isAdmin); err != nil {
+				failCount++
+				lastErr = err.Error()
+			} else {
+				successCount++
+			}
 		}
 	}
 
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	if failCount > 0 {
+		http.Redirect(w, r, fmt.Sprintf("%s&error=%s", redirectURL, url.QueryEscape(fmt.Sprintf("تم تنفيذ %d وفشل %d: %s", successCount, failCount, lastErr))), http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("%s&msg=%s", redirectURL, url.QueryEscape(fmt.Sprintf("تم تنفيذ العملية بنجاح لـ %d مشترك", successCount))), http.StatusFound)
 }
 
 func (bp *Blueprint) TerminateHandler(w http.ResponseWriter, r *http.Request) {

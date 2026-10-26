@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -339,6 +340,7 @@ func main() {
 	// Backups Blueprint (Admin Only)
 	bakBP := backupsBP.New(db, renderer, cfg)
 	backupPkg.StartBackupScheduler(db, cfg)
+	db.StartOutboxWorker(context.Background())
 	mux.HandleFunc("/backups", middleware.RequireAdmin(bakBP.IndexHandler))
 	mux.HandleFunc("/backups/settings", middleware.RequireAdmin(bakBP.SaveSettingsHandler))
 	mux.HandleFunc("/backups/create-now", middleware.RequireAdmin(bakBP.CreateNowHandler))
