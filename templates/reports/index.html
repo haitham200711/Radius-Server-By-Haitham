@@ -23,95 +23,419 @@
     </div>
 </div>
 
-<!-- Tabs Navigation Bar -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-2">
-        <ul class="nav nav-pills gap-1.5 flex-nowrap overflow-auto" id="reportsTabNav" style="white-space: nowrap;">
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "overview" }}active shadow-sm{{ end }}" href="/reports?tab=overview">
-                    <i class="bi bi-speedometer2 {{ if eq .ActiveTab "overview" }}text-white{{ else }}text-primary{{ end }} fs-6"></i>
+<style>
+/* ==========================================================================
+   Modern Reports Hub & Categorized Nav Cards - Enterprise Edition
+   ========================================================================== */
+.reports-hub-wrapper {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+}
+.report-categories-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px dashed #e2e8f0;
+    scrollbar-width: none;
+}
+.report-categories-bar::-webkit-scrollbar {
+    display: none;
+}
+.cat-pill-btn {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 30px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    text-decoration: none;
+}
+.cat-pill-btn:hover {
+    background: #edf2f7;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+.cat-pill-btn.active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+.reports-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 10px;
+}
+.report-card-chip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    text-decoration: none;
+    color: #1e293b;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+.report-card-chip:hover {
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    color: #0f172a;
+}
+.report-card-chip .icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    transition: all 0.22s ease;
+}
+.report-card-chip .content-wrap {
+    min-width: 0;
+    flex-grow: 1;
+}
+.report-card-chip .title-text {
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.report-card-chip .sub-text {
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.1;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* Active State Styling */
+.report-card-chip.active {
+    border: 2px solid #0d6efd;
+    background: #f8faff;
+    box-shadow: 0 8px 24px rgba(13, 110, 253, 0.12);
+}
+.report-card-chip.active .title-text {
+    color: #0d6efd;
+}
+.report-card-chip.active .sub-text {
+    color: #0d6efd;
+    opacity: 0.85;
+}
+.report-card-chip.active .icon-wrap {
+    background: #0d6efd !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+.active-pulse-indicator {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #0d6efd;
+    display: inline-block;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+    margin-right: 6px;
+}
+/* Active Report Spotlight Banner */
+.active-spotlight-banner {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px 20px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+    margin-bottom: 24px;
+}
+@media (max-width: 767.98px) {
+    .reports-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<!-- Modern Reports Hub & Navigation Bar -->
+<div class="reports-hub-wrapper">
+    <!-- Category Filter Pills Bar -->
+    <div class="report-categories-bar" id="reportCategoryPills">
+        <button type="button" class="cat-pill-btn active" data-cat="all">
+            <i class="bi bi-grid-fill"></i>
+            <span>جميع التقارير (14)</span>
+        </button>
+        <button type="button" class="cat-pill-btn" data-cat="general">
+            <i class="bi bi-speedometer2"></i>
+            <span>المتابعة العامة</span>
+        </button>
+        <button type="button" class="cat-pill-btn" data-cat="network">
+            <i class="bi bi-broadcast"></i>
+            <span>الشبكة وجلسات الاتصال (5)</span>
+        </button>
+        <button type="button" class="cat-pill-btn" data-cat="subscriptions">
+            <i class="bi bi-hourglass-split"></i>
+            <span>الاشتراكات والخدمات (3)</span>
+        </button>
+        <button type="button" class="cat-pill-btn" data-cat="financial">
+            <i class="bi bi-cash-stack"></i>
+            <span>الحسابات والمالية (4)</span>
+        </button>
+        <button type="button" class="cat-pill-btn" data-cat="security">
+            <i class="bi bi-shield-check"></i>
+            <span>الأمان والراوترات (2)</span>
+        </button>
+    </div>
+
+    <!-- 14 Modern Report Card Chips -->
+    <div class="reports-cards-grid" id="reportsGrid">
+        <!-- 0. Overview -->
+        <a class="report-card-chip {{ if eq .ActiveTab "overview" }}active{{ end }}" data-category="general" href="/reports?tab=overview">
+            <span class="icon-wrap bg-primary-subtle text-primary">
+                <i class="bi bi-speedometer2"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>لوحة المتابعة</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "auth" }}active shadow-sm{{ end }}" href="/reports?tab=auth">
-                    <i class="bi bi-shield-lock {{ if eq .ActiveTab "auth" }}text-white{{ else }}text-danger{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "overview" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">نظرة تنفيذية شاملة</span>
+            </div>
+        </a>
+
+        <!-- 1. Auth Log -->
+        <a class="report-card-chip {{ if eq .ActiveTab "auth" }}active{{ end }}" data-category="network" href="/reports?tab=auth">
+            <span class="icon-wrap bg-danger-subtle text-danger">
+                <i class="bi bi-shield-lock-fill"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>المصادقة والدخول</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "sessions" }}active shadow-sm{{ end }}" href="/reports?tab=sessions">
-                    <i class="bi bi-broadcast {{ if eq .ActiveTab "sessions" }}text-white{{ else }}text-success{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "auth" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">سجلات الدخول وأسباب الرفض</span>
+            </div>
+        </a>
+
+        <!-- 2. Sessions -->
+        <a class="report-card-chip {{ if eq .ActiveTab "sessions" }}active{{ end }}" data-category="network" href="/reports?tab=sessions">
+            <span class="icon-wrap bg-success-subtle text-success">
+                <i class="bi bi-broadcast"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>الجلسات والاتصال</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "traffic" }}active shadow-sm{{ end }}" href="/reports?tab=traffic{{ if .TrafficUser }}&user={{ .TrafficUser }}{{ end }}">
-                    <i class="bi bi-graph-up-arrow {{ if eq .ActiveTab "traffic" }}text-white{{ else }}text-info{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "sessions" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">أونلاين، منتهية، ومعلقة</span>
+            </div>
+        </a>
+
+        <!-- 3. Traffic -->
+        <a class="report-card-chip {{ if eq .ActiveTab "traffic" }}active{{ end }}" data-category="network" href="/reports?tab=traffic{{ if .TrafficUser }}&user={{ .TrafficUser }}{{ end }}">
+            <span class="icon-wrap bg-info-subtle text-info">
+                <i class="bi bi-graph-up-arrow"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>استهلاك العملاء</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "quota" }}active shadow-sm{{ end }}" href="/reports?tab=quota">
-                    <i class="bi bi-hourglass-split {{ if eq .ActiveTab "quota" }}text-white{{ else }}text-warning{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "traffic" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">سحب البيانات والقمم اليومية</span>
+            </div>
+        </a>
+
+        <!-- 4. Quota -->
+        <a class="report-card-chip {{ if eq .ActiveTab "quota" }}active{{ end }}" data-category="subscriptions" href="/reports?tab=quota">
+            <span class="icon-wrap bg-warning-subtle text-warning">
+                <i class="bi bi-hourglass-split"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>الكوتة والصلاحية</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "service" }}active shadow-sm{{ end }}" href="/reports?tab=service">
-                    <i class="bi bi-hdd-network {{ if eq .ActiveTab "service" }}text-white{{ else }}text-secondary{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "quota" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">الحصص وتواريخ الانتهاء</span>
+            </div>
+        </a>
+
+        <!-- 5. Service Status -->
+        <a class="report-card-chip {{ if eq .ActiveTab "service" }}active{{ end }}" data-category="subscriptions" href="/reports?tab=service">
+            <span class="icon-wrap bg-secondary-subtle text-secondary">
+                <i class="bi bi-hdd-network-fill"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>حالة الخدمة</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "subscriptions" }}active shadow-sm{{ end }}" href="/reports?tab=subscriptions">
-                    <i class="bi bi-people {{ if eq .ActiveTab "subscriptions" }}text-white{{ else }}text-primary{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "service" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">أحداث CoA وفصل الخدمة</span>
+            </div>
+        </a>
+
+        <!-- 6. Subscriptions Growth -->
+        <a class="report-card-chip {{ if eq .ActiveTab "subscriptions" }}active{{ end }}" data-category="subscriptions" href="/reports?tab=subscriptions">
+            <span class="icon-wrap bg-primary-subtle text-primary">
+                <i class="bi bi-people-fill"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>النمو والاشتراكات</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "debts" }}active shadow-sm{{ end }}" href="/reports?tab=debts">
-                    <i class="bi bi-person-exclamation {{ if eq .ActiveTab "debts" }}text-white{{ else }}text-danger{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "subscriptions" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">الباقات ومعدلات التجديد</span>
+            </div>
+        </a>
+
+        <!-- 7. Debts -->
+        <a class="report-card-chip {{ if eq .ActiveTab "debts" }}active{{ end }}" data-category="financial" href="/reports?tab=debts">
+            <span class="icon-wrap bg-danger-subtle text-danger">
+                <i class="bi bi-person-exclamation"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>ديون العملاء</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "resellers" }}active shadow-sm{{ end }}" href="/reports?tab=resellers">
-                    <i class="bi bi-shop-window {{ if eq .ActiveTab "resellers" }}text-white{{ else }}text-warning{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "debts" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">المستحقات والمديونيات الحرجة</span>
+            </div>
+        </a>
+
+        <!-- 8. Reseller Balances -->
+        <a class="report-card-chip {{ if eq .ActiveTab "resellers" }}active{{ end }}" data-category="financial" href="/reports?tab=resellers">
+            <span class="icon-wrap bg-warning-subtle text-warning">
+                <i class="bi bi-shop-window"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>أرصدة الموزعين</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "subscribers" }}active shadow-sm{{ end }}" href="/reports?tab=subscribers">
-                    <i class="bi bi-cash-stack {{ if eq .ActiveTab "subscribers" }}text-white{{ else }}text-success{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "resellers" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">المحافظ والحدود الائتمانية</span>
+            </div>
+        </a>
+
+        <!-- 9. Subscriber Balances -->
+        <a class="report-card-chip {{ if eq .ActiveTab "subscribers" }}active{{ end }}" data-category="financial" href="/reports?tab=subscribers">
+            <span class="icon-wrap bg-success-subtle text-success">
+                <i class="bi bi-cash-stack"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>أرصدة العملاء</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "revenue" }}active shadow-sm{{ end }}" href="/reports?tab=revenue">
-                    <i class="bi bi-coin {{ if eq .ActiveTab "revenue" }}text-white{{ else }}text-success{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "subscribers" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">الشحن والدائن والمدين</span>
+            </div>
+        </a>
+
+        <!-- 10. Revenue -->
+        <a class="report-card-chip {{ if eq .ActiveTab "revenue" }}active{{ end }}" data-category="financial" href="/reports?tab=revenue">
+            <span class="icon-wrap bg-success-subtle text-success">
+                <i class="bi bi-coin"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>الإيرادات والربحية</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "radius" }}active shadow-sm{{ end }}" href="/reports?tab=radius">
-                    <i class="bi bi-router {{ if eq .ActiveTab "radius" }}text-white{{ else }}text-info{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "revenue" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">صافي الأرباح وهوامش البيع</span>
+            </div>
+        </a>
+
+        <!-- 11. NAS & RADIUS -->
+        <a class="report-card-chip {{ if eq .ActiveTab "radius" }}active{{ end }}" data-category="security" href="/reports?tab=radius">
+            <span class="icon-wrap bg-info-subtle text-info">
+                <i class="bi bi-router-fill"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>الراوترات وNAS</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "capacity" }}active shadow-sm{{ end }}" href="/reports?tab=capacity">
-                    <i class="bi bi-activity {{ if eq .ActiveTab "capacity" }}text-white{{ else }}text-danger{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "radius" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">صحة الأجهزة واتصال السيرفر</span>
+            </div>
+        </a>
+
+        <!-- 12. Capacity -->
+        <a class="report-card-chip {{ if eq .ActiveTab "capacity" }}active{{ end }}" data-category="network" href="/reports?tab=capacity">
+            <span class="icon-wrap bg-danger-subtle text-danger">
+                <i class="bi bi-activity"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>سعة الشبكة</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "audit" }}active shadow-sm{{ end }}" href="/reports?tab=audit">
-                    <i class="bi bi-shield-check {{ if eq .ActiveTab "audit" }}text-white{{ else }}text-dark{{ end }} fs-6"></i>
+                    {{ if eq .ActiveTab "capacity" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">أوقات الذروة وتوزيع الحمل</span>
+            </div>
+        </a>
+
+        <!-- 13. Audit Log -->
+        <a class="report-card-chip {{ if eq .ActiveTab "audit" }}active{{ end }}" data-category="security" href="/reports?tab=audit">
+            <span class="icon-wrap bg-dark-subtle text-dark">
+                <i class="bi bi-shield-check"></i>
+            </span>
+            <div class="content-wrap">
+                <div class="title-text d-flex align-items-center">
                     <span>سجل الأمان</span>
-                </a>
-            </li>
-        </ul>
+                    {{ if eq .ActiveTab "audit" }}<span class="active-pulse-indicator"></span>{{ end }}
+                </div>
+                <span class="sub-text">التدقيق والعمليات الإدارية</span>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Active Report Spotlight Banner -->
+<div class="active-spotlight-banner d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <span class="p-2.5 rounded-3 d-inline-flex align-items-center justify-content-center shadow-sm 
+            {{ if eq .ActiveTab "overview" }}bg-primary text-white{{ else if eq .ActiveTab "sessions" }}bg-success text-white{{ else if eq .ActiveTab "auth" }}bg-danger text-white{{ else if eq .ActiveTab "debts" }}bg-danger text-white{{ else if eq .ActiveTab "resellers" }}bg-warning text-dark{{ else if eq .ActiveTab "revenue" }}bg-success text-white{{ else if eq .ActiveTab "radius" }}bg-info text-white{{ else }}bg-primary text-white{{ end }}" 
+            style="width: 48px; height: 48px;">
+            <i class="fs-4 bi 
+                {{ if eq .ActiveTab "overview" }}bi-speedometer2{{ else if eq .ActiveTab "auth" }}bi-shield-lock-fill{{ else if eq .ActiveTab "sessions" }}bi-broadcast{{ else if eq .ActiveTab "traffic" }}bi-graph-up-arrow{{ else if eq .ActiveTab "quota" }}bi-hourglass-split{{ else if eq .ActiveTab "service" }}bi-hdd-network-fill{{ else if eq .ActiveTab "subscriptions" }}bi-people-fill{{ else if eq .ActiveTab "debts" }}bi-person-exclamation{{ else if eq .ActiveTab "resellers" }}bi-shop-window{{ else if eq .ActiveTab "subscribers" }}bi-cash-stack{{ else if eq .ActiveTab "revenue" }}bi-coin{{ else if eq .ActiveTab "radius" }}bi-router-fill{{ else if eq .ActiveTab "capacity" }}bi-activity{{ else }}bi-shield-check{{ end }}"></i>
+        </span>
+        <div>
+            <h5 class="fw-bold mb-1 text-dark d-flex align-items-center gap-2">
+                <span>
+                    {{ if eq .ActiveTab "overview" }}لوحة المتابعة الشاملة والملخص التنفيذي{{ else if eq .ActiveTab "auth" }}تقرير سجلات المصادقة ومحاولات تسجيل الدخول{{ else if eq .ActiveTab "sessions" }}تقرير حالات تسجيل الدخول والجلسات النشطة والمنتهية{{ else if eq .ActiveTab "traffic" }}تقرير استهلاك العملاء التراكمي للبيانات{{ else if eq .ActiveTab "quota" }}تقرير الكوتة وصلاحية الاشتراكات{{ else if eq .ActiveTab "service" }}تقرير حالة الخدمة وأحداث الفصل وتعديل السرعة (CoA){{ else if eq .ActiveTab "subscriptions" }}تقرير نمو المشتركين وتوزيع الباقات ومعدل الاحتفاظ{{ else if eq .ActiveTab "debts" }}تقرير ديون ومستحقات العملاء والمتأخرات الحرجة{{ else if eq .ActiveTab "resellers" }}تقرير أرصدة ومحافظ الموزعين والمديرين{{ else if eq .ActiveTab "subscribers" }}تقرير أرصدة العملاء والعمليات المالية السابقة{{ else if eq .ActiveTab "revenue" }}تقرير الإيرادات والأرباح التشغيلية وهامش الربحية{{ else if eq .ActiveTab "radius" }}تقرير حالة الراوترات وسيرفر الراديوس (NAS){{ else if eq .ActiveTab "capacity" }}تقرير سعة الشبكة وأوقات الذروة وتوزيع الحمل{{ else }}سجل العمليات والتدقيق الأمني والحركات الإدارية{{ end }}
+                </span>
+                <span class="badge bg-light text-primary border font-monospace" style="font-size: 0.72rem;">{{ .ActiveTab }}</span>
+            </h5>
+            <p class="text-muted small mb-0">
+                {{ if eq .ActiveTab "overview" }}نظرة تنفيذية شاملة على مؤشرات الأداء الحية، عدد المتصلين، الاستهلاك، الديون، وصحة الشبكة{{ else if eq .ActiveTab "auth" }}تحليل تفصيلي لمحاولات الدخول الناجحة والمرفوضة وتصنيف أسباب الرفض عبر السيرفر{{ else if eq .ActiveTab "sessions" }}متابعة الجلسات المباشرة الأونلاين وتفاصيل الجلسات المنتهية والعالقة وتدقيق الاستهلاك{{ else if eq .ActiveTab "traffic" }}استعراض تفصيلي لاستهلاك المشتركين سنوياً وشهرياً ويومياً وتحديد أكثر العملاء استهلاكاً{{ else if eq .ActiveTab "quota" }}متابعة الكوتات المستهلكة والحسابات التي أوشكت على النفاد وتواريخ انتهاء الصلاحيات{{ else if eq .ActiveTab "service" }}سجل أحداث RADIUS Disconnect وأوامر تغيير السرعة الحية (CoA) ومتابعة الغياب{{ else if eq .ActiveTab "subscriptions" }}تحليل المشتركين والنمو وتوزيعهم الجغرافي وحسب الباقات ومعدل تجديد العقود{{ else if eq .ActiveTab "debts" }}كشف تفصيلي بالعملاء المدينين وحجم المتأخرات وأعمار الديون والديون الحرجة التي تتطلب تحصيل{{ else if eq .ActiveTab "resellers" }}كشف أرصدة محافظ الموزعين والحدود الائتمانية والقدرة التشغيلية المتاحة لكل موزع{{ else if eq .ActiveTab "subscribers" }}أرصدة حسابات المشتركين ومسيرات الشحن والسلف والعمليات المالية المرتبطة بهم{{ else if eq .ActiveTab "revenue" }}تحليل مبيعات الاشتراكات وتكلفة الباقات وصافي الربح المحقق وهامش الربحية{{ else if eq .ActiveTab "radius" }}مراقبة الأجهزة والراوترات المتصلة (MikroTik/Cisco) وأوقات الاستجابة والحمل اللحظي{{ else if eq .ActiveTab "capacity" }}تحليل الحمل اللحظي على مدار 24 ساعة وساعات الذروة والضغط لتخطيط سعة الخطوط{{ else }}كشف كامل لجميع الحركات الإدارية والأمنية ومنفذيها وعناوين IP وتواريخها{{ end }}
+            </p>
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/reports?tab={{ .ActiveTab }}&export=csv&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}&reseller_id={{ .ResellerFilter }}&sort={{ .SortBy }}&debt_status={{ .DebtStatusFilter }}&balance_state={{ .BalanceState }}&auth_reply={{ .AuthReplyFilter }}&quota_category={{ .QuotaCategory }}&service_status={{ .ServiceStatusFilter }}&action_filter={{ .ActionFilter }}&actor={{ .ActorFilter }}&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month={{ .TrafficMonth }}" 
+           class="btn btn-sm btn-success fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" title="تصدير هذا التقرير إلى Excel (CSV)">
+            <i class="bi bi-file-earmark-excel-fill"></i> تصدير البيانات
+        </a>
+        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" onclick="window.print()" title="طباعة الصفحة">
+            <i class="bi bi-printer-fill"></i> طباعة
+        </button>
     </div>
 </div>
 
@@ -2268,4 +2592,34 @@
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+{{ define "scripts" }}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const catBtns = document.querySelectorAll(".cat-pill-btn");
+    const chips = document.querySelectorAll(".report-card-chip");
+
+    // Category click handler
+    catBtns.forEach(btn => {
+        btn.addEventListener("click", function() {
+            catBtns.forEach(b => b.classList.remove("active"));
+            this.classList.add("active");
+            const targetCat = this.getAttribute("data-cat");
+
+            chips.forEach(chip => {
+                if (targetCat === "all" || chip.getAttribute("data-category") === targetCat) {
+                    chip.style.display = "flex";
+                } else {
+                    chip.style.display = "none";
+                }
+            });
+        });
+    });
+
+    // Auto-scroll active tab into view if needed
+    const activeChip = document.querySelector(".report-card-chip.active");
+    if (activeChip) {
+        activeChip.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+});
+</script>
+{{ end }}
