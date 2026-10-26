@@ -13,6 +13,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/money"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -920,7 +921,7 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	priceStr := strings.TrimSpace(r.FormValue("price"))
-	price, _ := strconv.ParseFloat(priceStr, 64)
+	price, _ := money.ParseFiniteFloat(priceStr)
 	paymentOption := strings.TrimSpace(r.FormValue("payment_option"))
 	if paymentOption == "" {
 		if r.FormValue("payment_status") == "unpaid" {
@@ -932,6 +933,10 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 	isPaid := paymentOption != "debt"
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
@@ -948,14 +953,16 @@ func (bp *Blueprint) RenewHandler(w http.ResponseWriter, r *http.Request) {
 
 	if username != "" {
 		if currentUser != nil && currentUser.Role == "reseller" {
-			if err := bp.db.ResellerRenewSubscriber(currentUser.ID, username, profile, isPaid, currentUser.Username); err != nil {
+			if err := bp.db.ResellerRenewSubscriber(currentUser.ID, username, profile, isPaid, currentUser.Username, idempotencyKey); err != nil {
 				fmt.Printf("[Subscribers] Reseller Renew Error: %v\n", err)
-				http.Redirect(w, r, redirectURL+"&error="+err.Error(), http.StatusFound)
+				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
 			}
 		} else {
-			if err := bp.db.RenewSubscriberWithPaymentOption(username, profile, price, paymentOption, paymentMethod, notes, adminUser); err != nil {
+			if err := bp.db.RenewSubscriberWithPaymentOption(username, profile, price, paymentOption, paymentMethod, notes, adminUser, idempotencyKey); err != nil {
 				fmt.Printf("[Subscribers] Error renewing subscriber %s: %v\n", username, err)
+				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+				return
 			}
 		}
 	}
@@ -1059,11 +1066,15 @@ func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Req
 
 func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
-	quotaGB, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("quota_gb")), 64)
-	price, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("price")), 64)
+	quotaGB, errQ := money.ParseFiniteFloat(r.FormValue("quota_gb"))
+	price, errP := money.ParseFiniteFloat(r.FormValue("price"))
 	isPaid := r.FormValue("payment_status") != "unpaid"
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
@@ -1078,12 +1089,21 @@ func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 
 	redirectURL := fmt.Sprintf("/subscribers?limit=%s&page=%s&q=%s&status=%s", limit, page, q, status)
 
+	if errQ != nil || quotaGB <= 0 {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("كمية الكوتة غير صحيحة"), http.StatusFound)
+		return
+	}
+	if errP != nil || price < 0 {
+		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape("سعر الكوتة غير صحيح"), http.StatusFound)
+		return
+	}
+
 	if username != "" && quotaGB > 0 {
 		if !bp.checkSubscriberAccess(w, r, username) {
 			return
 		}
 		if currentUser != nil && currentUser.Role == "reseller" {
-			if err := bp.db.ResellerAddQuota(currentUser.ID, username, quotaGB, price, isPaid, currentUser.Username); err != nil {
+			if err := bp.db.ResellerAddQuota(currentUser.ID, username, quotaGB, price, isPaid, currentUser.Username, idempotencyKey); err != nil {
 				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
 			}
@@ -1091,14 +1111,17 @@ func (bp *Blueprint) AddQuotaHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_ = bp.db.AddQuotaBilling(username, quotaGB, price, isPaid, paymentMethod, notes, adminUser)
+		if err := bp.db.AddQuotaBilling(username, quotaGB, price, isPaid, paymentMethod, notes, adminUser, idempotencyKey); err != nil {
+			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
+			return
+		}
 	}
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
-	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+	amount, _ := money.ParseFiniteFloat(r.FormValue("amount"))
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
@@ -1217,10 +1240,20 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 	callingMAC := strings.TrimSpace(r.FormValue("calling_mac"))
 	debtStr := strings.TrimSpace(r.FormValue("debt"))
 	balanceStr := strings.TrimSpace(r.FormValue("balance"))
-	quotaGBStr := strings.TrimSpace(r.FormValue("quota_gb"))
 	expStr := strings.TrimSpace(r.FormValue("expiration_date"))
 	status := strings.TrimSpace(r.FormValue("status"))
 	resellerID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("reseller_id")), 10, 64)
+
+	var expNullTime sql.NullTime
+	if expStr != "" {
+		t, err := time.Parse("2006-01-02T15:04", expStr)
+		if err != nil {
+			t, err = time.Parse("2006-01-02", expStr)
+		}
+		if err == nil {
+			expNullTime = sql.NullTime{Time: t, Valid: true}
+		}
+	}
 
 	currentUser := middleware.GetUser(r)
 	if currentUser != nil && currentUser.Role == "reseller" {
@@ -1242,42 +1275,41 @@ func (bp *Blueprint) EditHandler(w http.ResponseWriter, r *http.Request) {
 		status = "active"
 	}
 
-	debt, _ := strconv.ParseFloat(debtStr, 64)
-	balance, _ := strconv.ParseFloat(balanceStr, 64)
-	quotaGB, _ := strconv.ParseFloat(quotaGBStr, 64)
-	var quotaBytes int64
-	if quotaGB > 0 {
-		quotaBytes = int64(quotaGB * 1024 * 1024 * 1024)
-	}
-
-	var expNullTime sql.NullTime
-	if expStr != "" {
-		t, err := time.Parse("2006-01-02T15:04", expStr)
-		if err != nil {
-			t, err = time.Parse("2006-01-02", expStr)
-		}
-		if err == nil {
-			expNullTime = sql.NullTime{Time: t, Valid: true}
-		}
-	}
-
 	sub := &models.Subscriber{
 		Username:       username,
 		FullName:       fullName,
 		Phone:          phone,
 		Address:        address,
-		Debt:           debt,
-		Balance:        balance,
 		ProfileName:    profile,
 		StaticIP:       staticIP,
 		CallingMAC:     callingMAC,
-		QuotaBytes:     quotaBytes,
 		ExpirationDate: expNullTime,
 		Status:         status,
 		ResellerID:     resellerID,
 	}
 
-	_ = bp.db.UpdateSubscriberCRM(sub, password)
+	if err := bp.db.UpdateSubscriberCRM(sub, password); err != nil {
+		http.Redirect(w, r, "/subscribers?error="+url.QueryEscape("فشل تعديل بيانات المشترك: "+err.Error()), http.StatusFound)
+		return
+	}
+
+	// Adjust financials if admin modified debt or balance from CRM
+	if currentUser != nil && currentUser.Role == "admin" && currentSub != nil {
+		adminName := currentUser.Username
+		if balanceStr != "" {
+			if newBal, errB := money.ParseFiniteFloat(balanceStr); errB == nil && newBal != currentSub.Balance {
+				balDelta := newBal - currentSub.Balance
+				_ = bp.db.AdjustSubscriberFinancials(username, balDelta, 0, "تعديل رصيد من شاشة تفاصيل العميل", adminName, r.RemoteAddr)
+			}
+		}
+		if debtStr != "" {
+			if newDbt, errD := money.ParseFiniteFloat(debtStr); errD == nil && newDbt != currentSub.Debt {
+				dbtDelta := newDbt - currentSub.Debt
+				_ = bp.db.AdjustSubscriberFinancials(username, 0, dbtDelta, "تعديل مديونية من شاشة تفاصيل العميل", adminName, r.RemoteAddr)
+			}
+		}
+	}
+
 	http.Redirect(w, r, "/subscribers", http.StatusFound)
 }
 

@@ -4,13 +4,63 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 )
 
 var (
 	ErrInvalidCommission = errors.New("commission percent must be between 0 and 100")
 	ErrNegativeAmount    = errors.New("amount cannot be negative")
 	ErrInsufficientFunds = errors.New("insufficient balance and credit limit")
+	ErrNonFinite         = errors.New("number must be a finite valid number (not NaN or Infinity)")
+	ErrNonPositive       = errors.New("value must be greater than zero")
 )
+
+// ValidateFinite checks that a float64 is not NaN or Infinity
+func ValidateFinite(val float64) error {
+	if math.IsNaN(val) || math.IsInf(val, 0) {
+		return ErrNonFinite
+	}
+	return nil
+}
+
+// ValidatePositive checks that a float64 is finite and strictly positive (> 0)
+func ValidatePositive(val float64) error {
+	if err := ValidateFinite(val); err != nil {
+		return err
+	}
+	if val <= 0 {
+		return ErrNonPositive
+	}
+	return nil
+}
+
+// ValidateNonNegative checks that a float64 is finite and non-negative (>= 0)
+func ValidateNonNegative(val float64) error {
+	if err := ValidateFinite(val); err != nil {
+		return err
+	}
+	if val < 0 {
+		return ErrNegativeAmount
+	}
+	return nil
+}
+
+// ParseFiniteFloat parses a string into float64 and validates that it is finite
+func ParseFiniteFloat(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, nil
+	}
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid numeric format: %w", err)
+	}
+	if err := ValidateFinite(val); err != nil {
+		return 0, err
+	}
+	return val, nil
+}
 
 // ToCents converts a float64 amount (e.g. 10.50 EGP) to integer minor units / cents (1050)
 // using standard midpoint rounding to avoid IEEE-754 precision drift.

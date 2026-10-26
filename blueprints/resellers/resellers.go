@@ -3,12 +3,14 @@ package resellers
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/haitham200711/Radius-Server-By-Haitham/database"
 	"github.com/haitham200711/Radius-Server-By-Haitham/middleware"
 	"github.com/haitham200711/Radius-Server-By-Haitham/models"
+	"github.com/haitham200711/Radius-Server-By-Haitham/pkg/money"
 	"github.com/haitham200711/Radius-Server-By-Haitham/web"
 )
 
@@ -181,21 +183,25 @@ func (bp *Blueprint) RechargeHandler(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
 	actionType := strings.TrimSpace(r.FormValue("action_type"))
-	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+	amount, errA := money.ParseFiniteFloat(r.FormValue("amount"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	adminUser := "admin"
 	if u := middleware.GetUser(r); u != nil {
 		adminUser = u.Username
 	}
 
-	if id <= 0 || amount <= 0 {
+	if id <= 0 || errA != nil || amount <= 0 {
 		http.Redirect(w, r, "/resellers?error=invalid_amount", http.StatusFound)
 		return
 	}
 
-	if err := bp.db.AdjustResellerBalance(id, actionType, amount, notes, adminUser); err != nil {
-		http.Redirect(w, r, "/resellers?error="+err.Error(), http.StatusFound)
+	if err := bp.db.AdjustResellerBalance(id, actionType, amount, notes, adminUser, idempotencyKey); err != nil {
+		http.Redirect(w, r, "/resellers?error="+url.QueryEscape(err.Error()), http.StatusFound)
 		return
 	}
 

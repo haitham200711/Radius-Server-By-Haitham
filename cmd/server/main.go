@@ -55,9 +55,32 @@ func main() {
 	}
 	defer db.Close()
 
-	// CLI Flag: Reset Admin Password
+	// CLI Flags
 	resetAdmin := flag.String("reset-admin", "", "Reset admin password (format: username:newpassword or newpassword)")
+	reconcileFin := flag.Bool("reconcile-financials", false, "Run financial ledger reconciliation check and print report")
 	flag.Parse()
+
+	if *reconcileFin {
+		fmt.Println("[AUDIT] Running financial ledger reconciliation...")
+		report, err := db.ReconcileFinancials()
+		if err != nil {
+			log.Fatalf("[FATAL] Financial reconciliation failed: %v", err)
+		}
+		fmt.Printf("Subscribers Checked: %d\n", report.SubscribersChecked)
+		fmt.Printf("Resellers Checked:   %d\n", report.ResellersChecked)
+		fmt.Printf("Ledger Entries:      %d\n", report.LedgerTotalEntries)
+		fmt.Printf("Total Ledger Cents:  %d\n", report.TotalLedgerCents)
+		fmt.Printf("Ledger Balanced:     %v\n", report.IsBalanced)
+		if len(report.Discrepancies) > 0 {
+			fmt.Printf("⚠️ Found %d discrepancies:\n", len(report.Discrepancies))
+			for _, d := range report.Discrepancies {
+				fmt.Printf(" - [%s] %s: %s (Diff: %.2f)\n", d.Entity, d.Identifier, d.DiscrepancyMsg, d.Difference)
+			}
+		} else {
+			fmt.Println("✅ Financial ledger and balances are 100% reconciled and balanced.")
+		}
+		return
+	}
 
 	if *resetAdmin != "" {
 		parts := strings.SplitN(*resetAdmin, ":", 2)

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -299,102 +300,6 @@ func (d *DB) InitSchema() error {
 			INDEX idx_ssb_user (username),
 			INDEX idx_ssb_user_sess (username, acctsessionid)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS financial_ledger (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			reference_id VARCHAR(64) UNIQUE NOT NULL,
-			idempotency_key VARCHAR(64) UNIQUE NULL,
-			operation_type VARCHAR(64) NOT NULL,
-			account_type VARCHAR(32) NOT NULL,
-			subscriber_id INT DEFAULT 0,
-			subscriber_username VARCHAR(64) DEFAULT '',
-			reseller_id INT DEFAULT 0,
-			amount_cents BIGINT NOT NULL DEFAULT 0,
-			amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			balance_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			balance_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			debt_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			debt_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			status VARCHAR(32) NOT NULL DEFAULT 'completed',
-			description VARCHAR(255) NOT NULL DEFAULT '',
-			metadata TEXT NULL,
-			created_by VARCHAR(64) NOT NULL DEFAULT 'system',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_fledger_ref (reference_id),
-			INDEX idx_fledger_reseller (reseller_id),
-			INDEX idx_fledger_sub (subscriber_id),
-			INDEX idx_fledger_user (subscriber_username),
-			INDEX idx_fledger_op (operation_type),
-			INDEX idx_fledger_date (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS idempotency_keys (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			idempotency_key VARCHAR(64) UNIQUE NOT NULL,
-			operation_type VARCHAR(64) NOT NULL,
-			resource_id VARCHAR(64) DEFAULT '',
-			request_hash VARCHAR(64) DEFAULT '',
-			response_code INT DEFAULT 200,
-			response_body MEDIUMTEXT,
-			status VARCHAR(32) NOT NULL DEFAULT 'in_progress',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			expires_at DATETIME NOT NULL,
-			INDEX idx_idemp_key (idempotency_key),
-			INDEX idx_idemp_exp (expires_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS financial_outbox (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			event_type VARCHAR(64) NOT NULL,
-			aggregate_type VARCHAR(64) NOT NULL,
-			aggregate_id VARCHAR(64) NOT NULL,
-			payload MEDIUMTEXT NOT NULL,
-			status VARCHAR(32) NOT NULL DEFAULT 'pending',
-			retry_count INT NOT NULL DEFAULT 0,
-			max_retries INT NOT NULL DEFAULT 5,
-			last_error TEXT NULL,
-			scheduled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			processed_at DATETIME NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_outbox_sched (status, scheduled_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS loan_transactions (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			loan_id VARCHAR(64) UNIQUE NOT NULL,
-			reference_id VARCHAR(64) NOT NULL DEFAULT '',
-			subscriber_id INT NOT NULL,
-			username VARCHAR(64) NOT NULL,
-			commercial_value DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			granted_hours INT NOT NULL DEFAULT 0,
-			granted_quota_bytes BIGINT NOT NULL DEFAULT 0,
-			deduction_type VARCHAR(20) NOT NULL DEFAULT 'full',
-			initial_used_bytes BIGINT NOT NULL DEFAULT 0,
-			used_bytes BIGINT NOT NULL DEFAULT 0,
-			deducted_hours INT NOT NULL DEFAULT 0,
-			deducted_quota_bytes BIGINT NOT NULL DEFAULT 0,
-			deducted_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			remaining_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			status VARCHAR(32) NOT NULL DEFAULT 'active',
-			granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			settled_at DATETIME NULL,
-			INDEX idx_loan_sub (subscriber_id),
-			INDEX idx_loan_user (username),
-			INDEX idx_loan_status (status)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS audit_logs (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			reference_id VARCHAR(64) NOT NULL DEFAULT '',
-			actor_id INT NOT NULL DEFAULT 0,
-			actor_username VARCHAR(64) NOT NULL DEFAULT '',
-			actor_role VARCHAR(32) NOT NULL DEFAULT '',
-			action VARCHAR(64) NOT NULL,
-			target_type VARCHAR(64) NOT NULL,
-			target_id VARCHAR(64) NOT NULL,
-			details TEXT,
-			ip_address VARCHAR(45) NOT NULL DEFAULT '',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_audit_ref (reference_id),
-			INDEX idx_audit_actor (actor_username),
-			INDEX idx_audit_target (target_type, target_id),
-			INDEX idx_audit_date (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 		// 8. Subscribers CRM Table (ط§ظ„ط¹ظ…ظ„ط§ط، ظˆط§ظ„ط¹ظ‚ظˆط¯)
 		`CREATE TABLE IF NOT EXISTS subscribers (
 			id INT AUTO_INCREMENT PRIMARY KEY,
@@ -617,118 +522,17 @@ func (d *DB) InitSchema() error {
 			portal_announcement TEXT,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-
-		// 22. Financial Ledger (سجل الأستاذ المالي الشامل والحركات الدقيقة)
-		`CREATE TABLE IF NOT EXISTS financial_ledger (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			reference_id VARCHAR(64) UNIQUE NOT NULL,
-			idempotency_key VARCHAR(64) UNIQUE NULL,
-			operation_type VARCHAR(64) NOT NULL,
-			account_type VARCHAR(32) NOT NULL,
-			subscriber_id INT DEFAULT 0,
-			subscriber_username VARCHAR(64) DEFAULT '',
-			reseller_id INT DEFAULT 0,
-			amount_cents BIGINT NOT NULL DEFAULT 0,
-			amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			balance_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			balance_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			debt_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			debt_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			status VARCHAR(32) NOT NULL DEFAULT 'completed',
-			description VARCHAR(255) NOT NULL DEFAULT '',
-			metadata TEXT NULL,
-			created_by VARCHAR(64) NOT NULL DEFAULT 'system',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_fledger_ref (reference_id),
-			INDEX idx_fledger_reseller (reseller_id),
-			INDEX idx_fledger_sub (subscriber_id),
-			INDEX idx_fledger_user (subscriber_username),
-			INDEX idx_fledger_op (operation_type),
-			INDEX idx_fledger_date (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-
-		// 23. Idempotency Keys (منع تكرار العمليات المالية والطلبات)
-		`CREATE TABLE IF NOT EXISTS idempotency_keys (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			idempotency_key VARCHAR(64) UNIQUE NOT NULL,
-			operation_type VARCHAR(64) NOT NULL,
-			resource_id VARCHAR(64) DEFAULT '',
-			request_hash VARCHAR(64) DEFAULT '',
-			response_code INT DEFAULT 200,
-			response_body MEDIUMTEXT,
-			status VARCHAR(32) NOT NULL DEFAULT 'in_progress',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			expires_at DATETIME NOT NULL,
-			INDEX idx_idemp_key (idempotency_key),
-			INDEX idx_idemp_exp (expires_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-
-		// 24. Financial Outbox (صندوق عمليات الشبكة والـ RADIUS غير المتزامنة)
-		`CREATE TABLE IF NOT EXISTS financial_outbox (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			event_type VARCHAR(64) NOT NULL,
-			aggregate_type VARCHAR(64) NOT NULL,
-			aggregate_id VARCHAR(64) NOT NULL,
-			payload MEDIUMTEXT NOT NULL,
-			status VARCHAR(32) NOT NULL DEFAULT 'pending',
-			retry_count INT NOT NULL DEFAULT 0,
-			max_retries INT NOT NULL DEFAULT 5,
-			last_error TEXT NULL,
-			scheduled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			processed_at DATETIME NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_outbox_sched (status, scheduled_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-
-		// 25. Loan Transactions (سجل تتبع السلف وفترات السماح وتسويتها)
-		`CREATE TABLE IF NOT EXISTS loan_transactions (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			loan_id VARCHAR(64) UNIQUE NOT NULL,
-			reference_id VARCHAR(64) NOT NULL DEFAULT '',
-			subscriber_id INT NOT NULL,
-			username VARCHAR(64) NOT NULL,
-			commercial_value DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			granted_hours INT NOT NULL DEFAULT 0,
-			granted_quota_bytes BIGINT NOT NULL DEFAULT 0,
-			deduction_type VARCHAR(20) NOT NULL DEFAULT 'full',
-			initial_used_bytes BIGINT NOT NULL DEFAULT 0,
-			used_bytes BIGINT NOT NULL DEFAULT 0,
-			deducted_hours INT NOT NULL DEFAULT 0,
-			deducted_quota_bytes BIGINT NOT NULL DEFAULT 0,
-			deducted_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			remaining_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			status VARCHAR(32) NOT NULL DEFAULT 'active',
-			granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			settled_at DATETIME NULL,
-			INDEX idx_loan_sub (subscriber_id),
-			INDEX idx_loan_user (username),
-			INDEX idx_loan_status (status)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-
-		// 26. Audit Logs (سجل التدقيق الأمني والعمليات الإدارية الحساسة)
-		`CREATE TABLE IF NOT EXISTS audit_logs (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			reference_id VARCHAR(64) NOT NULL DEFAULT '',
-			actor_id INT NOT NULL DEFAULT 0,
-			actor_username VARCHAR(64) NOT NULL DEFAULT '',
-			actor_role VARCHAR(32) NOT NULL DEFAULT '',
-			action VARCHAR(64) NOT NULL,
-			target_type VARCHAR(64) NOT NULL,
-			target_id VARCHAR(64) NOT NULL,
-			details TEXT,
-			ip_address VARCHAR(45) NOT NULL DEFAULT '',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_audit_ref (reference_id),
-			INDEX idx_audit_actor (actor_username),
-			INDEX idx_audit_target (target_type, target_id),
-			INDEX idx_audit_date (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 
 	for _, q := range queries {
 		if _, err := d.Exec(q); err != nil {
 			return fmt.Errorf("error running query: %w\n%s", err, q)
 		}
+	}
+
+	// Run versioned schema migrations
+	if err := d.RunMigrations(); err != nil {
+		return fmt.Errorf("financial schema migrations failed: %w", err)
 	}
 
 	// Schema migrations for profiles and card templates
@@ -833,112 +637,6 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS normalized_output_bytes BIGINT UNSIGNED DEFAULT 0;`,
 		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS disconnect_status VARCHAR(32) DEFAULT '';`,
 		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS disconnect_pending_at DATETIME NULL;`,
-		`CREATE TABLE IF NOT EXISTS subscriber_session_baselines (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			username VARCHAR(64) NOT NULL,
-			acctsessionid VARCHAR(64) NOT NULL,
-			baseline_input_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
-			baseline_output_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_ssb_user (username),
-			INDEX idx_ssb_user_sess (username, acctsessionid)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS financial_ledger (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			reference_id VARCHAR(64) UNIQUE NOT NULL,
-			idempotency_key VARCHAR(64) UNIQUE NULL,
-			operation_type VARCHAR(64) NOT NULL,
-			account_type VARCHAR(32) NOT NULL,
-			subscriber_id INT DEFAULT 0,
-			subscriber_username VARCHAR(64) DEFAULT '',
-			reseller_id INT DEFAULT 0,
-			amount_cents BIGINT NOT NULL DEFAULT 0,
-			amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			balance_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			balance_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			debt_before DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			debt_after DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-			status VARCHAR(32) NOT NULL DEFAULT 'completed',
-			description VARCHAR(255) NOT NULL DEFAULT '',
-			metadata TEXT NULL,
-			created_by VARCHAR(64) NOT NULL DEFAULT 'system',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_fledger_ref (reference_id),
-			INDEX idx_fledger_reseller (reseller_id),
-			INDEX idx_fledger_sub (subscriber_id),
-			INDEX idx_fledger_user (subscriber_username),
-			INDEX idx_fledger_op (operation_type),
-			INDEX idx_fledger_date (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS idempotency_keys (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			idempotency_key VARCHAR(64) UNIQUE NOT NULL,
-			operation_type VARCHAR(64) NOT NULL,
-			resource_id VARCHAR(64) DEFAULT '',
-			request_hash VARCHAR(64) DEFAULT '',
-			response_code INT DEFAULT 200,
-			response_body MEDIUMTEXT,
-			status VARCHAR(32) NOT NULL DEFAULT 'in_progress',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			expires_at DATETIME NOT NULL,
-			INDEX idx_idemp_key (idempotency_key),
-			INDEX idx_idemp_exp (expires_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS financial_outbox (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			event_type VARCHAR(64) NOT NULL,
-			aggregate_type VARCHAR(64) NOT NULL,
-			aggregate_id VARCHAR(64) NOT NULL,
-			payload MEDIUMTEXT NOT NULL,
-			status VARCHAR(32) NOT NULL DEFAULT 'pending',
-			retry_count INT NOT NULL DEFAULT 0,
-			max_retries INT NOT NULL DEFAULT 5,
-			last_error TEXT NULL,
-			scheduled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			processed_at DATETIME NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_outbox_sched (status, scheduled_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS loan_transactions (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			loan_id VARCHAR(64) UNIQUE NOT NULL,
-			reference_id VARCHAR(64) NOT NULL DEFAULT '',
-			subscriber_id INT NOT NULL,
-			username VARCHAR(64) NOT NULL,
-			commercial_value DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			granted_hours INT NOT NULL DEFAULT 0,
-			granted_quota_bytes BIGINT NOT NULL DEFAULT 0,
-			deduction_type VARCHAR(20) NOT NULL DEFAULT 'full',
-			initial_used_bytes BIGINT NOT NULL DEFAULT 0,
-			used_bytes BIGINT NOT NULL DEFAULT 0,
-			deducted_hours INT NOT NULL DEFAULT 0,
-			deducted_quota_bytes BIGINT NOT NULL DEFAULT 0,
-			deducted_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			remaining_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-			status VARCHAR(32) NOT NULL DEFAULT 'active',
-			granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			settled_at DATETIME NULL,
-			INDEX idx_loan_sub (subscriber_id),
-			INDEX idx_loan_user (username),
-			INDEX idx_loan_status (status)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
-		`CREATE TABLE IF NOT EXISTS audit_logs (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			reference_id VARCHAR(64) NOT NULL DEFAULT '',
-			actor_id INT NOT NULL DEFAULT 0,
-			actor_username VARCHAR(64) NOT NULL DEFAULT '',
-			actor_role VARCHAR(32) NOT NULL DEFAULT '',
-			action VARCHAR(64) NOT NULL,
-			target_type VARCHAR(64) NOT NULL,
-			target_id VARCHAR(64) NOT NULL,
-			details TEXT,
-			ip_address VARCHAR(45) NOT NULL DEFAULT '',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_audit_ref (reference_id),
-			INDEX idx_audit_actor (actor_username),
-			INDEX idx_audit_target (target_type, target_id),
-			INDEX idx_audit_date (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	}
 	for _, m := range migrations {
 		_, _ = d.Exec(m)
@@ -1850,16 +1548,39 @@ func (d *DB) DeleteReseller(id int64) error {
 	return err
 }
 
-func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount float64, notes, adminUser string) error {
-	if amount <= 0 {
-		return fmt.Errorf("المبلغ يجب أن يكون أكبر من صفر")
+func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount float64, notes, adminUser string, idempotencyKey ...string) error {
+	if err := money.ValidateFinite(amount); err != nil || amount <= 0 {
+		return fmt.Errorf("المبلغ يجب أن يكون رقماً موجباً أكبر من صفر")
 	}
+
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("reseller_adjust", fmt.Sprintf("%d:%s:%.2f", resellerID, actionType, amount))
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"reseller_id": resellerID,
+		"action":      actionType,
+		"amount":      amount,
+	})
 
 	tx, err := d.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	// 1. Reserve idempotency key inside tx
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "reseller_adjust", fmt.Sprintf("%d", resellerID), reqHash, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
 
 	var (
 		resName        string
@@ -1877,6 +1598,7 @@ func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount f
 	amountCents := money.ToCents(amount)
 	balCents := money.ToCents(resBalance)
 	debtCents := money.ToCents(resDebt)
+	limitCents := money.ToCents(resCreditLimit)
 
 	newBalCents := balCents
 	newDebtCents := debtCents
@@ -1911,6 +1633,10 @@ func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount f
 		newBalCents = balCents - actualAmountCents
 		newDebtCents = debtCents - actualAmountCents
 	case "add_debt":
+		if limitCents > 0 && debtCents+amountCents > limitCents {
+			return fmt.Errorf("لا يمكن إضافة دين يتجاوز الحد الائتماني للموزع (%s). المديونية الحالية: %s، الحد الأقصى: %s",
+				money.FormatEGP(limitCents), money.FormatEGP(debtCents), money.FormatEGP(limitCents))
+		}
 		newDebtCents = debtCents + amountCents
 	default:
 		return fmt.Errorf("نوع العملية غير صالح: %s", actionType)
@@ -1958,21 +1684,41 @@ func (d *DB) AdjustResellerBalance(resellerID int64, actionType string, amount f
 	}
 
 	frec := &FinancialRecord{
-		ReferenceID:   refID,
-		OperationType: "reseller_" + actionType,
-		AccountType:   "reseller",
-		ResellerID:    resellerID,
-		AmountCents:   actualAmountCents,
-		Amount:        actualAmount,
-		BalanceBefore: resBalance,
-		BalanceAfter:  newBalance,
-		DebtBefore:    resDebt,
-		DebtAfter:     newDebt,
-		Status:        "completed",
-		Description:   notes,
-		CreatedBy:     adminUser,
+		ReferenceID:    refID,
+		IdempotencyKey: idempKey,
+		OperationType:  "reseller_" + actionType,
+		AccountType:    "reseller",
+		ResellerID:     resellerID,
+		AmountCents:    actualAmountCents,
+		Amount:         actualAmount,
+		BalanceBefore:  resBalance,
+		BalanceAfter:   newBalance,
+		DebtBefore:     resDebt,
+		DebtAfter:      newDebt,
+		Status:         "completed",
+		Description:    notes,
+		CreatedBy:      adminUser,
 	}
 	if err := d.RecordFinancialTx(tx, frec); err != nil {
+		return err
+	}
+
+	// Record audit log for admin adjustment
+	auditRec := &AuditLogRecord{
+		ReferenceID:   refID,
+		ActorUsername: adminUser,
+		ActorRole:     "admin",
+		Action:        "reseller_adjust_" + actionType,
+		TargetType:    "reseller",
+		TargetID:      fmt.Sprintf("%d", resellerID),
+		Details:       notes,
+	}
+	if err := d.RecordAuditTx(tx, auditRec); err != nil {
+		return err
+	}
+
+	// 2. Complete idempotency key
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
 		return err
 	}
 
@@ -2228,12 +1974,36 @@ func (d *DB) GetResellerIndebtedSubscribers(resellerID int64, search string, lim
 	return list, totalCount, totalDebt, nil
 }
 
-func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName string, isCustomerPaid bool, adminUser string) error {
+func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName string, isCustomerPaid bool, adminUser string, idempotencyKey ...string) error {
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("reseller_renew", fmt.Sprintf("%d:%s:%s", resellerID, username, profileName), isCustomerPaid)
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"reseller_id": resellerID,
+		"username":    username,
+		"profile":     profileName,
+		"is_paid":     isCustomerPaid,
+	})
+
 	tx, err := d.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	// 1. Reserve idempotency key inside tx
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "reseller_renew", fmt.Sprintf("%d:%s", resellerID, username), reqHash, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
 
 	var (
 		resName           string
@@ -2268,16 +2038,18 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 	}
 
 	var (
-		subID         int64
-		subResellerID int64
-		currentProf   string
-		contractNo    string
-		fullName      string
-		loanActive    bool
+		subID          int64
+		subResellerID  int64
+		currentProf    string
+		contractNo     string
+		fullName       string
+		loanActive     bool
+		subCurrDebt    float64
+		subCurrBalance float64
 	)
-	err = tx.QueryRow(`SELECT id, reseller_id, profile_name, COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(loan_active, 0) 
+	err = tx.QueryRow(`SELECT id, reseller_id, profile_name, COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(loan_active, 0), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
 		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(
-		&subID, &subResellerID, &currentProf, &contractNo, &fullName, &loanActive,
+		&subID, &subResellerID, &currentProf, &contractNo, &fullName, &loanActive, &subCurrDebt, &subCurrBalance,
 	)
 	if err != nil {
 		return fmt.Errorf("المشترك غير موجود")
@@ -2365,8 +2137,19 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 	}
 
 	if hadLoan {
-		_, _ = tx.Exec(`UPDATE loan_transactions SET status = 'settled', settled_at = NOW(), deducted_hours = ?, deducted_quota_bytes = ?
-			WHERE username = ? AND status = 'active'`, deductedHours, deductedQuotaBytes, username)
+		_, err = tx.Exec(`UPDATE loan_transactions SET 
+			status = 'settled', 
+			settled_at = NOW(), 
+			used_bytes = ?, 
+			deducted_hours = ?, 
+			deducted_quota_bytes = ?,
+			deducted_amount = ?,
+			remaining_amount = 0.00
+			WHERE username = ? AND status = 'active'`,
+			deductedQuotaBytes, int(deductedHours), deductedQuotaBytes, prof.Price, username)
+		if err != nil {
+			return fmt.Errorf("failed to settle loan transaction: %w", err)
+		}
 	}
 
 	expStr := newExp.Format("02 Jan 2006 15:04:05")
@@ -2397,18 +2180,49 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 	// Capture baselines for all active sessions inside tx
 	d.captureSessionBaselinesTx(tx, username)
 
+	refID := GenerateReferenceID("RENEW-RES")
 	payStatus := "paid"
 	payMethod := "reseller"
+	newSubDebt := subCurrDebt
 	if !isCustomerPaid {
 		payStatus = "unpaid"
 		payMethod = "debt"
-		_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", prof.Price, username)
+		newSubDebt = subCurrDebt + prof.Price
+		subDebtRes, err := tx.Exec("UPDATE subscribers SET debt = ? WHERE username = ?", newSubDebt, username)
+		if err != nil {
+			return fmt.Errorf("failed to update subscriber debt: %w", err)
+		}
+		if aff, _ := subDebtRes.RowsAffected(); aff == 0 {
+			return fmt.Errorf("failed to update subscriber debt: record not found")
+		}
+
+		// Record subscriber debt ledger entry
+		frecSub := &FinancialRecord{
+			ReferenceID:        refID + "-SUB",
+			IdempotencyKey:     idempKey + "-sub",
+			OperationType:      "subscriber_renew_debt",
+			AccountType:        "subscriber",
+			SubscriberID:       subID,
+			SubscriberUsername: username,
+			ResellerID:         resellerID,
+			AmountCents:        profPriceCents,
+			Amount:             prof.Price,
+			BalanceBefore:      subCurrBalance,
+			BalanceAfter:       subCurrBalance,
+			DebtBefore:         subCurrDebt,
+			DebtAfter:          newSubDebt,
+			Status:             "completed",
+			Description:        fmt.Sprintf("تجديد باقة آجل (%s) عبر الموزع %s", prof.DisplayName, resName),
+			CreatedBy:          adminUser,
+		}
+		if err := d.RecordFinancialTx(tx, frecSub); err != nil {
+			return err
+		}
 	}
 
 	if adminUser == "" {
 		adminUser = "admin"
 	}
-	refID := GenerateReferenceID("RENEW-RES")
 
 	desc := fmt.Sprintf("تجديد باقة: %s عبر الموزع %s", prof.DisplayName, resName)
 	if hadLoan {
@@ -2434,6 +2248,7 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 
 	frec := &FinancialRecord{
 		ReferenceID:        refID,
+		IdempotencyKey:     idempKey,
 		OperationType:      "reseller_renew",
 		AccountType:        "reseller",
 		SubscriberID:       subID,
@@ -2453,33 +2268,79 @@ func (d *DB) ResellerRenewSubscriber(resellerID int64, username, profileName str
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
+	// 2. Enqueue Outbox event inside transaction
+	action := "coa"
+	if currentProf != "" && currentProf != prof.Name {
+		action = "disconnect"
+	}
+	outboxPayload := OutboxPayload{
+		Username:           username,
+		OperationReference: refID,
+		IdempotencyKey:     idempKey,
+		Trigger:            "reseller_renew",
+	}
+	var activeSessID, activeNAS, activeFramed string
+	_ = tx.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(&activeSessID, &activeNAS, &activeFramed)
+	outboxPayload.SessionID = activeSessID
+	outboxPayload.NASIP = activeNAS
+	outboxPayload.FramedIP = activeFramed
+
+	if err := d.EnqueueOutboxTx(tx, action, "subscriber", username, outboxPayload); err != nil {
+		return fmt.Errorf("failed to enqueue outbox event: %w", err)
+	}
+
+	// 3. Mark idempotency key as completed inside tx
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
 		return err
 	}
 
-	// Post-commit: disconnect if profile changed or restore active connection
-	go func() {
-		if currentProf != "" && currentProf != prof.Name {
-			_, _, _ = d.DisconnectSubscriberSession(username)
-		} else {
-			_ = d.RestoreActiveSubscriberCoA(username)
-		}
-	}()
-
-	return nil
+	return tx.Commit()
 }
 
 // ResellerGenerateCards handles cards batch generation for a reseller with balance deduction and tracking
-func (d *DB) ResellerGenerateCards(resellerID int64, opts models.GenerateBatchOptions, adminUser string) (string, int, error) {
+func (d *DB) ResellerGenerateCards(resellerID int64, opts models.GenerateBatchOptions, adminUser string, idempotencyKey ...string) (string, int, error) {
 	if opts.Count <= 0 || opts.Count > 10000 {
 		return "", 0, fmt.Errorf("عدد الكروت غير صحيح (يجب أن يكون بين 1 و 10000)")
 	}
+
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("reseller_cards", fmt.Sprintf("%d:%d:%d", resellerID, opts.ProfileID, opts.Count), opts.CardType)
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"reseller_id": resellerID,
+		"profile_id":  opts.ProfileID,
+		"count":       opts.Count,
+		"card_type":   opts.CardType,
+	})
 
 	tx, err := d.Begin()
 	if err != nil {
 		return "", 0, err
 	}
 	defer tx.Rollback()
+
+	// 1. Reserve idempotency key inside tx
+	acquired, code, body, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "reseller_cards", fmt.Sprintf("%d", resellerID), reqHash, 24*time.Hour)
+	if err != nil {
+		return "", 0, err
+	}
+	if !acquired {
+		if code == 200 && body != "" {
+			var resp struct {
+				BatchCode string `json:"batch_code"`
+				Count     int    `json:"count"`
+			}
+			if err := json.Unmarshal([]byte(body), &resp); err == nil {
+				return resp.BatchCode, resp.Count, nil
+			}
+		}
+		return "", 0, nil
+	}
 
 	var (
 		resName           string
@@ -2591,21 +2452,27 @@ func (d *DB) ResellerGenerateCards(resellerID int64, opts models.GenerateBatchOp
 	}
 
 	frec := &FinancialRecord{
-		ReferenceID:   refID,
-		OperationType: "reseller_cards",
-		AccountType:   "reseller",
-		ResellerID:    resellerID,
-		AmountCents:   actualCostCents,
-		Amount:        actualCost,
-		BalanceBefore: resBalance,
-		BalanceAfter:  newBalance,
-		DebtBefore:    resDebt,
-		DebtAfter:     newDebt,
-		Status:        "completed",
-		Description:   notes,
-		CreatedBy:     adminUser,
+		ReferenceID:    refID,
+		IdempotencyKey: idempKey,
+		OperationType:  "reseller_cards",
+		AccountType:    "reseller",
+		ResellerID:     resellerID,
+		AmountCents:    actualCostCents,
+		Amount:         actualCost,
+		BalanceBefore:  resBalance,
+		BalanceAfter:   newBalance,
+		DebtBefore:     resDebt,
+		DebtAfter:      newDebt,
+		Status:         "completed",
+		Description:    notes,
+		CreatedBy:      adminUser,
 	}
 	if err := d.RecordFinancialTx(tx, frec); err != nil {
+		return "", 0, err
+	}
+
+	bodyResp := fmt.Sprintf(`{"batch_code":"%s","count":%d}`, batchCode, created)
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, bodyResp); err != nil {
 		return "", 0, err
 	}
 
@@ -2617,19 +2484,44 @@ func (d *DB) ResellerGenerateCards(resellerID int64, opts models.GenerateBatchOp
 }
 
 // ResellerAddQuota handles quota addition for a reseller's subscriber with balance tracking
-func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64, price float64, isPaid bool, adminUser string) error {
-	if quotaGB <= 0 {
-		return fmt.Errorf("كمية الكوتة المضافة يجب أن تكون أكبر من الصفر")
+func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64, price float64, isPaid bool, adminUser string, idempotencyKey ...string) error {
+	if err := money.ValidateFinite(quotaGB); err != nil || quotaGB <= 0 {
+		return fmt.Errorf("كمية الكوتة المضافة يجب أن تكون رقماً موجباً")
 	}
-	if price <= 0 {
-		return fmt.Errorf("سعر الكوتة الإضافية غير صحيح ويجب أن يكون أكبر من الصفر")
+	if err := money.ValidateFinite(price); err != nil || price <= 0 {
+		return fmt.Errorf("سعر الكوتة الإضافية غير صحيح ويجب أن يكون رقماً موجباً")
 	}
+
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("reseller_quota", fmt.Sprintf("%d:%s:%.2f", resellerID, username, quotaGB), price, isPaid)
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"reseller_id": resellerID,
+		"username":    username,
+		"quota_gb":    quotaGB,
+		"price":       price,
+		"is_paid":     isPaid,
+	})
 
 	tx, err := d.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	// 1. Reserve idempotency key inside tx
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "reseller_quota", fmt.Sprintf("%d:%s", resellerID, username), reqHash, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
 
 	var (
 		resName           string
@@ -2664,14 +2556,16 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 	}
 
 	var (
-		subID         int64
-		subResellerID int64
-		contractNo    string
-		fullName      string
+		subID          int64
+		subResellerID  int64
+		contractNo     string
+		fullName       string
+		subCurrDebt    float64
+		subCurrBalance float64
 	)
-	err = tx.QueryRow(`SELECT id, reseller_id, COALESCE(contract_no, ''), COALESCE(full_name, '') 
+	err = tx.QueryRow(`SELECT id, reseller_id, COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
 		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(
-		&subID, &subResellerID, &contractNo, &fullName,
+		&subID, &subResellerID, &contractNo, &fullName, &subCurrDebt, &subCurrBalance,
 	)
 	if err != nil {
 		return fmt.Errorf("المشترك غير موجود")
@@ -2725,8 +2619,41 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 		return fmt.Errorf("subscriber record not found")
 	}
 
+	refID := GenerateReferenceID("QUOTA-RES")
+
+	// If subscriber did not pay immediately, increase subscriber debt atomically
+	newSubDebt := subCurrDebt
 	if !isPaid && price > 0 {
-		_, _ = tx.Exec("UPDATE subscribers SET debt = debt + ? WHERE username = ?", price, username)
+		newSubDebt = subCurrDebt + price
+		subDebtRes, err := tx.Exec("UPDATE subscribers SET debt = ? WHERE username = ?", newSubDebt, username)
+		if err != nil {
+			return fmt.Errorf("failed to update subscriber debt: %w", err)
+		}
+		if aff, _ := subDebtRes.RowsAffected(); aff == 0 {
+			return fmt.Errorf("failed to update subscriber debt: record not found")
+		}
+
+		frecSub := &FinancialRecord{
+			ReferenceID:        refID + "-SUB",
+			IdempotencyKey:     idempKey + "-sub",
+			OperationType:      "subscriber_quota_debt",
+			AccountType:        "subscriber",
+			SubscriberID:       subID,
+			SubscriberUsername: username,
+			ResellerID:         resellerID,
+			AmountCents:        priceCents,
+			Amount:             price,
+			BalanceBefore:      subCurrBalance,
+			BalanceAfter:       subCurrBalance,
+			DebtBefore:         subCurrDebt,
+			DebtAfter:          newSubDebt,
+			Status:             "completed",
+			Description:        fmt.Sprintf("إضافة كوتة رصيد (%.1f GB) آجل عبر الموزع %s", quotaGB, resName),
+			CreatedBy:          adminUser,
+		}
+		if err := d.RecordFinancialTx(tx, frecSub); err != nil {
+			return err
+		}
 	}
 
 	var currLimitStr string
@@ -2734,12 +2661,16 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 	if errQ == nil {
 		currLimit, _ := strconv.ParseInt(currLimitStr, 10, 64)
 		newLimit := currLimit + addBytes
-		_, _ = tx.Exec("UPDATE radreply SET value = ? WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", fmt.Sprintf("%d", newLimit), username)
+		if _, err := tx.Exec("UPDATE radreply SET value = ? WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", fmt.Sprintf("%d", newLimit), username); err != nil {
+			return fmt.Errorf("failed to update radreply total limit: %w", err)
+		}
 	} else {
 		var newLimit int64
 		_ = tx.QueryRow("SELECT quota_bytes FROM subscribers WHERE username = ?", username).Scan(&newLimit)
 		if newLimit > 0 {
-			_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", newLimit))
+			if _, err := tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", newLimit)); err != nil {
+				return fmt.Errorf("failed to insert radreply total limit: %w", err)
+			}
 		}
 	}
 
@@ -2753,7 +2684,6 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 	if adminUser == "" {
 		adminUser = "admin"
 	}
-	refID := GenerateReferenceID("QUOTA-RES")
 
 	desc := fmt.Sprintf("إضافة كوتة رصيد: %.1f GB عبر الموزع %s", quotaGB, resName)
 	_, err = tx.Exec(`INSERT INTO billing_transactions (
@@ -2775,6 +2705,7 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 
 	frec := &FinancialRecord{
 		ReferenceID:        refID,
+		IdempotencyKey:     idempKey,
 		OperationType:      "reseller_quota",
 		AccountType:        "reseller",
 		SubscriberID:       subID,
@@ -2791,6 +2722,28 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 		CreatedBy:          adminUser,
 	}
 	if err := d.RecordFinancialTx(tx, frec); err != nil {
+		return err
+	}
+
+	// 2. Enqueue Outbox CoA event inside transaction
+	outboxPayload := OutboxPayload{
+		Username:           username,
+		OperationReference: refID,
+		IdempotencyKey:     idempKey,
+		Trigger:            "reseller_add_quota",
+	}
+	var activeSessID, activeNAS, activeFramed string
+	_ = tx.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(&activeSessID, &activeNAS, &activeFramed)
+	outboxPayload.SessionID = activeSessID
+	outboxPayload.NASIP = activeNAS
+	outboxPayload.FramedIP = activeFramed
+
+	if err := d.EnqueueOutboxTx(tx, "coa", "subscriber", username, outboxPayload); err != nil {
+		return fmt.Errorf("failed to enqueue quota outbox event: %w", err)
+	}
+
+	// 3. Mark idempotency key as completed inside tx
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
 		return err
 	}
 
@@ -3236,16 +3189,16 @@ func (d *DB) CalculateLoanDeductionTx(tx *sql.Tx, username string, p *models.Pro
 			deductedHours = float64(loanHours)
 		}
 
-		// 2. Partial quota deduction: only traffic consumed since loan grant
+		// 2. Partial quota deduction: traffic consumed since loan grant using baseline delta
 		if loanGrantedAt.Valid {
-			var usedDuringLoan int64
-			_ = tx.QueryRow(fmt.Sprintf(`SELECT %s
-				FROM radacct WHERE username = ? AND acctstarttime >= ?`, RadacctSumBytesSQL), username, loanGrantedAt.Time).Scan(&usedDuringLoan)
-			if usedDuringLoan > loanQuotaBytes {
-				usedDuringLoan = loanQuotaBytes
-			}
+			var currentCycleTotal int64
+			_ = tx.QueryRow(fmt.Sprintf(`SELECT %s FROM radacct WHERE username = ?`, RadacctSumBytesSQL), username).Scan(&currentCycleTotal)
+			usedDuringLoan := currentCycleTotal - loanInitialUsedBytes
 			if usedDuringLoan < 0 {
 				usedDuringLoan = 0
+			}
+			if loanQuotaBytes > 0 && usedDuringLoan > loanQuotaBytes {
+				usedDuringLoan = loanQuotaBytes
 			}
 			deductedQuotaBytes = usedDuringLoan
 		} else {
@@ -3414,7 +3367,13 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 	}
 
 	var currentUsedBytes int64
-	_ = tx.QueryRow(fmt.Sprintf("SELECT %s FROM radacct WHERE username = ?", RadacctSumBytesSQL), username).Scan(&currentUsedBytes)
+	var cycleStart time.Time
+	var lastRenewed sql.NullTime
+	_ = tx.QueryRow("SELECT last_renewed_at, created_at FROM subscribers WHERE username = ?", username).Scan(&lastRenewed, &cycleStart)
+	if lastRenewed.Valid {
+		cycleStart = lastRenewed.Time
+	}
+	_ = tx.QueryRow(fmt.Sprintf("SELECT %s FROM radacct WHERE username = ? AND acctstarttime >= ?", RadacctSumBytesSQL), username, cycleStart).Scan(&currentUsedBytes)
 
 	if adminUser == "self-service" {
 		nowCheck := time.Now()
@@ -3522,12 +3481,25 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 		return nil, err
 	}
 
+	// Enqueue Outbox CoA event inside transaction
+	outboxPayload := OutboxPayload{
+		Username:           username,
+		OperationReference: refID,
+		Trigger:            "subscriber_loan_grant",
+	}
+	var activeSessID, activeNAS, activeFramed string
+	_ = tx.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(&activeSessID, &activeNAS, &activeFramed)
+	outboxPayload.SessionID = activeSessID
+	outboxPayload.NASIP = activeNAS
+	outboxPayload.FramedIP = activeFramed
+
+	if err := d.EnqueueOutboxTx(tx, "coa", "subscriber", username, outboxPayload); err != nil {
+		return nil, fmt.Errorf("failed to enqueue loan outbox event: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-
-	// Post-commit: restore active session dynamically via CoA without disconnecting
-	_ = d.RestoreActiveSubscriberCoA(username)
 
 	sub := &models.Subscriber{
 		ID:             subID,
@@ -3830,6 +3802,30 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 	}
 	defer tx.Rollback()
 
+	// 1. CRM safety: Disallow modifying debt, balance, or quota directly from CRM.
+	// Preserves existing database values for existing subscribers, or defaults to 0.00 for new subscribers.
+	var (
+		existingDebt    float64
+		existingBalance float64
+		existingQuota   int64
+	)
+	err = tx.QueryRow(`SELECT COALESCE(debt, 0.00), COALESCE(balance, 0.00), COALESCE(quota_bytes, 0) 
+		FROM subscribers WHERE username = ? FOR UPDATE`, sub.Username).Scan(
+		&existingDebt, &existingBalance, &existingQuota,
+	)
+	if err == nil {
+		// Existing subscriber: preserve financial integrity
+		sub.Debt = existingDebt
+		sub.Balance = existingBalance
+		sub.QuotaBytes = existingQuota
+	} else if errors.Is(err, sql.ErrNoRows) {
+		// New subscriber created from CRM: start with 0 balance and debt
+		sub.Debt = 0.00
+		sub.Balance = 0.00
+	} else {
+		return fmt.Errorf("error verifying subscriber CRM state: %w", err)
+	}
+
 	var expDate interface{}
 	if sub.ExpirationDate.Valid {
 		expDate = sub.ExpirationDate.Time
@@ -3850,7 +3846,6 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 		profile_name = VALUES(profile_name),
 		static_ip = VALUES(static_ip),
 		calling_mac = VALUES(calling_mac),
-		quota_bytes = VALUES(quota_bytes),
 		expiration_date = VALUES(expiration_date),
 		status = VALUES(status),
 		reseller_id = VALUES(reseller_id),
@@ -3858,41 +3853,63 @@ func (d *DB) UpdateSubscriberCRM(sub *models.Subscriber, password string) error 
 		sub.Username, sub.ContractNo, sub.FullName, sub.Phone, sub.Address, sub.Debt, sub.Balance, sub.ProfileName,
 		sub.StaticIP, sub.CallingMAC, sub.QuotaBytes, expDate, sub.Status, sub.ResellerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save subscriber CRM: %w", err)
 	}
 
 	// Update Cleartext-Password
 	if password != "" {
-		_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", sub.Username)
-		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", sub.Username, password)
+		if _, err := tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Cleartext-Password'", sub.Username); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Cleartext-Password', ':=', ?)", sub.Username, password); err != nil {
+			return err
+		}
 	}
 
 	// Calling-Station-Id
-	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", sub.Username)
+	if _, err := tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Calling-Station-Id'", sub.Username); err != nil {
+		return err
+	}
 	if sub.CallingMAC != "" {
-		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", sub.Username, sub.CallingMAC)
+		if _, err := tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Calling-Station-Id', '==', ?)", sub.Username, sub.CallingMAC); err != nil {
+			return err
+		}
 	}
 
 	// Expiration
-	_, _ = tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", sub.Username)
+	if _, err := tx.Exec("DELETE FROM radcheck WHERE username = ? AND attribute = 'Expiration'", sub.Username); err != nil {
+		return err
+	}
 	if sub.ExpirationDate.Valid {
 		expStr := sub.ExpirationDate.Time.Format("02 Jan 2006 15:04:05")
-		_, _ = tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", sub.Username, expStr)
+		if _, err := tx.Exec("INSERT INTO radcheck (username, attribute, op, value) VALUES (?, 'Expiration', ':=', ?)", sub.Username, expStr); err != nil {
+			return err
+		}
 	}
 
 	// Profile group
-	_, _ = tx.Exec("DELETE FROM radusergroup WHERE username = ?", sub.Username)
+	if _, err := tx.Exec("DELETE FROM radusergroup WHERE username = ?", sub.Username); err != nil {
+		return err
+	}
 	if sub.ProfileName != "" {
-		_, _ = tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", sub.Username, sub.ProfileName)
+		if _, err := tx.Exec("INSERT INTO radusergroup (username, groupname, priority) VALUES (?, ?, 1)", sub.Username, sub.ProfileName); err != nil {
+			return err
+		}
 	}
 
 	// Reply items
-	_, _ = tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Framed-IP-Address', 'Mikrotik-Total-Limit')", sub.Username)
+	if _, err := tx.Exec("DELETE FROM radreply WHERE username = ? AND attribute IN ('Framed-IP-Address', 'Mikrotik-Total-Limit')", sub.Username); err != nil {
+		return err
+	}
 	if sub.StaticIP != "" {
-		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-IP-Address', ':=', ?)", sub.Username, sub.StaticIP)
+		if _, err := tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Framed-IP-Address', ':=', ?)", sub.Username, sub.StaticIP); err != nil {
+			return err
+		}
 	}
 	if sub.QuotaBytes > 0 {
-		_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", sub.Username, fmt.Sprintf("%d", sub.QuotaBytes))
+		if _, err := tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", sub.Username, fmt.Sprintf("%d", sub.QuotaBytes)); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
@@ -4739,10 +4756,20 @@ func (d *DB) BulkAddDebt(usernames []string, amount float64) (BulkSummary, error
 		}
 
 		desc := fmt.Sprintf("إضافة مديونية جماعية بقيمة %.2f ج.م", amount)
-		_, _ = tx.Exec(`INSERT INTO billing_transactions (
+		_, err = tx.Exec(`INSERT INTO billing_transactions (
 			username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 		) VALUES (?, ?, ?, 'debt', ?, ?, 'unpaid', 'debt', 'إضافة مديونية جماعية', 'admin')`,
 			u, contractNo, fullName, desc, amount)
+		if err != nil {
+			tx.Rollback()
+			summary.Failed++
+			summary.Items = append(summary.Items, BulkItemResult{
+				Identifier: u,
+				Success:    false,
+				Error:      err.Error(),
+			})
+			continue
+		}
 
 		frec := &FinancialRecord{
 			ReferenceID:        refID,
@@ -4761,7 +4788,36 @@ func (d *DB) BulkAddDebt(usernames []string, amount float64) (BulkSummary, error
 			Description:        desc,
 			CreatedBy:          "admin",
 		}
-		_ = d.RecordFinancialTx(tx, frec)
+		if err := d.RecordFinancialTx(tx, frec); err != nil {
+			tx.Rollback()
+			summary.Failed++
+			summary.Items = append(summary.Items, BulkItemResult{
+				Identifier: u,
+				Success:    false,
+				Error:      err.Error(),
+			})
+			continue
+		}
+
+		auditRec := &AuditLogRecord{
+			ReferenceID:   refID,
+			ActorUsername: "admin",
+			ActorRole:     "admin",
+			Action:        "bulk_add_debt",
+			TargetType:    "subscriber",
+			TargetID:      u,
+			Details:       desc,
+		}
+		if err := d.RecordAuditTx(tx, auditRec); err != nil {
+			tx.Rollback()
+			summary.Failed++
+			summary.Items = append(summary.Items, BulkItemResult{
+				Identifier: u,
+				Success:    false,
+				Error:      err.Error(),
+			})
+			continue
+		}
 
 		if err := tx.Commit(); err != nil {
 			summary.Failed++
@@ -4831,12 +4887,37 @@ func (d *DB) captureSessionBaselinesTx(tx *sql.Tx, username string) {
 
 // --- Billing & Financial Operations ---
 
-func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, price float64, paymentOption string, method, notes, adminUser string) error {
+func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, price float64, paymentOption string, method, notes, adminUser string, idempotencyKey ...string) error {
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("subscriber_renew", username, profileName, paymentOption)
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"username": username,
+		"profile":  profileName,
+		"price":    price,
+		"option":   paymentOption,
+	})
+
 	tx, err := d.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	// 1. Acquire idempotency key inside tx
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "subscriber_renew", username, reqHash, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		// Key was already processed successfully; return without re-executing
+		return nil
+	}
 
 	var (
 		subID          int64
@@ -4872,6 +4953,9 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 	if price <= 0 {
 		price = p.Price
 	}
+	if err := money.ValidateFinite(price); err != nil {
+		return fmt.Errorf("invalid price: %w", err)
+	}
 
 	newExp, finalQuota, deductedHours, deductedQuotaBytes, hadLoan := d.CalculateLoanDeductionTx(tx, username, &p)
 
@@ -4901,8 +4985,19 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 	}
 
 	if hadLoan {
-		_, _ = tx.Exec(`UPDATE loan_transactions SET status = 'settled', settled_at = NOW(), deducted_hours = ?, deducted_quota_bytes = ?
-			WHERE username = ? AND status = 'active'`, deductedHours, deductedQuotaBytes, username)
+		_, err = tx.Exec(`UPDATE loan_transactions SET 
+			status = 'settled', 
+			settled_at = NOW(), 
+			used_bytes = ?, 
+			deducted_hours = ?, 
+			deducted_quota_bytes = ?,
+			deducted_amount = ?,
+			remaining_amount = 0.00
+			WHERE username = ? AND status = 'active'`,
+			deductedQuotaBytes, int(deductedHours), deductedQuotaBytes, price, username)
+		if err != nil {
+			return fmt.Errorf("failed to update loan transactions: %w", err)
+		}
 	}
 
 	expStr := newExp.Format("02 Jan 2006 15:04:05")
@@ -5016,6 +5111,7 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 
 	frec := &FinancialRecord{
 		ReferenceID:        refID,
+		IdempotencyKey:     idempKey,
 		OperationType:      "subscriber_renew",
 		AccountType:        "subscriber",
 		SubscriberID:       subID,
@@ -5035,18 +5131,35 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
+	// 2. Enqueue Outbox event inside transaction
+	action := "coa"
+	if oldProfile != "" && oldProfile != p.Name {
+		action = "disconnect"
+	}
+	outboxPayload := OutboxPayload{
+		Username:           username,
+		OperationReference: refID,
+		IdempotencyKey:     idempKey,
+		Trigger:            "subscriber_renew",
+	}
+	var activeSessID, activeNAS, activeFramed string
+	_ = tx.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(&activeSessID, &activeNAS, &activeFramed)
+	outboxPayload.SessionID = activeSessID
+	outboxPayload.NASIP = activeNAS
+	outboxPayload.FramedIP = activeFramed
+
+	if err := d.EnqueueOutboxTx(tx, action, "subscriber", username, outboxPayload); err != nil {
+		return fmt.Errorf("failed to enqueue renewal outbox event: %w", err)
+	}
+
+	// 3. Mark idempotency key as completed inside tx
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
 		return err
 	}
 
-	// Post-commit: disconnect or CoA
-	go func() {
-		if oldProfile != "" && oldProfile != p.Name {
-			_, _, _ = d.DisconnectSubscriberSession(username)
-		} else {
-			_ = d.RestoreActiveSubscriberCoA(username)
-		}
-	}()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 
 	// Trigger WhatsApp notifications asynchronously
 	go func() {
@@ -5310,16 +5423,43 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 	return newBalance, newDebt, nil
 }
 
-func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, isPaid bool, method, notes, adminUser string) error {
-	if quotaGB <= 0 {
-		return fmt.Errorf("invalid quota")
+func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, isPaid bool, method, notes, adminUser string, idempotencyKey ...string) error {
+	if err := money.ValidateFinite(quotaGB); err != nil || quotaGB <= 0 {
+		return fmt.Errorf("كمية الكوتة المضافة يجب أن تكون رقماً موجباً")
 	}
+	if err := money.ValidateFinite(price); err != nil || price < 0 {
+		return fmt.Errorf("سعر الكوتة يجب أن يكون رقماً غير سالب")
+	}
+
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("subscriber_quota", fmt.Sprintf("%s:%.2f", username, quotaGB), price, isPaid)
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"username": username,
+		"quota_gb": quotaGB,
+		"price":    price,
+		"is_paid":  isPaid,
+	})
 
 	tx, err := d.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	// 1. Reserve idempotency key inside tx
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "subscriber_quota", username, reqHash, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
 
 	var (
 		subID       int64
@@ -5352,12 +5492,16 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 	if errQ == nil {
 		currLimit, _ := strconv.ParseInt(currLimitStr, 10, 64)
 		newLimit := currLimit + addBytes
-		_, _ = tx.Exec("UPDATE radreply SET value = ? WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", fmt.Sprintf("%d", newLimit), username)
+		if _, err := tx.Exec("UPDATE radreply SET value = ? WHERE username = ? AND attribute = 'Mikrotik-Total-Limit'", fmt.Sprintf("%d", newLimit), username); err != nil {
+			return fmt.Errorf("failed to update radreply total limit: %w", err)
+		}
 	} else {
 		var newLimit int64
 		_ = tx.QueryRow("SELECT quota_bytes FROM subscribers WHERE username = ?", username).Scan(&newLimit)
 		if newLimit > 0 {
-			_, _ = tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", newLimit))
+			if _, err := tx.Exec("INSERT INTO radreply (username, attribute, op, value) VALUES (?, 'Mikrotik-Total-Limit', ':=', ?)", username, fmt.Sprintf("%d", newLimit)); err != nil {
+				return fmt.Errorf("failed to insert radreply total limit: %w", err)
+			}
 		}
 	}
 
@@ -5399,6 +5543,7 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 
 	frec := &FinancialRecord{
 		ReferenceID:        refID,
+		IdempotencyKey:     idempKey,
 		OperationType:      "subscriber_quota_add",
 		AccountType:        "subscriber",
 		SubscriberID:       subID,
@@ -5415,6 +5560,28 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 		CreatedBy:          adminUser,
 	}
 	if err := d.RecordFinancialTx(tx, frec); err != nil {
+		return err
+	}
+
+	// 2. Enqueue Outbox CoA event inside transaction
+	outboxPayload := OutboxPayload{
+		Username:           username,
+		OperationReference: refID,
+		IdempotencyKey:     idempKey,
+		Trigger:            "subscriber_add_quota",
+	}
+	var activeSessID, activeNAS, activeFramed string
+	_ = tx.QueryRow(`SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct WHERE username = ? AND acctstoptime IS NULL ORDER BY radacctid DESC LIMIT 1`, username).Scan(&activeSessID, &activeNAS, &activeFramed)
+	outboxPayload.SessionID = activeSessID
+	outboxPayload.NASIP = activeNAS
+	outboxPayload.FramedIP = activeFramed
+
+	if err := d.EnqueueOutboxTx(tx, "coa", "subscriber", username, outboxPayload); err != nil {
+		return fmt.Errorf("failed to enqueue quota outbox event: %w", err)
+	}
+
+	// 3. Mark idempotency key as completed inside tx
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
 		return err
 	}
 
@@ -5440,16 +5607,40 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 	return nil
 }
 
-func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, adminUser string, creditReseller bool) (bool, string, error) {
-	if amount <= 0 {
-		return false, "", fmt.Errorf("المبلغ يجب أن يكون أكبر من صفر")
+func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, adminUser string, creditReseller bool, idempotencyKey ...string) (bool, string, error) {
+	if err := money.ValidateFinite(amount); err != nil || amount <= 0 {
+		return false, "", fmt.Errorf("المبلغ يجب أن يكون رقماً موجباً أكبر من صفر")
 	}
+
+	var idempKey string
+	if len(idempotencyKey) > 0 {
+		idempKey = strings.TrimSpace(idempotencyKey[0])
+	}
+	if idempKey == "" {
+		idempKey = GenerateDeterministicKey("subscriber_pay_debt", fmt.Sprintf("%s:%.2f", username, amount), method, creditReseller)
+	}
+
+	reqHash := ComputeRequestHash(map[string]interface{}{
+		"username":        username,
+		"amount":          amount,
+		"method":          method,
+		"credit_reseller": creditReseller,
+	})
 
 	tx, err := d.Begin()
 	if err != nil {
 		return false, "", err
 	}
 	defer tx.Rollback()
+
+	// 1. Reserve idempotency key inside tx
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "subscriber_pay_debt", username, reqHash, 24*time.Hour)
+	if err != nil {
+		return false, "", err
+	}
+	if !acquired {
+		return true, "تم سداد المديونية مسبقاً بنجاح", nil
+	}
 
 	var (
 		subID       int64
@@ -5557,7 +5748,8 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 			}
 
 			frecRes := &FinancialRecord{
-				ReferenceID:        GenerateReferenceID("SETTLE-RES"),
+				ReferenceID:        refID + "-RES",
+				IdempotencyKey:     idempKey + "-res",
 				OperationType:      "subscriber_debt_settle_reseller",
 				AccountType:        "reseller",
 				SubscriberID:       subID,
@@ -5573,7 +5765,9 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 				Description:        noteSettlement,
 				CreatedBy:          adminUser,
 			}
-			_ = d.RecordFinancialTx(tx, frecRes)
+			if err := d.RecordFinancialTx(tx, frecRes); err != nil {
+				return false, "", err
+			}
 
 			desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resName)
 		}
@@ -5589,6 +5783,7 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 
 	frecSub := &FinancialRecord{
 		ReferenceID:        refID,
+		IdempotencyKey:     idempKey,
 		OperationType:      "subscriber_debt_payment",
 		AccountType:        "subscriber",
 		SubscriberID:       subID,
@@ -5605,6 +5800,11 @@ func (d *DB) PaySubscriberDebt(username string, amount float64, method, notes, a
 		CreatedBy:          adminUser,
 	}
 	if err := d.RecordFinancialTx(tx, frecSub); err != nil {
+		return false, "", err
+	}
+
+	// 2. Complete idempotency key inside tx
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
 		return false, "", err
 	}
 
