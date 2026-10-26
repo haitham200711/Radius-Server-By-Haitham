@@ -9209,9 +9209,11 @@ func (d *DB) GetSubscriberLoginSummary(search, status, nasIP, fromDate, toDate s
 		TotalDownloadDisplay: FormatBytesHuman(totalDown),
 		TotalUploadDisplay:   FormatBytesHuman(totalUp),
 		TotalTrafficDisplay:  FormatBytesHuman(totalTraffic),
+		TotalBytesFormatted:  FormatBytesHuman(totalTraffic),
 		AvgDurationSeconds:   int64(avgSec),
 		AvgDurationDisplay:   FormatDurationArabic(int64(avgSec)),
 	}
+	_ = d.QueryRow("SELECT COUNT(*) FROM radacct WHERE acctstoptime IS NULL AND COALESCE(acctupdatetime, acctstarttime) < NOW() - INTERVAL 2 HOUR").Scan(&summary.StuckSessions)
 
 	if isUnfiltered {
 		loginSummaryMu.Lock()

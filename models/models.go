@@ -920,6 +920,7 @@ type SubscriberLoginSummary struct {
 	TotalSessions        int64  `json:"total_sessions"`
 	OnlineSessions       int64  `json:"online_sessions"`
 	ClosedSessions       int64  `json:"closed_sessions"`
+	StuckSessions        int64  `json:"stuck_sessions"`
 	UniqueUsersCount     int64  `json:"unique_users_count"`
 	TotalDownloadBytes   int64  `json:"total_download_bytes"`
 	TotalUploadBytes     int64  `json:"total_upload_bytes"`
@@ -927,6 +928,7 @@ type SubscriberLoginSummary struct {
 	TotalDownloadDisplay string `json:"total_download_display"`
 	TotalUploadDisplay   string `json:"total_upload_display"`
 	TotalTrafficDisplay  string `json:"total_traffic_display"`
+	TotalBytesFormatted  string `json:"total_bytes_formatted"`
 	AvgDurationSeconds   int64  `json:"avg_duration_seconds"`
 	AvgDurationDisplay   string `json:"avg_duration_display"`
 }

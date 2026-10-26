@@ -984,13 +984,16 @@ func (d *DB) GetSubscriberDebtsReport(
 	_ = d.QueryRow(fmt.Sprintf(`SELECT 
 		COUNT(*), 
 		COALESCE(SUM(s.debt), 0),
-		COALESCE(AVG(s.debt), 0)
+		COALESCE(AVG(s.debt), 0),
+		COALESCE(SUM(CASE WHEN (s.debt >= 500 OR DATEDIFF(NOW(), COALESCE(s.last_renewed_at, s.created_at)) > 60) THEN 1 ELSE 0 END), 0)
 	FROM subscribers s
 	WHERE %s`, whereSQL), args...).Scan(
 		&summary.TotalDebtorsCount,
 		&summary.TotalDebtAmount,
 		&summary.AverageDebt,
+		&summary.CriticalDebtsCount,
 	)
+	summary.AverageDebtPerUser = summary.AverageDebt
 
 	total := int(summary.TotalDebtorsCount)
 
@@ -1112,6 +1115,7 @@ func (d *DB) GetResellerBalancesReport(
 		COALESCE(SUM(balance), 0),
 		COALESCE(SUM(debt), 0),
 		COALESCE(SUM(balance + credit_limit - debt), 0),
+		COALESCE(SUM(credit_limit), 0),
 		COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END), 0)
 	FROM resellers r WHERE %s`, whereClause)
@@ -1119,9 +1123,13 @@ func (d *DB) GetResellerBalancesReport(
 		&summary.TotalResellerBalances,
 		&summary.TotalResellerDebt,
 		&summary.TotalAvailableCap,
+		&summary.TotalCreditLimitSum,
 		&summary.ActiveResellersCount,
 		&summary.InactiveResellersCount,
 	)
+	summary.TotalBalancesSum = summary.TotalResellerBalances
+	summary.TotalDebtsSum = summary.TotalResellerDebt
+	summary.NetOperationalCapacity = summary.TotalAvailableCap
 
 	_ = d.QueryRow(`SELECT COALESCE(SUM(amount), 0) FROM financial_ledger 
 		WHERE account_type = 'reseller' AND operation_type LIKE '%deposit%'`).Scan(&summary.TotalDepositsSum)

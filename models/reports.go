@@ -234,10 +234,12 @@ type SubscriberDebtItem struct {
 
 // SubscriberDebtsSummary holds KPI aggregates for subscriber debts
 type SubscriberDebtsSummary struct {
-	TotalDebtorsCount int64   `json:"total_debtors_count"`
-	TotalDebtAmount   float64 `json:"total_debt_amount"`
-	TotalSettledToday float64 `json:"total_settled_today"`
-	AverageDebt       float64 `json:"average_debt"`
+	TotalDebtorsCount  int64   `json:"total_debtors_count"`
+	TotalDebtAmount    float64 `json:"total_debt_amount"`
+	TotalSettledToday  float64 `json:"total_settled_today"`
+	AverageDebt        float64 `json:"average_debt"`
+	AverageDebtPerUser float64 `json:"average_debt_per_user"`
+	CriticalDebtsCount int64   `json:"critical_debts_count"`
 }
 
 // ResellerBalanceItem represents a financial summary row for a reseller
@@ -266,8 +268,12 @@ type ResellerBalanceItem struct {
 // ResellerBalancesSummary holds KPI aggregates for resellers
 type ResellerBalancesSummary struct {
 	TotalResellerBalances  float64 `json:"total_reseller_balances"`
+	TotalBalancesSum       float64 `json:"total_balances_sum"`
 	TotalResellerDebt      float64 `json:"total_reseller_debt"`
+	TotalDebtsSum          float64 `json:"total_debts_sum"`
 	TotalAvailableCap      float64 `json:"total_available_cap"`
+	NetOperationalCapacity float64 `json:"net_operational_capacity"`
+	TotalCreditLimitSum    float64 `json:"total_credit_limit_sum"`
 	TotalDepositsSum       float64 `json:"total_deposits_sum"`
 	ActiveResellersCount   int     `json:"active_resellers_count"`
 	InactiveResellersCount int     `json:"inactive_resellers_count"`
