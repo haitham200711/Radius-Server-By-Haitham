@@ -131,8 +131,8 @@
         </div>
     </div>
     <div class="mt-2 mt-md-0">
-        <a href="/reports?tab=reseller_debts" class="btn btn-sm btn-danger fw-bold shadow-sm">
-            <i class="bi bi-cash-stack me-1"></i> فتح كشف ديون المشتركين والتسوية الذكية
+        <a href="/subscribers" class="btn btn-sm btn-danger fw-bold shadow-sm">
+            <i class="bi bi-people me-1"></i> إدارة المشتركين
         </a>
     </div>
 </div>
@@ -211,7 +211,7 @@
                         </a>
                         {{ if gt $res.DebtorsCount 0 }}
                         <div class="mt-1">
-                            <a href="/reports?tab=reseller_debts&reseller_id={{ $res.ID }}" class="badge bg-danger-subtle text-danger border border-danger-subtle text-decoration-none fw-bold" title="عرض المشتركين المديونين لهذا الموزع">
+                            <a href="/subscribers?reseller_id={{ $res.ID }}" class="badge bg-danger-subtle text-danger border border-danger-subtle text-decoration-none fw-bold" title="عرض مشتركي هذا الموزع">
                                 <i class="bi bi-person-exclamation me-1"></i>{{ $res.DebtorsCount }} مدين ({{ printf "%.2f" $res.SubscribersDebt }} ج.م)
                             </a>
                         </div>
@@ -265,9 +265,6 @@
                             <button type="button" class="btn btn-outline-secondary" title="كشف حساب المعاملات" onclick="viewStatement({{ $res.ID }}, '{{ $res.Name }}')">
                                 <i class="bi bi-receipt"></i>
                             </button>
-                            <a href="/reports?tab=reseller_debts&reseller_id={{ $res.ID }}" class="btn btn-outline-danger" title="كشف ديون مشتركي هذا الموزع">
-                                <i class="bi bi-person-exclamation"></i>
-                            </a>
                             <button type="button" class="btn btn-outline-primary" title="تعديل البيانات" onclick="editReseller({{ $res.ID }})">
                                 <i class="bi bi-pencil"></i>
                             </button>

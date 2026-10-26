@@ -91,12 +91,6 @@
                     </a>
                 </li>
                 <li>
-                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-primary" href="javascript:void(0)" onclick="toolbarAction('consumption')">
-                        <i class="bi bi-speedometer2 text-primary fs-5"></i>
-                        <span class="fw-bold">تقرير الاستهلاك (شهري ويومي)</span>
-                    </a>
-                </li>
-                <li>
                     <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('edit')">
                         <i class="bi bi-pencil-square text-secondary fs-5"></i>
                         <span>تعديل بيانات المشترك</span>
@@ -1578,9 +1572,6 @@
                                 <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" onclick="refreshLiveTrafficUserList()" title="تحديث قائمة المشتركين">
                                     <i class="bi bi-arrow-repeat me-1"></i> تحديث
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="goToSubscriberTrafficReport()" title="عرض تقرير الاستهلاك الشهري واليومي الكامل">
-                                    <i class="bi bi-speedometer2 me-1"></i> كشف الاستهلاك
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -1948,15 +1939,6 @@ function toolbarAction(action) {
             openLiveTrafficModal(activeSubscriber.username, activeSubscriber.fullName);
         } else {
             openLiveTrafficModal('', '');
-        }
-        return;
-    }
-
-    if (action === 'consumption') {
-        if (activeSubscriber) {
-            window.location.href = '/reports?tab=traffic&user=' + encodeURIComponent(activeSubscriber.username);
-        } else {
-            window.location.href = '/reports?tab=traffic';
         }
         return;
     }
@@ -2465,14 +2447,6 @@ function openLiveTrafficModal(targetUsername, targetFullName) {
 
 function closeLiveTrafficModal() {
     stopLiveTrafficPolling();
-}
-
-function goToSubscriberTrafficReport() {
-    if (ltCurrentUsername) {
-        window.location.href = '/reports?tab=traffic&user=' + encodeURIComponent(ltCurrentUsername);
-    } else {
-        window.location.href = '/reports?tab=traffic';
-    }
 }
 
 function resetLiveTrafficUI(user, name) {
