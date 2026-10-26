@@ -639,7 +639,9 @@ func (d *DB) InitSchema() error {
 		`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS disconnect_pending_at DATETIME NULL;`,
 	}
 	for _, m := range migrations {
-		_, _ = d.Exec(m)
+		if _, err := d.Exec(m); err != nil {
+			return fmt.Errorf("schema migration failed: %w\nSQL: %s", err, m)
+		}
 	}
 
 	// Ensure default WhatsApp settings row exists
@@ -2609,7 +2611,10 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 	}
 
 	// Update subscriber quota
-	addBytes := int64(quotaGB * 1024 * 1024 * 1024)
+	addBytes, err := money.QuotaGBToBytes(quotaGB)
+	if err != nil {
+		return err
+	}
 	subRes, err := tx.Exec("UPDATE subscribers SET quota_bytes = quota_bytes + ? WHERE username = ?", addBytes, username)
 	if err != nil {
 		return fmt.Errorf("failed to update subscriber quota: %w", err)
@@ -2758,9 +2763,13 @@ func (d *DB) ResellerAddQuota(resellerID int64, username string, quotaGB float64
 }
 
 // ResellerAddSubscriberBalance handles balance deposit from reseller's wallet into their subscriber's balance
-func (d *DB) ResellerAddSubscriberBalance(resellerID int64, username string, amount float64, notes, adminUser string, settleDebtFirst bool) (float64, float64, float64, error) {
-	if amount <= 0 {
+func (d *DB) ResellerAddSubscriberBalance(resellerID int64, username string, amount float64, notes, adminUser string, settleDebtFirst bool, idempotencyKey ...string) (float64, float64, float64, error) {
+	if err := money.ValidatePositive(amount); err != nil {
 		return 0, 0, 0, fmt.Errorf("المبلغ يجب أن يكون أكبر من الصفر")
+	}
+	idempKey, err := ResolveIdempotencyKey(idempotencyKey, "reseller_sub_deposit", fmt.Sprintf("%d:%s", resellerID, username), amount, settleDebtFirst)
+	if err != nil {
+		return 0, 0, 0, err
 	}
 
 	tx, err := d.Begin()
@@ -2768,6 +2777,17 @@ func (d *DB) ResellerAddSubscriberBalance(resellerID int64, username string, amo
 		return 0, 0, 0, err
 	}
 	defer tx.Rollback()
+	acquired, _, responseBody, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "reseller_sub_deposit", fmt.Sprintf("%d:%s", resellerID, username), ComputeRequestHash(map[string]interface{}{"reseller_id": resellerID, "username": username, "amount": amount, "settle_debt_first": settleDebtFirst}), 24*time.Hour)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if !acquired {
+		var cached struct{ Balance, Debt, Settled float64 }
+		if json.Unmarshal([]byte(responseBody), &cached) == nil {
+			return cached.Balance, cached.Debt, cached.Settled, nil
+		}
+		return 0, 0, 0, nil
+	}
 
 	var (
 		resName        string
@@ -2925,6 +2945,32 @@ func (d *DB) ResellerAddSubscriberBalance(resellerID int64, username string, amo
 		CreatedBy:          adminUser,
 	}
 	if err := d.RecordFinancialTx(tx, frec); err != nil {
+		return 0, 0, 0, err
+	}
+
+	// Mirror the subscriber-side state change in the ledger as well.
+	frecSub := &FinancialRecord{
+		ReferenceID:        refID + "-SUB",
+		IdempotencyKey:     idempKey + "-sub",
+		OperationType:      "subscriber_balance_deposit_reseller",
+		AccountType:        "subscriber",
+		SubscriberID:       subID,
+		SubscriberUsername: username,
+		ResellerID:         resellerID,
+		AmountCents:        amountCents,
+		Amount:             amount,
+		BalanceBefore:      subBalance,
+		BalanceAfter:       finalSubBal,
+		DebtBefore:         subDebt,
+		DebtAfter:          finalSubDebt,
+		Status:             "completed",
+		Description:        desc,
+		CreatedBy:          adminUser,
+	}
+	if err := d.RecordFinancialTx(tx, frecSub); err != nil {
+		return 0, 0, 0, err
+	}
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"balance":%.2f,"debt":%.2f,"settled":%.2f}`, finalSubBal, finalSubDebt, settledAmount)); err != nil {
 		return 0, 0, 0, err
 	}
 
@@ -3294,17 +3340,29 @@ func (d *DB) RenewSubscriber(username, profileName string) error {
 }
 
 // GrantSubscriberLoan grants a grace period loan (time and quota) to a subscriber based on profile settings
-func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber, error) {
+func (d *DB) GrantSubscriberLoan(username, adminUser string, idempotencyKey ...string) (*models.Subscriber, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
 		return nil, fmt.Errorf("اسم المستخدم مطلوب")
 	}
 
+	idempKey, err := ResolveIdempotencyKey(idempotencyKey, "subscriber_loan_grant", username)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := d.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+	acquired, _, _, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "subscriber_loan_grant", username, ComputeRequestHash(map[string]interface{}{"username": username}), 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		_ = tx.Commit()
+		return d.GetSubscriber(username)
+	}
 
 	var (
 		subID          int64
@@ -3495,6 +3553,9 @@ func (d *DB) GrantSubscriberLoan(username, adminUser string) (*models.Subscriber
 
 	if err := d.EnqueueOutboxTx(tx, "coa", "subscriber", username, outboxPayload); err != nil {
 		return nil, fmt.Errorf("failed to enqueue loan outbox event: %w", err)
+	}
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"success":true,"reference_id":"%s"}`, refID)); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -4949,12 +5010,11 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 		return fmt.Errorf("profile %s not found: %w", profileName, err)
 	}
 
-	// Server-side authoritative price
-	if price <= 0 {
-		price = p.Price
-	}
-	if err := money.ValidateFinite(price); err != nil {
-		return fmt.Errorf("invalid price: %w", err)
+	// Always use the profile price from the database. A client supplied price is
+	// only a display hint and must never change the amount charged.
+	price = p.Price
+	if err := money.ValidatePositive(price); err != nil {
+		return fmt.Errorf("invalid profile price: %w", err)
 	}
 
 	newExp, finalQuota, deductedHours, deductedQuotaBytes, hadLoan := d.CalculateLoanDeductionTx(tx, username, &p)
@@ -5187,12 +5247,12 @@ func (d *DB) RenewSubscriberWithPaymentOption(username, profileName string, pric
 	return nil
 }
 
-func (d *DB) RenewSubscriberBilling(username, profileName string, price float64, isPaid bool, method, notes, adminUser string) error {
+func (d *DB) RenewSubscriberBilling(username, profileName string, price float64, isPaid bool, method, notes, adminUser string, idempotencyKey ...string) error {
 	opt := "cash"
 	if !isPaid {
 		opt = "debt"
 	}
-	return d.RenewSubscriberWithPaymentOption(username, profileName, price, opt, method, notes, adminUser)
+	return d.RenewSubscriberWithPaymentOption(username, profileName, price, opt, method, notes, adminUser, idempotencyKey...)
 }
 
 // AddSubscriberBalance deposits amount to subscriber wallet.
@@ -5200,9 +5260,13 @@ func (d *DB) RenewSubscriberBilling(username, profileName string, price float64,
 // - If amount >= debt: settles debt to 0, deposits remainder to balance.
 // - If amount < debt: reduces debt by amount, balance unaffected.
 // Returns (newBalance, newDebt, settledDebt, error)
-func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes, adminUser string, settleDebtFirst bool) (float64, float64, float64, error) {
-	if amount <= 0 {
+func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes, adminUser string, settleDebtFirst bool, idempotencyKey ...string) (float64, float64, float64, error) {
+	if err := money.ValidatePositive(amount); err != nil {
 		return 0, 0, 0, fmt.Errorf("مبلغ الشحن يجب أن يكون أكبر من الصفر")
+	}
+	idempKey, err := ResolveIdempotencyKey(idempotencyKey, "subscriber_balance_deposit", username, amount, settleDebtFirst, method)
+	if err != nil {
+		return 0, 0, 0, err
 	}
 
 	tx, err := d.Begin()
@@ -5210,11 +5274,24 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 		return 0, 0, 0, err
 	}
 	defer tx.Rollback()
+	requestHash := ComputeRequestHash(map[string]interface{}{"username": username, "amount": amount, "method": method, "settle_debt_first": settleDebtFirst})
+	acquired, _, responseBody, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "subscriber_balance_deposit", username, requestHash, 24*time.Hour)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if !acquired {
+		var cached struct{ Balance, Debt, Settled float64 }
+		if json.Unmarshal([]byte(responseBody), &cached) == nil {
+			return cached.Balance, cached.Debt, cached.Settled, nil
+		}
+		return 0, 0, 0, nil
+	}
 
+	var subID, resellerID int64
 	var contractNo, fullName string
 	var currDebt, currBalance float64
-	err = tx.QueryRow(`SELECT COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
-		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&contractNo, &fullName, &currDebt, &currBalance)
+	err = tx.QueryRow(`SELECT id, COALESCE(reseller_id, 0), COALESCE(contract_no, ''), COALESCE(full_name, ''), COALESCE(debt, 0.00), COALESCE(balance, 0.00) 
+		FROM subscribers WHERE username = ? FOR UPDATE`, username).Scan(&subID, &resellerID, &contractNo, &fullName, &currDebt, &currBalance)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("المشترك غير موجود: %w", err)
 	}
@@ -5245,18 +5322,22 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 
 			// 1. Transaction for settling debt
 			debtDesc := fmt.Sprintf("سداد كامل المديونية (%.2f ج.م) من عملية إيداع الرصيد", settledDebt)
-			_, _ = tx.Exec(`INSERT INTO billing_transactions (
+				if _, err = tx.Exec(`INSERT INTO billing_transactions (
 				username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 			) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
-				username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser)
+					username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser); err != nil {
+					return 0, 0, 0, err
+				}
 
 			// 2. Transaction for remaining deposit if > 0
 			if remDeposit > 0 {
 				depDesc := fmt.Sprintf("إيداع رصيد بالمحفظة (المتبقي بعد تصفير الدين - الرصيد الجديد: %.2f ج.م)", newBalance)
-				_, _ = tx.Exec(`INSERT INTO billing_transactions (
+					if _, err = tx.Exec(`INSERT INTO billing_transactions (
 					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 				) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', ?, ?, ?)`,
-					username, contractNo, fullName, depDesc, remDeposit, method, notes, adminUser)
+						username, contractNo, fullName, depDesc, remDeposit, method, notes, adminUser); err != nil {
+						return 0, 0, 0, err
+					}
 			}
 		} else { // amount < currDebt
 			settledDebt = amount
@@ -5269,10 +5350,12 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 			}
 
 			debtDesc := fmt.Sprintf("سداد جزئي للمديونية من عملية شحن الرصيد (المتبقي من الدين: %.2f ج.م)", newDebt)
-			_, _ = tx.Exec(`INSERT INTO billing_transactions (
+				if _, err = tx.Exec(`INSERT INTO billing_transactions (
 				username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 			) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
-				username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser)
+					username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser); err != nil {
+					return 0, 0, 0, err
+				}
 		}
 	} else {
 		settledDebt = 0
@@ -5285,10 +5368,12 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 		}
 
 		depDesc := fmt.Sprintf("شحن / إيداع رصيد بالمحفظة (الرصيد الجديد: %.2f ج.م)", newBalance)
-		_, _ = tx.Exec(`INSERT INTO billing_transactions (
+			if _, err = tx.Exec(`INSERT INTO billing_transactions (
 			username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 		) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', ?, ?, ?)`,
-			username, contractNo, fullName, depDesc, amount, method, notes, adminUser)
+				username, contractNo, fullName, depDesc, amount, method, notes, adminUser); err != nil {
+				return 0, 0, 0, err
+			}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -5313,18 +5398,63 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 				})
 			}
 		}
-	}()
+		}()
 
-	return newBalance, newDebt, settledDebt, nil
-}
+		refID := GenerateReferenceID("DEP-SUB")
+		desc := fmt.Sprintf("تغيير رصيد المشترك بمبلغ %.2f", amount)
+		frec := &FinancialRecord{
+			ReferenceID:        refID,
+			IdempotencyKey:     idempKey,
+			OperationType:      "subscriber_balance_deposit",
+			AccountType:        "subscriber",
+			SubscriberID:       subID,
+			SubscriberUsername: username,
+			ResellerID:         resellerID,
+			AmountCents:        money.ToCents(amount),
+			Amount:             amount,
+			BalanceBefore:      currBalance,
+			BalanceAfter:       newBalance,
+			DebtBefore:         currDebt,
+			DebtAfter:          newDebt,
+			Status:             "completed",
+			Description:        desc,
+			CreatedBy:          adminUser,
+		}
+		if err := d.RecordFinancialTx(tx, frec); err != nil {
+			return 0, 0, 0, err
+		}
+		if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"balance":%.2f,"debt":%.2f,"settled":%.2f}`, newBalance, newDebt, settledDebt)); err != nil {
+			return 0, 0, 0, err
+		}
 
-// SettleDebtFromBalance pays off existing subscriber debt using available wallet balance
-func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser string, creditReseller bool) (float64, float64, error) {
+		return newBalance, newDebt, settledDebt, nil
+	}
+
+	// SettleDebtFromBalance pays off existing subscriber debt using available wallet balance
+func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser string, creditReseller bool, idempotencyKey ...string) (float64, float64, error) {
+	if err := money.ValidatePositive(amount); err != nil {
+		return 0, 0, fmt.Errorf("مبلغ السداد يجب أن يكون رقماً موجباً")
+	}
+	idempKey, err := ResolveIdempotencyKey(idempotencyKey, "subscriber_debt_balance", username, amount, creditReseller)
+	if err != nil {
+		return 0, 0, err
+	}
 	tx, err := d.Begin()
 	if err != nil {
 		return 0, 0, err
 	}
 	defer tx.Rollback()
+	acquired, _, responseBody, err := d.AcquireIdempotencyKeyTx(tx, idempKey, "subscriber_debt_balance", username, ComputeRequestHash(map[string]interface{}{"username": username, "amount": amount, "credit_reseller": creditReseller}), 24*time.Hour)
+	if err != nil {
+		return 0, 0, err
+	}
+	if !acquired {
+		var cached struct{ Balance, Debt float64 }
+		if json.Unmarshal([]byte(responseBody), &cached) == nil {
+			return cached.Balance, cached.Debt, nil
+		}
+		return 0, 0, nil
+	}
 
 	var contractNo, fullName string
 	var currDebt, currBalance float64
@@ -5348,7 +5478,7 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 		return currBalance, currDebt, fmt.Errorf("لا توجد مديونية مسجلة على المشترك")
 	}
 
-	if amount <= 0 || amount > currBalance {
+	if amount > currBalance {
 		amount = currBalance
 	}
 	if amount > currDebt {
@@ -5365,12 +5495,17 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 
 	desc := fmt.Sprintf("سداد مديونية خصماً من رصيد المحفظة (متبقي الدين: %.2f ج.م، متبقي الرصيد: %.2f ج.م)", newDebt, newBalance)
 
+	var resellerBeforeBalance, resellerBeforeDebt, resellerAfterBalance, resellerAfterDebt float64
+	var resellerName string
 	// Smart settlement with reseller if applicable
 	if creditReseller && resellerID > 0 {
-		var resName string
 		var resBalance, resDebt float64
-		err = tx.QueryRow("SELECT name, balance, COALESCE(debt, 0.00) FROM resellers WHERE id = ? FOR UPDATE", resellerID).Scan(&resName, &resBalance, &resDebt)
-		if err == nil {
+		err = tx.QueryRow("SELECT name, balance, COALESCE(debt, 0.00) FROM resellers WHERE id = ? FOR UPDATE", resellerID).Scan(&resellerName, &resBalance, &resDebt)
+		if err != nil {
+			return 0, 0, fmt.Errorf("الموزع غير موجود: %w", err)
+		}
+		{
+			resellerBeforeBalance, resellerBeforeDebt = resBalance, resDebt
 			newResBalance := resBalance
 			newResDebt := resDebt
 			var noteSettlement string
@@ -5390,20 +5525,52 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 				noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s بقيمة %.2f ج.م خصماً من محفظته وتم إيداعها بمحفظة الموزع", fullName, amount)
 			}
 
-			_, _ = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID)
-			_, _ = tx.Exec(`INSERT INTO reseller_transactions 
+				if _, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID); err != nil {
+					return 0, 0, err
+				}
+				if _, err = tx.Exec(`INSERT INTO reseller_transactions 
 				(reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
 				VALUES (?, 'subscriber_debt_settlement', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				resellerID, amount, resBalance, newResBalance, resDebt, newResDebt, subID, fullName, noteSettlement, adminUser)
+					resellerID, amount, resBalance, newResBalance, resDebt, newResDebt, subID, fullName, noteSettlement, adminUser); err != nil {
+					return 0, 0, err
+				}
+				resellerAfterBalance, resellerAfterDebt = newResBalance, newResDebt
 
-			desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resName)
+				desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resellerName)
 		}
 	}
 
-	_, _ = tx.Exec(`INSERT INTO billing_transactions (
+	if _, err = tx.Exec(`INSERT INTO billing_transactions (
 		username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 	) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', 'balance', 'سداد من رصيد المحفظة', ?)`,
-		username, contractNo, fullName, desc, amount, adminUser)
+		username, contractNo, fullName, desc, amount, adminUser); err != nil {
+		return 0, 0, err
+	}
+
+	refID := GenerateReferenceID("PAY-BAL")
+	frecSub := &FinancialRecord{
+		ReferenceID: refID, IdempotencyKey: idempKey, OperationType: "subscriber_debt_payment_balance",
+		AccountType: "subscriber", SubscriberID: subID, SubscriberUsername: username, ResellerID: resellerID,
+		AmountCents: money.ToCents(amount), Amount: amount, BalanceBefore: currBalance, BalanceAfter: newBalance,
+		DebtBefore: currDebt, DebtAfter: newDebt, Status: "completed", Description: desc, CreatedBy: adminUser,
+	}
+	if err := d.RecordFinancialTx(tx, frecSub); err != nil {
+		return 0, 0, err
+	}
+	if resellerName != "" {
+		frecRes := &FinancialRecord{
+			ReferenceID: refID + "-RES", IdempotencyKey: idempKey + "-res", OperationType: "subscriber_debt_settle_reseller",
+			AccountType: "reseller", SubscriberID: subID, SubscriberUsername: username, ResellerID: resellerID,
+			AmountCents: money.ToCents(amount), Amount: amount, BalanceBefore: resellerBeforeBalance, BalanceAfter: resellerAfterBalance,
+			DebtBefore: resellerBeforeDebt, DebtAfter: resellerAfterDebt, Status: "completed", Description: desc, CreatedBy: adminUser,
+		}
+		if err := d.RecordFinancialTx(tx, frecRes); err != nil {
+			return 0, 0, err
+		}
+	}
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"balance":%.2f,"debt":%.2f}`, newBalance, newDebt)); err != nil {
+		return 0, 0, err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return 0, 0, err
@@ -5477,7 +5644,10 @@ func (d *DB) AddQuotaBilling(username string, quotaGB float64, price float64, is
 		return fmt.Errorf("subscriber not found: %w", err)
 	}
 
-	addBytes := int64(quotaGB * 1024 * 1024 * 1024)
+	addBytes, err := money.QuotaGBToBytes(quotaGB)
+	if err != nil {
+		return err
+	}
 	res, err := tx.Exec("UPDATE subscribers SET quota_bytes = quota_bytes + ? WHERE username = ?", addBytes, username)
 	if err != nil {
 		return err

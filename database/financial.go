@@ -150,6 +150,23 @@ func GenerateDeterministicKey(operationType, identifier string, params ...interf
 	return fmt.Sprintf("IDEM-%s-%s", operationType, hex.EncodeToString(h.Sum(nil))[:24])
 }
 
+// ResolveIdempotencyKey returns a bounded client key or a deterministic fallback.
+// Explicit keys are limited to the database column size so oversized headers
+// cannot make an otherwise valid financial transaction fail at commit time.
+func ResolveIdempotencyKey(keys []string, operationType, identifier string, params ...interface{}) (string, error) {
+	key := ""
+	if len(keys) > 0 {
+		key = strings.TrimSpace(keys[0])
+	}
+	if key == "" {
+		key = GenerateDeterministicKey(operationType, identifier, params...)
+	}
+	if len(key) > 128 {
+		return "", fmt.Errorf("idempotency key exceeds 128 characters")
+	}
+	return key, nil
+}
+
 // ComputeRequestHash computes a SHA256 digest of request parameters to detect payload tampering/mismatches on retry.
 func ComputeRequestHash(payload interface{}) string {
 	if payload == nil {
@@ -568,7 +585,7 @@ func (d *DB) ProcessOutboxBatch(ctx context.Context, batchSize int, workerID str
 
 			_, updateErr := d.Exec(`UPDATE financial_outbox 
 				SET status = ?, retry_count = ?, last_error = ?, scheduled_at = ?, lease_token = NULL, lease_expires_at = NULL 
-				WHERE id = ?`, newStatus, newRetries, procErr.Error(), nextRetry, item.id)
+					WHERE id = ? AND lease_token = ?`, newStatus, newRetries, procErr.Error(), nextRetry, item.id, workerID)
 			if updateErr != nil {
 				log.Printf("[OUTBOX] Failed to update error status on item %d: %v", item.id, updateErr)
 			}
@@ -576,7 +593,7 @@ func (d *DB) ProcessOutboxBatch(ctx context.Context, batchSize int, workerID str
 			processed++
 			_, updateErr := d.Exec(`UPDATE financial_outbox 
 				SET status = 'completed', processed_at = NOW(), lease_token = NULL, lease_expires_at = NULL 
-				WHERE id = ?`, item.id)
+					WHERE id = ? AND lease_token = ?`, item.id, workerID)
 			if updateErr != nil {
 				log.Printf("[OUTBOX] Failed to update completed status on item %d: %v", item.id, updateErr)
 			}

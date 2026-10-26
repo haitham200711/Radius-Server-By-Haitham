@@ -26,7 +26,7 @@ func GetRegisteredMigrations() []Migration {
 				`CREATE TABLE IF NOT EXISTS financial_ledger (
 					id BIGINT AUTO_INCREMENT PRIMARY KEY,
 					reference_id VARCHAR(64) UNIQUE NOT NULL,
-					idempotency_key VARCHAR(64) UNIQUE NULL,
+					idempotency_key VARCHAR(128) UNIQUE NULL,
 					operation_type VARCHAR(64) NOT NULL,
 					account_type VARCHAR(32) NOT NULL,
 					subscriber_id INT DEFAULT 0,
@@ -179,6 +179,24 @@ func GetRegisteredMigrations() []Migration {
 				`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
 			},
 		},
+			{
+				Version:     "20261026_05_radacct_active_dedup",
+				Description: "Deduplicate active accounting sessions and enforce one active row per session and NAS",
+				SQL: []string{
+					`ALTER TABLE financial_ledger MODIFY COLUMN idempotency_key VARCHAR(128) NULL;`,
+					// Keep the newest active row when old imports contain duplicate starts.
+					`DELETE r1 FROM radacct r1 JOIN radacct r2
+					 WHERE r1.acctstoptime IS NULL AND r2.acctstoptime IS NULL
+					   AND r1.acctsessionid = r2.acctsessionid
+					   AND r1.nasipaddress = r2.nasipaddress
+					   AND r1.radacctid < r2.radacctid;`,
+					`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS active_session_key VARCHAR(160)
+					 GENERATED ALWAYS AS (CASE WHEN acctstoptime IS NULL
+					 THEN CONCAT(acctsessionid, '|', nasipaddress, '|ACTIVE')
+					 ELSE CONCAT(acctsessionid, '|', nasipaddress, '|', radacctid) END) STORED;`,
+					`ALTER TABLE radacct ADD UNIQUE KEY IF NOT EXISTS uq_radacct_active_session (active_session_key);`,
+				},
+			},
 	}
 }
 

@@ -14,7 +14,10 @@ var (
 	ErrInsufficientFunds = errors.New("insufficient balance and credit limit")
 	ErrNonFinite         = errors.New("number must be a finite valid number (not NaN or Infinity)")
 	ErrNonPositive       = errors.New("value must be greater than zero")
+	ErrQuotaTooLarge     = errors.New("quota exceeds the supported maximum")
 )
+
+const bytesPerGB = 1024 * 1024 * 1024
 
 // ValidateFinite checks that a float64 is not NaN or Infinity
 func ValidateFinite(val float64) error {
@@ -60,6 +63,21 @@ func ParseFiniteFloat(s string) (float64, error) {
 		return 0, err
 	}
 	return val, nil
+}
+
+// QuotaGBToBytes converts a quota to bytes without allowing float overflow.
+func QuotaGBToBytes(gb float64) (int64, error) {
+	if err := ValidatePositive(gb); err != nil {
+		return 0, err
+	}
+	if gb > float64(math.MaxInt64)/bytesPerGB {
+		return 0, ErrQuotaTooLarge
+	}
+	bytes := math.Round(gb * bytesPerGB)
+	if bytes <= 0 || bytes > float64(math.MaxInt64) {
+		return 0, ErrQuotaTooLarge
+	}
+	return int64(bytes), nil
 }
 
 // ToCents converts a float64 amount (e.g. 10.50 EGP) to integer minor units / cents (1050)

@@ -976,6 +976,10 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 	settleDebtFirst := r.FormValue("settle_debt_first") == "1" || r.FormValue("settle_debt_first") == "on" || r.FormValue("settle_debt_first") == "true"
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
@@ -995,7 +999,7 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if currentUser != nil && currentUser.Role == "reseller" {
-			newBal, newDebt, settled, err := bp.db.ResellerAddSubscriberBalance(currentUser.ID, username, amount, notes, currentUser.Username, settleDebtFirst)
+				newBal, newDebt, settled, err := bp.db.ResellerAddSubscriberBalance(currentUser.ID, username, amount, notes, currentUser.Username, settleDebtFirst, idempotencyKey)
 			if err != nil {
 				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
@@ -1010,7 +1014,7 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		newBal, newDebt, settled, err := bp.db.AddSubscriberBalance(username, amount, paymentMethod, notes, adminUser, settleDebtFirst)
+			newBal, newDebt, settled, err := bp.db.AddSubscriberBalance(username, amount, paymentMethod, notes, adminUser, settleDebtFirst, idempotencyKey)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -1031,6 +1035,10 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
@@ -1051,7 +1059,7 @@ func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Req
 		if !bp.checkSubscriberAccess(w, r, username) {
 			return
 		}
-		newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller)
+			newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller, idempotencyKey)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -1124,6 +1132,10 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 	amount, _ := money.ParseFiniteFloat(r.FormValue("amount"))
 	paymentMethod := strings.TrimSpace(r.FormValue("payment_method"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	currentUser := middleware.GetUser(r)
 	adminUser := "admin"
@@ -1157,7 +1169,7 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if paymentMethod == "balance" {
-			_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller)
+				_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller, idempotencyKey)
 			if err != nil {
 				http.Redirect(w, r, redirectURL+sep+"error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
@@ -1165,7 +1177,7 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, redirectURL+sep+"success="+url.QueryEscape(fmt.Sprintf("تم سداد مبلغ %.2f ج.م من مديونية المشترك بنجاح", amount)), http.StatusFound)
 			return
 		} else {
-			_, msg, err := bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser, creditReseller)
+				_, msg, err := bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser, creditReseller, idempotencyKey)
 			if err != nil {
 				http.Redirect(w, r, redirectURL+sep+"error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
@@ -1325,6 +1337,10 @@ func (bp *Blueprint) GrantLoanHandler(w http.ResponseWriter, r *http.Request) {
 	if currentUser != nil {
 		adminUser = currentUser.Username
 	}
+	idempotencyKey := strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.FormValue("idempotency_key"))
+	}
 
 	limit := r.FormValue("limit")
 	page := r.FormValue("page")
@@ -1345,7 +1361,7 @@ func (bp *Blueprint) GrantLoanHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err := bp.db.GrantSubscriberLoan(username, adminUser)
+	_, err := bp.db.GrantSubscriberLoan(username, adminUser, idempotencyKey)
 	if err != nil {
 		http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 		return
