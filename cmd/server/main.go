@@ -21,6 +21,7 @@ import (
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/dashboard"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/portal"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/profiles"
+	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/reports"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/resellers"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/routers"
 	"github.com/haitham200711/Radius-Server-By-Haitham/blueprints/sessions"
@@ -306,6 +307,10 @@ func main() {
 	sessBP := sessions.New(db, renderer)
 	mux.HandleFunc("/sessions", middleware.RequireAdmin(sessBP.ListHandler))
 	mux.HandleFunc("/sessions/disconnect", middleware.RequireAdmin(sessBP.DisconnectHandler))
+
+	// Reports Blueprint
+	repBP := reports.New(db, renderer)
+	mux.HandleFunc("/reports", middleware.RequireAdminOrReseller(repBP.IndexHandler))
 
 	// Settings Blueprint
 	settBP := settings.New(db, renderer)

@@ -197,6 +197,16 @@ func GetRegisteredMigrations() []Migration {
 				`ALTER TABLE radacct ADD UNIQUE KEY IF NOT EXISTS uq_radacct_active_session (active_session_key);`,
 			},
 		},
+		{
+			Version:     "20261026_06_reports_performance_indexes",
+			Description: "Create performance indexes for reporting on radacct, subscribers, and financial_ledger",
+			SQL: []string{
+				`CREATE INDEX IF NOT EXISTS idx_radacct_user_start ON radacct (username, acctstarttime);`,
+				`CREATE INDEX IF NOT EXISTS idx_subscribers_reseller_debt ON subscribers (reseller_id, debt);`,
+				`CREATE INDEX IF NOT EXISTS idx_subscribers_balance ON subscribers (balance);`,
+				`CREATE INDEX IF NOT EXISTS idx_ledger_acct_created ON financial_ledger (account_type, created_at);`,
+			},
+		},
 	}
 }
 

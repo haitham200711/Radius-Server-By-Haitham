@@ -5322,22 +5322,22 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 
 			// 1. Transaction for settling debt
 			debtDesc := fmt.Sprintf("سداد كامل المديونية (%.2f ج.م) من عملية إيداع الرصيد", settledDebt)
-				if _, err = tx.Exec(`INSERT INTO billing_transactions (
+			if _, err = tx.Exec(`INSERT INTO billing_transactions (
 				username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 			) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
-					username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser); err != nil {
-					return 0, 0, 0, err
-				}
+				username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser); err != nil {
+				return 0, 0, 0, err
+			}
 
 			// 2. Transaction for remaining deposit if > 0
 			if remDeposit > 0 {
 				depDesc := fmt.Sprintf("إيداع رصيد بالمحفظة (المتبقي بعد تصفير الدين - الرصيد الجديد: %.2f ج.م)", newBalance)
-					if _, err = tx.Exec(`INSERT INTO billing_transactions (
+				if _, err = tx.Exec(`INSERT INTO billing_transactions (
 					username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 				) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', ?, ?, ?)`,
-						username, contractNo, fullName, depDesc, remDeposit, method, notes, adminUser); err != nil {
-						return 0, 0, 0, err
-					}
+					username, contractNo, fullName, depDesc, remDeposit, method, notes, adminUser); err != nil {
+					return 0, 0, 0, err
+				}
 			}
 		} else { // amount < currDebt
 			settledDebt = amount
@@ -5350,12 +5350,12 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 			}
 
 			debtDesc := fmt.Sprintf("سداد جزئي للمديونية من عملية شحن الرصيد (المتبقي من الدين: %.2f ج.م)", newDebt)
-				if _, err = tx.Exec(`INSERT INTO billing_transactions (
+			if _, err = tx.Exec(`INSERT INTO billing_transactions (
 				username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 			) VALUES (?, ?, ?, 'payment', ?, ?, 'paid', ?, ?, ?)`,
-					username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser); err != nil {
-					return 0, 0, 0, err
-				}
+				username, contractNo, fullName, debtDesc, settledDebt, method, notes, adminUser); err != nil {
+				return 0, 0, 0, err
+			}
 		}
 	} else {
 		settledDebt = 0
@@ -5368,68 +5368,68 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 		}
 
 		depDesc := fmt.Sprintf("شحن / إيداع رصيد بالمحفظة (الرصيد الجديد: %.2f ج.م)", newBalance)
-			if _, err = tx.Exec(`INSERT INTO billing_transactions (
+		if _, err = tx.Exec(`INSERT INTO billing_transactions (
 			username, contract_no, full_name, type, description, amount, payment_status, payment_method, notes, created_by
 		) VALUES (?, ?, ?, 'deposit', ?, ?, 'paid', ?, ?, ?)`,
-				username, contractNo, fullName, depDesc, amount, method, notes, adminUser); err != nil {
-				return 0, 0, 0, err
-			}
+			username, contractNo, fullName, depDesc, amount, method, notes, adminUser); err != nil {
+			return 0, 0, 0, err
+		}
 	}
 
-		refID := GenerateReferenceID("DEP-SUB")
-		desc := fmt.Sprintf("تغيير رصيد المشترك بمبلغ %.2f", amount)
-		frec := &FinancialRecord{
-			ReferenceID:        refID,
-			IdempotencyKey:     idempKey,
-			OperationType:      "subscriber_balance_deposit",
-			AccountType:        "subscriber",
-			SubscriberID:       subID,
-			SubscriberUsername: username,
-			ResellerID:         resellerID,
-			AmountCents:        money.ToCents(amount),
-			Amount:             amount,
-			BalanceBefore:      currBalance,
-			BalanceAfter:       newBalance,
-			DebtBefore:         currDebt,
-			DebtAfter:          newDebt,
-			Status:             "completed",
-			Description:        desc,
-			CreatedBy:          adminUser,
-		}
-		if err := d.RecordFinancialTx(tx, frec); err != nil {
-			return 0, 0, 0, err
-		}
-		if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"balance":%.2f,"debt":%.2f,"settled":%.2f}`, newBalance, newDebt, settledDebt)); err != nil {
-			return 0, 0, 0, err
-		}
-		if err := tx.Commit(); err != nil {
-			return 0, 0, 0, err
-		}
-
-		// Trigger notifications only after the financial transaction is durable.
-		go func() {
-			sub, err := d.GetSubscriber(username)
-			if err == nil && sub != nil {
-				if settledDebt > 0 {
-					_ = d.TriggerWhatsAppEvent("debt_paid", sub, map[string]string{
-						"{amount}": fmt.Sprintf("%.2f", settledDebt),
-						"{debt}":   fmt.Sprintf("%.2f", newDebt),
-					})
-				}
-				rem := amount - settledDebt
-				if rem > 0 {
-					_ = d.TriggerWhatsAppEvent("balance_added", sub, map[string]string{
-						"{amount}":  fmt.Sprintf("%.2f", rem),
-						"{balance}": fmt.Sprintf("%.2f", newBalance),
-					})
-				}
-			}
-		}()
-
-		return newBalance, newDebt, settledDebt, nil
+	refID := GenerateReferenceID("DEP-SUB")
+	desc := fmt.Sprintf("تغيير رصيد المشترك بمبلغ %.2f", amount)
+	frec := &FinancialRecord{
+		ReferenceID:        refID,
+		IdempotencyKey:     idempKey,
+		OperationType:      "subscriber_balance_deposit",
+		AccountType:        "subscriber",
+		SubscriberID:       subID,
+		SubscriberUsername: username,
+		ResellerID:         resellerID,
+		AmountCents:        money.ToCents(amount),
+		Amount:             amount,
+		BalanceBefore:      currBalance,
+		BalanceAfter:       newBalance,
+		DebtBefore:         currDebt,
+		DebtAfter:          newDebt,
+		Status:             "completed",
+		Description:        desc,
+		CreatedBy:          adminUser,
+	}
+	if err := d.RecordFinancialTx(tx, frec); err != nil {
+		return 0, 0, 0, err
+	}
+	if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"balance":%.2f,"debt":%.2f,"settled":%.2f}`, newBalance, newDebt, settledDebt)); err != nil {
+		return 0, 0, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, 0, err
 	}
 
-	// SettleDebtFromBalance pays off existing subscriber debt using available wallet balance
+	// Trigger notifications only after the financial transaction is durable.
+	go func() {
+		sub, err := d.GetSubscriber(username)
+		if err == nil && sub != nil {
+			if settledDebt > 0 {
+				_ = d.TriggerWhatsAppEvent("debt_paid", sub, map[string]string{
+					"{amount}": fmt.Sprintf("%.2f", settledDebt),
+					"{debt}":   fmt.Sprintf("%.2f", newDebt),
+				})
+			}
+			rem := amount - settledDebt
+			if rem > 0 {
+				_ = d.TriggerWhatsAppEvent("balance_added", sub, map[string]string{
+					"{amount}":  fmt.Sprintf("%.2f", rem),
+					"{balance}": fmt.Sprintf("%.2f", newBalance),
+				})
+			}
+		}
+	}()
+
+	return newBalance, newDebt, settledDebt, nil
+}
+
+// SettleDebtFromBalance pays off existing subscriber debt using available wallet balance
 func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser string, creditReseller bool, idempotencyKey ...string) (float64, float64, error) {
 	if err := money.ValidatePositive(amount); err != nil {
 		return 0, 0, fmt.Errorf("مبلغ السداد يجب أن يكون رقماً موجباً")
@@ -5524,18 +5524,18 @@ func (d *DB) SettleDebtFromBalance(username string, amount float64, adminUser st
 				noteSettlement = fmt.Sprintf("تسوية ذكية: سداد مديونية المشترك %s بقيمة %.2f ج.م خصماً من محفظته وتم إيداعها بمحفظة الموزع", fullName, amount)
 			}
 
-				if _, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID); err != nil {
-					return 0, 0, err
-				}
-				if _, err = tx.Exec(`INSERT INTO reseller_transactions 
+			if _, err = tx.Exec("UPDATE resellers SET balance = ?, debt = ? WHERE id = ?", newResBalance, newResDebt, resellerID); err != nil {
+				return 0, 0, err
+			}
+			if _, err = tx.Exec(`INSERT INTO reseller_transactions
 				(reseller_id, type, amount, balance_before, balance_after, debt_before, debt_after, subscriber_id, subscriber_name, notes, created_by)
 				VALUES (?, 'subscriber_debt_settlement', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					resellerID, amount, resBalance, newResBalance, resDebt, newResDebt, subID, fullName, noteSettlement, adminUser); err != nil {
-					return 0, 0, err
-				}
-				resellerAfterBalance, resellerAfterDebt = newResBalance, newResDebt
+				resellerID, amount, resBalance, newResBalance, resDebt, newResDebt, subID, fullName, noteSettlement, adminUser); err != nil {
+				return 0, 0, err
+			}
+			resellerAfterBalance, resellerAfterDebt = newResBalance, newResDebt
 
-				desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resellerName)
+			desc += fmt.Sprintf(" [تسوية ذكية مع الموزع: %s]", resellerName)
 		}
 	}
 

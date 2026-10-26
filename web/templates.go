@@ -46,6 +46,7 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 		"resellers/list":            {"templates/base.html", "templates/resellers/list.html"},
 		"sessions/list":             {"templates/base.html", "templates/sessions/list.html"},
 		"sstp/index":                {"templates/base.html", "templates/sstp/index.html"},
+		"reports/index":             {"templates/base.html", "templates/reports/index.html"},
 		"settings/index":            {"templates/base.html", "templates/settings/index.html"},
 		"whatsapp/index":            {"templates/base.html", "templates/whatsapp/index.html"},
 		"backups/index":             {"templates/base.html", "templates/backups/index.html"},

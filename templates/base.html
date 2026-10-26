@@ -245,6 +245,15 @@
                         {{ if eq .ActiveMenu "sstp" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
 
+                    <!-- 8. تقارير النظام -->
+                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "reports" }}active{{ end }}" href="/reports">
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-file-earmark-bar-graph-fill text-primary"></i>
+                            <span>{{ tr .Lang "تقارير النظام" "System Reports" }}</span>
+                        </span>
+                        {{ if eq .ActiveMenu "reports" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
+                    </a>
+
                     {{ if eq .CurrentUser.Role "admin" }}
                     <!-- 9. الموزعين -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "resellers" }}active{{ end }}" href="/resellers">

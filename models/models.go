@@ -891,6 +891,7 @@ type SubscriberLoginSession struct {
 	ContractNo          string     `json:"contract_no"`
 	Phone               string     `json:"phone"`
 	ProfileName         string     `json:"profile_name"`
+	ResellerName        string     `json:"reseller_name"`
 	NASIPAddress        string     `json:"nasipaddress"`
 	NASName             string     `json:"nas_name"`
 	FramedIPAddress     string     `json:"framedipaddress"`
