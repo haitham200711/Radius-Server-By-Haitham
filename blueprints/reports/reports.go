@@ -35,7 +35,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	tab := strings.TrimSpace(r.URL.Query().Get("tab"))
 	if tab == "" {
-		tab = "sessions"
+		tab = "overview"
 	}
 
 	export := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("export")))
@@ -73,6 +73,15 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		sortBy = "newest"
 	}
 
+	// Tab-specific filters
+	authReplyFilter := strings.TrimSpace(r.URL.Query().Get("auth_reply"))
+	quotaCategory := strings.TrimSpace(r.URL.Query().Get("quota_category"))
+	serviceStatusFilter := strings.TrimSpace(r.URL.Query().Get("service_status"))
+	debtStatusFilter := strings.TrimSpace(r.URL.Query().Get("debt_status"))
+	balanceState := strings.TrimSpace(r.URL.Query().Get("balance_state"))
+	actionFilter := strings.TrimSpace(r.URL.Query().Get("action_filter"))
+	actorFilter := strings.TrimSpace(r.URL.Query().Get("actor"))
+
 	// Reseller list for admin dropdown
 	var resellersList []map[string]interface{}
 	if currentUser.Role == "admin" {
@@ -103,6 +112,13 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		"ResellerFilter":       effectiveResellerID,
 		"ResellersList":        resellersList,
 		"NASRouters":           nasRouters,
+		"AuthReplyFilter":      authReplyFilter,
+		"QuotaCategory":        quotaCategory,
+		"ServiceStatusFilter":  serviceStatusFilter,
+		"DebtStatusFilter":     debtStatusFilter,
+		"BalanceState":         balanceState,
+		"ActionFilter":         actionFilter,
+		"ActorFilter":          actorFilter,
 		"Page":                 page,
 		"Limit":                limit,
 		"CurrentTimeFormatted": time.Now().Format("2006-01-02 15:04:05"),
@@ -110,13 +126,57 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch tab {
 	// =========================================================================
-	// 1. تقرير حالات تسجيل الدخول والجلسات (Sessions Report)
+	// 0. لوحة المتابعة الشاملة (Executive Overview Dashboard)
+	// =========================================================================
+	case "overview":
+		summary, err := bp.db.GetReportsExecutiveSummary(effectiveResellerID)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل ملخص المتابعة: " + err.Error()
+		}
+		data["ExecutiveSummary"] = summary
+
+		// Include top 10 consumers this month
+		now := time.Now()
+		topConsumers, _ := bp.db.GetTopConsumersReport(effectiveResellerID, now.Year(), int(now.Month()), 10)
+		data["TopConsumers"] = topConsumers
+
+		// Include router health status
+		nasHealth, nasSummary, _ := bp.db.GetNASHealthReport()
+		data["NASHealthList"] = nasHealth
+		data["NASHealthSummary"] = nasSummary
+
+	// =========================================================================
+	// 1. تقرير المصادقة وتسجيل الدخول (Authentication & Logins Report)
+	// =========================================================================
+	case "auth":
+		if export == "csv" {
+			authLogs, _, _, _, err := bp.db.GetAuthLogReport(searchQuery, authReplyFilter, fromDate, toDate, effectiveResellerID, 5000, 0)
+			if err != nil {
+				http.Error(w, "فشل تصدير سجل المصادقة: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			bp.exportAuthLogCSV(w, authLogs)
+			return
+		}
+
+		authLogs, total, authSummary, topFailures, err := bp.db.GetAuthLogReport(searchQuery, authReplyFilter, fromDate, toDate, effectiveResellerID, limit, offset)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل سجل المصادقة: " + err.Error()
+		}
+		data["AuthLogs"] = authLogs
+		data["AuthSummary"] = authSummary
+		data["AuthTopFailed"] = topFailures
+		data["TotalRecords"] = total
+		bp.populatePagination(data, total, page, limit)
+
+	// =========================================================================
+	// 2. تقرير حالات تسجيل الدخول والجلسات (Sessions Report)
 	// =========================================================================
 	case "sessions":
 		if export == "csv" {
 			sessions, _, err := bp.db.GetSubscriberLoginSessionsReport(searchQuery, statusFilter, nasFilter, fromDate, toDate, effectiveResellerID, sortBy, 5000, 0)
 			if err != nil {
-				http.Error(w, "فشل تصدير التقرير: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "فشل تصدير الجلسات: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			bp.exportSessionsCSV(w, sessions)
@@ -135,7 +195,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		bp.populatePagination(data, total, page, limit)
 
 	// =========================================================================
-	// 2. تقرير استهلاك العملاء (Traffic Report)
+	// 3. تقرير استهلاك العملاء (Traffic Report)
 	// =========================================================================
 	case "traffic":
 		trafficUser := strings.TrimSpace(r.URL.Query().Get("user"))
@@ -172,12 +232,72 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	// =========================================================================
-	// 3. تقرير ديون العملاء (Subscriber Debts Report)
+	// 4. تقرير الكوتة والصلاحية (Quota & Expiry Report)
+	// =========================================================================
+	case "quota":
+		if export == "csv" {
+			quotaItems, _, _, err := bp.db.GetQuotaExpiryReport(searchQuery, quotaCategory, effectiveResellerID, 5000, 0)
+			if err != nil {
+				http.Error(w, "فشل تصدير تقرير الكوتة والصلاحية: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			bp.exportQuotaExpiryCSV(w, quotaItems)
+			return
+		}
+
+		quotaItems, total, quotaSummary, err := bp.db.GetQuotaExpiryReport(searchQuery, quotaCategory, effectiveResellerID, limit, offset)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل تقرير الكوتة والصلاحية: " + err.Error()
+		}
+		data["QuotaItems"] = quotaItems
+		data["QuotaSummary"] = quotaSummary
+		data["TotalRecords"] = total
+		bp.populatePagination(data, total, page, limit)
+
+	// =========================================================================
+	// 5. تقرير حالة الخدمة وأحداث CoA/Disconnect (Service Status & Events)
+	// =========================================================================
+	case "service":
+		if export == "csv" {
+			services, _, _, err := bp.db.GetServiceStatusReport(searchQuery, serviceStatusFilter, effectiveResellerID, 5000, 0)
+			if err != nil {
+				http.Error(w, "فشل تصدير تقرير حالة الخدمة: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			bp.exportServiceStatusCSV(w, services)
+			return
+		}
+
+		services, total, srvSummary, err := bp.db.GetServiceStatusReport(searchQuery, serviceStatusFilter, effectiveResellerID, limit, offset)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل تقرير حالة الخدمة: " + err.Error()
+		}
+		data["ServiceItems"] = services
+		data["ServiceSummary"] = srvSummary
+		data["TotalRecords"] = total
+		bp.populatePagination(data, total, page, limit)
+
+	// =========================================================================
+	// 6. تقرير العملاء والنمو ومعدل التجديد (Subscribers Growth & Churn)
+	// =========================================================================
+	case "subscriptions":
+		byProfile, byReseller, growthSummary, err := bp.db.GetSubscribersGrowthReport(effectiveResellerID)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل إحصائيات المشتركين والنمو: " + err.Error()
+		}
+		data["SubscribersByProfile"] = byProfile
+		data["SubscribersByReseller"] = byReseller
+		data["GrowthSummary"] = growthSummary
+
+		if export == "csv" {
+			bp.exportSubscribersGrowthCSV(w, byProfile, byReseller, growthSummary)
+			return
+		}
+
+	// =========================================================================
+	// 7. تقرير ديون العملاء (Subscriber Debts Report)
 	// =========================================================================
 	case "debts":
-		debtStatusFilter := strings.TrimSpace(r.URL.Query().Get("debt_status"))
-		data["DebtStatusFilter"] = debtStatusFilter
-
 		if export == "csv" {
 			debts, _, _, err := bp.db.GetSubscriberDebtsReport(searchQuery, debtStatusFilter, effectiveResellerID, 5000, 0)
 			if err != nil {
@@ -198,7 +318,7 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		bp.populatePagination(data, total, page, limit)
 
 	// =========================================================================
-	// 4. تقرير أرصدة الموزعين والمديرين (Reseller & Admin Balances Report)
+	// 8. تقرير أرصدة الموزعين والمديرين (Reseller & Admin Balances Report)
 	// =========================================================================
 	case "resellers":
 		targetReseller := effectiveResellerID
@@ -230,12 +350,9 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		bp.populatePagination(data, totalLedger, page, limit)
 
 	// =========================================================================
-	// 5. تقرير أرصدة العملاء والعمليات المالية (Subscriber Balances & Ledger)
+	// 9. تقرير أرصدة العملاء والعمليات المالية (Subscriber Balances & Ledger)
 	// =========================================================================
 	case "subscribers":
-		balanceState := strings.TrimSpace(r.URL.Query().Get("balance_state"))
-		data["BalanceState"] = balanceState
-
 		if export == "csv" {
 			subs, _, _, _, _, err := bp.db.GetSubscriberBalancesReport(searchQuery, balanceState, effectiveResellerID, 5000, 0)
 			if err != nil {
@@ -255,6 +372,77 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		data["SubscriberLedger"] = ledgerItems
 		data["TotalRecords"] = total
 		data["TotalLedgerRecords"] = totalLedger
+		bp.populatePagination(data, total, page, limit)
+
+	// =========================================================================
+	// 10. تقرير الإيرادات والربحية المالية (Revenue & Profitability Report)
+	// =========================================================================
+	case "revenue":
+		byProfile, byReseller, revSummary, err := bp.db.GetRevenueProfitReport(effectiveResellerID)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل تقرير الإيرادات والأرباح: " + err.Error()
+		}
+		data["RevenueByProfile"] = byProfile
+		data["RevenueByReseller"] = byReseller
+		data["RevenueSummary"] = revSummary
+
+		if export == "csv" {
+			bp.exportRevenueProfitCSV(w, byProfile, byReseller, revSummary)
+			return
+		}
+
+	// =========================================================================
+	// 11. تقرير حالة الراوترات وسيرفر الراديوس (NAS & RADIUS Health)
+	// =========================================================================
+	case "radius":
+		nasList, nasSummary, err := bp.db.GetNASHealthReport()
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل تقرير الراوترات: " + err.Error()
+		}
+		data["NASHealthList"] = nasList
+		data["NASHealthSummary"] = nasSummary
+
+		if export == "csv" {
+			bp.exportNASHealthCSV(w, nasList)
+			return
+		}
+
+	// =========================================================================
+	// 12. تقرير سعة الشبكة وأوقات الذروة (Capacity & Peak Load Report)
+	// =========================================================================
+	case "capacity":
+		capacityList, capSummary, err := bp.db.GetCapacityPeakReport(effectiveResellerID)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل تقرير سعة الشبكة: " + err.Error()
+		}
+		data["CapacityHourlyList"] = capacityList
+		data["CapacitySummary"] = capSummary
+
+		if export == "csv" {
+			bp.exportCapacityCSV(w, capacityList, capSummary)
+			return
+		}
+
+	// =========================================================================
+	// 13. سجل العمليات والأمان (Audit Log Report)
+	// =========================================================================
+	case "audit":
+		if export == "csv" {
+			logs, _, err := bp.db.GetAuditReport(searchQuery, actionFilter, actorFilter, fromDate, toDate, 5000, 0)
+			if err != nil {
+				http.Error(w, "فشل تصدير سجل الأمان: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			bp.exportAuditCSV(w, logs)
+			return
+		}
+
+		logs, total, err := bp.db.GetAuditReport(searchQuery, actionFilter, actorFilter, fromDate, toDate, limit, offset)
+		if err != nil {
+			data["ErrorMessage"] = "فشل تحميل سجل الأمان: " + err.Error()
+		}
+		data["AuditLogs"] = logs
+		data["TotalRecords"] = total
 		bp.populatePagination(data, total, page, limit)
 	}
 
@@ -563,6 +751,325 @@ func (bp *Blueprint) exportSubscriberBalancesCSV(w http.ResponseWriter, subs []m
 			fmt.Sprintf("%.2f", s.TotalDeposits),
 			fmt.Sprintf("%.2f", s.TotalPurchases),
 			s.LastTxType + " (" + s.LastTxDate + ")",
+		})
+	}
+}
+
+func (bp *Blueprint) exportAuthLogCSV(w http.ResponseWriter, logs []models.AuthLogItem) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=auth_log_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	_ = writer.Write([]string{
+		"اسم المستخدم",
+		"اسم العميل",
+		"رقم العقد",
+		"الموزع",
+		"النتيجة",
+		"نوع الخطأ / التصنيف",
+		"سبب الرفض",
+		"الراوتر / NAS",
+		"عنوان IP",
+		"تاريخ وتوقيت المحاولة",
+	})
+
+	for _, l := range logs {
+		_ = writer.Write([]string{
+			l.Username,
+			l.FullName,
+			l.ContractNo,
+			l.ResellerName,
+			l.Reply,
+			l.ErrorCategory,
+			l.ReasonText,
+			l.NASName,
+			l.ClientIP,
+			l.AuthDateFormatted,
+		})
+	}
+}
+
+func (bp *Blueprint) exportQuotaExpiryCSV(w http.ResponseWriter, items []models.QuotaExpiryItem) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=quota_expiry_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	_ = writer.Write([]string{
+		"اسم المستخدم",
+		"اسم العميل",
+		"رقم العقد",
+		"الهاتف",
+		"الموزع",
+		"الباقة",
+		"الكوتة المخصصة (GB)",
+		"الكوتة المستهلكة (GB)",
+		"الكوتة المتبقية (GB)",
+		"نسبة الاستهلاك %",
+		"تاريخ الانتهاء",
+		"الأيام المتبقية",
+		"حالة الكوتة",
+	})
+
+	for _, q := range items {
+		_ = writer.Write([]string{
+			q.Username,
+			q.FullName,
+			q.ContractNo,
+			q.Phone,
+			q.ResellerName,
+			q.ProfileName,
+			fmt.Sprintf("%.2f", q.TotalQuotaGB),
+			fmt.Sprintf("%.2f", q.UsedGB),
+			fmt.Sprintf("%.2f", q.RemainingGB),
+			fmt.Sprintf("%.1f%%", q.UsagePercent),
+			q.ExpirationDate,
+			strconv.Itoa(q.DaysRemaining),
+			q.StatusText,
+		})
+	}
+}
+
+func (bp *Blueprint) exportServiceStatusCSV(w http.ResponseWriter, items []models.ServiceStatusItem) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=service_status_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	_ = writer.Write([]string{
+		"اسم المستخدم",
+		"اسم العميل",
+		"الموزع",
+		"الباقة",
+		"حالة الخدمة",
+		"الاتصال المباشر",
+		"تاريخ آخر دخول",
+		"أيام منذ آخر دخول",
+		"تاريخ آخر فصل",
+		"سبب آخر فصل",
+		"نجاح CoA",
+		"فشل CoA",
+	})
+
+	for _, s := range items {
+		onlineText := "غير متصل"
+		if s.IsOnline {
+			onlineText = "متصل أونلاين"
+		}
+		_ = writer.Write([]string{
+			s.Username,
+			s.FullName,
+			s.ResellerName,
+			s.ProfileName,
+			s.StatusText,
+			onlineText,
+			s.LastLoginDate,
+			strconv.Itoa(s.DaysSinceLastLogin),
+			s.LastDisconnectDate,
+			s.DisconnectReason,
+			strconv.Itoa(s.CoASuccessCount),
+			strconv.Itoa(s.CoAFailCount),
+		})
+	}
+}
+
+func (bp *Blueprint) exportSubscribersGrowthCSV(w http.ResponseWriter, profiles, resellers []models.SubscribersGrowthItem, sum *models.SubscribersGrowthSummary) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=growth_retention_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	if sum != nil {
+		_ = writer.Write([]string{"--- مؤشرات الاحتفاظ والنمو ---"})
+		_ = writer.Write([]string{"إجمالي المشتركين", strconv.FormatInt(sum.TotalSubscribers, 10)})
+		_ = writer.Write([]string{"مشتركين جدد هذا الشهر", strconv.FormatInt(sum.NewThisMonth, 10)})
+		_ = writer.Write([]string{"تجديدات هذا الشهر", strconv.FormatInt(sum.RenewedThisMonth, 10)})
+		_ = writer.Write([]string{"معدل الاحتفاظ (Retention)", fmt.Sprintf("%.2f%%", sum.RetentionRate)})
+		_ = writer.Write([]string{"معدل التسرب (Churn)", fmt.Sprintf("%.2f%%", sum.ChurnRate)})
+		_ = writer.Write([]string{""})
+	}
+
+	_ = writer.Write([]string{"--- توزيع المشتركين حسب الباقات ---"})
+	_ = writer.Write([]string{"اسم الباقة", "إجمالي المشتركين", "النشطين", "المنتهين", "النسبة %", "إجمالي الإيرادات"})
+	for _, p := range profiles {
+		_ = writer.Write([]string{
+			p.GroupName,
+			strconv.FormatInt(p.Count, 10),
+			strconv.FormatInt(p.ActiveCount, 10),
+			strconv.FormatInt(p.ExpiredCount, 10),
+			fmt.Sprintf("%.1f%%", p.Percentage),
+			fmt.Sprintf("%.2f", p.TotalRevenue),
+		})
+	}
+
+	_ = writer.Write([]string{""})
+	_ = writer.Write([]string{"--- توزيع المشتركين حسب الموزعين ---"})
+	_ = writer.Write([]string{"اسم الموزع", "إجمالي المشتركين", "النشطين", "المنتهين", "النسبة %", "إجمالي الإيرادات"})
+	for _, r := range resellers {
+		_ = writer.Write([]string{
+			r.GroupName,
+			strconv.FormatInt(r.Count, 10),
+			strconv.FormatInt(r.ActiveCount, 10),
+			strconv.FormatInt(r.ExpiredCount, 10),
+			fmt.Sprintf("%.1f%%", r.Percentage),
+			fmt.Sprintf("%.2f", r.TotalRevenue),
+		})
+	}
+}
+
+func (bp *Blueprint) exportRevenueProfitCSV(w http.ResponseWriter, profiles, resellers []models.RevenueProfitItem, sum *models.RevenueProfitSummary) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=revenue_profit_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	if sum != nil {
+		_ = writer.Write([]string{"--- ملخص الأرباح والإيرادات المالية ---"})
+		_ = writer.Write([]string{"إيراد اليوم", fmt.Sprintf("%.2f", sum.TodayRevenue)})
+		_ = writer.Write([]string{"إيراد الشهر الحالي", fmt.Sprintf("%.2f", sum.MonthRevenue)})
+		_ = writer.Write([]string{"إيراد العام الحالي", fmt.Sprintf("%.2f", sum.YearRevenue)})
+		_ = writer.Write([]string{"إجمالي التكلفة التقديرية", fmt.Sprintf("%.2f", sum.TotalEstimatedCost)})
+		_ = writer.Write([]string{"صافي الربح التقديري", fmt.Sprintf("%.2f", sum.TotalNetProfit)})
+		_ = writer.Write([]string{"متوسط هامش الربح %", fmt.Sprintf("%.1f%%", sum.ProfitMarginAvg)})
+		_ = writer.Write([]string{"ديون غير محصلة", fmt.Sprintf("%.2f", sum.TotalUncollectedDebt)})
+		_ = writer.Write([]string{""})
+	}
+
+	_ = writer.Write([]string{"--- ربحية الباقات ---"})
+	_ = writer.Write([]string{"اسم الباقة", "عدد المبيعات", "إجمالي الإيراد", "التكلفة", "صافي الربح", "هامش الربح %"})
+	for _, p := range profiles {
+		_ = writer.Write([]string{
+			p.ItemName,
+			strconv.FormatInt(p.SalesCount, 10),
+			fmt.Sprintf("%.2f", p.GrossRevenue),
+			fmt.Sprintf("%.2f", p.CostPrice),
+			fmt.Sprintf("%.2f", p.NetProfit),
+			fmt.Sprintf("%.1f%%", p.ProfitMargin),
+		})
+	}
+
+	_ = writer.Write([]string{""})
+	_ = writer.Write([]string{"--- ربحية الموزعين ---"})
+	_ = writer.Write([]string{"اسم الموزع", "عدد العمليات", "إجمالي الإيراد", "التكلفة", "صافي الربح", "هامش الربح %"})
+	for _, r := range resellers {
+		_ = writer.Write([]string{
+			r.ItemName,
+			strconv.FormatInt(r.SalesCount, 10),
+			fmt.Sprintf("%.2f", r.GrossRevenue),
+			fmt.Sprintf("%.2f", r.CostPrice),
+			fmt.Sprintf("%.2f", r.NetProfit),
+			fmt.Sprintf("%.1f%%", r.ProfitMargin),
+		})
+	}
+}
+
+func (bp *Blueprint) exportNASHealthCSV(w http.ResponseWriter, items []models.NASHealthItem) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=nas_health_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	_ = writer.Write([]string{
+		"اسم الراوتر / NAS",
+		"الاسم المختصر",
+		"النوع",
+		"الجلسات النشطة",
+		"إجمالي الاستهلاك (GB)",
+		"آخر تحديث محاسبة (Acct)",
+		"آخر محاولة مصادقة (Auth)",
+		"الحالة التشغيلية",
+	})
+
+	for _, n := range items {
+		_ = writer.Write([]string{
+			n.NASName,
+			n.ShortName,
+			n.Type,
+			strconv.Itoa(n.ActiveSessions),
+			fmt.Sprintf("%.2f", n.TotalTrafficGB),
+			n.LastAcctUpdate,
+			n.LastAuthAttempt,
+			n.HealthText,
+		})
+	}
+}
+
+func (bp *Blueprint) exportCapacityCSV(w http.ResponseWriter, items []models.CapacityHourlyItem, sum *models.CapacitySummary) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=network_capacity_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	if sum != nil {
+		_ = writer.Write([]string{"--- مؤشرات سعة الشبكة والذروة ---"})
+		_ = writer.Write([]string{"ساعة الذروة", sum.PeakHourText})
+		_ = writer.Write([]string{"أقصى استهلاك بالساعة (GB)", fmt.Sprintf("%.2f", sum.PeakTrafficHourGB)})
+		_ = writer.Write([]string{"متوسط الاستهلاك بالساعة (GB)", fmt.Sprintf("%.2f", sum.AvgHourlyTrafficGB)})
+		_ = writer.Write([]string{"توصية السعة والنطاق الترددي", sum.BandwidthAdvisory})
+		_ = writer.Write([]string{""})
+	}
+
+	_ = writer.Write([]string{"الساعة", "الجلسات المفتوحة", "التحميل (GB)", "الرفع (GB)", "إجمالي الاستهلاك (GB)", "نسبة الحمل من الذروة %"})
+	for _, c := range items {
+		_ = writer.Write([]string{
+			c.HourDisplay,
+			strconv.Itoa(c.SessionsStarted),
+			fmt.Sprintf("%.2f", c.DownloadGB),
+			fmt.Sprintf("%.2f", c.UploadGB),
+			fmt.Sprintf("%.2f", c.TotalTrafficGB),
+			fmt.Sprintf("%.1f%%", c.PercentOfPeak),
+		})
+	}
+}
+
+func (bp *Blueprint) exportAuditCSV(w http.ResponseWriter, logs []models.AuditReportItem) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=audit_log_%s.csv", time.Now().Format("20060102_150405")))
+	_, _ = w.Write([]byte("\xef\xbb\xbf"))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	_ = writer.Write([]string{
+		"رقم العملية (ID)",
+		"رقم المرجع (Ref ID)",
+		"اسم المستخدم المنفذ",
+		"الدور",
+		"نوع الإجراء",
+		"الهدف (Target Type)",
+		"معرف الهدف (Target ID)",
+		"التفاصيل",
+		"عنوان IP",
+		"التاريخ والوقت",
+	})
+
+	for _, l := range logs {
+		_ = writer.Write([]string{
+			strconv.FormatInt(l.ID, 10),
+			l.ReferenceID,
+			l.ActorUsername,
+			l.ActorRole,
+			l.Action,
+			l.TargetType,
+			l.TargetID,
+			l.Details,
+			l.IPAddress,
+			l.CreatedAtFormatted,
 		})
 	}
 }

@@ -5,13 +5,13 @@
             <span class="p-2 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
                 <i class="bi bi-file-earmark-bar-graph-fill fs-5"></i>
             </span>
-            <span>تقارير وسجلات النظام والتحليلات</span>
+            <span>تقارير وسجلات النظام والتحليلات الشاملة</span>
         </h4>
-        <p class="text-muted small mb-0">مركز متكامل لمتابعة الجلسات المباشرة، استهلاك الكوتة، الديون، وأرصدة الموزعين والعملاء بدقة متناهية</p>
+        <p class="text-muted small mb-0">منصة تحليلية مركزية لمتابعة الجلسات المباشرة، المصادقة، الكوتة، الديون، أرصدة الموزعين والعملاء، الإيرادات والربحية</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-        <a href="/reports?tab={{ .ActiveTab }}&export=csv&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}&reseller_id={{ .ResellerFilter }}&sort={{ .SortBy }}&debt_status={{ .DebtStatusFilter }}&balance_state={{ .BalanceState }}&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month={{ .TrafficMonth }}" 
-           class="btn btn-sm btn-outline-success fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" title="تصدير السجلات إلى ملف Excel مع التوافق الكامل باللغة العربية">
+        <a href="/reports?tab={{ .ActiveTab }}&export=csv&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}&reseller_id={{ .ResellerFilter }}&sort={{ .SortBy }}&debt_status={{ .DebtStatusFilter }}&balance_state={{ .BalanceState }}&auth_reply={{ .AuthReplyFilter }}&quota_category={{ .QuotaCategory }}&service_status={{ .ServiceStatusFilter }}&action_filter={{ .ActionFilter }}&actor={{ .ActorFilter }}&user={{ .TrafficUser }}&year={{ .TrafficYear }}&month={{ .TrafficMonth }}" 
+           class="btn btn-sm btn-outline-success fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" title="تصدير السجلات إلى ملف Excel مع التوافق الكامل باللغة العربية UTF-8">
             <i class="bi bi-file-earmark-spreadsheet-fill"></i> تصدير Excel (CSV)
         </a>
         <button type="button" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" onclick="window.print()" title="طباعة التقرير">
@@ -28,36 +28,87 @@
     <div class="card-body p-2">
         <ul class="nav nav-pills gap-1.5 flex-nowrap overflow-auto" id="reportsTabNav" style="white-space: nowrap;">
             <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "overview" }}active shadow-sm{{ end }}" href="/reports?tab=overview">
+                    <i class="bi bi-speedometer2 {{ if eq .ActiveTab "overview" }}text-white{{ else }}text-primary{{ end }} fs-6"></i>
+                    <span>لوحة المتابعة</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "auth" }}active shadow-sm{{ end }}" href="/reports?tab=auth">
+                    <i class="bi bi-shield-lock {{ if eq .ActiveTab "auth" }}text-white{{ else }}text-danger{{ end }} fs-6"></i>
+                    <span>المصادقة والدخول</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "sessions" }}active shadow-sm{{ end }}" href="/reports?tab=sessions">
-                    <i class="bi bi-broadcast text-success fs-6"></i>
-                    <span>حالات الجلسات والاتصال</span>
+                    <i class="bi bi-broadcast {{ if eq .ActiveTab "sessions" }}text-white{{ else }}text-success{{ end }} fs-6"></i>
+                    <span>الجلسات والاتصال</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "traffic" }}active shadow-sm{{ end }}" href="/reports?tab=traffic{{ if .TrafficUser }}&user={{ .TrafficUser }}{{ end }}">
-                    <i class="bi bi-speedometer2 text-primary fs-6"></i>
+                    <i class="bi bi-graph-up-arrow {{ if eq .ActiveTab "traffic" }}text-white{{ else }}text-info{{ end }} fs-6"></i>
                     <span>استهلاك العملاء</span>
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "quota" }}active shadow-sm{{ end }}" href="/reports?tab=quota">
+                    <i class="bi bi-hourglass-split {{ if eq .ActiveTab "quota" }}text-white{{ else }}text-warning{{ end }} fs-6"></i>
+                    <span>الكوتة والصلاحية</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "service" }}active shadow-sm{{ end }}" href="/reports?tab=service">
+                    <i class="bi bi-hdd-network {{ if eq .ActiveTab "service" }}text-white{{ else }}text-secondary{{ end }} fs-6"></i>
+                    <span>حالة الخدمة</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "subscriptions" }}active shadow-sm{{ end }}" href="/reports?tab=subscriptions">
+                    <i class="bi bi-people {{ if eq .ActiveTab "subscriptions" }}text-white{{ else }}text-primary{{ end }} fs-6"></i>
+                    <span>النمو والاشتراكات</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "debts" }}active shadow-sm{{ end }}" href="/reports?tab=debts">
-                    <i class="bi bi-person-exclamation text-danger fs-6"></i>
+                    <i class="bi bi-person-exclamation {{ if eq .ActiveTab "debts" }}text-white{{ else }}text-danger{{ end }} fs-6"></i>
                     <span>ديون العملاء</span>
-                    {{ if and .DebtsSummary (gt .DebtsSummary.TotalDebtorsCount 0) }}
-                    <span class="badge {{ if eq .ActiveTab "debts" }}bg-white text-danger{{ else }}bg-danger text-white{{ end }} ms-1 fw-bold">{{ .DebtsSummary.TotalDebtorsCount }}</span>
-                    {{ end }}
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "resellers" }}active shadow-sm{{ end }}" href="/reports?tab=resellers">
-                    <i class="bi bi-shop-window text-warning fs-6"></i>
-                    <span>أرصدة وحسابات الموزعين</span>
+                    <i class="bi bi-shop-window {{ if eq .ActiveTab "resellers" }}text-white{{ else }}text-warning{{ end }} fs-6"></i>
+                    <span>أرصدة الموزعين</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "subscribers" }}active shadow-sm{{ end }}" href="/reports?tab=subscribers">
-                    <i class="bi bi-cash-stack text-info fs-6"></i>
-                    <span>أرصدة وحركات العملاء</span>
+                    <i class="bi bi-cash-stack {{ if eq .ActiveTab "subscribers" }}text-white{{ else }}text-success{{ end }} fs-6"></i>
+                    <span>أرصدة العملاء</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "revenue" }}active shadow-sm{{ end }}" href="/reports?tab=revenue">
+                    <i class="bi bi-coin {{ if eq .ActiveTab "revenue" }}text-white{{ else }}text-success{{ end }} fs-6"></i>
+                    <span>الإيرادات والربحية</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "radius" }}active shadow-sm{{ end }}" href="/reports?tab=radius">
+                    <i class="bi bi-router {{ if eq .ActiveTab "radius" }}text-white{{ else }}text-info{{ end }} fs-6"></i>
+                    <span>الراوترات وNAS</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "capacity" }}active shadow-sm{{ end }}" href="/reports?tab=capacity">
+                    <i class="bi bi-activity {{ if eq .ActiveTab "capacity" }}text-white{{ else }}text-danger{{ end }} fs-6"></i>
+                    <span>سعة الشبكة</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link fw-bold px-3 py-2 d-inline-flex align-items-center gap-2 {{ if eq .ActiveTab "audit" }}active shadow-sm{{ end }}" href="/reports?tab=audit">
+                    <i class="bi bi-shield-check {{ if eq .ActiveTab "audit" }}text-white{{ else }}text-dark{{ end }} fs-6"></i>
+                    <span>سجل الأمان</span>
                 </a>
             </li>
         </ul>
@@ -73,7 +124,387 @@
 {{ end }}
 
 <!-- ======================================================================= -->
-<!-- TAB 1: تقرير حالات تسجيل الدخول والجلسات (Sessions Report)              -->
+<!-- TAB 0: لوحة المتابعة الشاملة (Executive Overview Dashboard)             -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "overview" }}
+{{ if .ExecutiveSummary }}
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-broadcast fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">متصلين أونلاين الآن</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ .ExecutiveSummary.OnlineNow }} <small class="fs-6 text-muted">مشترك</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">جلسات نشطة حالياً بالسيرفر</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-speedometer fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">استهلاك اليوم التراكمي</span>
+                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ .ExecutiveSummary.TodayTrafficDisplay }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">دقة 64-bit بالجيجاوورد</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-shield-x fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">دخول مرفوض اليوم</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ .ExecutiveSummary.FailedLoginsToday }} <small class="fs-6 text-muted">محاولة</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">Access-Reject مسجلة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-exclamation-octagon fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">كوتة أو اشتراك منتهي</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ add .ExecutiveSummary.QuotaExhaustedCount .ExecutiveSummary.ExpiredCount }} <small class="fs-6 text-muted">حساب</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">بحاجة لتجديد أو شحن كوتة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3">
+                <span class="text-muted small d-block mb-1">إجمالي ديون العملاء</span>
+                <h5 class="fw-bold text-danger font-monospace mb-1">{{ printf "%.2f" .ExecutiveSummary.TotalCustomerDebt }} ج.م</h5>
+                <span class="text-muted small" style="font-size: 0.72rem;">مستحقات على المشتركين</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3">
+                <span class="text-muted small d-block mb-1">أرصدة العملاء الدائنة</span>
+                <h5 class="fw-bold text-success font-monospace mb-1">{{ printf "%.2f" .ExecutiveSummary.TotalCustomerBalance }} ج.م</h5>
+                <span class="text-muted small" style="font-size: 0.72rem;">مبالغ مشحونة جاهزة للتجديد</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3">
+                <span class="text-muted small d-block mb-1">أرصدة الموزعين المتاحة</span>
+                <h5 class="fw-bold text-primary font-monospace mb-1">{{ printf "%.2f" .ExecutiveSummary.TotalResellerBalance }} ج.م</h5>
+                <span class="text-muted small" style="font-size: 0.72rem;">سيولة الموزعين بالمحفظة</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3">
+                <span class="text-muted small d-block mb-1">إيرادات الشهر وساعة الذروة</span>
+                <h5 class="fw-bold text-dark font-monospace mb-1">{{ printf "%.2f" .ExecutiveSummary.TotalRevenueMonth }} ج.م</h5>
+                <span class="badge bg-light text-primary border" style="font-size: 0.72rem;">{{ .ExecutiveSummary.PeakTrafficHourText }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<!-- Two Column Dashboard Layout: Top Consumers & NAS Quick Health -->
+<div class="row g-4">
+    <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-0 py-3 d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-trophy-fill text-warning"></i>
+                    <span>أعلى 10 مستهلكين للبيانات خلال الشهر الحالي</span>
+                </h6>
+                <a href="/reports?tab=traffic" class="btn btn-sm btn-link text-decoration-none">عرض الجميع &larr;</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3 text-center" style="width: 50px;">#</th>
+                            <th>المشترك</th>
+                            <th>الموزع</th>
+                            <th>الباقة</th>
+                            <th class="text-center">التحميل</th>
+                            <th class="text-center">الرفع</th>
+                            <th class="pe-3 text-end">الإجمالي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ if .TopConsumers }}
+                        {{ range .TopConsumers }}
+                        <tr>
+                            <td class="ps-3 text-center">
+                                <span class="badge {{ if eq .Rank 1 }}bg-warning text-dark{{ else if eq .Rank 2 }}bg-secondary{{ else if eq .Rank 3 }}bg-dark{{ else }}bg-light text-muted border{{ end }} rounded-pill">
+                                    {{ .Rank }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark">{{ .FullName }}</div>
+                                <div class="text-muted font-monospace small">@{{ .Username }}</div>
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                            <td class="small text-muted">{{ .ProfileName }}</td>
+                            <td class="text-center font-monospace">{{ printf "%.2f" .DownloadGB }} GB</td>
+                            <td class="text-center font-monospace">{{ printf "%.2f" .UploadGB }} GB</td>
+                            <td class="pe-3 text-end">
+                                <span class="fw-bold text-primary font-monospace">{{ printf "%.2f" .TotalGB }} GB</span>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ .PercentOfTop }}%;"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        {{ end }}
+                        {{ else }}
+                        <tr><td colspan="7" class="text-center py-4 text-muted">لا يوجد استهلاك مسجل لهذا الشهر</td></tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-5">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-0 py-3 d-flex align-items-center justify-content-between">
+                <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-router-fill text-info"></i>
+                    <span>حالة راوترات الشبكة (NAS Routers)</span>
+                </h6>
+                <a href="/reports?tab=radius" class="btn btn-sm btn-link text-decoration-none">تفاصيل &larr;</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">الراوتر</th>
+                            <th class="text-center">جلسات أونلاين</th>
+                            <th class="text-center">الاستهلاك</th>
+                            <th class="pe-3 text-end">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ if .NASHealthList }}
+                        {{ range .NASHealthList }}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-bold text-dark">{{ .ShortName }}</div>
+                                <div class="text-muted font-monospace small">{{ .NASName }}</div>
+                            </td>
+                            <td class="text-center font-monospace fw-bold text-success">{{ .ActiveSessions }}</td>
+                            <td class="text-center font-monospace">{{ printf "%.1f" .TotalTrafficGB }} GB</td>
+                            <td class="pe-3 text-end">
+                                <span class="badge {{ .HealthBadgeClass }} px-2 py-1">{{ .HealthText }}</span>
+                            </td>
+                        </tr>
+                        {{ end }}
+                        {{ else }}
+                        <tr><td colspan="4" class="text-center py-4 text-muted">لا توجد أجهزة NAS مضافة</td></tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 1: تقرير المصادقة وتسجيل الدخول (Authentication & Logins Report)    -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "auth" }}
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-shield-check fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">إجمالي محاولات الدخول</span>
+                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .AuthSummary }}{{ .AuthSummary.TotalAttempts }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">سجلات طلبات التحقق</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-check-circle fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">دخول ناجح (Accept)</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .AuthSummary }}{{ .AuthSummary.AcceptedCount }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">مصادقة صحيحة ومقبولة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-x-circle fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">دخول مرفوض (Reject)</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .AuthSummary }}{{ .AuthSummary.RejectedCount }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">أخطاء كلمة مرور أو انتهاء</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-percent fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">نسبة النجاح بالمصادقة</span>
+                    <h4 class="fw-bold mb-0 text-info font-monospace">{{ if .AuthSummary }}{{ printf "%.1f" .AuthSummary.SuccessRatePercent }}%{{ else }}0%{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">معدل استقرار تسجيل الدخول</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Form -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-body p-3">
+        <form method="GET" action="/reports" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="auth">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1">بحث بالمستخدم أو العقد</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" placeholder="اسم المستخدم، العميل..." value="{{ .SearchQuery }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">نتيجة الدخول</label>
+                <select name="auth_reply" class="form-select form-select-sm">
+                    <option value="">جميع المحاولات</option>
+                    <option value="Access-Accept" {{ if eq .AuthReplyFilter "Access-Accept" }}selected{{ end }}>دخول ناجح (Accept)</option>
+                    <option value="Access-Reject" {{ if eq .AuthReplyFilter "Access-Reject" }}selected{{ end }}>دخول مرفوض (Reject)</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">من تاريخ</label>
+                <input type="date" name="from" class="form-control form-control-sm" value="{{ .FromDate }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">إلى تاريخ</label>
+                <input type="date" name="to" class="form-control form-control-sm" value="{{ .ToDate }}">
+            </div>
+            <div class="col-6 col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1 fw-bold">
+                    <i class="bi bi-filter"></i> تطبيق الفلتر
+                </button>
+                <a href="/reports?tab=auth" class="btn btn-sm btn-light border text-muted">إعادة ضبط</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width: 60px;">ID</th>
+                    <th>المشترك</th>
+                    <th>رقم العقد</th>
+                    <th>الموزع</th>
+                    <th>النتيجة</th>
+                    <th>تصنيف السبب</th>
+                    <th>الراوتر / NAS</th>
+                    <th>عنوان IP</th>
+                    <th class="pe-3 text-end">وقت المحاولة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ if .AuthLogs }}
+                {{ range .AuthLogs }}
+                <tr>
+                    <td class="ps-3 font-monospace text-muted">{{ .ID }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ .FullName }}</div>
+                        <div class="text-muted font-monospace small">@{{ .Username }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ .ContractNo }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td>
+                        <span class="badge {{ .StatusBadgeClass }} px-2 py-1">
+                            {{ if .IsSuccess }}<i class="bi bi-check-circle me-1"></i> ناجح{{ else }}<i class="bi bi-x-circle me-1"></i> مرفوض{{ end }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="fw-bold small {{ if not .IsSuccess }}text-danger{{ else }}text-success{{ end }}">{{ .ErrorCategory }}</div>
+                        <div class="text-muted small" style="font-size: 0.72rem;">{{ .ReasonText }}</div>
+                    </td>
+                    <td class="small">{{ .NASName }}</td>
+                    <td class="font-monospace small text-muted">{{ .ClientIP }}</td>
+                    <td class="pe-3 text-end font-monospace small text-muted">{{ .AuthDateFormatted }}</td>
+                </tr>
+                {{ end }}
+                {{ else }}
+                <tr><td colspan="9" class="text-center py-4 text-muted">لا توجد سجلات مصادقة مطابقة لشروط البحث</td></tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=auth&page={{ .PrevPage }}&q={{ .SearchQuery }}&auth_reply={{ .AuthReplyFilter }}&from={{ .FromDate }}&to={{ .ToDate }}">السابق</a>
+            </li>
+            {{ range .VisiblePages }}
+            <li class="page-item {{ if eq . $.Page }}active{{ end }}">
+                <a class="page-link" href="/reports?tab=auth&page={{ . }}&q={{ $.SearchQuery }}&auth_reply={{ $.AuthReplyFilter }}&from={{ $.FromDate }}&to={{ $.ToDate }}">{{ . }}</a>
+            </li>
+            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=auth&page={{ .NextPage }}&q={{ .SearchQuery }}&auth_reply={{ .AuthReplyFilter }}&from={{ .FromDate }}&to={{ .ToDate }}">التالي</a>
+            </li>
+        </ul>
+    </div>
+    {{ end }}
+</div>
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 2: تقرير حالات تسجيل الدخول والجلسات (Sessions Report)              -->
 <!-- ======================================================================= -->
 {{ if eq .ActiveTab "sessions" }}
 
@@ -100,9 +531,23 @@
                     <i class="bi bi-journal-check fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">جلسات منتهية</span>
-                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .SessionsSummary }}{{ .SessionsSummary.ClosedSessions }}{{ else }}0{{ end }} <small class="fs-6 text-muted">جلسة</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">سجلت خروج أو أغلقت</span>
+                    <span class="text-muted small d-block">جلسات منتهية ومؤرشفة</span>
+                    <h4 class="fw-bold mb-0 text-secondary font-monospace">{{ if .SessionsSummary }}{{ .SessionsSummary.ClosedSessions }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">تم إغلاقها بشكل طبيعي</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-exclamation-triangle fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">جلسات عالقة أو مفصولة</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .SessionsSummary }}{{ .SessionsSummary.StuckSessions }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">لم تتلقَ تحديثاً منذ أكثر من ساعتين</span>
                 </div>
             </div>
         </div>
@@ -111,12 +556,345 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-people-fill fs-4"></i>
+                    <i class="bi bi-pie-chart-fill fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">إجمالي الجلسات المسجلة</span>
-                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .SessionsSummary }}{{ .SessionsSummary.TotalSessions }}{{ else }}0{{ end }}</h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">لـ <b>{{ if .SessionsSummary }}{{ .SessionsSummary.UniqueUsersCount }}{{ else }}0{{ end }}</b> عميل مختلف</span>
+                    <span class="text-muted small d-block">إجمالي حجم البيانات المتبادلة</span>
+                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .SessionsSummary }}{{ .SessionsSummary.TotalBytesFormatted }}{{ else }}0 B{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">محسوبة بالجيجاوورد بدقة 64-bit</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Form -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-body p-3">
+        <form method="GET" action="/reports" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="sessions">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1">بحث بالعميل أو المستخدم أو IP</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" placeholder="اسم، مستخدم، IP، MAC، عقد..." value="{{ .SearchQuery }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">حالة الجلسة</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">جميع الحالات</option>
+                    <option value="online" {{ if eq .StatusFilter "online" }}selected{{ end }}>متصل حالياً (أونلاين)</option>
+                    <option value="closed" {{ if eq .StatusFilter "closed" }}selected{{ end }}>جلسة منتهية</option>
+                    <option value="stuck" {{ if eq .StatusFilter "stuck" }}selected{{ end }}>جلسة عالقة / معلقة</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">الراوتر / NAS</label>
+                <select name="nas" class="form-select form-select-sm">
+                    <option value="">جميع الراوترات</option>
+                    {{ range .NASRouters }}
+                    <option value="{{ .NASName }}" {{ if eq $.NASFilter .NASName }}selected{{ end }}>{{ .ShortName }} ({{ .NASName }})</option>
+                    {{ end }}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">من تاريخ</label>
+                <input type="date" name="from" class="form-control form-control-sm" value="{{ .FromDate }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">إلى تاريخ</label>
+                <input type="date" name="to" class="form-control form-control-sm" value="{{ .ToDate }}">
+            </div>
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold" title="تطبيق الفلتر">
+                    <i class="bi bi-filter"></i> فلترة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Sessions Table -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width: 70px;">ID</th>
+                    <th>المشترك</th>
+                    <th>رقم العقد</th>
+                    <th>الموزع</th>
+                    <th>الحالة</th>
+                    <th>عنوان IP / MAC</th>
+                    <th>الراوتر / NAS</th>
+                    <th>وقت البداية / النهاية</th>
+                    <th>المدة</th>
+                    <th>التحميل / الرفع</th>
+                    <th>إجمالي الاستهلاك</th>
+                    <th class="pe-3">سبب الإنهاء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ if .Sessions }}
+                {{ range .Sessions }}
+                <tr class="{{ if .IsOnline }}table-success-subtle{{ end }}">
+                    <td class="ps-3 font-monospace text-muted">{{ .RadAcctID }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ .FullName }}</div>
+                        <div class="text-muted font-monospace small">@{{ .UserName }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ .ContractNo }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td>
+                        <span class="badge {{ .StatusBadgeClass }} px-2 py-1">
+                            {{ if .IsOnline }}<i class="bi bi-broadcast me-1"></i>{{ end }}
+                            {{ .StatusText }}
+                        </span>
+                        {{ if .MultipleActive }}
+                        <span class="badge bg-danger ms-1" title="هذا المشترك متصل بأكثر من جلسة في نفس الوقت">مكرر</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <div class="font-monospace fw-bold text-primary">{{ .FramedIPAddress }}</div>
+                        <div class="text-muted font-monospace small">{{ .CallingStationID }}</div>
+                    </td>
+                    <td>
+                        <div class="fw-bold">{{ .NASName }}</div>
+                        <div class="text-muted font-monospace small">{{ .NASIPAddress }}</div>
+                    </td>
+                    <td>
+                        <div class="text-success small"><i class="bi bi-play-circle me-1"></i>{{ .StartTimeFormatted }}</div>
+                        <div class="text-muted small"><i class="bi bi-stop-circle me-1"></i>{{ .StopTimeFormatted }}</div>
+                    </td>
+                    <td class="font-monospace fw-bold">{{ .DurationFormatted }}</td>
+                    <td>
+                        <div class="text-primary font-monospace small"><i class="bi bi-arrow-down-circle me-1"></i>{{ .DownloadFormatted }}</div>
+                        <div class="text-info font-monospace small"><i class="bi bi-arrow-up-circle me-1"></i>{{ .UploadFormatted }}</div>
+                    </td>
+                    <td class="font-monospace fw-bold text-dark">{{ .TotalBytesFormatted }}</td>
+                    <td class="pe-3 small text-muted">{{ .TerminateCauseText }}</td>
+                </tr>
+                {{ end }}
+                {{ else }}
+                <tr><td colspan="12" class="text-center py-4 text-muted">لا توجد سجلات جلسات مطابقة لشروط البحث</td></tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=sessions&page={{ .PrevPage }}&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}">السابق</a>
+            </li>
+            {{ range .VisiblePages }}
+            <li class="page-item {{ if eq . $.Page }}active{{ end }}">
+                <a class="page-link" href="/reports?tab=sessions&page={{ . }}&q={{ $.SearchQuery }}&status={{ $.StatusFilter }}&nas={{ $.NASFilter }}&from={{ $.FromDate }}&to={{ $.ToDate }}">{{ . }}</a>
+            </li>
+            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=sessions&page={{ .NextPage }}&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}">التالي</a>
+            </li>
+        </ul>
+    </div>
+    {{ end }}
+</div>
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 3: تقرير استهلاك العملاء (Traffic Report)                           -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "traffic" }}
+
+<!-- Selection & Filter Form -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-body p-3">
+        <form method="GET" action="/reports" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="traffic">
+            <div class="col-12 col-sm-6 col-md-4">
+                <label class="form-label small fw-bold text-muted mb-1">اسم مستخدم العميل للفحص التفصيلي</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person-fill"></i></span>
+                    <input type="text" name="user" class="form-control border-start-0" placeholder="أدخل اسم المستخدم (مثال: ahmed10)" value="{{ .TrafficUser }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">السنة</label>
+                <select name="year" class="form-select form-select-sm">
+                    <option value="2026" {{ if eq .TrafficYear 2026 }}selected{{ end }}>2026</option>
+                    <option value="2025" {{ if eq .TrafficYear 2025 }}selected{{ end }}>2025</option>
+                    <option value="2024" {{ if eq .TrafficYear 2024 }}selected{{ end }}>2024</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1">الفترة الزمنية</label>
+                <select name="month" class="form-select form-select-sm">
+                    <option value="0" {{ if eq .TrafficMonth 0 }}selected{{ end }}>كامل السنة (12 شهر)</option>
+                    <option value="1" {{ if eq .TrafficMonth 1 }}selected{{ end }}>يناير</option>
+                    <option value="2" {{ if eq .TrafficMonth 2 }}selected{{ end }}>فبراير</option>
+                    <option value="3" {{ if eq .TrafficMonth 3 }}selected{{ end }}>مارس</option>
+                    <option value="4" {{ if eq .TrafficMonth 4 }}selected{{ end }}>أبريل</option>
+                    <option value="5" {{ if eq .TrafficMonth 5 }}selected{{ end }}>مايو</option>
+                    <option value="6" {{ if eq .TrafficMonth 6 }}selected{{ end }}>يونيو</option>
+                    <option value="7" {{ if eq .TrafficMonth 7 }}selected{{ end }}>يوليو</option>
+                    <option value="8" {{ if eq .TrafficMonth 8 }}selected{{ end }}>أغسطس</option>
+                    <option value="9" {{ if eq .TrafficMonth 9 }}selected{{ end }}>سبتمبر</option>
+                    <option value="10" {{ if eq .TrafficMonth 10 }}selected{{ end }}>أكتوبر</option>
+                    <option value="11" {{ if eq .TrafficMonth 11 }}selected{{ end }}>نوفمبر</option>
+                    <option value="12" {{ if eq .TrafficMonth 12 }}selected{{ end }}>ديسمبر</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1 fw-bold">
+                    <i class="bi bi-search"></i> عرض تقرير الاستهلاك
+                </button>
+                <a href="/reports?tab=traffic" class="btn btn-sm btn-light border text-muted">إلغاء</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{ if .TrafficReport }}
+<!-- Single Subscriber Consumption Drill-Down -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-header bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                <i class="bi bi-person-badge-fill text-primary"></i>
+                <span>تقرير استهلاك: {{ .TrafficReport.FullName }}</span>
+                <span class="badge bg-primary-subtle text-primary font-monospace fs-6">@{{ .TrafficReport.Username }}</span>
+            </h5>
+            <span class="text-muted small">رقم العقد: <strong>{{ .TrafficReport.ContractNo }}</strong> &bull; الموزع: <strong>{{ .TrafficReport.ResellerName }}</strong> &bull; الباقة: <strong>{{ .TrafficReport.ProfileName }}</strong></span>
+        </div>
+        <div class="text-end">
+            <span class="text-muted small d-block">إجمالي الاستهلاك بالفترة المحددة:</span>
+            <span class="fw-bold fs-5 text-primary font-monospace">{{ printf "%.2f" .TrafficReport.TotalPeriodGB }} GB</span>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">{{ if eq .TrafficMonth 0 }}الشهر{{ else }}اليوم والتاريخ{{ end }}</th>
+                    <th class="text-center">حجم التحميل (Download)</th>
+                    <th class="text-center">حجم الرفع (Upload)</th>
+                    <th class="text-center">إجمالي الاستهلاك</th>
+                    <th class="text-center">عدد الجلسات</th>
+                    <th class="pe-3 text-end">إجمالي مدة الاتصال</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ if eq .TrafficMonth 0 }}
+                {{ range .TrafficReport.MonthlyList }}
+                <tr>
+                    <td class="ps-3 fw-bold text-dark">{{ .MonthName }}</td>
+                    <td class="text-center font-monospace text-primary">{{ printf "%.2f" .DownloadGB }} GB</td>
+                    <td class="text-center font-monospace text-info">{{ printf "%.2f" .UploadGB }} GB</td>
+                    <td class="text-center font-monospace fw-bold text-success">{{ printf "%.2f" .TotalGB }} GB</td>
+                    <td class="text-center font-monospace">{{ .SessionCount }} جلسة</td>
+                    <td class="pe-3 text-end font-monospace text-muted">{{ .DurationString }}</td>
+                </tr>
+                {{ end }}
+                {{ else }}
+                {{ range .TrafficReport.DailyList }}
+                <tr>
+                    <td class="ps-3">
+                        <span class="fw-bold text-dark">{{ .DayNameAr }}</span>
+                        <span class="text-muted small font-monospace ms-2">({{ .Date }})</span>
+                    </td>
+                    <td class="text-center font-monospace text-primary">{{ printf "%.2f" .DownloadGB }} GB</td>
+                    <td class="text-center font-monospace text-info">{{ printf "%.2f" .UploadGB }} GB</td>
+                    <td class="text-center font-monospace fw-bold text-success">{{ printf "%.2f" .TotalGB }} GB</td>
+                    <td class="text-center font-monospace">{{ .SessionCount }} جلسة</td>
+                    <td class="pe-3 text-end font-monospace text-muted">{{ .DurationString }}</td>
+                </tr>
+                {{ end }}
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ else }}
+<!-- Top 15 Consumers Overview -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-header bg-white border-0 py-3">
+        <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-award-fill text-warning"></i>
+            <span>أكثر 15 عميلاً استهلاكاً للبيانات ({{ if eq .TrafficMonth 0 }}خلال عام {{ .TrafficYear }}{{ else }}شهر {{ .TrafficMonth }} / {{ .TrafficYear }}{{ end }})</span>
+        </h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3 text-center" style="width: 50px;">#</th>
+                    <th>المشترك</th>
+                    <th>رقم العقد</th>
+                    <th>الموزع</th>
+                    <th>الباقة</th>
+                    <th class="text-center">التحميل (Download)</th>
+                    <th class="text-center">الرفع (Upload)</th>
+                    <th class="pe-3 text-end">إجمالي الاستهلاك</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ if .TopConsumers }}
+                {{ range .TopConsumers }}
+                <tr>
+                    <td class="ps-3 text-center">
+                        <span class="badge {{ if eq .Rank 1 }}bg-warning text-dark{{ else if eq .Rank 2 }}bg-secondary{{ else if eq .Rank 3 }}bg-dark{{ else }}bg-light text-muted border{{ end }} rounded-pill">
+                            {{ .Rank }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ .FullName }}</div>
+                        <a href="/reports?tab=traffic&user={{ .Username }}" class="text-primary font-monospace small text-decoration-none">@{{ .Username }} &rarr;</a>
+                    </td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ .ContractNo }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td class="small text-muted">{{ .ProfileName }}</td>
+                    <td class="text-center font-monospace text-primary">{{ printf "%.2f" .DownloadGB }} GB</td>
+                    <td class="text-center font-monospace text-info">{{ printf "%.2f" .UploadGB }} GB</td>
+                    <td class="pe-3 text-end">
+                        <span class="fw-bold text-success font-monospace fs-6">{{ printf "%.2f" .TotalGB }} GB</span>
+                        <div class="progress mt-1" style="height: 5px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ .PercentOfTop }}%;"></div>
+                        </div>
+                    </td>
+                </tr>
+                {{ end }}
+                {{ else }}
+                <tr><td colspan="8" class="text-center py-4 text-muted">لا توجد بيانات استهلاك مسجلة لهذه الفترة</td></tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 4: تقرير الكوتة والصلاحية (Quota & Expiry Report)                   -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "quota" }}
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-hdd-stack fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">إجمالي الكوتة المخصصة</span>
+                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .QuotaSummary }}{{ printf "%.1f" .QuotaSummary.TotalAssignedQuotaGB }} GB{{ else }}0 GB{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">سعة باقات المشتركين الفعالة</span>
                 </div>
             </div>
         </div>
@@ -125,463 +903,309 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-arrow-down-up fs-4"></i>
+                    <i class="bi bi-speedometer2 fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">إجمالي الاستهلاك المسجل</span>
-                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .SessionsSummary }}{{ .SessionsSummary.TotalTrafficDisplay }}{{ else }}0 B{{ end }}</h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">تحميل: <b>{{ if .SessionsSummary }}{{ .SessionsSummary.TotalDownloadDisplay }}{{ else }}0{{ end }}</b> | رفع: <b>{{ if .SessionsSummary }}{{ .SessionsSummary.TotalUploadDisplay }}{{ else }}0{{ end }}</b></span>
+                    <span class="text-muted small d-block">إجمالي المستهلك منها</span>
+                    <h4 class="fw-bold mb-0 text-info font-monospace">{{ if .QuotaSummary }}{{ printf "%.1f" .QuotaSummary.TotalConsumedQuotaGB }} GB{{ else }}0 GB{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">منذ آخر تجديد لكل مشترك</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-battery fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">كوتة نافدة بالكامل (100%)</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .QuotaSummary }}{{ .QuotaSummary.ExhaustedCount }}{{ else }}0{{ end }} <small class="fs-6 text-muted">مشترك</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">تم خفض سرعتهم أو إيقافهم</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-hourglass-bottom fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">أوشكت على النفاد (&ge; 85%)</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .QuotaSummary }}{{ .QuotaSummary.NearExpiryQuotaCount }}{{ else }}0{{ end }} <small class="fs-6 text-muted">مشترك</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">مرشحون لشحن باقات إضافية</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="card border-0 shadow-sm mb-4">
+<!-- Filters Form -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
     <div class="card-body p-3">
-        <form method="GET" action="/reports" class="row g-2 align-items-center">
-            <input type="hidden" name="tab" value="sessions">
-            <div class="col-12 col-md-3">
+        <form method="GET" action="/reports" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="quota">
+            <div class="col-12 col-sm-6 col-md-4">
+                <label class="form-label small fw-bold text-muted mb-1">بحث بالعميل أو المستخدم أو الهاتف</label>
                 <div class="input-group input-group-sm">
-                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" name="q" class="form-control border-start-0" placeholder="بحث باسم العميل، المستخدم، IP، MAC..." value="{{ .SearchQuery }}">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" placeholder="اسم، مستخدم، هاتف، عقد..." value="{{ .SearchQuery }}">
                 </div>
             </div>
-            <div class="col-6 col-md-2">
-                <select name="status" class="form-select form-select-sm">
-                    <option value="" {{ if eq .StatusFilter "" }}selected{{ end }}>كافة الحالات</option>
-                    <option value="online" {{ if eq .StatusFilter "online" }}selected{{ end }}>متصل الآن (Online)</option>
-                    <option value="closed" {{ if eq .StatusFilter "closed" }}selected{{ end }}>منتهية (Closed)</option>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1">حالة الكوتة والصلاحية</label>
+                <select name="quota_category" class="form-select form-select-sm">
+                    <option value="">جميع الحالات</option>
+                    <option value="exhausted" {{ if eq .QuotaCategory "exhausted" }}selected{{ end }}>كوتة منتهية تماماً (Exhausted)</option>
+                    <option value="near_quota" {{ if eq .QuotaCategory "near_quota" }}selected{{ end }}>كوتة أوشكت على النفاد (&ge; 85%)</option>
+                    <option value="near_time" {{ if eq .QuotaCategory "near_time" }}selected{{ end }}>تنتهي قريباً (&le; 3 أيام)</option>
+                    <option value="healthy" {{ if eq .QuotaCategory "healthy" }}selected{{ end }}>كوتة وصلاحية جيدة</option>
                 </select>
             </div>
-            {{ if eq .CurrentUser.Role "admin" }}
-            <div class="col-6 col-md-2">
-                <select name="reseller_id" class="form-select form-select-sm">
-                    <option value="0">كافة الموزعين</option>
-                    {{ range .ResellersList }}
-                    <option value="{{ .ID }}" {{ if eq $.ResellerFilter .ID }}selected{{ end }}>{{ .Name }}</option>
-                    {{ end }}
-                </select>
-            </div>
-            {{ end }}
-            <div class="col-6 col-md-2">
-                <select name="nas" class="form-select form-select-sm">
-                    <option value="">كافة راوترات NAS</option>
-                    {{ range .NASRouters }}
-                    <option value="{{ .NASName }}" {{ if eq $.NASFilter .NASName }}selected{{ end }}>{{ .ShortName }} ({{ .NASName }})</option>
-                    {{ end }}
-                </select>
-            </div>
-            <div class="col-6 col-md-1.5">
-                <select name="sort" class="form-select form-select-sm">
-                    <option value="newest" {{ if eq .SortBy "newest" }}selected{{ end }}>الأحدث أولاً</option>
-                    <option value="duration_desc" {{ if eq .SortBy "duration_desc" }}selected{{ end }}>أطول مدة</option>
-                    <option value="traffic_desc" {{ if eq .SortBy "traffic_desc" }}selected{{ end }}>أعلى استهلاك</option>
-                </select>
-            </div>
-            <div class="col-12 col-md-1.5 d-flex gap-1">
-                <button type="submit" class="btn btn-sm btn-primary fw-bold w-100">
-                    <i class="bi bi-funnel me-1"></i> تصفية
+            <div class="col-6 col-md-3">
+                <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold">
+                    <i class="bi bi-filter"></i> تطبيق الفلتر
                 </button>
-                <a href="/reports?tab=sessions" class="btn btn-sm btn-outline-secondary" title="إعادة ضبط الفلاتر">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                </a>
+            </div>
+            <div class="col-12 col-md-2">
+                <a href="/reports?tab=quota" class="btn btn-sm btn-light border text-muted w-100">إعادة ضبط</a>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Sessions Table -->
-<div class="card border-0 shadow-sm mb-4">
+<!-- Quota Table -->
+<div class="card border-0 shadow-sm rounded-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap" style="font-size: 0.88rem;">
-            <thead class="table-light border-bottom">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
                 <tr>
-                    <th class="ps-3">الحالة</th>
-                    <th>المشترك / العميل</th>
+                    <th class="ps-3">المشترك</th>
+                    <th>رقم العقد</th>
                     <th>الموزع</th>
-                    <th>عنوان IP و MAC</th>
-                    <th>الراوتر / NAS</th>
-                    <th>بداية الاتصال</th>
-                    <th>نهاية الاتصال</th>
-                    <th>مدة الجلسة</th>
-                    <th>التحميل</th>
-                    <th>الرفع</th>
-                    <th>إجمالي الاستهلاك</th>
-                    <th>سبب الإنهاء</th>
-                    <th class="pe-3">Session ID</th>
+                    <th>الباقة</th>
+                    <th class="text-center">الكوتة الكلية</th>
+                    <th class="text-center">المستهلك</th>
+                    <th class="text-center">المتبقي</th>
+                    <th style="min-width: 140px;">نسبة الاستهلاك</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th class="pe-3 text-end">الحالة</th>
                 </tr>
             </thead>
             <tbody>
-                {{ if .Sessions }}
-                {{ range .Sessions }}
-                <tr class="{{ if .IsOnline }}table-success-subtle{{ end }}">
+                {{ if .QuotaItems }}
+                {{ range .QuotaItems }}
+                <tr>
                     <td class="ps-3">
-                        <span class="badge {{ .StatusBadgeClass }} px-2 py-1 font-monospace fw-bold">
-                            {{ if .IsOnline }}<span class="spinner-grow spinner-grow-sm me-1" style="width: 0.5rem; height: 0.5rem;" role="status"></span>{{ end }}
-                            {{ .StatusText }}
+                        <div class="fw-bold text-dark">{{ .FullName }}</div>
+                        <div class="text-muted font-monospace small">@{{ .Username }} &bull; {{ .Phone }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ .ContractNo }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td class="small">{{ .ProfileName }}</td>
+                    <td class="text-center font-monospace">{{ printf "%.1f" .TotalQuotaGB }} GB</td>
+                    <td class="text-center font-monospace text-danger">{{ printf "%.1f" .UsedGB }} GB</td>
+                    <td class="text-center font-monospace fw-bold text-success">{{ printf "%.1f" .RemainingGB }} GB</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="font-monospace small fw-bold" style="width: 45px;">{{ printf "%.1f" .UsagePercent }}%</span>
+                            <div class="progress flex-grow-1" style="height: 6px;">
+                                <div class="progress-bar {{ if ge .UsagePercent 100.0 }}bg-danger{{ else if ge .UsagePercent 85.0 }}bg-warning{{ else }}bg-success{{ end }}" role="progressbar" style="width: {{ .UsagePercent }}%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="small font-monospace">{{ .ExpirationDate }}</div>
+                        <span class="badge {{ if le .DaysRemaining 0 }}bg-danger-subtle text-danger{{ else if le .DaysRemaining 3 }}bg-warning-subtle text-warning{{ else }}bg-light text-muted border{{ end }}" style="font-size: 0.72rem;">
+                            {{ if le .DaysRemaining 0 }}منتهي{{ else }}متبقي {{ .DaysRemaining }} يوم{{ end }}
                         </span>
                     </td>
-                    <td>
-                        <div class="fw-bold text-dark">{{ .FullName }}</div>
-                        <div class="text-muted small font-monospace">@{{ .UserName }} {{ if .ContractNo }}<span class="badge bg-light text-muted border py-0 px-1">{{ .ContractNo }}</span>{{ end }}</div>
+                    <td class="pe-3 text-end">
+                        <span class="badge {{ .StatusBadgeClass }} px-2 py-1">{{ .StatusText }}</span>
                     </td>
-                    <td>
-                        <span class="badge bg-light text-dark border">{{ .ResellerName }}</span>
-                    </td>
-                    <td>
-                        <div class="font-monospace fw-bold text-primary">{{ if .FramedIPAddress }}{{ .FramedIPAddress }}{{ else }}-{{ end }}</div>
-                        <div class="text-muted small font-monospace" style="font-size: 0.72rem;">{{ if .CallingStationID }}{{ .CallingStationID }}{{ else }}-{{ end }}</div>
-                    </td>
-                    <td>
-                        <div class="fw-bold text-secondary">{{ .NASName }}</div>
-                        <div class="text-muted small font-monospace" style="font-size: 0.72rem;">{{ .NASIPAddress }}</div>
-                    </td>
-                    <td class="font-monospace small">{{ .StartTimeFormatted }}</td>
-                    <td class="font-monospace small">
-                        {{ if .IsOnline }}
-                        <span class="text-success fw-bold">قيد الاتصال...</span>
-                        {{ else }}
-                        {{ .StopTimeFormatted }}
-                        {{ end }}
-                    </td>
-                    <td class="font-monospace fw-bold">{{ .DurationFormatted }}</td>
-                    <td class="font-monospace text-primary">{{ .DownloadFormatted }}</td>
-                    <td class="font-monospace text-info">{{ .UploadFormatted }}</td>
-                    <td class="font-monospace fw-bold text-dark">{{ .TotalBytesFormatted }}</td>
-                    <td>
-                        <span class="small text-muted" title="{{ .AcctTerminateCause }}">{{ .TerminateCauseText }}</span>
-                    </td>
-                    <td class="pe-3 font-monospace text-muted small" style="font-size: 0.72rem;">{{ .AcctSessionID }}</td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr>
-                    <td colspan="13" class="text-center py-5 text-muted">
-                        <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary opacity-50"></i>
-                        <span class="fw-bold">لا توجد جلسات تطابق معايير البحث الحالية</span>
-                    </td>
-                </tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">لا توجد سجلات كوتة مطابقة لشروط البحث</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 
     <!-- Pagination -->
-    {{ if and .TotalPages (gt .TotalPages 1) }}
-    <div class="card-footer bg-white border-top d-flex flex-wrap align-items-center justify-content-between gap-2 py-2.5">
-        <span class="text-muted small">إجمالي السجلات: <b class="text-dark">{{ .TotalRecords }}</b> | الصفحة <b>{{ .Page }}</b> من <b>{{ .TotalPages }}</b></span>
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
         <ul class="pagination pagination-sm mb-0">
-            {{ if .HasPrev }}
-            <li class="page-item"><a class="page-link" href="/reports?tab=sessions&page={{ .PrevPage }}&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}&reseller_id={{ .ResellerFilter }}&sort={{ .SortBy }}">السابق</a></li>
-            {{ else }}
-            <li class="page-item disabled"><span class="page-link">السابق</span></li>
-            {{ end }}
-
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=quota&page={{ .PrevPage }}&q={{ .SearchQuery }}&quota_category={{ .QuotaCategory }}">السابق</a>
+            </li>
             {{ range .VisiblePages }}
             <li class="page-item {{ if eq . $.Page }}active{{ end }}">
-                <a class="page-link" href="/reports?tab=sessions&page={{ . }}&q={{ $.SearchQuery }}&status={{ $.StatusFilter }}&nas={{ $.NASFilter }}&from={{ $.FromDate }}&to={{ $.ToDate }}&reseller_id={{ $.ResellerFilter }}&sort={{ $.SortBy }}">{{ . }}</a>
+                <a class="page-link" href="/reports?tab=quota&page={{ . }}&q={{ $.SearchQuery }}&quota_category={{ $.QuotaCategory }}">{{ . }}</a>
             </li>
             {{ end }}
-
-            {{ if .HasNext }}
-            <li class="page-item"><a class="page-link" href="/reports?tab=sessions&page={{ .NextPage }}&q={{ .SearchQuery }}&status={{ .StatusFilter }}&nas={{ .NASFilter }}&from={{ .FromDate }}&to={{ .ToDate }}&reseller_id={{ .ResellerFilter }}&sort={{ .SortBy }}">التالي</a></li>
-            {{ else }}
-            <li class="page-item disabled"><span class="page-link">التالي</span></li>
-            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=quota&page={{ .NextPage }}&q={{ .SearchQuery }}&quota_category={{ .QuotaCategory }}">التالي</a>
+            </li>
         </ul>
     </div>
     {{ end }}
 </div>
-
 {{ end }}
 
 <!-- ======================================================================= -->
-<!-- TAB 2: تقرير استهلاك العملاء (Traffic Report)                           -->
+<!-- TAB 5: تقرير حالة الخدمة والفصل (Service Status & Disconnects)          -->
 <!-- ======================================================================= -->
-{{ if eq .ActiveTab "traffic" }}
+{{ if eq .ActiveTab "service" }}
 
-<!-- User & Date Selector -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-3">
-        <form method="GET" action="/reports" class="row g-2 align-items-center">
-            <input type="hidden" name="tab" value="traffic">
-            <div class="col-12 col-md-4">
-                <label class="form-label small fw-bold mb-1">اسم مستخدم العميل</label>
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
-                    <input type="text" name="user" class="form-control" placeholder="أدخل اسم المستخدم مثل user123..." value="{{ .TrafficUser }}" required>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <label class="form-label small fw-bold mb-1">السنة</label>
-                <select name="year" class="form-select form-select-sm">
-                    <option value="2027" {{ if eq .TrafficYear 2027 }}selected{{ end }}>2027</option>
-                    <option value="2026" {{ if eq .TrafficYear 2026 }}selected{{ end }}>2026</option>
-                    <option value="2025" {{ if eq .TrafficYear 2025 }}selected{{ end }}>2025</option>
-                    <option value="2024" {{ if eq .TrafficYear 2024 }}selected{{ end }}>2024</option>
-                </select>
-            </div>
-            <div class="col-6 col-md-3">
-                <label class="form-label small fw-bold mb-1">الشهر</label>
-                <select name="month" class="form-select form-select-sm">
-                    <option value="0" {{ if eq .TrafficMonth 0 }}selected{{ end }}>تقرير سنة كاملة (12 شهر)</option>
-                    <option value="1" {{ if eq .TrafficMonth 1 }}selected{{ end }}>يناير (1)</option>
-                    <option value="2" {{ if eq .TrafficMonth 2 }}selected{{ end }}>فبراير (2)</option>
-                    <option value="3" {{ if eq .TrafficMonth 3 }}selected{{ end }}>مارس (3)</option>
-                    <option value="4" {{ if eq .TrafficMonth 4 }}selected{{ end }}>أبريل (4)</option>
-                    <option value="5" {{ if eq .TrafficMonth 5 }}selected{{ end }}>مايو (5)</option>
-                    <option value="6" {{ if eq .TrafficMonth 6 }}selected{{ end }}>يونيو (6)</option>
-                    <option value="7" {{ if eq .TrafficMonth 7 }}selected{{ end }}>يوليو (7)</option>
-                    <option value="8" {{ if eq .TrafficMonth 8 }}selected{{ end }}>أغسطس (8)</option>
-                    <option value="9" {{ if eq .TrafficMonth 9 }}selected{{ end }}>سبتمبر (9)</option>
-                    <option value="10" {{ if eq .TrafficMonth 10 }}selected{{ end }}>أكتوبر (10)</option>
-                    <option value="11" {{ if eq .TrafficMonth 11 }}selected{{ end }}>نوفمبر (11)</option>
-                    <option value="12" {{ if eq .TrafficMonth 12 }}selected{{ end }}>ديسمبر (12)</option>
-                </select>
-            </div>
-            <div class="col-12 col-md-2 mt-auto d-flex gap-1">
-                <button type="submit" class="btn btn-sm btn-primary fw-bold w-100">
-                    <i class="bi bi-search me-1"></i> عرض الاستهلاك
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{ if .TrafficReport }}
-<!-- Subscriber Profile Strip -->
-<div class="card border-0 shadow-sm mb-4 bg-primary text-white">
-    <div class="card-body p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <span class="rounded-circle bg-white text-primary p-3 d-inline-flex align-items-center justify-content-center fw-bold fs-4" style="width: 50px; height: 50px;">
-                <i class="bi bi-person-fill"></i>
-            </span>
-            <div>
-                <h5 class="fw-bold mb-0">{{ .TrafficReport.FullName }}</h5>
-                <span class="opacity-75 small font-monospace">@{{ .TrafficReport.Username }}</span>
-                {{ if .TrafficReport.ContractNo }}<span class="badge bg-white text-primary ms-2">{{ .TrafficReport.ContractNo }}</span>{{ end }}
-                <span class="badge bg-white-50 text-white ms-1">{{ .TrafficReport.ProfileDisplay }}</span>
-            </div>
-        </div>
-        <div class="text-end">
-            <span class="d-block opacity-75 small">الموزع: <b>{{ .TrafficReport.ResellerName }}</b></span>
-            <span class="d-block small">الفترة المعروضة: <b>{{ .TrafficReport.SelectedMonthName }} - سنة {{ .TrafficReport.SelectedYear }}</b></span>
-        </div>
-    </div>
-</div>
-
-<!-- Traffic KPI Metrics -->
+<!-- KPI Cards -->
 <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-                <span class="text-muted small d-block mb-1">إجمالي الاستهلاك بالسنة</span>
-                <h4 class="fw-bold text-dark font-monospace mb-0">{{ printf "%.2f" .TrafficReport.YearTotalGB }} <small class="fs-6 text-muted">GB</small></h4>
-                <div class="small text-muted mt-1">تحميل: <b>{{ printf "%.2f" .TrafficReport.YearTotalDownGB }} GB</b> | رفع: <b>{{ printf "%.2f" .TrafficReport.YearTotalUploadGB }} GB</b></div>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 text-center">
+                <span class="text-muted small d-block mb-1">مشتركين نشطين</span>
+                <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .ServiceSummary }}{{ .ServiceSummary.ActiveCount }}{{ else }}0{{ end }}</h4>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-                <span class="text-muted small d-block mb-1">إجمالي الجلسات المسجلة</span>
-                <h4 class="fw-bold text-primary font-monospace mb-0">{{ .TrafficReport.YearTotalSessions }} <small class="fs-6 text-muted">جلسة</small></h4>
-                <div class="small text-muted mt-1">مدة الاتصال: <b>{{ .TrafficReport.YearTotalDuration }}</b></div>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 text-center">
+                <span class="text-muted small d-block mb-1">اشتراكات منتهية</span>
+                <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .ServiceSummary }}{{ .ServiceSummary.ExpiredCount }}{{ else }}0{{ end }}</h4>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-                <span class="text-muted small d-block mb-1">أعلى شهر استهلاكاً (Peak)</span>
-                <h4 class="fw-bold text-danger font-monospace mb-0">{{ printf "%.2f" .TrafficReport.YearPeakMonthGB }} <small class="fs-6 text-muted">GB</small></h4>
-                <div class="small text-muted mt-1">{{ .TrafficReport.YearPeakMonth }}</div>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 text-center">
+                <span class="text-muted small d-block mb-1">حسابات موقوفة</span>
+                <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .ServiceSummary }}{{ .ServiceSummary.SuspendedCount }}{{ else }}0{{ end }}</h4>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-                <span class="text-muted small d-block mb-1">حالة الاتصال المباشر</span>
-                {{ if .TrafficReport.IsOnline }}
-                <h4 class="fw-bold text-success font-monospace mb-0"><i class="bi bi-broadcast me-1"></i> متصل أونلاين</h4>
-                <div class="small text-muted mt-1 font-monospace">IP: {{ .TrafficReport.OnlineIP }}</div>
-                {{ else }}
-                <h4 class="fw-bold text-secondary font-monospace mb-0">غير متصل حالياً</h4>
-                <div class="small text-muted mt-1">غير متصل بالراوتر حالياً</div>
-                {{ end }}
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 text-center">
+                <span class="text-muted small d-block mb-1">خاملون (&gt;30 يوم)</span>
+                <h4 class="fw-bold mb-0 text-secondary font-monospace">{{ if .ServiceSummary }}{{ .ServiceSummary.DormantCount }}{{ else }}0{{ end }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 text-center">
+                <span class="text-muted small d-block mb-1">نجاح CoA/فصل</span>
+                <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .ServiceSummary }}{{ .ServiceSummary.CoASuccessTotal }}{{ else }}0{{ end }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 text-center">
+                <span class="text-muted small d-block mb-1">فشل CoA/فصل</span>
+                <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .ServiceSummary }}{{ .ServiceSummary.CoAFailTotal }}{{ else }}0{{ end }}</h4>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Monthly / Daily Breakdown Table -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-        <h6 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-calendar3 me-2 text-primary"></i> 
-            {{ if eq .TrafficReport.SelectedMonth 0 }}
-            كشف الشهور لسنة {{ .TrafficReport.SelectedYear }} (12 شهراً)
-            {{ else }}
-            كشف الاستهلاك اليومي لشهر {{ .TrafficReport.SelectedMonthName }}
-            {{ end }}
-        </h6>
-    </div>
+<!-- Table -->
+<div class="card border-0 shadow-sm rounded-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">{{ if eq .TrafficReport.SelectedMonth 0 }}الشهر{{ else }}اليوم والتاريخ{{ end }}</th>
-                    <th>التحميل (Download)</th>
-                    <th>الرفع (Upload)</th>
-                    <th>إجمالي الاستهلاك</th>
-                    <th style="min-width: 140px;">مؤشر الاستهلاك</th>
-                    <th>عدد الجلسات</th>
-                    <th>مدة الاتصال</th>
-                    <th class="pe-3 text-end">إجراء</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ if eq .TrafficReport.SelectedMonth 0 }}
-                    {{ range .TrafficReport.MonthlyList }}
-                    <tr>
-                        <td class="ps-3 fw-bold text-dark">{{ .MonthName }}</td>
-                        <td class="font-monospace text-primary">{{ printf "%.2f" .DownloadGB }} GB</td>
-                        <td class="font-monospace text-info">{{ printf "%.2f" .UploadGB }} GB</td>
-                        <td class="font-monospace fw-bold text-dark">{{ printf "%.2f" .TotalGB }} GB</td>
-                        <td>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ .PercentOfPeak }}%;"></div>
-                            </div>
-                        </td>
-                        <td class="font-monospace">{{ .SessionCount }} جلسة</td>
-                        <td class="font-monospace small text-muted">{{ .DurationString }}</td>
-                        <td class="pe-3 text-end">
-                            <a href="/reports?tab=traffic&user={{ $.TrafficUser }}&year={{ $.TrafficYear }}&month={{ .Month }}" class="btn btn-xs btn-outline-primary py-0.5 px-2 small">
-                                <i class="bi bi-zoom-in me-1"></i> فتح أيام الشهر
-                            </a>
-                        </td>
-                    </tr>
-                    {{ end }}
-                {{ else }}
-                    {{ range .TrafficReport.DailyList }}
-                    <tr>
-                        <td class="ps-3">
-                            <span class="fw-bold text-dark">{{ .DayNameAr }}</span>
-                            <span class="text-muted small font-monospace ms-1">({{ .Date }})</span>
-                        </td>
-                        <td class="font-monospace text-primary">{{ printf "%.2f" .DownloadGB }} GB</td>
-                        <td class="font-monospace text-info">{{ printf "%.2f" .UploadGB }} GB</td>
-                        <td class="font-monospace fw-bold text-dark">{{ printf "%.2f" .TotalGB }} GB</td>
-                        <td>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ .PercentOfPeak }}%;"></div>
-                            </div>
-                        </td>
-                        <td class="font-monospace">{{ .SessionCount }} جلسة</td>
-                        <td class="font-monospace small text-muted">{{ .DurationString }}</td>
-                        <td class="pe-3 text-end">
-                            <a href="/reports?tab=sessions&q={{ $.TrafficUser }}&from={{ .Date }}&to={{ .Date }}" class="btn btn-xs btn-outline-secondary py-0.5 px-2 small" title="عرض جلسات هذا اليوم">
-                                جلسات اليوم
-                            </a>
-                        </td>
-                    </tr>
-                    {{ end }}
-                {{ end }}
-            </tbody>
-        </table>
-    </div>
-</div>
-{{ end }}
-
-<!-- Top Consumers Leaderboard -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-        <h6 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-trophy-fill text-warning me-2"></i> أعلى العملاء استهلاكاً (Top Consumers)
-        </h6>
-        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">أعلى 15 مشتركاً</span>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap">
-            <thead class="table-light">
-                <tr>
-                    <th class="ps-3">#</th>
-                    <th>العميل والمشترك</th>
+                    <th class="ps-3">المشترك</th>
                     <th>الموزع</th>
                     <th>الباقة</th>
-                    <th>التحميل</th>
-                    <th>الرفع</th>
-                    <th>إجمالي الاستهلاك</th>
-                    <th>عدد الجلسات</th>
-                    <th class="pe-3 text-end">تقرير العميل</th>
+                    <th>حالة الخدمة</th>
+                    <th>الاتصال المباشر</th>
+                    <th>آخر تسجيل دخول</th>
+                    <th>أيام الغياب</th>
+                    <th>آخر فصل (Disconnect)</th>
+                    <th>سبب الفصل</th>
+                    <th class="pe-3 text-end">أحداث CoA</th>
                 </tr>
             </thead>
             <tbody>
-                {{ if .TopConsumers }}
-                {{ range $index, $c := .TopConsumers }}
+                {{ if .ServiceItems }}
+                {{ range .ServiceItems }}
                 <tr>
-                    <td class="ps-3 font-monospace fw-bold text-muted">{{ add $index 1 }}</td>
-                    <td>
-                        <div class="fw-bold text-dark">{{ $c.FullName }}</div>
-                        <div class="text-muted small font-monospace">@{{ $c.Username }}</div>
+                    <td class="ps-3">
+                        <div class="fw-bold text-dark">{{ .FullName }}</div>
+                        <div class="text-muted font-monospace small">@{{ .Username }}</div>
                     </td>
-                    <td><span class="badge bg-light text-dark border">{{ $c.ResellerName }}</span></td>
-                    <td><span class="badge bg-light text-primary border">{{ $c.ProfileName }}</span></td>
-                    <td class="font-monospace text-primary">{{ printf "%.2f" $c.DownloadGB }} GB</td>
-                    <td class="font-monospace text-info">{{ printf "%.2f" $c.UploadGB }} GB</td>
-                    <td class="font-monospace fw-bold text-dark">{{ printf "%.2f" $c.TotalGB }} GB</td>
-                    <td class="font-monospace">{{ $c.SessionCount }}</td>
-                    <td class="pe-3 text-end">
-                        <a href="/reports?tab=traffic&user={{ $c.Username }}&year={{ $.TrafficYear }}&month={{ $.TrafficMonth }}" class="btn btn-sm btn-outline-primary py-1 px-2.5">
-                            <i class="bi bi-speedometer2 me-1"></i> فتح الكشف
-                        </a>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td class="small text-muted">{{ .ProfileName }}</td>
+                    <td><span class="badge {{ .StatusBadgeClass }} px-2 py-1">{{ .StatusText }}</span></td>
+                    <td>
+                        {{ if .IsOnline }}
+                        <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-broadcast me-1"></i>متصل الآن</span>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">غير متصل</span>
+                        {{ end }}
+                    </td>
+                    <td class="font-monospace small text-muted">{{ .LastLoginDate }}</td>
+                    <td class="font-monospace text-center">{{ .DaysSinceLastLogin }} يوم</td>
+                    <td class="font-monospace small text-muted">{{ .LastDisconnectDate }}</td>
+                    <td class="small text-muted">{{ .DisconnectReason }}</td>
+                    <td class="pe-3 text-end font-monospace">
+                        <span class="badge bg-success-subtle text-success">{{ .CoASuccessCount }} نجاح</span>
+                        <span class="badge bg-danger-subtle text-danger">{{ .CoAFailCount }} فشل</span>
                     </td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr><td colspan="9" class="text-center py-4 text-muted">لا تتوفر سجلات استهلاك كافية للترتيب</td></tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">لا توجد سجلات خدمة مطابقة</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
-</div>
 
+    <!-- Pagination -->
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=service&page={{ .PrevPage }}&q={{ .SearchQuery }}&service_status={{ .ServiceStatusFilter }}">السابق</a>
+            </li>
+            {{ range .VisiblePages }}
+            <li class="page-item {{ if eq . $.Page }}active{{ end }}">
+                <a class="page-link" href="/reports?tab=service&page={{ . }}&q={{ $.SearchQuery }}&service_status={{ $.ServiceStatusFilter }}">{{ . }}</a>
+            </li>
+            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=service&page={{ .NextPage }}&q={{ .SearchQuery }}&service_status={{ $.ServiceStatusFilter }}">التالي</a>
+            </li>
+        </ul>
+    </div>
+    {{ end }}
+</div>
 {{ end }}
 
 <!-- ======================================================================= -->
-<!-- TAB 3: تقرير ديون العملاء (Subscriber Debts Report)                     -->
+<!-- TAB 6: تقرير العملاء والنمو ومعدل التجديد (Subscribers Growth & Retention)-->
 <!-- ======================================================================= -->
-{{ if eq .ActiveTab "debts" }}
+{{ if eq .ActiveTab "subscriptions" }}
 
-<!-- Debts KPI Cards -->
+<!-- KPI Cards -->
 <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-person-exclamation fs-4"></i>
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-people-fill fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">عدد العملاء المدينين</span>
-                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .DebtsSummary }}{{ .DebtsSummary.TotalDebtorsCount }}{{ else }}0{{ end }} <small class="fs-6 text-muted">عميل</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">عليهم مديونيات معلقة</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm h-100 rounded-3">
-            <div class="card-body p-3 d-flex align-items-center gap-3">
-                <span class="p-3 bg-danger text-white rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-cash-stack fs-4"></i>
-                </span>
-                <div class="min-w-0">
-                    <span class="text-muted small d-block">إجمالي قيمة الديون</span>
-                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .DebtsSummary }}{{ printf "%.2f" .DebtsSummary.TotalDebtAmount }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">مستحقات على المشتركين</span>
+                    <span class="text-muted small d-block">إجمالي المشتركين بالنظام</span>
+                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .GrowthSummary }}{{ .GrowthSummary.TotalSubscribers }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">قاعدة العملاء الكلية</span>
                 </div>
             </div>
         </div>
@@ -590,12 +1214,12 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-check2-circle fs-4"></i>
+                    <i class="bi bi-person-plus-fill fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">إجمالي المسدد اليوم</span>
-                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .DebtsSummary }}{{ printf "%.2f" .DebtsSummary.TotalSettledToday }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">تمت تسويته اليوم</span>
+                    <span class="text-muted small d-block">مشتركون جدد هذا الشهر</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">+{{ if .GrowthSummary }}{{ .GrowthSummary.NewThisMonth }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">نمو قاعدة العملاء الجديدة</span>
                 </div>
             </div>
         </div>
@@ -603,77 +1227,205 @@
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <span class="p-3 bg-warning-subtle text-warning-emphasis rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-pie-chart-fill fs-4"></i>
+                <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-arrow-repeat fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">متوسط دين العميل</span>
-                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .DebtsSummary }}{{ printf "%.2f" .DebtsSummary.AverageDebt }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">متوسط المديونية الفردية</span>
+                    <span class="text-muted small d-block">معدل الاحتفاظ (Retention)</span>
+                    <h4 class="fw-bold mb-0 text-info font-monospace">{{ if .GrowthSummary }}{{ printf "%.1f" .GrowthSummary.RetentionRate }}%{{ else }}0%{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">نسبة المشتركين المجددين</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-person-dash-fill fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">معدل التسرب (Churn Rate)</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .GrowthSummary }}{{ printf "%.1f" .GrowthSummary.ChurnRate }}%{{ else }}0%{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">حسابات منتهية لم تجدد</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Debts Filter Bar -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-3">
-        <form method="GET" action="/reports" class="row g-2 align-items-center">
-            <input type="hidden" name="tab" value="debts">
-            <div class="col-12 col-md-4">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" name="q" class="form-control border-start-0" placeholder="بحث بالاسم، المستخدم، الهاتف، رقم العقد..." value="{{ .SearchQuery }}">
+<div class="row g-4">
+    <!-- By Profile -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-pie-chart-fill text-primary"></i>
+                    <span>توزيع المشتركين والإيرادات حسب الباقات (Profiles)</span>
+                </h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">اسم الباقة</th>
+                            <th class="text-center">الإجمالي</th>
+                            <th class="text-center">النشط</th>
+                            <th class="text-center">المنتهي</th>
+                            <th class="text-center">الحصة %</th>
+                            <th class="pe-3 text-end">الإيراد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ if .SubscribersByProfile }}
+                        {{ range .SubscribersByProfile }}
+                        <tr>
+                            <td class="ps-3 fw-bold text-dark">{{ .GroupName }}</td>
+                            <td class="text-center font-monospace">{{ .Count }}</td>
+                            <td class="text-center font-monospace text-success">{{ .ActiveCount }}</td>
+                            <td class="text-center font-monospace text-danger">{{ .ExpiredCount }}</td>
+                            <td class="text-center font-monospace">
+                                <span class="badge bg-light text-primary border">{{ printf "%.1f" .Percentage }}%</span>
+                            </td>
+                            <td class="pe-3 text-end font-monospace fw-bold text-dark">{{ printf "%.2f" .TotalRevenue }} ج.م</td>
+                        </tr>
+                        {{ end }}
+                        {{ else }}
+                        <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد بيانات باقات مسجلة</td></tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- By Reseller -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-shop-window text-warning"></i>
+                    <span>توزيع المشتركين والإيرادات حسب الموزعين</span>
+                </h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">الموزع</th>
+                            <th class="text-center">الإجمالي</th>
+                            <th class="text-center">النشط</th>
+                            <th class="text-center">المنتهي</th>
+                            <th class="text-center">الحصة %</th>
+                            <th class="pe-3 text-end">الإيراد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ if .SubscribersByReseller }}
+                        {{ range .SubscribersByReseller }}
+                        <tr>
+                            <td class="ps-3 fw-bold text-dark">{{ .GroupName }}</td>
+                            <td class="text-center font-monospace">{{ .Count }}</td>
+                            <td class="text-center font-monospace text-success">{{ .ActiveCount }}</td>
+                            <td class="text-center font-monospace text-danger">{{ .ExpiredCount }}</td>
+                            <td class="text-center font-monospace">
+                                <span class="badge bg-light text-warning border">{{ printf "%.1f" .Percentage }}%</span>
+                            </td>
+                            <td class="pe-3 text-end font-monospace fw-bold text-dark">{{ printf "%.2f" .TotalRevenue }} ج.م</td>
+                        </tr>
+                        {{ end }}
+                        {{ else }}
+                        <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد بيانات موزعين مسجلة</td></tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 7: تقرير ديون العملاء (Subscriber Debts Report)                    -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "debts" }}
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-cash-coin fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">إجمالي المبالغ المدينة</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .DebtsSummary }}{{ printf "%.2f" .DebtsSummary.TotalDebtAmount }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">ديون مستحقة على المشتركين</span>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <select name="debt_status" class="form-select form-select-sm">
-                    <option value="" {{ if eq .DebtStatusFilter "" }}selected{{ end }}>كافة تصنيفات الديون</option>
-                    <option value="critical" {{ if eq .DebtStatusFilter "critical" }}selected{{ end }}>متعثر (> 30 يوم أو > 500 ج.م)</option>
-                    <option value="overdue" {{ if eq .DebtStatusFilter "overdue" }}selected{{ end }}>متأخر (8 - 30 يوم)</option>
-                    <option value="minor" {{ if eq .DebtStatusFilter "minor" }}selected{{ end }}>دين بسيط (أقل من أسبوع)</option>
-                </select>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-people fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">عدد العملاء المدينين</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .DebtsSummary }}{{ .DebtsSummary.TotalDebtorsCount }}{{ else }}0{{ end }} <small class="fs-6 text-muted">مشترك</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">عليهم ديون فعلية بالنظام</span>
+                </div>
             </div>
-            {{ if eq .CurrentUser.Role "admin" }}
-            <div class="col-6 col-md-3">
-                <select name="reseller_id" class="form-select form-select-sm">
-                    <option value="0">كافة الموزعين</option>
-                    {{ range .ResellersList }}
-                    <option value="{{ .ID }}" {{ if eq $.ResellerFilter .ID }}selected{{ end }}>{{ .Name }}</option>
-                    {{ end }}
-                </select>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-secondary-subtle text-secondary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-calculator fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">متوسط الدين لكل عميل</span>
+                    <h4 class="fw-bold mb-0 text-secondary font-monospace">{{ if .DebtsSummary }}{{ printf "%.2f" .DebtsSummary.AverageDebtPerUser }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">متوسط قيمة المديونية</span>
+                </div>
             </div>
-            {{ end }}
-            <div class="col-12 col-md-2 d-flex gap-1">
-                <button type="submit" class="btn btn-sm btn-danger fw-bold w-100">
-                    <i class="bi bi-funnel me-1"></i> تصفية الديون
-                </button>
-                <a href="/reports?tab=debts" class="btn btn-sm btn-outline-secondary" title="إعادة ضبط">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                </a>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-dark-subtle text-dark rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-calendar-x fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">ديون حرجة متأخرة (&gt;60 يوم)</span>
+                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .DebtsSummary }}{{ .DebtsSummary.CriticalDebtsCount }}{{ else }}0{{ end }} <small class="fs-6 text-muted">حساب</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">تتطلب متابعة تحصيل عاجلة</span>
+                </div>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
 <!-- Debts Table -->
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm rounded-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">المشترك والعميل</th>
+                    <th class="ps-3">المشترك</th>
+                    <th>رقم العقد</th>
                     <th>الموزع</th>
-                    <th>رقم الهاتف</th>
-                    <th>الرصيد الحالي</th>
-                    <th>قيمة الدين الحالية</th>
+                    <th>رصيد العميل</th>
+                    <th>قيمة الدين</th>
                     <th>عمر الدين</th>
-                    <th>تصنيف المديونية</th>
-                    <th>آخر عملية سداد</th>
+                    <th>درجة الخطورة</th>
+                    <th>قيمة آخر سداد</th>
                     <th>تاريخ آخر سداد</th>
-                    <th>تاريخ آخر تجديد</th>
-                    <th class="pe-3 text-end">إجراء</th>
+                    <th class="pe-3 text-end">تاريخ آخر تجديد</th>
                 </tr>
             </thead>
             <tbody>
@@ -682,81 +1434,54 @@
                 <tr>
                     <td class="ps-3">
                         <div class="fw-bold text-dark">{{ .FullName }}</div>
-                        <div class="text-muted small font-monospace">@{{ .Username }} {{ if .ContractNo }}<span class="badge bg-light text-muted border py-0 px-1">{{ .ContractNo }}</span>{{ end }}</div>
+                        <div class="text-muted font-monospace small">@{{ .Username }} &bull; {{ .Phone }}</div>
                     </td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ .ContractNo }}</span></td>
                     <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
-                    <td class="font-monospace small">{{ .Phone }}</td>
                     <td class="font-monospace text-muted">{{ printf "%.2f" .Balance }} ج.م</td>
                     <td class="font-monospace fw-bold text-danger fs-6">{{ printf "%.2f" .Debt }} ج.م</td>
-                    <td class="font-monospace">
-                        {{ if gt .DebtAgeDays 30 }}
-                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ .DebtAgeDays }} يوم</span>
-                        {{ else if gt .DebtAgeDays 7 }}
-                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ .DebtAgeDays }} يوم</span>
-                        {{ else }}
-                        <span class="badge bg-light text-muted border">{{ .DebtAgeDays }} يوم</span>
-                        {{ end }}
-                    </td>
-                    <td>
-                        <span class="badge {{ .DebtStatusBadgeClass }} px-2 py-1 fw-bold">{{ .DebtStatusText }}</span>
-                    </td>
-                    <td class="font-monospace text-success">{{ if gt .LastPaymentAmount 0.0 }}{{ printf "%.2f" .LastPaymentAmount }} ج.م{{ else }}-{{ end }}</td>
+                    <td class="font-monospace">{{ .DebtAgeDays }} يوم</td>
+                    <td><span class="badge {{ .DebtBadgeClass }} px-2 py-1">{{ .DebtStatusText }}</span></td>
+                    <td class="font-monospace text-success">{{ printf "%.2f" .LastPaymentAmount }} ج.م</td>
                     <td class="font-monospace small text-muted">{{ .LastPaymentDate }}</td>
-                    <td class="font-monospace small text-muted">{{ .LastRenewalDate }}</td>
-                    <td class="pe-3 text-end">
-                        <a href="/subscribers?q={{ .Username }}" class="btn btn-xs btn-outline-primary py-1 px-2.5 small" title="فتح صفحة المشترك">
-                            <i class="bi bi-box-arrow-up-right me-1"></i> إدارة المشترك
-                        </a>
-                    </td>
+                    <td class="pe-3 text-end font-monospace small text-muted">{{ .LastRenewalDate }}</td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr>
-                    <td colspan="11" class="text-center py-5 text-muted">
-                        <i class="bi bi-check-circle-fill fs-1 d-block mb-2 text-success opacity-75"></i>
-                        <span class="fw-bold fs-6">ممتاز! لا توجد ديون مطابقة لمعايير البحث الحالية</span>
-                    </td>
-                </tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">لا توجد ديون مسجلة مطابقة</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 
     <!-- Pagination -->
-    {{ if and .TotalPages (gt .TotalPages 1) }}
-    <div class="card-footer bg-white border-top d-flex flex-wrap align-items-center justify-content-between gap-2 py-2.5">
-        <span class="text-muted small">إجمالي العملاء المدينين: <b class="text-danger">{{ .TotalRecords }}</b> | الصفحة <b>{{ .Page }}</b> من <b>{{ .TotalPages }}</b></span>
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
         <ul class="pagination pagination-sm mb-0">
-            {{ if .HasPrev }}
-            <li class="page-item"><a class="page-link" href="/reports?tab=debts&page={{ .PrevPage }}&q={{ .SearchQuery }}&debt_status={{ .DebtStatusFilter }}&reseller_id={{ .ResellerFilter }}">السابق</a></li>
-            {{ else }}
-            <li class="page-item disabled"><span class="page-link">السابق</span></li>
-            {{ end }}
-
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=debts&page={{ .PrevPage }}&q={{ .SearchQuery }}&debt_status={{ .DebtStatusFilter }}">السابق</a>
+            </li>
             {{ range .VisiblePages }}
             <li class="page-item {{ if eq . $.Page }}active{{ end }}">
-                <a class="page-link" href="/reports?tab=debts&page={{ . }}&q={{ $.SearchQuery }}&debt_status={{ $.DebtStatusFilter }}&reseller_id={{ $.ResellerFilter }}">{{ . }}</a>
+                <a class="page-link" href="/reports?tab=debts&page={{ . }}&q={{ $.SearchQuery }}&debt_status={{ $.DebtStatusFilter }}">{{ . }}</a>
             </li>
             {{ end }}
-
-            {{ if .HasNext }}
-            <li class="page-item"><a class="page-link" href="/reports?tab=debts&page={{ .NextPage }}&q={{ .SearchQuery }}&debt_status={{ .DebtStatusFilter }}&reseller_id={{ .ResellerFilter }}">التالي</a></li>
-            {{ else }}
-            <li class="page-item disabled"><span class="page-link">التالي</span></li>
-            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=debts&page={{ .NextPage }}&q={{ .SearchQuery }}&debt_status={{ $.DebtStatusFilter }}">التالي</a>
+            </li>
         </ul>
     </div>
     {{ end }}
 </div>
-
 {{ end }}
 
 <!-- ======================================================================= -->
-<!-- TAB 4: تقرير أرصدة الموزعين والمديرين (Reseller Balances Report)        -->
+<!-- TAB 8: تقرير أرصدة الموزعين والمديرين (Reseller Balances & Capacity)     -->
 <!-- ======================================================================= -->
 {{ if eq .ActiveTab "resellers" }}
 
-<!-- Resellers KPI Metrics -->
+<!-- Resellers KPI Cards -->
 <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100 rounded-3">
@@ -766,8 +1491,8 @@
                 </span>
                 <div class="min-w-0">
                     <span class="text-muted small d-block">إجمالي أرصدة الموزعين</span>
-                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.TotalResellerBalances }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">أرصدة إيجابية في حساباتهم</span>
+                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.TotalBalancesSum }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">أرصدة إيجابية دائنة</span>
                 </div>
             </div>
         </div>
@@ -776,12 +1501,12 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-exclamation-octagon-fill fs-4"></i>
+                    <i class="bi bi-credit-card-2-front fs-4"></i>
                 </span>
                 <div class="min-w-0">
                     <span class="text-muted small d-block">إجمالي ديون الموزعين</span>
-                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.TotalResellerDebt }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">مستحقات على الموزعين للمركز</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.TotalDebtsSum }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">مبالغ مستحقة على الموزعين</span>
                 </div>
             </div>
         </div>
@@ -790,12 +1515,12 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-shield-check fs-4"></i>
+                    <i class="bi bi-lightning-charge fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">الرصيد المتاح فعلياً (Capacity)</span>
-                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.TotalAvailableCap }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">الرصيد + الحد الائتماني - الدين</span>
+                    <span class="text-muted small d-block">صافي الطاقة التشغيلية</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.NetOperationalCapacity }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">رصيد + حد ائتماني - دين</span>
                 </div>
             </div>
         </div>
@@ -803,13 +1528,13 @@
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-shop fs-4"></i>
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-shield-lock fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">حالة حسابات الموزعين</span>
-                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .ResellerSummary }}{{ .ResellerSummary.ActiveResellersCount }}{{ else }}0{{ end }} <small class="fs-6 text-muted">نشط</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">المتوقفين: <b>{{ if .ResellerSummary }}{{ .ResellerSummary.InactiveResellersCount }}{{ else }}0{{ end }}</b> موزع</span>
+                    <span class="text-muted small d-block">إجمالي الحدود الائتمانية</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .ResellerSummary }}{{ printf "%.2f" .ResellerSummary.TotalCreditLimitSum }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">سقوف السحب على المكشوف الممنوحة</span>
                 </div>
             </div>
         </div>
@@ -817,28 +1542,28 @@
 </div>
 
 <!-- Resellers Table -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-        <h6 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-table me-2 text-primary"></i> جدول الأرصدة والحدود الائتمانية للموزعين
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+    <div class="card-header bg-white border-0 py-3">
+        <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-table text-primary"></i>
+            <span>أرصدة الموزعين والطاقة المتاحة</span>
         </h6>
     </div>
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">الموزع</th>
-                    <th>الهاتف</th>
+                    <th class="ps-3">اسم الموزع</th>
+                    <th>الدور</th>
                     <th>الرصيد الحالي</th>
                     <th>الحد الائتماني</th>
-                    <th>الدين الحالي</th>
-                    <th>القدرة المتاحة للعمليات</th>
-                    <th>العمولة</th>
-                    <th>إجمالي الإيداعات</th>
-                    <th>تكلفة التجديدات</th>
-                    <th>تكلفة الكروت</th>
-                    <th>عدد المشتركين</th>
-                    <th class="pe-3">آخر حركة</th>
+                    <th>الدين</th>
+                    <th>المتاح فعلياً</th>
+                    <th>نسبة العمولة</th>
+                    <th>المشتركين</th>
+                    <th>تجديدات</th>
+                    <th>كروت</th>
+                    <th class="pe-3 text-end">آخر حركة</th>
                 </tr>
             </thead>
             <tbody>
@@ -847,106 +1572,94 @@
                 <tr>
                     <td class="ps-3">
                         <div class="fw-bold text-dark">{{ .Name }}</div>
-                        <div class="text-muted small font-monospace">@{{ .Username }}</div>
+                        <div class="text-muted font-monospace small">@{{ .Username }} &bull; {{ .Phone }}</div>
                     </td>
-                    <td class="font-monospace small">{{ .Phone }}</td>
-                    <td class="font-monospace fw-bold text-primary fs-6">{{ printf "%.2f" .Balance }} ج.م</td>
-                    <td class="font-monospace text-secondary">{{ printf "%.2f" .CreditLimit }} ج.م</td>
+                    <td><span class="badge bg-light text-dark border">{{ .Role }}</span></td>
+                    <td class="font-monospace fw-bold text-primary">{{ printf "%.2f" .Balance }} ج.م</td>
+                    <td class="font-monospace text-muted">{{ printf "%.2f" .CreditLimit }} ج.م</td>
                     <td class="font-monospace {{ if gt .Debt 0.0 }}text-danger fw-bold{{ else }}text-muted{{ end }}">{{ printf "%.2f" .Debt }} ج.م</td>
-                    <td class="font-monospace fw-bold {{ if gt .AvailableCapacity 0.0 }}text-success{{ else }}text-danger{{ end }}">
-                        {{ printf "%.2f" .AvailableCapacity }} ج.م
-                    </td>
-                    <td class="font-monospace text-muted">{{ printf "%.1f" .CommissionPercent }}%</td>
-                    <td class="font-monospace text-success">{{ printf "%.2f" .TotalDeposits }} ج.م</td>
-                    <td class="font-monospace text-dark">{{ printf "%.2f" .TotalRenewalsCost }} ج.م</td>
-                    <td class="font-monospace text-dark">{{ printf "%.2f" .TotalCardsCost }} ج.م</td>
-                    <td class="font-monospace fw-bold text-center"><span class="badge bg-light text-primary border">{{ .SubscribersCount }}</span></td>
-                    <td class="pe-3 font-monospace small text-muted">{{ .LastTxDate }}</td>
+                    <td class="font-monospace fw-bold text-success fs-6">{{ printf "%.2f" .AvailableCapacity }} ج.م</td>
+                    <td class="font-monospace">{{ printf "%.1f" .CommissionPercent }}%</td>
+                    <td class="font-monospace">{{ .SubscribersCount }} مشترك</td>
+                    <td class="font-monospace text-muted">{{ printf "%.2f" .TotalRenewalsCost }} ج.م</td>
+                    <td class="font-monospace text-muted">{{ printf "%.2f" .TotalCardsCost }} ج.م</td>
+                    <td class="pe-3 text-end font-monospace small text-muted">{{ .LastTxDate }}</td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr><td colspan="12" class="text-center py-4 text-muted">لا تتوفر حسابات موزعين للعرض</td></tr>
+                <tr><td colspan="11" class="text-center py-4 text-muted">لا يوجد موزعين مسجلين</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- Reseller Financial Ledger Statement -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-        <h6 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-receipt-cutoff me-2 text-success"></i> سجل العمليات المالية وسندات القيد (Financial Ledger)
+<!-- Reseller Ledger Section -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-header bg-white border-0 py-3">
+        <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history text-secondary"></i>
+            <span>كشف العمليات المالية للموزعين (Financial Ledger)</span>
         </h6>
-        <span class="badge bg-success-subtle text-success border border-success-subtle">حركات مالية حقيقية غير قابلة للتعديل</span>
     </div>
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap" style="font-size: 0.88rem;">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.82rem;">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">رقم المرجع (Ref ID)</th>
+                    <th class="ps-3">المرجع</th>
                     <th>الموزع</th>
                     <th>نوع الحركة</th>
                     <th>المبلغ</th>
-                    <th>الرصيد قبل</th>
-                    <th>الرصيد بعد</th>
-                    <th>الدين قبل</th>
-                    <th>الدين بعد</th>
-                    <th>العميل المستفيد</th>
-                    <th>البيان والتفاصيل</th>
+                    <th>الرصيد قبل / بعد</th>
+                    <th>الدين قبل / بعد</th>
+                    <th>المشترك</th>
+                    <th>البيان</th>
                     <th>المنفذ</th>
-                    <th class="pe-3">التاريخ والوقت</th>
+                    <th class="pe-3 text-end">التاريخ والوقت</th>
                 </tr>
             </thead>
             <tbody>
                 {{ if .ResellerLedger }}
                 {{ range .ResellerLedger }}
                 <tr>
-                    <td class="ps-3 font-monospace fw-bold text-primary">{{ .ReferenceID }}</td>
-                    <td class="fw-bold text-dark">{{ .ResellerName }}</td>
-                    <td>
-                        <span class="badge bg-light text-dark border px-2 py-1">{{ .OperationTypeText }}</span>
-                    </td>
-                    <td class="font-monospace fw-bold fs-6 {{ if gt .Amount 0.0 }}text-success{{ else }}text-danger{{ end }}">
-                        {{ printf "%.2f" .Amount }} ج.م
-                    </td>
-                    <td class="font-monospace text-muted">{{ printf "%.2f" .BalanceBefore }}</td>
-                    <td class="font-monospace fw-bold text-primary">{{ printf "%.2f" .BalanceAfter }}</td>
-                    <td class="font-monospace text-muted">{{ printf "%.2f" .DebtBefore }}</td>
-                    <td class="font-monospace {{ if gt .DebtAfter 0.0 }}text-danger fw-bold{{ else }}text-muted{{ end }}">{{ printf "%.2f" .DebtAfter }}</td>
-                    <td class="font-monospace small">{{ .SubscriberName }}</td>
+                    <td class="ps-3 font-monospace text-primary fw-bold">{{ .ReferenceID }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
+                    <td><span class="badge bg-light text-dark border px-2 py-1">{{ .OperationTypeText }}</span></td>
+                    <td class="font-monospace fw-bold {{ if gt .Amount 0.0 }}text-success{{ else }}text-danger{{ end }}">{{ printf "%.2f" .Amount }} ج.م</td>
+                    <td class="font-monospace small text-muted">{{ printf "%.2f" .BalanceBefore }} &rarr; <strong class="text-primary">{{ printf "%.2f" .BalanceAfter }}</strong></td>
+                    <td class="font-monospace small text-muted">{{ printf "%.2f" .DebtBefore }} &rarr; <strong class="text-danger">{{ printf "%.2f" .DebtAfter }}</strong></td>
+                    <td class="small">{{ .SubscriberName }}</td>
                     <td class="small text-muted">{{ .Description }}</td>
                     <td class="small font-monospace"><span class="badge bg-secondary-subtle text-secondary">{{ .CreatedBy }}</span></td>
-                    <td class="pe-3 font-monospace small text-muted">{{ .CreatedAtFormatted }}</td>
+                    <td class="pe-3 text-end font-monospace small text-muted">{{ .CreatedAtFormatted }}</td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr><td colspan="12" class="text-center py-4 text-muted">لا توجد حركات مالية مسجلة بعد</td></tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">لا توجد حركات مالية مسجلة</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 </div>
-
 {{ end }}
 
 <!-- ======================================================================= -->
-<!-- TAB 5: تقرير أرصدة العملاء والعمليات المالية (Subscriber Balances)       -->
+<!-- TAB 9: تقرير أرصدة العملاء والعمليات المالية (Subscriber Balances)      -->
 <!-- ======================================================================= -->
 {{ if eq .ActiveTab "subscribers" }}
 
-<!-- Subscriber Balances KPI Metrics -->
+<!-- Balances KPI Cards -->
 <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
                     <i class="bi bi-wallet-fill fs-4"></i>
                 </span>
                 <div class="min-w-0">
                     <span class="text-muted small d-block">إجمالي أرصدة المشتركين</span>
-                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .SubscriberSummary }}{{ printf "%.2f" .SubscriberSummary.TotalBalancesSum }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">أرصدة مودعة في المحافظ</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .SubscriberSummary }}{{ printf "%.2f" .SubscriberSummary.TotalBalancesSum }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">أرصدة إيجابية جاهزة للتجديد</span>
                 </div>
             </div>
         </div>
@@ -955,12 +1668,12 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                    <i class="bi bi-credit-card fs-4"></i>
                 </span>
                 <div class="min-w-0">
                     <span class="text-muted small d-block">إجمالي ديون المشتركين</span>
                     <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .SubscriberSummary }}{{ printf "%.2f" .SubscriberSummary.TotalDebtsSum }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">ديون وسلف مستحقة</span>
+                    <span class="text-muted small" style="font-size: 0.72rem;">مستحقات وسلف معلقة</span>
                 </div>
             </div>
         </div>
@@ -968,13 +1681,13 @@
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-graph-up-arrow fs-4"></i>
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-shield-check fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">صافي سيولة العملاء (Net)</span>
-                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .SubscriberSummary }}{{ printf "%.2f" .SubscriberSummary.NetLiquidity }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">الرصيد الكلي - الديون الكلية</span>
+                    <span class="text-muted small d-block">صافي السيولة النقدية</span>
+                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .SubscriberSummary }}{{ printf "%.2f" .SubscriberSummary.NetLiquidity }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">الرصيد مطروحاً منه الديون</span>
                 </div>
             </div>
         </div>
@@ -983,77 +1696,34 @@
         <div class="card border-0 shadow-sm h-100 rounded-3">
             <div class="card-body p-3 d-flex align-items-center gap-3">
                 <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    <i class="bi bi-person-check fs-4"></i>
+                    <i class="bi bi-people-fill fs-4"></i>
                 </span>
                 <div class="min-w-0">
-                    <span class="text-muted small d-block">حسابات ذات رصيد إيجابي</span>
-                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .SubscriberSummary }}{{ .SubscriberSummary.PositiveAccounts }}{{ else }}0{{ end }} <small class="fs-6 text-muted">حساب</small></h4>
-                    <span class="text-muted small" style="font-size: 0.72rem;">حسابات بها رصيد للشراء والتجديد</span>
+                    <span class="text-muted small d-block">حسابات دائنة / مدينة</span>
+                    <h4 class="fw-bold mb-0 text-info font-monospace">{{ if .SubscriberSummary }}{{ .SubscriberSummary.PositiveAccounts }}{{ else }}0{{ end }} <small class="fs-6 text-muted">دائن</small> / {{ if .SubscriberSummary }}{{ .SubscriberSummary.DebtorAccounts }}{{ else }}0{{ end }} <small class="fs-6 text-muted">مدين</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">توزيع الحالة المالية للمشتركين</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Subscribers Balances Filter Bar -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body p-3">
-        <form method="GET" action="/reports" class="row g-2 align-items-center">
-            <input type="hidden" name="tab" value="subscribers">
-            <div class="col-12 col-md-4">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" name="q" class="form-control border-start-0" placeholder="بحث باسم العميل، المستخدم، الهاتف، رقم العقد..." value="{{ .SearchQuery }}">
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <select name="balance_state" class="form-select form-select-sm">
-                    <option value="" {{ if eq .BalanceFilter "" }}selected{{ end }}>كافة الحسابات</option>
-                    <option value="positive" {{ if eq .BalanceFilter "positive" }}selected{{ end }}>حسابات بها رصيد (> 0)</option>
-                    <option value="debt" {{ if eq .BalanceFilter "debt" }}selected{{ end }}>حسابات عليها ديون (> 0)</option>
-                    <option value="zero" {{ if eq .BalanceFilter "zero" }}selected{{ end }}>حسابات رصيدها صفر</option>
-                </select>
-            </div>
-            {{ if eq .CurrentUser.Role "admin" }}
-            <div class="col-6 col-md-3">
-                <select name="reseller_id" class="form-select form-select-sm">
-                    <option value="0">كافة الموزعين</option>
-                    {{ range .ResellersList }}
-                    <option value="{{ .ID }}" {{ if eq $.ResellerFilter .ID }}selected{{ end }}>{{ .Name }}</option>
-                    {{ end }}
-                </select>
-            </div>
-            {{ end }}
-            <div class="col-12 col-md-2 d-flex gap-1">
-                <button type="submit" class="btn btn-sm btn-primary fw-bold w-100">
-                    <i class="bi bi-funnel me-1"></i> تصفية
-                </button>
-                <a href="/reports?tab=subscribers" class="btn btn-sm btn-outline-secondary" title="إعادة ضبط">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                </a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Subscribers Balances Table -->
-<div class="card border-0 shadow-sm mb-4">
+<!-- Subscribers Balance Table -->
+<div class="card border-0 shadow-sm rounded-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">المشترك والعميل</th>
+                    <th class="ps-3">المشترك</th>
+                    <th>رقم العقد</th>
                     <th>الموزع</th>
                     <th>الباقة</th>
-                    <th>الرصيد الحالي</th>
-                    <th>الدين الحالي</th>
-                    <th>الرصيد الصافي</th>
-                    <th>قيمة آخر شحن</th>
-                    <th>تاريخ آخر شحن</th>
-                    <th>إجمالي الشحنات</th>
-                    <th>إجمالي المشتريات</th>
-                    <th>حالة الحساب</th>
-                    <th class="pe-3">السلفة</th>
+                    <th>الرصيد</th>
+                    <th>الدين</th>
+                    <th>صافي الرصيد</th>
+                    <th>سلفة نشطة</th>
+                    <th>آخر شحن</th>
+                    <th class="pe-3 text-end">آخر حركة</th>
                 </tr>
             </thead>
             <tbody>
@@ -1062,134 +1732,537 @@
                 <tr>
                     <td class="ps-3">
                         <div class="fw-bold text-dark">{{ .FullName }}</div>
-                        <div class="text-muted small font-monospace">@{{ .Username }} {{ if .ContractNo }}<span class="badge bg-light text-muted border py-0 px-1">{{ .ContractNo }}</span>{{ end }}</div>
+                        <div class="text-muted font-monospace small">@{{ .Username }} &bull; {{ .Phone }}</div>
                     </td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ .ContractNo }}</span></td>
                     <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
-                    <td><span class="badge bg-light text-primary border">{{ .ProfileName }}</span></td>
-                    <td class="font-monospace fw-bold {{ if gt .Balance 0.0 }}text-success{{ else }}text-muted{{ end }} fs-6">
-                        {{ printf "%.2f" .Balance }} ج.م
-                    </td>
-                    <td class="font-monospace {{ if gt .Debt 0.0 }}text-danger fw-bold{{ else }}text-muted{{ end }}">
-                        {{ printf "%.2f" .Debt }} ج.م
-                    </td>
-                    <td class="font-monospace fw-bold {{ if gt .NetBalance 0.0 }}text-success{{ else if lt .NetBalance 0.0 }}text-danger{{ else }}text-muted{{ end }}">
-                        {{ printf "%.2f" .NetBalance }} ج.م
-                    </td>
-                    <td class="font-monospace text-primary">{{ if gt .LastDepositAmount 0.0 }}{{ printf "%.2f" .LastDepositAmount }} ج.م{{ else }}-{{ end }}</td>
-                    <td class="font-monospace small text-muted">{{ .LastDepositDate }}</td>
-                    <td class="font-monospace text-success">{{ printf "%.2f" .TotalDeposits }} ج.م</td>
-                    <td class="font-monospace text-dark">{{ printf "%.2f" .TotalPurchases }} ج.م</td>
+                    <td class="small">{{ .ProfileName }}</td>
+                    <td class="font-monospace fw-bold text-success">{{ printf "%.2f" .Balance }} ج.م</td>
+                    <td class="font-monospace {{ if gt .Debt 0.0 }}text-danger fw-bold{{ else }}text-muted{{ end }}">{{ printf "%.2f" .Debt }} ج.م</td>
+                    <td class="font-monospace fw-bold {{ if ge .NetBalance 0.0 }}text-primary{{ else }}text-danger{{ end }}">{{ printf "%.2f" .NetBalance }} ج.م</td>
                     <td>
-                        {{ if eq .Status "active" }}
-                        <span class="badge bg-success-subtle text-success border border-success-subtle">نشط</span>
-                        {{ else if eq .Status "expired" }}
-                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">منتهي</span>
-                        {{ else }}
-                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ .Status }}</span>
-                        {{ end }}
-                    </td>
-                    <td class="pe-3">
                         {{ if .LoanActive }}
-                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-hourglass-split me-1"></i> سلفة نشطة</span>
+                        <span class="badge bg-warning-subtle text-warning border border-warning">سلفة نشطة</span>
                         {{ else }}
                         <span class="text-muted small">-</span>
                         {{ end }}
                     </td>
+                    <td>
+                        <div class="font-monospace text-success small">{{ printf "%.2f" .LastDepositAmount }} ج.م</div>
+                        <div class="text-muted small font-monospace">{{ .LastDepositDate }}</div>
+                    </td>
+                    <td class="pe-3 text-end">
+                        <div class="small fw-bold text-dark">{{ .LastTxType }}</div>
+                        <div class="text-muted font-monospace small">{{ .LastTxDate }}</div>
+                    </td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr><td colspan="12" class="text-center py-5 text-muted">لا توجد حسابات عملاء تطابق شروط التصفية</td></tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">لا توجد سجلات أرصدة مطابقة</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 
     <!-- Pagination -->
-    {{ if and .TotalPages (gt .TotalPages 1) }}
-    <div class="card-footer bg-white border-top d-flex flex-wrap align-items-center justify-content-between gap-2 py-2.5">
-        <span class="text-muted small">إجمالي المشتركين: <b class="text-dark">{{ .TotalRecords }}</b> | الصفحة <b>{{ .Page }}</b> من <b>{{ .TotalPages }}</b></span>
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
         <ul class="pagination pagination-sm mb-0">
-            {{ if .HasPrev }}
-            <li class="page-item"><a class="page-link" href="/reports?tab=subscribers&page={{ .PrevPage }}&q={{ .SearchQuery }}&balance_state={{ .BalanceFilter }}&reseller_id={{ .ResellerFilter }}">السابق</a></li>
-            {{ else }}
-            <li class="page-item disabled"><span class="page-link">السابق</span></li>
-            {{ end }}
-
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=subscribers&page={{ .PrevPage }}&q={{ .SearchQuery }}&balance_state={{ .BalanceState }}">السابق</a>
+            </li>
             {{ range .VisiblePages }}
             <li class="page-item {{ if eq . $.Page }}active{{ end }}">
-                <a class="page-link" href="/reports?tab=subscribers&page={{ . }}&q={{ $.SearchQuery }}&balance_state={{ $.BalanceFilter }}&reseller_id={{ $.ResellerFilter }}">{{ . }}</a>
+                <a class="page-link" href="/reports?tab=subscribers&page={{ . }}&q={{ $.SearchQuery }}&balance_state={{ $.BalanceState }}">{{ . }}</a>
             </li>
             {{ end }}
-
-            {{ if .HasNext }}
-            <li class="page-item"><a class="page-link" href="/reports?tab=subscribers&page={{ .NextPage }}&q={{ .SearchQuery }}&balance_state={{ .BalanceFilter }}&reseller_id={{ .ResellerFilter }}">التالي</a></li>
-            {{ else }}
-            <li class="page-item disabled"><span class="page-link">التالي</span></li>
-            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=subscribers&page={{ .NextPage }}&q={{ .SearchQuery }}&balance_state={{ $.BalanceState }}">التالي</a>
+            </li>
         </ul>
     </div>
     {{ end }}
 </div>
+{{ end }}
 
-<!-- Subscriber Financial Ledger Timeline -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-        <h6 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-clock-history me-2 text-info"></i> سجل العمليات وسندات الصرف والإيداع للعملاء
-        </h6>
-        <span class="badge bg-info-subtle text-info border border-info-subtle">حركات محاسبية مؤكدة مع Ledger References</span>
+<!-- ======================================================================= -->
+<!-- TAB 10: تقرير الإيرادات والربحية المالية (Revenue & Profitability)       -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "revenue" }}
+
+<!-- Revenue KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-calendar2-day fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">إيرادات اليوم</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .RevenueSummary }}{{ printf "%.2f" .RevenueSummary.TodayRevenue }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">المحصل خلال الـ 24 ساعة الماضية</span>
+                </div>
+            </div>
+        </div>
     </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-calendar2-month fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">إيرادات الشهر الحالي</span>
+                    <h4 class="fw-bold mb-0 text-primary font-monospace">{{ if .RevenueSummary }}{{ printf "%.2f" .RevenueSummary.MonthRevenue }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">إجمالي المقبوضات الشهرية</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-graph-up fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">صافي الأرباح التقديرية</span>
+                    <h4 class="fw-bold mb-0 text-info font-monospace">{{ if .RevenueSummary }}{{ printf "%.2f" .RevenueSummary.TotalNetProfit }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">متوسط هامش: {{ if .RevenueSummary }}{{ printf "%.1f" .RevenueSummary.ProfitMarginAvg }}%{{ else }}0%{{ end }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-hourglass-top fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">ديون غير محصلة</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .RevenueSummary }}{{ printf "%.2f" .RevenueSummary.TotalUncollectedDebt }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">ج.م</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">مستحقات بالخارج</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Revenue By Profile -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-cash-stack text-success"></i>
+                    <span>مبيعات وأرباح الباقات</span>
+                </h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">الباقة</th>
+                            <th class="text-center">العمليات</th>
+                            <th class="text-center">الإيراد</th>
+                            <th class="text-center">التكلفة</th>
+                            <th class="text-center">صافي الربح</th>
+                            <th class="pe-3 text-end">هامش الربح</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ if .RevenueByProfile }}
+                        {{ range .RevenueByProfile }}
+                        <tr>
+                            <td class="ps-3 fw-bold text-dark">{{ .ItemName }}</td>
+                            <td class="text-center font-monospace">{{ .SalesCount }}</td>
+                            <td class="text-center font-monospace text-primary">{{ printf "%.2f" .GrossRevenue }}</td>
+                            <td class="text-center font-monospace text-muted">{{ printf "%.2f" .CostPrice }}</td>
+                            <td class="text-center font-monospace fw-bold text-success">{{ printf "%.2f" .NetProfit }}</td>
+                            <td class="pe-3 text-end">
+                                <span class="badge bg-success-subtle text-success font-monospace">{{ printf "%.1f" .ProfitMargin }}%</span>
+                            </td>
+                        </tr>
+                        {{ end }}
+                        {{ else }}
+                        <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد مبيعات مسجلة</td></tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue By Reseller -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-shop text-warning"></i>
+                    <span>مبيعات وأرباح الموزعين</span>
+                </h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">الموزع</th>
+                            <th class="text-center">العمليات</th>
+                            <th class="text-center">الإيراد</th>
+                            <th class="text-center">التكلفة</th>
+                            <th class="text-center">صافي الربح</th>
+                            <th class="pe-3 text-end">هامش الربح</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ if .RevenueByReseller }}
+                        {{ range .RevenueByReseller }}
+                        <tr>
+                            <td class="ps-3 fw-bold text-dark">{{ .ItemName }}</td>
+                            <td class="text-center font-monospace">{{ .SalesCount }}</td>
+                            <td class="text-center font-monospace text-primary">{{ printf "%.2f" .GrossRevenue }}</td>
+                            <td class="text-center font-monospace text-muted">{{ printf "%.2f" .CostPrice }}</td>
+                            <td class="text-center font-monospace fw-bold text-success">{{ printf "%.2f" .NetProfit }}</td>
+                            <td class="pe-3 text-end">
+                                <span class="badge bg-warning-subtle text-warning font-monospace">{{ printf "%.1f" .ProfitMargin }}%</span>
+                            </td>
+                        </tr>
+                        {{ end }}
+                        {{ else }}
+                        <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد بيانات موزعين مسجلة</td></tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 11: تقرير حالة الراوترات وسيرفر الراديوس (NAS & RADIUS Health)       -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "radius" }}
+
+<!-- NAS Health KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-primary-subtle text-primary rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-router fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">إجمالي راوترات الشبكة (NAS)</span>
+                    <h4 class="fw-bold mb-0 text-dark font-monospace">{{ if .NASHealthSummary }}{{ .NASHealthSummary.TotalRouters }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">أجهزة ميكروتك وسيسكو مضافة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-check-all fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">راوترات متصلة ونشطة</span>
+                    <h4 class="fw-bold mb-0 text-success font-monospace">{{ if .NASHealthSummary }}{{ .NASHealthSummary.OnlineRouters }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">ترسل Accounting وتستقبل راديوس</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-pause-circle fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">راوترات في وضع الخمول</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .NASHealthSummary }}{{ .NASHealthSummary.IdleRouters }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">متصلة بدون مستخدمين نشطين</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-slash-circle fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">راوترات غير متصلة (Offline)</span>
+                    <h4 class="fw-bold mb-0 text-danger font-monospace">{{ if .NASHealthSummary }}{{ .NASHealthSummary.OfflineRouters }}{{ else }}0{{ end }}</h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">انقطع الاتصال بها</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NAS Table -->
+<div class="card border-0 shadow-sm rounded-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap" style="font-size: 0.88rem;">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">رقم المرجع (Ref ID)</th>
-                    <th>المشترك</th>
-                    <th>نوع الحركة</th>
-                    <th>المبلغ</th>
-                    <th>الرصيد قبل</th>
-                    <th>الرصيد بعد</th>
-                    <th>الدين قبل</th>
-                    <th>الدين بعد</th>
-                    <th>طريقة الدفع</th>
-                    <th>البيان والتفاصيل</th>
-                    <th>المنفذ</th>
-                    <th class="pe-3">التاريخ والوقت</th>
+                    <th class="ps-3">اسم الراوتر</th>
+                    <th>عنوان IP</th>
+                    <th>النوع</th>
+                    <th class="text-center">الجلسات النشطة</th>
+                    <th class="text-center">إجمالي الاستهلاك</th>
+                    <th>آخر تحديث محاسبة</th>
+                    <th>آخر محاولة مصادقة</th>
+                    <th class="pe-3 text-end">الحالة التشغيلية</th>
                 </tr>
             </thead>
             <tbody>
-                {{ if .SubscriberLedger }}
-                {{ range .SubscriberLedger }}
+                {{ if .NASHealthList }}
+                {{ range .NASHealthList }}
                 <tr>
-                    <td class="ps-3 font-monospace fw-bold text-primary">{{ .ReferenceID }}</td>
-                    <td>
-                        <div class="fw-bold text-dark">{{ .FullName }}</div>
-                        <div class="text-muted small font-monospace">@{{ .Username }}</div>
+                    <td class="ps-3 fw-bold text-dark">{{ .ShortName }}</td>
+                    <td class="font-monospace text-primary">{{ .NASName }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ .Type }}</span></td>
+                    <td class="text-center font-monospace fw-bold text-success">{{ .ActiveSessions }}</td>
+                    <td class="text-center font-monospace">{{ printf "%.2f" .TotalTrafficGB }} GB</td>
+                    <td class="font-monospace small text-muted">{{ .LastAcctUpdate }}</td>
+                    <td class="font-monospace small text-muted">{{ .LastAuthAttempt }}</td>
+                    <td class="pe-3 text-end">
+                        <span class="badge {{ .HealthBadgeClass }} px-2 py-1">{{ .HealthText }}</span>
                     </td>
-                    <td>
-                        <span class="badge bg-light text-dark border px-2 py-1">{{ .OperationTypeText }}</span>
-                    </td>
-                    <td class="font-monospace fw-bold fs-6 {{ if gt .Amount 0.0 }}text-success{{ else }}text-danger{{ end }}">
-                        {{ printf "%.2f" .Amount }} ج.م
-                    </td>
-                    <td class="font-monospace text-muted">{{ printf "%.2f" .BalanceBefore }}</td>
-                    <td class="font-monospace fw-bold text-primary">{{ printf "%.2f" .BalanceAfter }}</td>
-                    <td class="font-monospace text-muted">{{ printf "%.2f" .DebtBefore }}</td>
-                    <td class="font-monospace {{ if gt .DebtAfter 0.0 }}text-danger fw-bold{{ else }}text-muted{{ end }}">{{ printf "%.2f" .DebtAfter }}</td>
-                    <td><span class="badge bg-light text-secondary border">{{ .PaymentMethod }}</span></td>
-                    <td class="small text-muted">{{ .Description }}</td>
-                    <td class="small font-monospace"><span class="badge bg-secondary-subtle text-secondary">{{ .CreatedBy }}</span></td>
-                    <td class="pe-3 font-monospace small text-muted">{{ .CreatedAtFormatted }}</td>
                 </tr>
                 {{ end }}
                 {{ else }}
-                <tr><td colspan="12" class="text-center py-4 text-muted">لا توجد حركات مالية للعملاء مسجلة بعد</td></tr>
+                <tr><td colspan="8" class="text-center py-4 text-muted">لا توجد راوترات مسجلة</td></tr>
                 {{ end }}
             </tbody>
         </table>
     </div>
 </div>
+{{ end }}
 
+<!-- ======================================================================= -->
+<!-- TAB 12: تقرير سعة الشبكة وأوقات الذروة (Capacity & Peak Load)            -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "capacity" }}
+
+<!-- Capacity KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-danger-subtle text-danger rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-clock-fill fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">أوقات الذروة القصوى</span>
+                    <h5 class="fw-bold mb-0 text-danger font-monospace">{{ if .CapacitySummary }}{{ .CapacitySummary.PeakHourText }}{{ else }}-{{ end }}</h5>
+                    <span class="text-muted small" style="font-size: 0.72rem;">أعلى ساعات ازدحام على الشبكة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-warning-subtle text-warning rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-speedometer fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">أعلى استهلاك في ساعة واحدة</span>
+                    <h4 class="fw-bold mb-0 text-warning font-monospace">{{ if .CapacitySummary }}{{ printf "%.2f" .CapacitySummary.PeakTrafficHourGB }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">GB</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">حجم البيانات خلال ساعة الذروة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-info-subtle text-info rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-bar-chart fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">متوسط الاستهلاك بالساعة</span>
+                    <h4 class="fw-bold mb-0 text-info font-monospace">{{ if .CapacitySummary }}{{ printf "%.2f" .CapacitySummary.AvgHourlyTrafficGB }}{{ else }}0.00{{ end }} <small class="fs-6 text-muted">GB</small></h4>
+                    <span class="text-muted small" style="font-size: 0.72rem;">المعدل على مدار الـ 24 ساعة</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100 rounded-3">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <span class="p-3 bg-success-subtle text-success rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                    <i class="bi bi-lightbulb fs-4"></i>
+                </span>
+                <div class="min-w-0">
+                    <span class="text-muted small d-block">توصية سعة الشبكة</span>
+                    <h6 class="fw-bold mb-0 text-success">{{ if .CapacitySummary }}{{ .CapacitySummary.BandwidthAdvisory }}{{ else }}سعة مستقرة{{ end }}</h6>
+                    <span class="text-muted small" style="font-size: 0.72rem;">تحليل ذكي للحمل</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 24-Hour Load Curve Table -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="card-header bg-white border-0 py-3">
+        <h6 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-graph-up text-primary"></i>
+            <span>منحنى الحمل على مدار 24 ساعة اليوم</span>
+        </h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width: 100px;">الساعة</th>
+                    <th class="text-center">الجلسات المفتوحة</th>
+                    <th class="text-center">التحميل (Download)</th>
+                    <th class="text-center">الرفع (Upload)</th>
+                    <th class="text-center">الإجمالي</th>
+                    <th class="pe-3" style="min-width: 180px;">نسبة الحمل من الذروة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ if .CapacityHourlyList }}
+                {{ range .CapacityHourlyList }}
+                <tr>
+                    <td class="ps-3 font-monospace fw-bold text-dark">{{ .HourDisplay }}</td>
+                    <td class="text-center font-monospace">{{ .SessionsStarted }}</td>
+                    <td class="text-center font-monospace text-primary">{{ printf "%.2f" .DownloadGB }} GB</td>
+                    <td class="text-center font-monospace text-info">{{ printf "%.2f" .UploadGB }} GB</td>
+                    <td class="text-center font-monospace fw-bold text-success">{{ printf "%.2f" .TotalTrafficGB }} GB</td>
+                    <td class="pe-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="font-monospace small" style="width: 45px;">{{ printf "%.1f" .PercentOfPeak }}%</span>
+                            <div class="progress flex-grow-1" style="height: 6px;">
+                                <div class="progress-bar {{ if ge .PercentOfPeak 90.0 }}bg-danger{{ else if ge .PercentOfPeak 60.0 }}bg-warning{{ else }}bg-primary{{ end }}" role="progressbar" style="width: {{ .PercentOfPeak }}%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {{ end }}
+                {{ else }}
+                <tr><td colspan="6" class="text-center py-4 text-muted">لا توجد بيانات حمل مسجلة لليوم</td></tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+<!-- ======================================================================= -->
+<!-- TAB 13: سجل العمليات والأمان (Audit Log Report)                          -->
+<!-- ======================================================================= -->
+{{ if eq .ActiveTab "audit" }}
+
+<!-- Filters Form -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-body p-3">
+        <form method="GET" action="/reports" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="audit">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1">بحث بالمرجع، المستخدم أو الهدف</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" placeholder="مرجع، اسم، معرف..." value="{{ .SearchQuery }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">نوع الإجراء</label>
+                <input type="text" name="action_filter" class="form-control form-control-sm" placeholder="مثال: RENEW, DEPOSIT..." value="{{ .ActionFilter }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">اسم المستخدم المنفذ</label>
+                <input type="text" name="actor" class="form-control form-control-sm" placeholder="اسم المنفذ..." value="{{ .ActorFilter }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">من تاريخ</label>
+                <input type="date" name="from" class="form-control form-control-sm" value="{{ .FromDate }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">إلى تاريخ</label>
+                <input type="date" name="to" class="form-control form-control-sm" value="{{ .ToDate }}">
+            </div>
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold">
+                    <i class="bi bi-filter"></i> فلترة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Audit Log Table -->
+<div class="card border-0 shadow-sm rounded-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width: 60px;">ID</th>
+                    <th>المرجع (Ref ID)</th>
+                    <th>المنفذ</th>
+                    <th>الإجراء (Action)</th>
+                    <th>الهدف (Target)</th>
+                    <th>التفاصيل والملاحظات</th>
+                    <th>عنوان IP</th>
+                    <th class="pe-3 text-end">التاريخ والوقت</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ if .AuditLogs }}
+                {{ range .AuditLogs }}
+                <tr>
+                    <td class="ps-3 font-monospace text-muted">{{ .ID }}</td>
+                    <td class="font-monospace fw-bold text-primary">{{ .ReferenceID }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ .ActorUsername }}</div>
+                        <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.7rem;">{{ .ActorRole }}</span>
+                    </td>
+                    <td><span class="badge bg-secondary-subtle text-secondary px-2 py-1">{{ .ActionText }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ .TargetType }}: {{ .TargetID }}</span></td>
+                    <td class="small text-muted" style="max-width: 280px; word-break: break-word;">{{ .Details }}</td>
+                    <td class="font-monospace small text-muted">{{ .IPAddress }}</td>
+                    <td class="pe-3 text-end font-monospace small text-muted">{{ .CreatedAtFormatted }}</td>
+                </tr>
+                {{ end }}
+                {{ else }}
+                <tr><td colspan="8" class="text-center py-4 text-muted">لا توجد سجلات أمان مسجلة</td></tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {{ if gt .TotalPages 1 }}
+    <div class="card-footer bg-white border-0 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">إجمالي السجلات: <strong class="text-dark">{{ .TotalRecords }}</strong> (صفحة {{ .Page }} من {{ .TotalPages }})</span>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ if not .HasPrev }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=audit&page={{ .PrevPage }}&q={{ .SearchQuery }}&action_filter={{ .ActionFilter }}&actor={{ .ActorFilter }}&from={{ .FromDate }}&to={{ .ToDate }}">السابق</a>
+            </li>
+            {{ range .VisiblePages }}
+            <li class="page-item {{ if eq . $.Page }}active{{ end }}">
+                <a class="page-link" href="/reports?tab=audit&page={{ . }}&q={{ $.SearchQuery }}&action_filter={{ $.ActionFilter }}&actor={{ $.ActorFilter }}&from={{ $.FromDate }}&to={{ $.ToDate }}">{{ . }}</a>
+            </li>
+            {{ end }}
+            <li class="page-item {{ if not .HasNext }}disabled{{ end }}">
+                <a class="page-link" href="/reports?tab=audit&page={{ .NextPage }}&q={{ .SearchQuery }}&action_filter={{ $.ActionFilter }}&actor={{ $.ActorFilter }}&from={{ $.FromDate }}&to={{ $.ToDate }}">التالي</a>
+            </li>
+        </ul>
+    </div>
+    {{ end }}
+</div>
 {{ end }}
 
 {{ end }}
