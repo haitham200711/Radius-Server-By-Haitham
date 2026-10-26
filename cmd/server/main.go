@@ -312,6 +312,7 @@ func main() {
 	repBP := reports.New(db, renderer)
 	mux.HandleFunc("/reports", middleware.RequireAdminOrReseller(repBP.IndexHandler))
 	mux.HandleFunc("/reports/logins", middleware.RequireAdminOrReseller(repBP.LoginsRedirectHandler))
+	mux.HandleFunc("/reports/clear-history", middleware.RequireAdmin(repBP.ClearHistoryHandler))
 
 	// Settings Blueprint
 	settBP := settings.New(db, renderer)

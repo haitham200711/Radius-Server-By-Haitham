@@ -179,24 +179,24 @@ func GetRegisteredMigrations() []Migration {
 				`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2) DEFAULT 0.00;`,
 			},
 		},
-			{
-				Version:     "20261026_05_radacct_active_dedup",
-				Description: "Deduplicate active accounting sessions and enforce one active row per session and NAS",
-				SQL: []string{
-					`ALTER TABLE financial_ledger MODIFY COLUMN idempotency_key VARCHAR(128) NULL;`,
-					// Keep the newest active row when old imports contain duplicate starts.
-					`DELETE r1 FROM radacct r1 JOIN radacct r2
+		{
+			Version:     "20261026_05_radacct_active_dedup",
+			Description: "Deduplicate active accounting sessions and enforce one active row per session and NAS",
+			SQL: []string{
+				`ALTER TABLE financial_ledger MODIFY COLUMN idempotency_key VARCHAR(128) NULL;`,
+				// Keep the newest active row when old imports contain duplicate starts.
+				`DELETE r1 FROM radacct r1 JOIN radacct r2
 					 WHERE r1.acctstoptime IS NULL AND r2.acctstoptime IS NULL
 					   AND r1.acctsessionid = r2.acctsessionid
 					   AND r1.nasipaddress = r2.nasipaddress
 					   AND r1.radacctid < r2.radacctid;`,
-					`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS active_session_key VARCHAR(160)
+				`ALTER TABLE radacct ADD COLUMN IF NOT EXISTS active_session_key VARCHAR(160)
 					 GENERATED ALWAYS AS (CASE WHEN acctstoptime IS NULL
 					 THEN CONCAT(acctsessionid, '|', nasipaddress)
 					 ELSE NULL END) STORED;`,
-					`ALTER TABLE radacct ADD UNIQUE KEY IF NOT EXISTS uq_radacct_active_session (active_session_key);`,
-				},
+				`ALTER TABLE radacct ADD UNIQUE KEY IF NOT EXISTS uq_radacct_active_session (active_session_key);`,
 			},
+		},
 	}
 }
 

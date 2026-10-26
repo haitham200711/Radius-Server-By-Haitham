@@ -999,7 +999,7 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if currentUser != nil && currentUser.Role == "reseller" {
-				newBal, newDebt, settled, err := bp.db.ResellerAddSubscriberBalance(currentUser.ID, username, amount, notes, currentUser.Username, settleDebtFirst, idempotencyKey)
+			newBal, newDebt, settled, err := bp.db.ResellerAddSubscriberBalance(currentUser.ID, username, amount, notes, currentUser.Username, settleDebtFirst, idempotencyKey)
 			if err != nil {
 				http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
@@ -1014,7 +1014,7 @@ func (bp *Blueprint) AddBalanceHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-			newBal, newDebt, settled, err := bp.db.AddSubscriberBalance(username, amount, paymentMethod, notes, adminUser, settleDebtFirst, idempotencyKey)
+		newBal, newDebt, settled, err := bp.db.AddSubscriberBalance(username, amount, paymentMethod, notes, adminUser, settleDebtFirst, idempotencyKey)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -1059,7 +1059,7 @@ func (bp *Blueprint) SettleDebtBalanceHandler(w http.ResponseWriter, r *http.Req
 		if !bp.checkSubscriberAccess(w, r, username) {
 			return
 		}
-			newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller, idempotencyKey)
+		newBal, newDebt, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller, idempotencyKey)
 		if err != nil {
 			http.Redirect(w, r, redirectURL+"&error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -1169,7 +1169,7 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if paymentMethod == "balance" {
-				_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller, idempotencyKey)
+			_, _, err := bp.db.SettleDebtFromBalance(username, amount, adminUser, creditReseller, idempotencyKey)
 			if err != nil {
 				http.Redirect(w, r, redirectURL+sep+"error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return
@@ -1177,7 +1177,7 @@ func (bp *Blueprint) PayDebtHandler(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, redirectURL+sep+"success="+url.QueryEscape(fmt.Sprintf("تم سداد مبلغ %.2f ج.م من مديونية المشترك بنجاح", amount)), http.StatusFound)
 			return
 		} else {
-				_, msg, err := bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser, creditReseller, idempotencyKey)
+			_, msg, err := bp.db.PaySubscriberDebt(username, amount, paymentMethod, notes, adminUser, creditReseller, idempotencyKey)
 			if err != nil {
 				http.Redirect(w, r, redirectURL+sep+"error="+url.QueryEscape(err.Error()), http.StatusFound)
 				return

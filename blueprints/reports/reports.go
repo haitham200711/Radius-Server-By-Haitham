@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -491,4 +492,18 @@ func (bp *Blueprint) IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 func (bp *Blueprint) LoginsRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/reports?tab=logins", http.StatusFound)
+}
+
+// ClearHistoryHandler resets historical report data for admins while preserving
+// subscribers, balances, active sessions, and active loans.
+func (bp *Blueprint) ClearHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := bp.db.ClearReportHistory(); err != nil {
+		http.Redirect(w, r, "/reports?error="+url.QueryEscape("فشل تنظيف تاريخ التقارير: "+err.Error()), http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/reports?success="+url.QueryEscape("تم تنظيف تاريخ التقارير مع الإبقاء على الحسابات والجلسات الحالية"), http.StatusFound)
 }

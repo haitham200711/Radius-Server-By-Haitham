@@ -35,6 +35,13 @@
         <a href="/subscribers" class="btn btn-sm btn-primary fw-bold shadow-sm">
             <i class="bi bi-people me-1"></i> إدارة المشتركين
         </a>
+        {{ if and .CurrentUser (eq .CurrentUser.Role "admin") }}
+        <form method="POST" action="/reports/clear-history" class="d-inline" onsubmit="return confirm('سيتم حذف تاريخ التقارير والفواتير والحركات المغلقة مع الإبقاء على الحسابات والأرصدة والجلسات الحالية. هل تريد المتابعة؟');">
+            <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm" title="تنظيف تاريخ التقارير">
+                <i class="bi bi-trash3 me-1"></i> تنظيف تاريخ التقارير
+            </button>
+        </form>
+        {{ end }}
     </div>
 </div>
 

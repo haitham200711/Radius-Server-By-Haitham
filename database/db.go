@@ -5376,30 +5376,6 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 			}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return 0, 0, 0, err
-	}
-
-	// Trigger notifications
-	go func() {
-		sub, err := d.GetSubscriber(username)
-		if err == nil && sub != nil {
-			if settledDebt > 0 {
-				_ = d.TriggerWhatsAppEvent("debt_paid", sub, map[string]string{
-					"{amount}": fmt.Sprintf("%.2f", settledDebt),
-					"{debt}":   fmt.Sprintf("%.2f", newDebt),
-				})
-			}
-			rem := amount - settledDebt
-			if rem > 0 {
-				_ = d.TriggerWhatsAppEvent("balance_added", sub, map[string]string{
-					"{amount}":  fmt.Sprintf("%.2f", rem),
-					"{balance}": fmt.Sprintf("%.2f", newBalance),
-				})
-			}
-		}
-		}()
-
 		refID := GenerateReferenceID("DEP-SUB")
 		desc := fmt.Sprintf("تغيير رصيد المشترك بمبلغ %.2f", amount)
 		frec := &FinancialRecord{
@@ -5426,6 +5402,29 @@ func (d *DB) AddSubscriberBalance(username string, amount float64, method, notes
 		if err := d.CompleteIdempotencyKeyTx(tx, idempKey, 200, fmt.Sprintf(`{"balance":%.2f,"debt":%.2f,"settled":%.2f}`, newBalance, newDebt, settledDebt)); err != nil {
 			return 0, 0, 0, err
 		}
+		if err := tx.Commit(); err != nil {
+			return 0, 0, 0, err
+		}
+
+		// Trigger notifications only after the financial transaction is durable.
+		go func() {
+			sub, err := d.GetSubscriber(username)
+			if err == nil && sub != nil {
+				if settledDebt > 0 {
+					_ = d.TriggerWhatsAppEvent("debt_paid", sub, map[string]string{
+						"{amount}": fmt.Sprintf("%.2f", settledDebt),
+						"{debt}":   fmt.Sprintf("%.2f", newDebt),
+					})
+				}
+				rem := amount - settledDebt
+				if rem > 0 {
+					_ = d.TriggerWhatsAppEvent("balance_added", sub, map[string]string{
+						"{amount}":  fmt.Sprintf("%.2f", rem),
+						"{balance}": fmt.Sprintf("%.2f", newBalance),
+					})
+				}
+			}
+		}()
 
 		return newBalance, newDebt, settledDebt, nil
 	}
