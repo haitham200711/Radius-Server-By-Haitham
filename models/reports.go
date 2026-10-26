@@ -10,6 +10,7 @@ type ReportsExecutiveSummary struct {
 	FailedLoginsToday    int64   `json:"failed_logins_today"`
 	QuotaExhaustedCount  int64   `json:"quota_exhausted_count"`
 	ExpiredCount         int64   `json:"expired_count"`
+	TotalIssuesCount     int64   `json:"total_issues_count"`
 	TotalCustomerDebt    float64 `json:"total_customer_debt"`
 	TotalCustomerBalance float64 `json:"total_customer_balance"`
 	TotalResellerBalance float64 `json:"total_reseller_balance"`

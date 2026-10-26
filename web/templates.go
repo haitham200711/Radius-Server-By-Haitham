@@ -60,7 +60,27 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 	}
 
 	funcMap := template.FuncMap{
-		"add": func(a, b int) int { return a + b },
+		"add": func(a, b interface{}) int64 {
+			toInt64 := func(v interface{}) int64 {
+				switch val := v.(type) {
+				case int:
+					return int64(val)
+				case int64:
+					return val
+				case int32:
+					return int64(val)
+				case uint:
+					return int64(val)
+				case uint64:
+					return int64(val)
+				case float64:
+					return int64(val)
+				default:
+					return 0
+				}
+			}
+			return toInt64(a) + toInt64(b)
+		},
 		"urlQueryEscape": func(s string) string {
 			return url.QueryEscape(s)
 		},

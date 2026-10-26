@@ -109,6 +109,7 @@ func (d *DB) GetReportsExecutiveSummary(resellerID int64) (*models.ReportsExecut
 	// 4. Quota Exhausted & Expired
 	_ = d.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM subscribers WHERE %s AND quota_bytes > 0 AND (SELECT COALESCE(SUM(acctinputoctets + acctoutputoctets), 0) FROM radacct WHERE username = subscribers.username COLLATE utf8mb4_unicode_ci AND acctstarttime >= subscribers.last_renewed_at) >= quota_bytes", whereSub), subArgs...).Scan(&s.QuotaExhaustedCount)
 	_ = d.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM subscribers WHERE %s AND expiration_date IS NOT NULL AND expiration_date < NOW()", whereSub), subArgs...).Scan(&s.ExpiredCount)
+	s.TotalIssuesCount = s.QuotaExhaustedCount + s.ExpiredCount
 
 	// 5. Customer Debt & Customer Balances
 	_ = d.QueryRow(fmt.Sprintf("SELECT COALESCE(SUM(debt), 0), COALESCE(SUM(balance), 0) FROM subscribers WHERE %s", whereSub), subArgs...).Scan(&s.TotalCustomerDebt, &s.TotalCustomerBalance)
