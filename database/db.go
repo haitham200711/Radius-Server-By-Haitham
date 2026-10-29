@@ -308,6 +308,7 @@ func (d *DB) InitSchema() error {
 			full_name VARCHAR(150) NOT NULL,
 			phone VARCHAR(30) DEFAULT '',
 			address TEXT,
+			reseller_id INT DEFAULT 0,
 			debt DECIMAL(10, 2) DEFAULT 0.00,
 			balance DECIMAL(10, 2) DEFAULT 0.00,
 			profile_name VARCHAR(64) DEFAULT '',

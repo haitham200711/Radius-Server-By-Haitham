@@ -201,6 +201,7 @@ func GetRegisteredMigrations() []Migration {
 			Version:     "20261026_06_reports_performance_indexes",
 			Description: "Create performance indexes for reporting on radacct, subscribers, and financial_ledger",
 			SQL: []string{
+				`ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS reseller_id INT DEFAULT 0;`,
 				`CREATE INDEX IF NOT EXISTS idx_radacct_user_start ON radacct (username, acctstarttime);`,
 				`CREATE INDEX IF NOT EXISTS idx_subscribers_reseller_debt ON subscribers (reseller_id, debt);`,
 				`CREATE INDEX IF NOT EXISTS idx_subscribers_balance ON subscribers (balance);`,
