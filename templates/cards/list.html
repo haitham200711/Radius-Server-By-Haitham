@@ -1,63 +1,136 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h3 class="fw-bold mb-1">{{ if eq .CardType "cafe" }}كروت الكافيهات (Hotspot Batches){{ else }}كروت الشحن (Recharge Batches){{ end }}</h3>
-        <p class="text-muted small mb-0">{{ if eq .CardType "cafe" }}سجل دفعات كروت هوتسبوت الكافيهات المولدة في النظام{{ else }}سجل دفعات كروت الشحن المولدة والمحفوظة في النظام{{ end }}</p>
-    </div>
-    <a href="/cards/generate{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="btn btn-primary fw-bold">
-        <i class="bi bi-plus-circle me-1"></i> توليد دفعة جديدة
-    </a>
-</div>
-
-<div class="card">
-    <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>كود واسم الدفعة</th>
-                    <th>الباقة</th>
-                    <th>الموزع / التخصيص</th>
-                    <th>عدد الكروت</th>
-                    <th>سعر الجمهور</th>
-                    <th>سعر التكلفة</th>
-                    <th>إجمالي البيع</th>
-                    <th>صافي الربح</th>
-                    <th>تاريخ التوليد</th>
-                    <th class="text-end">الطباعة</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ range .Batches }}
-                <tr>
-                    <td>
-                        {{ if .BatchName }}
-                        <span class="fw-bold text-dark d-block">{{ .BatchName }}</span>
-                        <code class="small text-muted font-monospace">#{{ .BatchCode }}</code>
+<div class="mb-4">
+    <!-- Header & Action Toolbar -->
+    <div class="component-card mb-4 p-3 p-md-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-0">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="nav-icon-bubble" style="{{ if eq .CardType "cafe" }}background: rgba(225, 29, 72, 0.1); color: #E11D48;{{ else }}background: rgba(217, 119, 6, 0.1); color: #D97706;{{ end }} width: 32px; height: 32px;">
+                        <i class="bi {{ if eq .CardType "cafe" }}bi-cup-hot-fill{{ else }}bi-credit-card-2-front-fill{{ end }}"></i>
+                    </span>
+                    <h4 class="fw-bold mb-0 text-dark fs-5">
+                        {{ if eq .CardType "cafe" }}
+                            {{ tr .Lang "كروت هوتسبوت الكافيهات (Cafe Hotspot Vouchers)" "Cafe Hotspot Vouchers & Batches" }}
                         {{ else }}
-                        <strong class="font-monospace">{{ .BatchCode }}</strong>
+                            {{ tr .Lang "كروت الشحن ورصيد الباقات (Recharge Batches)" "Recharge & Quota Vouchers" }}
                         {{ end }}
-                    </td>
-                    <td><span class="badge bg-primary">{{ .ProfileName }}</span></td>
-                    <td><span class="badge bg-light text-dark border">{{ .ResellerName }}</span></td>
-                    <td><span class="fw-bold">{{ .Count }}</span></td>
-                    <td><strong class="text-success">{{ printf "%.2f" .PricePerCard }} ج.م</strong></td>
-                    <td><span class="badge bg-light text-secondary border font-monospace">{{ printf "%.2f" .CostPricePerCard }} ج.م</span></td>
-                    <td><strong class="text-dark">{{ printf "%.2f" .TotalPrice }} ج.م</strong></td>
-                    <td><span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-bold">+{{ printf "%.2f" .TotalProfit }} ج.م</span></td>
-                    <td class="small text-muted">{{ .CreatedAt.Format "2006-01-02 15:04" }}</td>
-                    <td class="text-end">
-                        <a href="/cards/print?batch={{ .BatchCode }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-printer"></i> طباعة شيت
-                        </a>
-                    </td>
-                </tr>
-                {{ else }}
-                <tr>
-                    <td colspan="10" class="text-center py-5 text-muted">لا يوجد أي دفعات كروت حتى الآن</td>
-                </tr>
-                {{ end }}
-            </tbody>
-        </table>
+                    </h4>
+                    <span class="badge font-monospace px-2 py-1" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; font-size: 0.72rem; border-radius: 6px;">
+                        {{ len .Batches }} {{ tr .Lang "دفعات محفوظة" "Batches Stored" }}
+                    </span>
+                </div>
+                <p class="text-secondary small mb-0">
+                    {{ if eq .CardType "cafe" }}
+                        {{ tr .Lang "سجل دفعات كروت هوتسبوت الكافيهات المولدة في النظام وطباعتها وتصديرها" "Log of generated Hotspot Cafe voucher batches, ready for PDF/thermal printing" }}
+                    {{ else }}
+                        {{ tr .Lang "سجل دفعات كروت الشحن المولدة والمحفوظة في النظام مع تتبع التكلفة والأرباح" "Log of recharge voucher batches with profit analysis and printing layout" }}
+                    {{ end }}
+                </p>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="/card-templates" class="noc-action-btn text-decoration-none">
+                    <span class="nav-icon-bubble" style="background: #EEF2FF; color: #4F46E5; width: 22px; height: 22px; font-size: 0.75rem;">
+                        <i class="bi bi-file-earmark-richtext"></i>
+                    </span>
+                    <span>{{ tr .Lang "نماذج وتصميم الكروت" "Card Templates" }}</span>
+                </a>
+                <a href="/cards/generate{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="noc-action-btn primary text-decoration-none">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>{{ tr .Lang "توليد دفعة جديدة" "Generate New Batch" }}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batches Table Card -->
+    <div class="noc-bento-card overflow-hidden">
+        <div class="table-responsive">
+            <table class="table-enterprise align-middle mb-0 text-nowrap">
+                <thead>
+                    <tr>
+                        <th>{{ tr .Lang "كود واسم الدفعة" "Batch Code & Name" }}</th>
+                        <th>{{ tr .Lang "الباقة" "Profile" }}</th>
+                        <th>{{ tr .Lang "الموزع / التخصيص" "Reseller" }}</th>
+                        <th>{{ tr .Lang "عدد الكروت" "Count" }}</th>
+                        <th>{{ tr .Lang "سعر الجمهور" "Price" }}</th>
+                        <th>{{ tr .Lang "سعر التكلفة" "Cost" }}</th>
+                        <th>{{ tr .Lang "إجمالي البيع" "Total Value" }}</th>
+                        <th>{{ tr .Lang "صافي الربح" "Net Profit" }}</th>
+                        <th>{{ tr .Lang "تاريخ التوليد" "Date" }}</th>
+                        <th class="text-end">{{ tr .Lang "الطباعة" "Action" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Batches }}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="nav-icon-bubble" style="background: #F8FAFC; color: #475569; width: 30px; height: 30px; font-size: 0.8rem; border: 1px solid #E2E8F0;">
+                                    <i class="bi bi-upc-scan"></i>
+                                </span>
+                                <div>
+                                    {{ if .BatchName }}
+                                    <strong class="text-dark d-block">{{ .BatchName }}</strong>
+                                    <code class="text-secondary small font-monospace">#{{ .BatchCode }}</code>
+                                    {{ else }}
+                                    <strong class="font-monospace text-dark">#{{ .BatchCode }}</strong>
+                                    {{ end }}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.8rem; border-radius: 6px;">
+                                {{ .ProfileName }}
+                            </span>
+                        </td>
+                        <td>
+                            {{ if .ResellerName }}
+                            <span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="border-radius: 6px;">
+                                <i class="bi bi-shop me-1"></i>{{ .ResellerName }}
+                            </span>
+                            {{ else }}
+                            <span class="text-muted small">—</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border font-monospace px-2 py-1" style="font-size: 0.82rem; border-radius: 6px;">
+                                {{ .Count }} {{ tr $.Lang "كارت" "cards" }}
+                            </span>
+                        </td>
+                        <td><strong class="text-success font-monospace">{{ printf "%.2f" .PricePerCard }} ج.م</strong></td>
+                        <td><span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="border-radius: 6px;">{{ printf "%.2f" .CostPricePerCard }} ج.م</span></td>
+                        <td><strong class="text-dark font-monospace">{{ printf "%.2f" .TotalPrice }} ج.م</strong></td>
+                        <td>
+                            <span class="badge font-monospace px-2 py-1" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-weight: 700; border-radius: 6px;">
+                                +{{ printf "%.2f" .TotalProfit }} ج.م
+                            </span>
+                        </td>
+                        <td class="small text-secondary font-monospace">{{ .CreatedAt.Format "2006-01-02 15:04" }}</td>
+                        <td class="text-end">
+                            <a href="/cards/print?batch={{ .BatchCode }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2.5 fw-semibold" style="border-radius: 8px;">
+                                <i class="bi bi-printer me-1"></i> {{ tr $.Lang "طباعة شيت" "Print" }}
+                            </a>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="10" class="text-center py-5 text-muted">
+                            <div class="py-4">
+                                <span class="nav-icon-bubble mx-auto mb-3" style="background: #F1F5F9; color: #94A3B8; width: 56px; height: 56px; font-size: 1.5rem;">
+                                    <i class="bi bi-credit-card-2-front"></i>
+                                </span>
+                                <h6 class="fw-bold text-dark">{{ tr .Lang "لا توجد أي دفعات كروت حتى الآن" "No Card Batches Found" }}</h6>
+                                <p class="text-secondary small mb-3">{{ tr .Lang "قم بتوليد دفعة جديدة لتوزيعها أو طباعتها للعملاء" "Generate your first voucher batch to distribute or print" }}</p>
+                                <a href="/cards/generate{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="btn btn-sm btn-primary fw-bold px-3 py-1.5" style="border-radius: 8px;">
+                                    <i class="bi bi-plus-circle me-1"></i> {{ tr .Lang "توليد دفعة جديدة الآن" "Generate Batch Now" }}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {{ end }}

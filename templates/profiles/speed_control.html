@@ -1,86 +1,104 @@
 {{ define "content" }}
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-    <div>
-        <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
-            <span class="p-1.5 bg-primary-subtle text-primary rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                <i class="bi bi-speedometer2"></i>
-            </span>
-            <span>التحكم بالسرعات ومضاعفة الباقات</span>
-        </h4>
-        <p class="text-muted small mb-0">رفع سرعات البروفايلات دفعة واحدة (مؤقتاً، مجدولاً يومياً، أو بشكل دائم)</p>
+<div class="mb-4">
+    <!-- Top Action Toolbar -->
+    <div class="component-card mb-4 p-3 p-md-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-0">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="nav-icon-bubble" style="background: rgba(245, 158, 11, 0.1); color: #D97706; width: 32px; height: 32px;">
+                        <i class="bi bi-speedometer2"></i>
+                    </span>
+                    <h4 class="fw-bold mb-0 text-dark fs-5">
+                        {{ tr .Lang "التحكم بالسرعات ومضاعفة الباقات اللحظية" "Bandwidth Speed Multiplier & Boost Control" }}
+                    </h4>
+                    <span class="badge font-monospace px-2 py-1" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; font-size: 0.72rem; border-radius: 6px;">
+                        {{ if .Config.IsCurrentlyBoosted }}
+                            <span class="live-pulse-dot bg-success" style="width: 5px; height: 5px;"></span> {{ tr .Lang "مضاعفة نشطة" "Boost Active" }}
+                        {{ else }}
+                            {{ tr .Lang "السرعات القياسية" "Standard Speeds" }}
+                        {{ end }}
+                    </span>
+                </div>
+                <p class="text-secondary small mb-0">
+                    {{ tr .Lang "رفع سرعات البروفايلات دفعة واحدة (مؤقتاً، مجدولاً يومياً، أو بشكل دائم)" "Global or targeted bandwidth boost (temporary hours, daily recurring happy hours, or permanent)" }}
+                </p>
+            </div>
+
+            <!-- Top Action Buttons -->
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <button type="button" class="noc-action-btn" data-bs-toggle="modal" data-bs-target="#tempBoostModal">
+                    <span class="nav-icon-bubble" style="background: #FFFBEB; color: #D97706; width: 22px; height: 22px; font-size: 0.75rem;">
+                        <i class="bi bi-hourglass-split"></i>
+                    </span>
+                    <span>{{ tr .Lang "زيادة مؤقتة بالساعات" "Temporary Boost" }}</span>
+                </button>
+
+                <button type="button" class="noc-action-btn" data-bs-toggle="modal" data-bs-target="#recBoostModal">
+                    <span class="nav-icon-bubble" style="background: #ECFDF5; color: #10B981; width: 22px; height: 22px; font-size: 0.75rem;">
+                        <i class="bi bi-clock-history"></i>
+                    </span>
+                    <span>{{ tr .Lang "ساعات السعادة اليومية" "Happy Hours" }}</span>
+                </button>
+
+                <button type="button" class="noc-action-btn primary" data-bs-toggle="modal" data-bs-target="#permBoostModal">
+                    <i class="bi bi-infinity"></i>
+                    <span>{{ tr .Lang "زيادة دائمة" "Permanent" }}</span>
+                </button>
+
+                {{ if .Config.IsCurrentlyBoosted }}
+                <form method="POST" action="/profiles/speed-control/restore" class="d-inline" onsubmit="return confirm('هل أنت متأكد من استعادة كافة السرعات الأصلية لجميع البروفايلات الآن؟')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold" style="border-radius: 8px;">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> {{ tr .Lang "استعادة كافة السرعات" "Restore All" }}
+                    </button>
+                </form>
+                {{ end }}
+
+                <a href="/profiles" class="noc-action-btn text-decoration-none">
+                    <i class="bi bi-sliders2-vertical"></i>
+                    <span>{{ tr .Lang "إدارة البروفايلات" "Profiles" }}</span>
+                </a>
+            </div>
+        </div>
     </div>
 
-    <!-- Top Action Buttons -->
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <!-- 1. زر زيادة مؤقتة بالساعات -->
-        <button type="button" class="btn btn-sm btn-warning fw-bold shadow-sm text-dark" data-bs-toggle="modal" data-bs-target="#tempBoostModal">
-            <i class="bi bi-hourglass-split me-1"></i> زيادة مؤقتة بالساعات
-        </button>
-
-        <!-- 2. زر جدول يومي متكرر -->
-        <button type="button" class="btn btn-sm btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#recBoostModal">
-            <i class="bi bi-clock-history me-1"></i> جدول يومي (Happy Hours)
-        </button>
-
-        <!-- 3. زر زيادة دائمة -->
-        <button type="button" class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#permBoostModal">
-            <i class="bi bi-infinity me-1"></i> زيادة دائمة
-        </button>
-
-        <!-- زر استعادة كافة السرعات (عند التفعيل) -->
-        {{ if .Config.IsCurrentlyBoosted }}
-        <form method="POST" action="/profiles/speed-control/restore" class="d-inline" onsubmit="return confirm('هل أنت متأكد من استعادة كافة السرعات الأصلية لجميع البروفايلات الآن؟')">
-            <button type="submit" class="btn btn-sm btn-danger fw-bold shadow-sm">
-                <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة كافة السرعات
-            </button>
-        </form>
-        {{ end }}
-
-        <a href="/profiles" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-sliders2-vertical me-1"></i> إدارة البروفايلات
-        </a>
+    <!-- Alerts / Messages -->
+    {{ if eq .Message "temp_applied" }}
+    <div class="alert alert-success alert-dismissible fade show py-2.5 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert" style="border-radius: 10px;">
+        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+        <span>تم تفعيل الزيادة المؤقتة بنجاح وتحديث سرعات البروفايلات!</span>
+        <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
     </div>
-</div>
+    {{ else if eq .Message "recurring_saved" }}
+    <div class="alert alert-success alert-dismissible fade show py-2.5 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert" style="border-radius: 10px;">
+        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+        <span>تم حفظ وتفعيل جدول ساعات السعادة اليومي بنجاح!</span>
+        <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
+    </div>
+    {{ else if eq .Message "permanent_applied" }}
+    <div class="alert alert-success alert-dismissible fade show py-2.5 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert" style="border-radius: 10px;">
+        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+        <span>تم تطبيق الزيادة الدائمة واعتمادها كسرعة رسمية لجميع الباقات!</span>
+        <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
+    </div>
+    {{ else if eq .Message "restored" }}
+    <div class="alert alert-info alert-dismissible fade show py-2.5 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert" style="border-radius: 10px;">
+        <i class="bi bi-info-circle-fill text-info fs-5"></i>
+        <span>تم إلغاء الزيادة واستعادة كافة السرعات الأصلية لجميع البروفايلات بنجاح.</span>
+        <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
+    </div>
+    {{ else if eq .Message "profile_restored" }}
+    <div class="alert alert-success alert-dismissible fade show py-2.5 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert" style="border-radius: 10px;">
+        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+        <span>تم استعادة السرعة الأصلية للبروفايل المحدد بنجاح!</span>
+        <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
+    </div>
+    {{ end }}
 
-<!-- Alerts / Messages -->
-{{ if eq .Message "temp_applied" }}
-<div class="alert alert-success alert-dismissible fade show py-2 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill text-success fs-5"></i>
-    <span>تم تفعيل الزيادة المؤقتة بنجاح وتحديث سرعات البروفايلات!</span>
-    <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
-</div>
-{{ else if eq .Message "recurring_saved" }}
-<div class="alert alert-success alert-dismissible fade show py-2 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill text-success fs-5"></i>
-    <span>تم حفظ وتفعيل جدول ساعات السعادة اليومي بنجاح!</span>
-    <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
-</div>
-{{ else if eq .Message "permanent_applied" }}
-<div class="alert alert-success alert-dismissible fade show py-2 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill text-success fs-5"></i>
-    <span>تم تطبيق الزيادة الدائمة واعتمادها كسرعة رسمية لجميع الباقات!</span>
-    <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
-</div>
-{{ else if eq .Message "restored" }}
-<div class="alert alert-info alert-dismissible fade show py-2 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-info-circle-fill text-info fs-5"></i>
-    <span>تم إلغاء الزيادة واستعادة كافة السرعات الأصلية لجميع البروفايلات بنجاح.</span>
-    <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
-</div>
-{{ else if eq .Message "profile_restored" }}
-<div class="alert alert-success alert-dismissible fade show py-2 px-3 small border-0 shadow-sm mb-3 d-flex align-items-center gap-2" role="alert">
-    <i class="bi bi-check-circle-fill text-success fs-5"></i>
-    <span>تم استعادة السرعة الأصلية للبروفايل المحدد بنجاح!</span>
-    <button type="button" class="btn-close ms-auto p-2" data-bs-dismiss="alert"></button>
-</div>
-{{ end }}
-
-<!-- Status Ribbon (Compact & Clean) -->
-<div class="card border-0 shadow-sm mb-3">
-    <div class="card-body p-3">
+    <!-- Status Ribbon (NOC Bento Card) -->
+    <div class="noc-bento-card mb-4 p-3 p-md-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-2.5">
-                <span class="rounded-circle d-inline-flex align-items-center justify-content-center {{ if .Config.IsCurrentlyBoosted }}bg-success-subtle text-success{{ else }}bg-light text-secondary border{{ end }}" style="width: 36px; height: 36px; font-size: 1.1rem;">
+            <div class="d-flex align-items-center gap-3">
+                <span class="nav-icon-bubble" style="width: 44px; height: 44px; font-size: 1.25rem; {{ if .Config.IsCurrentlyBoosted }}background: #ECFDF5; color: #10B981;{{ else }}background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0;{{ end }}">
                     {{ if .Config.IsCurrentlyBoosted }}
                     <i class="bi bi-lightning-charge-fill"></i>
                     {{ else }}
@@ -88,34 +106,36 @@
                     {{ end }}
                 </span>
                 <div>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="fw-bold small {{ if .Config.IsCurrentlyBoosted }}text-success{{ else }}text-dark{{ end }}">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="fw-bold {{ if .Config.IsCurrentlyBoosted }}text-success{{ else }}text-dark{{ end }} fs-6">
                             {{ if .Config.IsCurrentlyBoosted }}
-                            مضاعفة السرعات نشطة حالياً
+                            {{ tr .Lang "مضاعفة السرعات نشطة حالياً عبر الشبكة" "Bandwidth Multiplier Active" }}
                             {{ else }}
-                            السرعات الأساسية الطبيعية تعمل الآن
+                            {{ tr .Lang "السرعات الأساسية الطبيعية تعمل الآن" "Standard Bandwidth Profiles Running" }}
                             {{ end }}
                         </span>
                         {{ if .Config.IsCurrentlyBoosted }}
-                        <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-2 small">
-                            <span class="pulse-dot-green me-1"></span> نشط
+                        <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                            <span class="live-pulse-dot bg-success" style="width: 6px; height: 6px;"></span> {{ tr .Lang "نشط لايف" "Live Active" }}
                         </span>
                         {{ else }}
-                        <span class="badge bg-light text-muted border py-0.5 px-2 small">وضع طبيعي</span>
+                        <span class="badge bg-light text-secondary border font-monospace small px-2 py-1" style="border-radius: 6px;">
+                            {{ tr .Lang "الوضع الافتراضي" "Default Mode" }}
+                        </span>
                         {{ end }}
                     </div>
-                    <div class="text-muted" style="font-size: 0.8rem;">
+                    <div class="text-secondary small">
                         {{ if .Config.IsCurrentlyBoosted }}
                             {{ if eq .Config.Mode "temp" }}
-                                زيادة مؤقتة: تنتهي بعد <strong>{{ .RemainingTimeStr }}</strong> (عند {{ if .Config.TempExpiresAt }}{{ .Config.TempExpiresAt.Format "15:04" }}{{ end }}).
+                                زيادة مؤقتة: تنتهي بعد <strong class="text-dark">{{ .RemainingTimeStr }}</strong> (عند {{ if .Config.TempExpiresAt }}{{ .Config.TempExpiresAt.Format "15:04" }}{{ end }}).
                             {{ else if eq .Config.Mode "recurring" }}
-                                ساعات السعادة اليومية: نشطة الآن وحتى الساعة <strong>{{ .Config.RecurringEndTime }}</strong>.
+                                ساعات السعادة اليومية: نشطة الآن وحتى الساعة <strong class="text-dark">{{ .Config.RecurringEndTime }}</strong>.
                             {{ else }}
                                 زيادة دائمة مفعلة على كافة البروفايلات.
                             {{ end }}
                         {{ else }}
                             {{ if .Config.RecurringEnabled }}
-                                الجدول اليومي مفعل: ستبدأ الزيادة تلقائياً من الساعة <strong>{{ .Config.RecurringStartTime }}</strong> إلى <strong>{{ .Config.RecurringEndTime }}</strong>.
+                                الجدول اليومي مفعل: ستبدأ الزيادة تلقائياً من الساعة <strong class="text-dark">{{ .Config.RecurringStartTime }}</strong> إلى <strong class="text-dark">{{ .Config.RecurringEndTime }}</strong>.
                             {{ else }}
                                 لا توجد أي زيادات نشطة حالياً. اختر من الأزرار أعلاه لتطبيق زيادة مؤقتة أو مجدولة أو دائمة.
                             {{ end }}
@@ -124,94 +144,85 @@
                 </div>
             </div>
 
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-light text-secondary border py-1.5 px-2.5 font-monospace">
-                    {{ .ProfilesCount }} باقة مسجلة
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace small" style="border-radius: 8px;">
+                    <i class="bi bi-layers me-1 text-primary"></i> {{ .ProfilesCount }} باقات معرفة
                 </span>
                 {{ if .Config.IsCurrentlyBoosted }}
-                <span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-2.5 font-monospace fw-bold">
-                    قيمة الزيادة: {{ if eq .Config.BoostType "add_fixed" }}+{{ printf "%.0f" .Config.BoostValue }}M{{ else }}{{ printf "%.1f" .Config.BoostValue }}x{{ end }}
+                <span class="badge font-monospace px-2.5 py-1.5 small fw-bold" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; border-radius: 8px;">
+                    ⚡ الزيادة: {{ if eq .Config.BoostType "add_fixed" }}+{{ printf "%.0f" .Config.BoostValue }}M{{ else }}{{ printf "%.1f" .Config.BoostValue }}x{{ end }}
                 </span>
                 {{ end }}
             </div>
         </div>
     </div>
-</div>
 
-<!-- Profiles Live Speeds Table -->
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-table text-primary"></i>
-            <span class="fw-bold small text-dark">مقارنة سرعات البروفايلات الحالية واستعادة السرعة الأصلية</span>
+    <!-- Profiles Live Speeds Table -->
+    <div class="noc-bento-card overflow-hidden">
+        <div class="table-responsive">
+            <table class="table-enterprise align-middle mb-0 text-nowrap">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>{{ tr .Lang "اسم البروفايل" "Profile Name" }}</th>
+                        <th>{{ tr .Lang "السرعة الأصلية" "Base Rate" }}</th>
+                        <th>{{ tr .Lang "السرعة النشطة الآن" "Active Live Rate" }}</th>
+                        <th>{{ tr .Lang "حالة السرعة" "Status" }}</th>
+                        <th class="text-end" style="width: 200px;">{{ tr .Lang "الإجراء" "Action" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range $index, $p := .Speeds }}
+                    <tr>
+                        <td><span class="text-muted font-monospace small">{{ add $index 1 }}</span></td>
+                        <td>
+                            <strong class="text-dark">{{ $p.DisplayName }}</strong>
+                            <code class="text-muted small ms-1 font-monospace">({{ $p.ProfileName }})</code>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="border-radius: 6px;">
+                                {{ $p.BaseRateLimit }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace px-2 py-1" style="font-size: 0.82rem; border-radius: 6px; {{ if $p.IsBoosted }}background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-weight: 700;{{ else }}background: #F8FAFC; color: #0F172A; border: 1px solid #E2E8F0;{{ end }}">
+                                ⚡ {{ $p.CurrentRateLimit }}
+                            </span>
+                        </td>
+                        <td>
+                            {{ if $p.IsBoosted }}
+                            <span class="badge font-monospace px-2 py-1" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; border-radius: 6px;">
+                                <i class="bi bi-lightning-fill me-1 text-warning"></i> مضاعفة نشطة
+                            </span>
+                            {{ else }}
+                            <span class="badge bg-light text-muted border px-2 py-1 small" style="border-radius: 6px;">
+                                سرعة أصلية
+                            </span>
+                            {{ end }}
+                        </td>
+                        <td class="text-end">
+                            {{ if $p.IsBoosted }}
+                            <form method="POST" action="/profiles/speed-control/restore-profile" class="d-inline" onsubmit="return confirm('استعادة السرعة الأصلية لهذا البروفايل ({{ $p.DisplayName }})؟')">
+                                <input type="hidden" name="profile_id" value="{{ $p.ProfileID }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2.5 fw-semibold" style="border-radius: 6px;" title="استعادة السرعة الأصلية لهذا البروفايل فوراً">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة الأصلية
+                                </button>
+                            </form>
+                            {{ else }}
+                            <span class="text-muted small font-monospace">—</span>
+                            {{ end }}
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted small">
+                            لا توجد أي بروفايلات مسجلة حتى الآن.
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
         </div>
-        <span class="badge bg-light text-secondary border font-monospace small">
-            {{ .ProfilesCount }} بروفايل
-        </span>
-    </div>
-    <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0 text-nowrap" style="font-size: 0.88rem;">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 50px;">#</th>
-                    <th>اسم البروفايل</th>
-                    <th>السرعة الأصلية</th>
-                    <th>السرعة النشطة الآن</th>
-                    <th>حالة السرعة</th>
-                    <th class="text-end" style="width: 200px;">الإجراء</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ range $index, $p := .Speeds }}
-                <tr>
-                    <td><span class="text-muted small">{{ add $index 1 }}</span></td>
-                    <td>
-                        <strong class="text-dark">{{ $p.DisplayName }}</strong>
-                        <code class="text-muted small ms-1">({{ $p.ProfileName }})</code>
-                    </td>
-                    <td>
-                        <span class="badge bg-light text-secondary border font-monospace px-2 py-1">
-                            {{ $p.BaseRateLimit }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="badge {{ if $p.IsBoosted }}bg-success-subtle text-success border border-success-subtle fw-bold{{ else }}bg-light text-dark border{{ end }} font-monospace px-2 py-1">
-                            {{ $p.CurrentRateLimit }}
-                        </span>
-                    </td>
-                    <td>
-                        {{ if $p.IsBoosted }}
-                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle py-1 px-2 small">
-                            <i class="bi bi-lightning-fill me-1"></i> مضاعفة (معدلة)
-                        </span>
-                        {{ else }}
-                        <span class="badge bg-light text-muted border py-1 px-2 small">
-                            سرعة أصلية
-                        </span>
-                        {{ end }}
-                    </td>
-                    <td class="text-end">
-                        {{ if $p.IsBoosted }}
-                        <form method="POST" action="/profiles/speed-control/restore-profile" class="d-inline" onsubmit="return confirm('استعادة السرعة الأصلية لهذا البروفايل ({{ $p.DisplayName }})؟')">
-                            <input type="hidden" name="profile_id" value="{{ $p.ProfileID }}">
-                            <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2.5 fw-semibold" title="استعادة السرعة الأصلية لهذا البروفايل فوراً">
-                                <i class="bi bi-arrow-counterclockwise me-1"></i> استعادة السرعة الأصلية
-                            </button>
-                        </form>
-                        {{ else }}
-                        <span class="text-muted small">—</span>
-                        {{ end }}
-                    </td>
-                </tr>
-                {{ else }}
-                <tr>
-                    <td colspan="6" class="text-center py-4 text-muted small">
-                        لا توجد أي بروفايلات مسجلة حتى الآن.
-                    </td>
-                </tr>
-                {{ end }}
-            </tbody>
-        </table>
     </div>
 </div>
 
