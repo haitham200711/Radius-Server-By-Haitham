@@ -99,6 +99,70 @@ func NewRenderer(baseDir string) (*Renderer, error) {
 			}
 			return fmt.Sprintf("%.1f", float64(b)/(1024*1024*1024))
 		},
+		"formatBytes": func(b interface{}) string {
+			var val int64
+			switch v := b.(type) {
+			case int:
+				val = int64(v)
+			case int64:
+				val = v
+			case int32:
+				val = int64(v)
+			case uint:
+				val = int64(v)
+			case uint32:
+				val = int64(v)
+			case uint64:
+				val = int64(v)
+			case float64:
+				val = int64(v)
+			default:
+				return "0 B"
+			}
+			if val <= 0 {
+				return "0 B"
+			}
+			const unit = 1024.0
+			f := float64(val)
+			if f < unit {
+				return fmt.Sprintf("%d B", val)
+			}
+			div, exp := unit, 0
+			for n := f / unit; n >= unit; n /= unit {
+				div *= unit
+				exp++
+			}
+			return fmt.Sprintf("%.1f %cB", f/div, "KMGTPE"[exp])
+		},
+		"formatDuration": func(sec interface{}) string {
+			var s int64
+			switch v := sec.(type) {
+			case int:
+				s = int64(v)
+			case int64:
+				s = v
+			case int32:
+				s = int64(v)
+			case uint:
+				s = int64(v)
+			case uint64:
+				val := int64(v)
+				s = val
+			case float64:
+				s = int64(v)
+			default:
+				return "0s"
+			}
+			if s < 60 {
+				return fmt.Sprintf("%ds", s)
+			}
+			if s < 3600 {
+				return fmt.Sprintf("%dm %ds", s/60, s%60)
+			}
+			h := s / 3600
+			m := (s % 3600) / 60
+			return fmt.Sprintf("%dh %dm", h, m)
+		},
 		"t": func(lang, key string) string {
 			return i18n.T(lang, key)
 		},

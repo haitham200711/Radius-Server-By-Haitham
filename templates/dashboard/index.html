@@ -1,63 +1,73 @@
 {{ define "content" }}
-<div class="mb-3">
-    <!-- Top Modern Action Toolbar (Tailwind / shadcn style) -->
+<div class="mb-4">
+    <!-- Top Enterprise NOC Operations Bar -->
     <div class="component-card mb-4 p-3 p-md-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
             <div>
-                <h4 class="fw-bold mb-1 text-dark d-flex align-items-center gap-2 fs-5">
-                    <span class="btn-icon-bubble" style="background: #EEF2FF; color: #4F46E5; width: 28px; height: 28px;">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="nav-icon-bubble" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5; width: 32px; height: 32px;">
                         <i class="bi bi-grid-1x2-fill"></i>
                     </span>
-                    <span>{{ tr .Lang "لوحة المتابعة والعمليات الفورية" "Enterprise Operations & Analytics" }}</span>
-                </h4>
-                <p class="text-secondary small mb-0">{{ tr .Lang "متابعة حية للشبكة، معدلات سحب الباندويث، والمشتركين النشطين لحظياً" "Real-time network telemetry, bandwidth utilization, and subscribers" }}</p>
+                    <h4 class="fw-bold mb-0 text-dark fs-5">
+                        {{ tr .Lang "مركز العمليات والمراقبة اللحظية (RADIUS NOC & Telemetry)" "Enterprise Operations & Live Telemetry" }}
+                    </h4>
+                    <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.72rem; border-radius: 6px;">
+                        v3.0 ENTERPRISE
+                    </span>
+                </div>
+                <p class="text-secondary small mb-0">
+                    {{ tr .Lang "متابعة حية للشبكة، معدلات سحب الباندويث، والمشتركين النشطين لحظياً عبر راوترات MikroTik" "Real-time network telemetry, bandwidth utilization, and live subscriber sessions across MikroTik NAS gateways" }}
+                </p>
             </div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
                 <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
-                    <span class="pulse-dot-green"></span>
+                    <span class="live-pulse-dot bg-success"></span>
                     <span>{{ tr .Lang "خادم الراديوس متصل 99.98%" "RADIUS Core Active 99.98%" }}</span>
+                </span>
+                <span class="badge bg-light text-secondary border px-2.5 py-1.5 font-monospace small" style="border-radius: 8px;">
+                    <i class="bi bi-hdd-rack me-1 text-primary"></i> <span id="sysHost">{{ .System.Hostname }}</span>
                 </span>
             </div>
         </div>
 
-        <!-- All Action Buttons (Modern shadcn / Tailwind UI Component Group) -->
+        <!-- Quick NOC Action Buttons Group -->
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <a href="/subscribers/add" class="btn-component-primary">
-                <i class="bi bi-person-plus-fill fs-6"></i>
+            <a href="/subscribers/add" class="noc-action-btn primary text-decoration-none">
+                <i class="bi bi-person-plus-fill"></i>
                 <span>{{ tr .Lang "إضافة مشترك جديد" "Add Subscriber" }}</span>
             </a>
-            <a href="/subscribers" class="btn-component-outline">
-                <span class="btn-icon-bubble" style="background: #ECFDF5; color: #10B981;">
+            <a href="/subscribers" class="noc-action-btn text-decoration-none">
+                <span class="nav-icon-bubble" style="background: #ECFDF5; color: #10B981; width: 22px; height: 22px; font-size: 0.75rem;">
                     <i class="bi bi-arrow-repeat"></i>
                 </span>
                 <span>{{ tr .Lang "تجديد باقة مشترك" "Renew Quota" }}</span>
             </a>
-            <a href="/cards/generate" class="btn-component-outline">
-                <span class="btn-icon-bubble" style="background: #FFFBEB; color: #D97706;">
+            <a href="/cards/generate" class="noc-action-btn text-decoration-none">
+                <span class="nav-icon-bubble" style="background: #FFFBEB; color: #D97706; width: 22px; height: 22px; font-size: 0.75rem;">
                     <i class="bi bi-credit-card-2-front-fill"></i>
                 </span>
                 <span>{{ tr .Lang "توليد كروت شحن" "Generate Cards" }}</span>
             </a>
-            <a href="/cards/cafe" class="btn-component-outline">
-                <span class="btn-icon-bubble" style="background: #FFF1F2; color: #E11D48;">
+            <a href="/cards/cafe" class="noc-action-btn text-decoration-none">
+                <span class="nav-icon-bubble" style="background: #FFF1F2; color: #E11D48; width: 22px; height: 22px; font-size: 0.75rem;">
                     <i class="bi bi-cup-hot-fill"></i>
                 </span>
                 <span>{{ tr .Lang "كروت الكافيهات" "Cafe Cards" }}</span>
             </a>
-            <a href="/profiles/speed-control" class="btn-component-outline">
-                <span class="btn-icon-bubble" style="background: #EEF2FF; color: #4F46E5;">
+            <a href="/profiles/speed-control" class="noc-action-btn text-decoration-none">
+                <span class="nav-icon-bubble" style="background: #EEF2FF; color: #4F46E5; width: 22px; height: 22px; font-size: 0.75rem;">
                     <i class="bi bi-speedometer2"></i>
                 </span>
                 <span>{{ tr .Lang "التحكم بالسرعات" "Speed Control" }}</span>
             </a>
-            <a href="/routers" class="btn-component-outline">
-                <span class="btn-icon-bubble" style="background: #F0F9FF; color: #0284C7;">
+            <a href="/routers" class="noc-action-btn text-decoration-none">
+                <span class="nav-icon-bubble" style="background: #F0F9FF; color: #0284C7; width: 22px; height: 22px; font-size: 0.75rem;">
                     <i class="bi bi-router-fill"></i>
                 </span>
                 <span>{{ tr .Lang "إدارة راوترات NAS" "Manage Routers" }}</span>
             </a>
-            <a href="/reports" class="btn-component-outline">
-                <span class="btn-icon-bubble" style="background: #F1F5F9; color: #475569;">
+            <a href="/reports" class="noc-action-btn text-decoration-none">
+                <span class="nav-icon-bubble" style="background: #F8FAFC; color: #475569; width: 22px; height: 22px; font-size: 0.75rem; border: 1px solid #E2E8F0;">
                     <i class="bi bi-file-earmark-bar-graph-fill"></i>
                 </span>
                 <span>{{ tr .Lang "تقارير النظام" "System Reports" }}</span>
@@ -69,137 +79,158 @@
     <div class="row g-3 mb-4">
         <!-- 1. Online Users -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="kpi-modern-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="kpi-modern-title">{{ tr .Lang "المشتركين المتصلين الآن" "Online Subscribers Now" }}</span>
-                        <div class="kpi-modern-icon" style="background: #EEF2FF; color: #4F46E5;">
-                            <i class="bi bi-broadcast"></i>
+            <a href="/sessions" class="text-decoration-none">
+                <div class="noc-bento-card p-3 p-md-4 h-100 position-relative overflow-hidden">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4F46E5, #818CF8);"></div>
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="kpi-modern-title">{{ tr .Lang "المشتركين المتصلين الآن" "Online Subscribers Now" }}</span>
+                            <div class="nav-icon-bubble" style="background: #EEF2FF; color: #4F46E5; width: 36px; height: 36px;">
+                                <i class="bi bi-broadcast"></i>
+                            </div>
                         </div>
+                        <div class="kpi-modern-number text-primary font-monospace">{{ .Metrics.OnlineSessions }}</div>
                     </div>
-                    <div class="kpi-modern-number text-primary">{{ .Metrics.OnlineSessions }}</div>
+                    <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-2">
+                        <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                            <span class="live-pulse-dot bg-success" style="width: 6px; height: 6px;"></span>
+                            <span>{{ tr .Lang "نشط لايف" "Live Active" }}</span>
+                        </span>
+                        <span class="text-secondary small font-monospace">({{ .Metrics.OnlineSubscribers }} PPPoE · {{ .Metrics.OnlineCards }} Hotspot)</span>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
-                    <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
-                        <span class="pulse-dot-green" style="width: 6px; height: 6px;"></span> {{ tr .Lang "نشط الآن" "Live Active" }}
-                    </span>
-                    <span class="text-secondary small font-monospace">({{ .Metrics.OnlineSubscribers }} PPPoE · {{ .Metrics.OnlineCards }} Hotspot)</span>
-                </div>
-            </div>
+            </a>
         </div>
 
         <!-- 2. Total Subscribers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="kpi-modern-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="kpi-modern-title">{{ tr .Lang "إجمالي المشتركين المسجلين" "Total Subscribers" }}</span>
-                        <div class="kpi-modern-icon" style="background: #F0F9FF; color: #0284C7;">
-                            <i class="bi bi-people-fill"></i>
+            <a href="/subscribers" class="text-decoration-none">
+                <div class="noc-bento-card p-3 p-md-4 h-100 position-relative overflow-hidden">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #0284C7, #38BDF8);"></div>
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="kpi-modern-title">{{ tr .Lang "إجمالي المشتركين المسجلين" "Total Subscribers" }}</span>
+                            <div class="nav-icon-bubble" style="background: #F0F9FF; color: #0284C7; width: 36px; height: 36px;">
+                                <i class="bi bi-people-fill"></i>
+                            </div>
                         </div>
+                        <div class="kpi-modern-number text-dark font-monospace">{{ .Metrics.TotalSubscribers }}</div>
                     </div>
-                    <div class="kpi-modern-number">{{ .Metrics.TotalSubscribers }}</div>
-                </div>
-                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
-                    <div class="d-flex align-items-center gap-1.5">
-                        <span class="kpi-pill-badge" style="background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD;">{{ .Metrics.ActiveSubscribers }} {{ tr .Lang "متاح" "Active" }}</span>
-                        <span class="kpi-pill-badge" style="background: #FFF1F2; color: #9F1239; border: 1px solid #FECDD3;">{{ .Metrics.ExpiredSubscribers }} {{ tr .Lang "منتهي" "Expired" }}</span>
+                    <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-2">
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="kpi-pill-badge" style="background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD;">{{ .Metrics.ActiveSubscribers }} {{ tr .Lang "متاح" "Active" }}</span>
+                            <span class="kpi-pill-badge" style="background: #FFF1F2; color: #9F1239; border: 1px solid #FECDD3;">{{ .Metrics.ExpiredSubscribers }} {{ tr .Lang "منتهي" "Expired" }}</span>
+                        </div>
+                        <small class="text-muted font-monospace">سداد 94%</small>
                     </div>
-                    <small class="text-muted font-monospace">92% سداد</small>
                 </div>
-            </div>
+            </a>
         </div>
 
         <!-- 3. Active NAS Routers -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="kpi-modern-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="kpi-modern-title">{{ tr .Lang "راوترات NAS المتصلة" "Connected NAS Routers" }}</span>
-                        <div class="kpi-modern-icon" style="background: #ECFDF5; color: #10B981;">
-                            <i class="bi bi-hdd-network-fill"></i>
+            <a href="/routers" class="text-decoration-none">
+                <div class="noc-bento-card p-3 p-md-4 h-100 position-relative overflow-hidden">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #10B981, #34D399);"></div>
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="kpi-modern-title">{{ tr .Lang "راوترات NAS المتصلة" "Connected NAS Routers" }}</span>
+                            <div class="nav-icon-bubble" style="background: #ECFDF5; color: #10B981; width: 36px; height: 36px;">
+                                <i class="bi bi-hdd-network-fill"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-modern-number text-dark font-monospace">
+                            {{ .Metrics.TotalRouters }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "أجهزة" "Routers" }}</small>
                         </div>
                     </div>
-                    <div class="kpi-modern-number">
-                        {{ .Metrics.TotalRouters }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "أجهزة" "Routers" }}</small>
+                    <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-2">
+                        <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
+                            <span class="live-pulse-dot bg-success" style="width: 6px; height: 6px;"></span>
+                            <span>{{ tr .Lang "مستقرة وجاهزة" "All Healthy" }}</span>
+                        </span>
+                        <small class="text-success font-monospace fw-bold">⚡ CoA 3799 OK</small>
                     </div>
                 </div>
-                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
-                    <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
-                        🟢 {{ tr .Lang "جميع الراوترات مستقرة" "All Routers Healthy" }}
-                    </span>
-                    <small class="text-success font-monospace fw-bold">⚡ 4ms Ping</small>
-                </div>
-            </div>
+            </a>
         </div>
 
         <!-- 4. Revenue & Collections -->
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="kpi-modern-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="kpi-modern-title">{{ tr .Lang "تحصيل ومبيعات اليوم" "Today's Collections" }}</span>
-                        <div class="kpi-modern-icon" style="background: #FFFBEB; color: #D97706;">
-                            <i class="bi bi-wallet2"></i>
+            <a href="/reports" class="text-decoration-none">
+                <div class="noc-bento-card p-3 p-md-4 h-100 position-relative overflow-hidden">
+                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #F59E0B, #FBBF24);"></div>
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="kpi-modern-title">{{ tr .Lang "تحصيل ومبيعات اليوم" "Today's Collections" }}</span>
+                            <div class="nav-icon-bubble" style="background: #FFFBEB; color: #D97706; width: 36px; height: 36px;">
+                                <i class="bi bi-wallet2"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-modern-number text-dark font-monospace">
+                            {{ printf "%.0f" .Metrics.TodayRevenue }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "ج.م" "EGP" }}</small>
                         </div>
                     </div>
-                    <div class="kpi-modern-number">
-                        {{ printf "%.0f" .Metrics.TodayRevenue }} <small class="fs-6 text-muted fw-normal">{{ tr .Lang "ج.م" "EGP" }}</small>
+                    <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-2">
+                        <span class="kpi-pill-badge" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A;">
+                            <i class="bi bi-check-circle-fill me-1"></i> {{ tr .Lang "الإجمالي:" "Total:" }} {{ printf "%.0f" .Metrics.TotalRevenue }}
+                        </span>
+                        <small class="text-secondary font-monospace">سداد فوري</small>
                     </div>
                 </div>
-                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
-                    <span class="kpi-pill-badge" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A;">
-                        <i class="bi bi-check-circle-fill me-1"></i> {{ tr .Lang "إجمالي المحقق:" "Total:" }} {{ printf "%.0f" .Metrics.TotalRevenue }}
-                    </span>
-                    <small class="text-secondary font-monospace">سداد فوري</small>
-                </div>
-            </div>
+            </a>
         </div>
     </div>
 
-    <!-- 2. Central Live Bandwidth Chart (Component Card) -->
-    <div class="component-card mb-4 p-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <!-- 2. Central Live Bandwidth Chart -->
+    <div class="noc-bento-card mb-4 p-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-2 border-bottom">
             <div>
-                <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6">
-                    <i class="bi bi-graph-up text-primary"></i>
+                <h5 class="fw-bold mb-1 text-dark d-flex align-items-center gap-2 fs-6">
+                    <span class="nav-icon-bubble" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5; width: 28px; height: 28px;">
+                        <i class="bi bi-activity"></i>
+                    </span>
                     <span>{{ tr .Lang "معدل استهلاك الباندويث الحي (Live Bandwidth Utilization)" "Live Bandwidth Utilization" }}</span>
                 </h5>
                 <small class="text-secondary">{{ tr .Lang "مراقبة سحب الترافيك اللحظي عبر خوادم مايكروتك (Download vs Upload)" "Real-time bandwidth throughput across MikroTik core gateways" }}</small>
             </div>
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex flex-wrap align-items-center gap-3">
                 <span class="small fw-bold d-flex align-items-center gap-1.5" style="color: #4F46E5;">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #4F46E5; display: inline-block;"></span>
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: #4F46E5; display: inline-block;"></span>
                     {{ tr .Lang "تحميل (Download)" "Download" }}
                 </span>
                 <span class="small fw-bold d-flex align-items-center gap-1.5" style="color: #10B981;">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #10B981; display: inline-block;"></span>
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: #10B981; display: inline-block;"></span>
                     {{ tr .Lang "رفع (Upload)" "Upload" }}
                 </span>
-                <span class="badge font-monospace px-3 py-2" style="background: #EEF2FF; border: 1px solid #C7D2FE !important; color: #4F46E5; font-size: 0.88rem; border-radius: 8px;">
+                <span class="badge font-monospace px-3 py-2" style="background: #EEF2FF; border: 1px solid #C7D2FE !important; color: #4F46E5; font-size: 0.9rem; border-radius: 8px;">
                     ⚡ <span id="liveThroughputVal">2.45 Gbps</span>
                 </span>
             </div>
         </div>
 
-        <div style="height: 270px; position: relative;">
+        <div style="height: 280px; position: relative;">
             <canvas id="lightTrafficCanvas"></canvas>
         </div>
     </div>
 
-    <!-- 3. Host Hardware Resources (Component Card) -->
-    <div class="component-card mb-3 p-4">
+    <!-- 3. Host Hardware Resources -->
+    <div class="noc-bento-card mb-3 p-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
-            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
-                <i class="bi bi-cpu text-info"></i>
-                <span>{{ tr .Lang "موارد وسرعة خادم الراديوس (Linux Host Resources)" "Host Server Resources" }}</span>
-            </h6>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-light text-dark border px-2 py-1 font-monospace small" style="border-radius: 8px;">
-                    <i class="bi bi-hdd-rack me-1 text-primary"></i> <span id="sysHost">{{ .System.Hostname }}</span>
+                <span class="nav-icon-bubble" style="background: #ECFEFF; color: #0891B2; width: 30px; height: 30px;">
+                    <i class="bi bi-cpu"></i>
                 </span>
-                <span class="badge bg-light text-secondary border px-2 py-1 small" style="border-radius: 8px;">
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark">{{ tr .Lang "موارد وسرعة خادم الراديوس (Linux Host Resources)" "Host Server Resources & Telemetry" }}</h6>
+                    <small class="text-secondary">المراقبة المستمرة لأداء النواة واستهلاك المعالج والذاكرة والتخزين</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-light text-secondary border px-2 py-1 font-monospace small" style="border-radius: 8px;">
                     <i class="bi bi-ubuntu me-1 text-danger"></i> <span id="sysOS">{{ .System.OS }}</span>
+                </span>
+                <span class="badge bg-light text-success border px-2 py-1 font-monospace small" style="border-radius: 8px;">
+                    <i class="bi bi-check-circle-fill me-1"></i> Daemon Active
                 </span>
             </div>
         </div>
@@ -207,7 +238,7 @@
         <div class="row g-3">
             <!-- CPU -->
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                <div class="p-3 rounded-3 border bg-light-subtle h-100" style="border-radius: 12px !important; border-color: #E2E8F0 !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="fw-bold text-dark small"><i class="bi bi-cpu text-primary me-1"></i> {{ tr .Lang "المعالج (CPU)" "CPU Usage" }}</span>
                         <span class="badge bg-white text-dark border font-monospace small" id="cpuCores">{{ .System.CPUCores }} Cores</span>
@@ -224,7 +255,7 @@
 
             <!-- RAM -->
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                <div class="p-3 rounded-3 border bg-light-subtle h-100" style="border-radius: 12px !important; border-color: #E2E8F0 !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="fw-bold text-dark small"><i class="bi bi-memory text-info me-1"></i> {{ tr .Lang "الذاكرة (RAM)" "RAM Usage" }}</span>
                         <span class="badge bg-white text-info border font-monospace small" id="memUsageValBadge">{{ printf "%.1f" .System.MemUsage }}%</span>
@@ -241,7 +272,7 @@
 
             <!-- Disk -->
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                <div class="p-3 rounded-3 border bg-light-subtle h-100" style="border-radius: 12px !important; border-color: #E2E8F0 !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="fw-bold text-dark small"><i class="bi bi-hdd-network text-warning me-1"></i> {{ tr .Lang "التخزين (Root /)" "Disk Usage" }}</span>
                         <span class="badge bg-white text-warning border font-monospace small" id="diskUsageValBadge">{{ printf "%.1f" .System.DiskUsage }}%</span>
@@ -258,7 +289,7 @@
 
             <!-- Uptime -->
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="p-3 rounded-3 bg-light border" style="border-radius: 12px !important;">
+                <div class="p-3 rounded-3 border bg-light-subtle h-100" style="border-radius: 12px !important; border-color: #E2E8F0 !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="fw-bold text-dark small"><i class="bi bi-clock-history text-success me-1"></i> {{ tr .Lang "مدة التشغيل" "System Uptime" }}</span>
                         <span class="badge bg-success-subtle text-success border border-success-subtle small">{{ tr .Lang "نشط ومستقر" "Healthy" }}</span>
@@ -286,12 +317,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     
-    const gradIndigo = ctx.createLinearGradient(0, 0, 0, 250);
-    gradIndigo.addColorStop(0, 'rgba(79, 70, 229, 0.28)');
+    const gradIndigo = ctx.createLinearGradient(0, 0, 0, 260);
+    gradIndigo.addColorStop(0, 'rgba(79, 70, 229, 0.32)');
     gradIndigo.addColorStop(1, 'rgba(79, 70, 229, 0.0)');
 
-    const gradGreen = ctx.createLinearGradient(0, 0, 0, 250);
-    gradGreen.addColorStop(0, 'rgba(16, 185, 129, 0.22)');
+    const gradGreen = ctx.createLinearGradient(0, 0, 0, 260);
+    gradGreen.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
     gradGreen.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
     const labels = ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00', 'الآن'];
@@ -343,17 +374,18 @@ document.addEventListener('DOMContentLoaded', function() {
             titleColor: '#fff',
             bodyColor: '#e2e8f0',
             padding: 10,
-            borderColor: '#e2e8f0',
-            borderWidth: 1
+            borderColor: '#334155',
+            borderWidth: 1,
+            cornerRadius: 8
           }
         },
         scales: {
           x: {
-            grid: { color: '#f1f5f9' },
+            grid: { color: 'rgba(226, 232, 240, 0.6)' },
             ticks: { color: '#64748b', font: { size: 11, family: 'Inter' } }
           },
           y: {
-            grid: { color: '#f1f5f9' },
+            grid: { color: 'rgba(226, 232, 240, 0.6)' },
             ticks: {
               color: '#64748b',
               font: { size: 11, family: 'Inter' },

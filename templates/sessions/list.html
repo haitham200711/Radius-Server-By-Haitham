@@ -1,59 +1,201 @@
 {{ define "content" }}
-<div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h3 class="fw-bold mb-1">{{ tr .Lang "المتصلين الآن (Live Sessions & CoA)" "Online Users (Live Sessions & CoA)" }}</h3>
-        <p class="text-muted small mb-0">{{ tr .Lang "الجلسات المتصلة حالياً على راوترات المايكروتك (PPPoE / Hotspot)" "Currently active user sessions on MikroTik routers (PPPoE / Hotspot)" }}</p>
-    </div>
-    <a href="/sessions" class="btn btn-outline-primary fw-bold">
-        <i class="bi bi-arrow-clockwise me-1"></i> {{ tr .Lang "تحديث الجلسات" "Refresh Sessions" }}
-    </a>
-</div>
+<div class="mb-4">
+    <!-- Header & Action Toolbar -->
+    <div class="component-card mb-4 p-3 p-md-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="nav-icon-bubble" style="background: rgba(16, 185, 129, 0.1); color: #10B981; width: 32px; height: 32px;">
+                        <i class="bi bi-broadcast"></i>
+                    </span>
+                    <h4 class="fw-bold mb-0 text-dark fs-5">
+                        {{ tr .Lang "المتصلين الآن ومراقبة الجلسات الحية (Live Sessions & CoA)" "Live Sessions & CoA Telemetry" }}
+                    </h4>
+                    <span class="badge font-monospace px-2 py-1" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.72rem; border-radius: 6px;">
+                        <span class="live-pulse-dot bg-success" style="width: 5px; height: 5px;"></span>
+                        <span>{{ len .Sessions }} {{ tr .Lang "جلسة متصلة" "Active" }}</span>
+                    </span>
+                </div>
+                <p class="text-secondary small mb-0">
+                    {{ tr .Lang "المشتركين المتصلين حالياً على راوترات المايكروتك مع إمكانية قطع الاتصال اللحظي عبر PoD / CoA Port 3799" "Currently active user sessions on MikroTik routers with instant Disconnect (PoD / CoA) capability" }}
+                </p>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <button type="button" class="noc-action-btn" onclick="window.location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    <span>{{ tr .Lang "تحديث الجلسات" "Refresh" }}</span>
+                </button>
+                <div class="form-check form-switch ms-2 d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                    <label class="form-check-label small text-secondary fw-semibold" for="autoRefreshToggle">
+                        {{ tr .Lang "تحديث تلقائي (15 ثانية)" "Auto (15s)" }}
+                    </label>
+                </div>
+            </div>
+        </div>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body p-0 table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>{{ tr .Lang "اسم المشترك" "Username" }}</th>
-                    <th>{{ tr .Lang "معرف الجلسة (Session ID)" "Session ID" }}</th>
-                    <th>{{ tr .Lang "عنوان IP" "Framed IP" }}</th>
-                    <th>{{ tr .Lang "MAC الجهاز" "Calling MAC" }}</th>
-                    <th>{{ tr .Lang "راوتر NAS" "NAS Router" }}</th>
-                    <th>{{ tr .Lang "مدة الاتصال" "Session Time" }}</th>
-                    <th>{{ tr .Lang "التحميل" "Download" }}</th>
-                    <th>{{ tr .Lang "الرفع" "Upload" }}</th>
-                    <th class="text-end">{{ tr .Lang "قطع الاتصال" "Action" }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ range .Sessions }}
-                <tr>
-                    <td><strong>{{ .UserName }}</strong></td>
-                    <td><code>{{ .AcctSessionID }}</code></td>
-                    <td><span class="badge bg-light text-dark border">{{ .FramedIPAddress }}</span></td>
-                    <td><code>{{ .CallingStationID }}</code></td>
-                    <td>{{ .NASIPAddress }}</td>
-                    <td>{{ .AcctSessionTime }} {{ tr $.Lang "ثانية" "sec" }}</td>
-                    <td>{{ .AcctInputOctets }} B</td>
-                    <td>{{ .AcctOutputOctets }} B</td>
-                    <td class="text-end">
-                        <a href="/sessions/disconnect?username={{ .UserName }}&session={{ .AcctSessionID }}&nas={{ .NASIPAddress }}&ip={{ .FramedIPAddress }}" 
-                           class="btn btn-sm btn-danger fw-bold" 
-                           onclick="return confirm('{{ tr $.Lang "هل أنت متأكد من قطع اتصال المشترك وإرسال أمر Disconnect (PoD) للمايكروتك فوراً؟" "Are you sure you want to send Disconnect (PoD) request to MikroTik router?" }}');">
-                            <i class="bi bi-power"></i> {{ tr $.Lang "فصل (PoD)" "Disconnect" }}
-                        </a>
-                    </td>
-                </tr>
-                {{ else }}
-                <tr>
-                    <td colspan="9" class="text-center py-5 text-muted">{{ tr .Lang "لا يوجد جلسات نشطة حالياً على الراوترات" "No active sessions on routers currently" }}</td>
-                </tr>
-                {{ end }}
-            </tbody>
-        </table>
+        <!-- Search & Filter Controls -->
+        <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" id="sessionSearchInput" class="form-control border-start-0 ps-0" placeholder="{{ tr .Lang "بحث فوري بالاسم، عنوان IP، أو الماك أدريس MAC..." "Filter by username, framed IP, or MAC..." }}" onkeyup="filterSessionsTable()">
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <select id="nasFilterSelect" class="form-select font-monospace text-secondary" onchange="filterSessionsTable()">
+                    <option value="">{{ tr .Lang "جميع راوترات NAS" "All NAS Routers" }}</option>
+                    {{ range .Sessions }}
+                        <option value="{{ .NASIPAddress }}">{{ .NASIPAddress }}</option>
+                    {{ end }}
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-md-4 text-md-end">
+                <span class="text-secondary small font-monospace">
+                    {{ tr .Lang "عرض أحدث 150 جلسة متصلة بالشبكة" "Displaying up to 150 active sessions" }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sessions Table -->
+    <div class="noc-bento-card overflow-hidden">
+        <div class="table-responsive">
+            <table class="table-enterprise align-middle mb-0" id="sessionsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 22%;">{{ tr .Lang "المشترك / اسم المستخدم" "Subscriber / Username" }}</th>
+                        <th style="width: 14%;">{{ tr .Lang "عنوان IP المخصص" "Framed IP" }}</th>
+                        <th style="width: 15%;">{{ tr .Lang "الماك أدريس (Calling MAC)" "Calling Station ID (MAC)" }}</th>
+                        <th style="width: 12%;">{{ tr .Lang "راوتر NAS" "NAS Router" }}</th>
+                        <th style="width: 11%;">{{ tr .Lang "مدة الاتصال" "Uptime" }}</th>
+                        <th style="width: 11%;">{{ tr .Lang "التحميل (Down)" "Download" }}</th>
+                        <th style="width: 11%;">{{ tr .Lang "الرفع (Up)" "Upload" }}</th>
+                        <th style="width: 4%;" class="text-end">{{ tr .Lang "فصل" "Action" }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Sessions }}
+                    <tr class="session-row" data-username="{{ .UserName }}" data-ip="{{ .FramedIPAddress }}" data-mac="{{ .CallingStationID }}" data-nas="{{ .NASIPAddress }}">
+                        <td>
+                            <div class="d-flex align-items-center gap-2.5">
+                                <span class="nav-icon-bubble" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5; width: 34px; height: 34px; font-weight: 700; font-size: 0.85rem;">
+                                    {{ printf "%.1s" .UserName }}
+                                </span>
+                                <div>
+                                    <div class="fw-bold text-dark d-flex align-items-center gap-1.5">
+                                        <span>{{ .UserName }}</span>
+                                        <span class="live-pulse-dot bg-success" style="width: 6px; height: 6px;" title="متصل الآن"></span>
+                                    </div>
+                                    <small class="text-muted font-monospace" style="font-size: 0.72rem;">ID: {{ .AcctSessionID }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace px-2 py-1" style="background: #F0F9FF; color: #0284C7; border: 1px solid #BAE6FD; font-size: 0.82rem; border-radius: 6px;">
+                                <i class="bi bi-hdd-network me-1"></i>{{ .FramedIPAddress }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace text-secondary bg-light border px-2 py-1" style="font-size: 0.78rem; border-radius: 6px;">
+                                {{ if .CallingStationID }}{{ .CallingStationID }}{{ else }}—{{ end }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border font-monospace px-2 py-1" style="border-radius: 6px;">
+                                <i class="bi bi-router me-1 text-primary"></i>{{ .NASIPAddress }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace text-dark bg-light border px-2 py-1" style="font-size: 0.8rem; border-radius: 6px;">
+                                <i class="bi bi-clock me-1 text-secondary"></i>{{ formatDuration .AcctSessionTime }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.8rem; border-radius: 6px;">
+                                <i class="bi bi-arrow-down me-1"></i>{{ formatBytes .AcctInputOctets }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge font-monospace" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.8rem; border-radius: 6px;">
+                                <i class="bi bi-arrow-up me-1"></i>{{ formatBytes .AcctOutputOctets }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <a href="/sessions/disconnect?username={{ urlQueryEscape .UserName }}&session={{ urlQueryEscape .AcctSessionID }}&nas={{ urlQueryEscape .NASIPAddress }}&ip={{ urlQueryEscape .FramedIPAddress }}" 
+                               class="btn btn-sm btn-outline-danger py-1 px-2.5 fw-bold" 
+                               style="border-radius: 8px;"
+                               onclick="return confirm('{{ tr $.Lang "هل أنت متأكد من إرسال أمر فصل فوري (CoA / PoD) لهذا المشترك من الراوتر؟" "Send instant Disconnect (PoD) request to MikroTik NAS?" }}');"
+                               title="{{ tr $.Lang "قطع الاتصال فوراً وإرسال PoD" "Disconnect Session" }}">
+                                <i class="bi bi-power"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <div class="py-4">
+                                <span class="nav-icon-bubble mx-auto mb-3" style="background: #F1F5F9; color: #94A3B8; width: 56px; height: 56px; font-size: 1.5rem;">
+                                    <i class="bi bi-broadcast-pin"></i>
+                                </span>
+                                <h6 class="fw-bold text-dark">{{ tr .Lang "لا توجد جلسات نشطة حالياً" "No Active Sessions" }}</h6>
+                                <p class="text-secondary small mb-0">{{ tr .Lang "لا يوجد أي مشترك متصل على راوترات الشبكة في الوقت الحالي" "No active PPPoE or Hotspot sessions detected on routers" }}</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {{ end }}
 
 {{ define "auth_content" }}{{ end }}
-{{ define "scripts" }}{{ end }}
+{{ define "scripts" }}
+<script>
+function filterSessionsTable() {
+    const searchVal = (document.getElementById('sessionSearchInput')?.value || '').toLowerCase().trim();
+    const nasVal = (document.getElementById('nasFilterSelect')?.value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#sessionsTable tbody tr.session-row');
+
+    rows.forEach(row => {
+        const username = (row.getAttribute('data-username') || '').toLowerCase();
+        const ip = (row.getAttribute('data-ip') || '').toLowerCase();
+        const mac = (row.getAttribute('data-mac') || '').toLowerCase();
+        const nas = (row.getAttribute('data-nas') || '').toLowerCase();
+
+        const matchesSearch = !searchVal || username.includes(searchVal) || ip.includes(searchVal) || mac.includes(searchVal);
+        const matchesNas = !nasVal || nas === nasVal;
+
+        if (matchesSearch && matchesNas) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Auto-refresh timer every 15s if toggle is enabled
+let refreshTimer = null;
+const autoToggle = document.getElementById('autoRefreshToggle');
+if (autoToggle) {
+    function scheduleRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        if (autoToggle.checked) {
+            refreshTimer = setInterval(() => {
+                const searchVal = document.getElementById('sessionSearchInput')?.value || '';
+                // Don't auto-refresh while the user is actively searching
+                if (!searchVal) {
+                    window.location.reload();
+                }
+            }, 15000);
+        }
+    }
+    autoToggle.addEventListener('change', scheduleRefresh);
+    scheduleRefresh();
+}
+</script>
+{{ end }}
