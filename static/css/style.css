@@ -20,39 +20,43 @@
     --text-muted: #64748b;
     --text-light: #94a3b8;
     
-    /* Design #2 Enterprise Colors (Royal Indigo & Emerald) */
-    --primary: #4f46e5;
-    --primary-hover: #4338ca;
-    --primary-subtle: #eef2ff;
-    --primary-border: #c7d2fe;
+    /* Adv Radius PRO Palette */
+    --primary: #3598dc;
+    --primary-hover: #2a80b9;
+    --primary-subtle: #edf6fd;
+    --primary-border: #bce1f7;
     
-    --success: #10b981;
-    --success-hover: #059669;
-    --success-subtle: #ecfdf5;
-    --success-border: #a7f3d0;
+    --success: #26c281;
+    --success-hover: #20a870;
+    --success-subtle: #ebfaf3;
+    --success-border: #a3ecc9;
     
-    --warning: #f59e0b;
-    --warning-hover: #d97706;
-    --warning-subtle: #fffbeb;
-    --warning-border: #fde68a;
+    --warning: #dfba49;
+    --warning-hover: #c9a334;
+    --warning-subtle: #fcf8ec;
+    --warning-border: #f4e3aa;
     
-    --danger: #f43f5e;
-    --danger-hover: #e11d48;
-    --danger-subtle: #fff1f2;
-    --danger-border: #fecdd3;
+    --danger: #e7505a;
+    --danger-hover: #d2323d;
+    --danger-subtle: #fdf0f1;
+    --danger-border: #f6b5b9;
     
-    --info: #0284c7;
-    --info-subtle: #f0f9ff;
-    --info-border: #bae6fd;
+    --info: #3598dc;
+    --info-subtle: #edf6fd;
+    --info-border: #bce1f7;
     
-    --purple: #8b5cf6;
-    --purple-subtle: #f5f3ff;
-    --purple-border: #ddd6fe;
+    --purple: #8e44ad;
+    --purple-subtle: #f6effa;
+    --purple-border: #dcbfe7;
+
+    --teal: #1bbc9b;
+    --teal-subtle: #ebf9f6;
+    --teal-border: #9ee5d6;
     
     /* Clean Hairline Borders & Soft Micro-Shadows */
     --border-color: #e2e8f0;
     --border-subtle: #f1f5f9;
-    --border-focus: #4f46e5;
+    --border-focus: #3598dc;
     
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
     --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.07);
@@ -194,14 +198,14 @@ a:hover {
 .brand-icon-box {
     width: 38px;
     height: 38px;
-    background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%) !important;
+    background: linear-gradient(135deg, #3598dc 0%, #26c281 100%) !important;
     border-radius: 10px !important;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #ffffff !important;
     font-size: 1.25rem;
-    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3) !important;
+    box-shadow: 0 2px 8px rgba(53, 152, 220, 0.35) !important;
     flex-shrink: 0;
 }
 
@@ -246,13 +250,13 @@ a:hover {
     height: 8px;
     border-radius: 50%;
     background-color: var(--primary);
-    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.5);
+    box-shadow: 0 0 0 0 rgba(53, 152, 220, 0.5);
     animation: pulseBlueAnim 2s infinite;
 }
 @keyframes pulseBlueAnim {
-    0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.5); }
-    70% { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(53, 152, 220, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(53, 152, 220, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(53, 152, 220, 0); }
 }
 
 .user-btn {
@@ -1435,9 +1439,12 @@ html[dir="ltr"] .sidebar-submenu {
     color: #ffffff !important;
 }
 .small-box .inner {
-    padding: 20px 22px;
+    padding: 18px 20px 18px 75px;
     position: relative;
     z-index: 2;
+}
+html[dir="ltr"] .small-box .inner {
+    padding: 18px 75px 18px 20px;
 }
 .small-box h3 {
     font-size: 34px !important;
@@ -1550,6 +1557,19 @@ html[dir="ltr"] .app-sidebar {
 html[dir="ltr"] .sidebar-nav-link.active {
     border-right: none !important;
     border-left: 4px solid #3598dc !important;
+}
+.sidebar-nav-link.active-parent {
+    background-color: #141b27 !important;
+    color: #ffffff !important;
+    border-right: 4px solid #3598dc !important;
+}
+html[dir="ltr"] .sidebar-nav-link.active-parent {
+    border-right: none !important;
+    border-left: 4px solid #3598dc !important;
+}
+.app-sidebar .sidebar-nav-link.active-parent .nav-icon-bubble {
+    background: rgba(53, 152, 220, 0.22) !important;
+    color: #38bdf8 !important;
 }
 .sidebar-submenu {
     background-color: #141b27 !important;
