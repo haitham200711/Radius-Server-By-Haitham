@@ -2,209 +2,166 @@
 <style>
 .subscriber-row {
     cursor: pointer;
-    transition: all 0.15s ease-in-out;
+    transition: background-color 0.15s ease-in-out;
 }
 .subscriber-row:hover {
-    background-color: rgba(79, 70, 229, 0.04) !important;
+    background-color: rgba(13, 110, 253, 0.05) !important;
 }
 .subscriber-row.active-selected {
-    background-color: rgba(79, 70, 229, 0.08) !important;
-    border-right: 4px solid #4F46E5 !important;
-}
-.sub-avatar-circle {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.8rem;
-    flex-shrink: 0;
+    background-color: rgba(13, 110, 253, 0.12) !important;
+    border-right: 4px solid #0d6efd !important;
 }
 </style>
 
-<!-- Top Enterprise Operations & Management Header -->
-<div class="component-card mb-4 p-3 p-md-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="nav-icon-bubble" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5; width: 32px; height: 32px;">
-                    <i class="bi bi-people-fill"></i>
-                </span>
-                <h4 class="fw-bold mb-0 text-dark fs-5">
-                    {{ tr .Lang "إدارة المشتركين والعقود (PPPoE / Hotspot)" "Subscriber Directory & Contracts (PPPoE / Hotspot)" }}
-                </h4>
-                <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.72rem; border-radius: 6px;">
-                    {{ tr .Lang "إدارة كاملة" "Full AAA Control" }}
-                </span>
-            </div>
-            <p class="text-secondary small mb-0">
-                {{ tr .Lang "سجل المشتركين المتكامل مع الراديوس، مراقبة الكوتات، تجديد الباقات، التحكم المالي والسرعات" "Comprehensive subscriber database with RADIUS sync, quota tracking, renewal automation, and financial accounting" }}
-            </p>
-        </div>
-        <div class="d-flex flex-wrap align-items-center gap-2">
-            <!-- Active Subscriber Selection Badge -->
-            <div id="activeSubBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 d-none align-items-center gap-2 shadow-sm" style="font-size: 0.85rem; border-radius: 8px;">
-                <i class="bi bi-person-check-fill fs-6"></i>
-                <span>{{ tr .Lang "المحدد:" "Selected:" }} <strong id="activeSubName"></strong></span>
-                <button type="button" class="btn-close btn-close-sm ms-1" style="font-size: 0.6rem;" onclick="clearActiveSubscriber(event)" title="{{ tr .Lang "إلغاء التحديد" "Deselect" }}"></button>
-            </div>
-
-            <!-- Unified Actions Dropdown Menu -->
-            <div class="dropdown">
-                <button class="noc-action-btn primary dropdown-toggle" type="button" id="subscribersActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-grid-fill"></i>
-                    <span>{{ tr .Lang "إجراءات المشتركين" "Subscriber Actions" }}</span>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 py-2" aria-labelledby="subscribersActionsDropdown" style="min-width: 260px; border-radius: 14px;">
-                    <li><h6 class="dropdown-header text-uppercase text-muted small fw-bold">{{ tr .Lang "العمليات على المشترك المحدد" "Selected User Operations" }}</h6></li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('renew')">
-                            <span class="nav-icon-bubble" style="background: #ECFDF5; color: #10B981; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-arrow-repeat"></i>
-                            </span>
-                            <span class="fw-bold">{{ tr .Lang "تجديد الاشتراك" "Renew Subscription" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('change_profile')">
-                            <span class="nav-icon-bubble" style="background: #EEF2FF; color: #4F46E5; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-arrow-left-right"></i>
-                            </span>
-                            <span class="fw-bold text-primary">{{ tr .Lang "تحويل / تغيير البروفايل" "Change Profile" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('settle_loan')">
-                            <span class="nav-icon-bubble" style="background: #F0F9FF; color: #0284C7; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-check2-circle"></i>
-                            </span>
-                            <span class="fw-bold text-primary">{{ tr .Lang "سداد سلفة" "Settle Loan" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('loan')">
-                            <span class="nav-icon-bubble" style="background: #FFFBEB; color: #D97706; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-clock-history"></i>
-                            </span>
-                            <span>{{ tr .Lang "منح سلفة فترة سماح" "Grant Loan" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('quota')">
-                            <span class="nav-icon-bubble" style="background: #ECFEFF; color: #0891B2; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-database-add"></i>
-                            </span>
-                            <span>{{ tr .Lang "إضافة كوتة رصيد (+GB)" "Add Quota (+GB)" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('balance')">
-                            <span class="nav-icon-bubble" style="background: #ECFDF5; color: #059669; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-wallet2"></i>
-                            </span>
-                            <span class="fw-bold">{{ tr .Lang "شحن / إيداع رصيد بالمحفظة" "Add Wallet Balance" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('debt')">
-                            <span class="nav-icon-bubble" style="background: #FEF3C7; color: #B45309; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-cash-stack"></i>
-                            </span>
-                            <span>{{ tr .Lang "سداد / تسوية مديونية" "Settle Debt" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="toolbarAction('terminate')">
-                            <span class="nav-icon-bubble" style="background: #FFF1F2; color: #E11D48; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-stop-circle"></i>
-                            </span>
-                            <span class="fw-bold">{{ tr .Lang "إنهاء الاشتراك فوراً" "Terminate Immediately" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('traffic')">
-                            <span class="nav-icon-bubble" style="background: #FEE2E2; color: #DC2626; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-activity"></i>
-                            </span>
-                            <span>{{ tr .Lang "مراقبة السحب لايف" "Live Traffic Monitor" }}</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('edit')">
-                            <span class="nav-icon-bubble" style="background: #F1F5F9; color: #475569; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-pencil-square"></i>
-                            </span>
-                            <span>{{ tr .Lang "تعديل بيانات المشترك" "Edit Subscriber" }}</span>
-                        </a>
-                    </li>
-                    <li><hr class="dropdown-divider my-1"></li>
-                    <li>
-                        <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="toolbarAction('delete')">
-                            <span class="nav-icon-bubble" style="background: #FEE2E2; color: #B91C1C; width: 26px; height: 26px; font-size: 0.8rem;">
-                                <i class="bi bi-trash"></i>
-                            </span>
-                            <span class="fw-bold">{{ tr .Lang "حذف المشترك نهائياً" "Delete Subscriber" }}</span>
-                        </a>
-                    </li>
-                </ul>
-            </div>
-
-            <a href="/subscribers/add" class="noc-action-btn primary text-decoration-none">
-                <i class="bi bi-person-plus-fill"></i>
-                <span>{{ tr .Lang "إضافة مشترك جديد" "Add Subscriber" }}</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Status Filter Chips -->
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <div class="d-flex flex-wrap gap-1.5">
-            <a href="/subscribers?limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "" }}btn-primary fw-bold shadow-sm{{ else }}btn-light border text-secondary{{ end }}" style="border-radius: 8px;">
-                <i class="bi bi-people-fill me-1"></i> {{ tr .Lang "الكل" "All" }}
-            </a>
-            <a href="/subscribers?status=online&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "online" }}btn-success fw-bold shadow-sm{{ else }}btn-light border text-success{{ end }}" style="border-radius: 8px;">
-                <span class="live-pulse-dot bg-success" style="width: 6px; height: 6px;"></span>
-                {{ tr .Lang "متصلين الآن" "Online" }} ({{ .OnlineCount }})
-            </a>
-            <a href="/subscribers?status=offline&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "offline" }}btn-secondary fw-bold shadow-sm{{ else }}btn-light border text-secondary{{ end }}" style="border-radius: 8px;">
-                <i class="bi bi-slash-circle me-1"></i> {{ tr .Lang "غير متصلين" "Offline" }}
-            </a>
-            <a href="/subscribers?status=loan&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "loan" }}btn-warning text-dark fw-bold shadow-sm{{ else }}btn-light border text-warning{{ end }}" style="border-radius: 8px;">
-                <i class="bi bi-clock-history me-1"></i> {{ tr .Lang "مستلفين" "Loans" }} ({{ .LoanActiveCount }})
-            </a>
-            <a href="/subscribers?status=expired_time&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_time" }}btn-danger fw-bold shadow-sm{{ else }}btn-light border text-danger{{ end }}" style="border-radius: 8px;">
-                <i class="bi bi-hourglass-bottom me-1"></i> {{ tr .Lang "منتهي وقت" "Expired Time" }} ({{ .ExpiredTimeCount }})
-            </a>
-            <a href="/subscribers?status=expired_quota&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_quota" }}btn-warning text-dark fw-bold shadow-sm{{ else }}btn-light border text-dark{{ end }}" style="border-radius: 8px;">
-                <i class="bi bi-pie-chart-fill me-1"></i> {{ tr .Lang "منتهي كوتة" "Expired Quota" }} ({{ .ExpiredQuotaCount }})
-            </a>
-        </div>
-
-        {{ if .FilterStatus }}
-        <div>
-            <a href="/subscribers?limit={{ .Limit }}" class="badge bg-light text-dark text-decoration-none border px-2.5 py-1.5" style="border-radius: 8px;">
-                {{ tr .Lang "إلغاء الفلتر" "Clear Filter" }} <i class="bi bi-x-circle ms-1"></i>
-            </a>
-        </div>
-        {{ end }}
-    </div>
-
-    <!-- Search, Page Size & Column Customization Filter Form -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 p-3 bg-white rounded-3 shadow-sm border">
     <div>
+        <h4 class="fw-bold mb-1 text-dark">
+            <i class="bi bi-people-fill text-primary me-2"></i> إدارة المشتركين والعقود (PPPoE / Hotspot)
+        </h4>
+        <p class="text-muted small mb-0">سجل المشتركين المتكامل مع النظام والتحكم المباشر في الجلسات والباقات</p>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <!-- Active Subscriber Selection Badge -->
+        <div id="activeSubBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 d-none align-items-center gap-2 shadow-sm" style="font-size: 0.85rem;">
+            <i class="bi bi-person-check-fill fs-6"></i>
+            <span>المحدد: <strong id="activeSubName"></strong></span>
+            <button type="button" class="btn-close btn-close-sm ms-1" style="font-size: 0.6rem;" onclick="clearActiveSubscriber(event)" title="إلغاء التحديد"></button>
+        </div>
+
+        <!-- Unified Actions Dropdown Menu (Clean & Fixed) -->
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle fw-bold shadow-sm d-flex align-items-center gap-2 px-3 py-2" type="button" id="subscribersActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-grid-fill"></i>
+                <span>إجراءات المشتركين</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 py-2" aria-labelledby="subscribersActionsDropdown" style="min-width: 250px; border-radius: 12px;">
+                <li><h6 class="dropdown-header text-uppercase text-muted small fw-bold">العمليات على المشترك</h6></li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('renew')">
+                        <i class="bi bi-arrow-repeat text-success fs-5"></i>
+                        <span class="fw-bold">تجديد الاشتراك</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('change_profile')">
+                        <i class="bi bi-arrow-left-right text-primary fs-5"></i>
+                        <span class="fw-bold text-primary">تحويل / تغيير البروفايل</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('settle_loan')">
+                        <i class="bi bi-check2-circle text-primary fs-5"></i>
+                        <span class="fw-bold text-primary">سداد سلفة</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('loan')">
+                        <i class="bi bi-clock-history text-warning fs-5"></i>
+                        <span>منح سلفة فترة سماح</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('quota')">
+                        <i class="bi bi-database-add text-info fs-5"></i>
+                        <span>إضافة كوتة رصيد (+GB)</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('balance')">
+                        <i class="bi bi-wallet2 text-success fs-5"></i>
+                        <span class="fw-bold">شحن / إيداع رصيد بالمحفظة</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('debt')">
+                        <i class="bi bi-cash-stack text-warning fs-5"></i>
+                        <span>سداد / تسوية مديونية</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="toolbarAction('terminate')">
+                        <i class="bi bi-stop-circle fs-5"></i>
+                        <span class="fw-bold">إنهاء الاشتراك فورا</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('traffic')">
+                        <i class="bi bi-activity text-danger fs-5"></i>
+                        <span>مراقبة السحب لايف</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="toolbarAction('edit')">
+                        <i class="bi bi-pencil-square text-secondary fs-5"></i>
+                        <span>تعديل بيانات المشترك</span>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                    <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="toolbarAction('delete')">
+                        <i class="bi bi-trash fs-5"></i>
+                        <span class="fw-bold">حذف المشترك</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <a href="/subscribers/add" class="btn btn-outline-primary fw-bold shadow-sm d-flex align-items-center gap-1 px-3 py-2">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>إضافة مشترك جديد</span>
+        </a>
+    </div>
+</div>
+
+<!-- Status Filter Tabs -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/subscribers?limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "" }}btn-primary fw-bold{{ else }}btn-outline-secondary{{ end }}">
+            <i class="bi bi-people-fill me-1"></i> جميع المشتركين
+        </a>
+        <a href="/subscribers?status=online&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "online" }}btn-success fw-bold{{ else }}btn-outline-success{{ end }}">
+            <span class="spinner-grow spinner-grow-sm text-success me-1" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+            متصلين الآن ({{ .OnlineCount }})
+        </a>
+        <a href="/subscribers?status=offline&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "offline" }}btn-secondary fw-bold{{ else }}btn-outline-secondary{{ end }}">
+            <i class="bi bi-slash-circle me-1"></i> غير متصلين
+        </a>
+        <a href="/subscribers?status=loan&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "loan" }}btn-warning text-dark fw-bold shadow-sm{{ else }}btn-outline-warning text-dark{{ end }}">
+            <i class="bi bi-clock-history me-1"></i> مستلفين ({{ .LoanActiveCount }})
+        </a>
+        <a href="/subscribers?status=expired_time&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_time" }}btn-danger fw-bold{{ else }}btn-outline-danger{{ end }}">
+            <i class="bi bi-clock-history me-1"></i> منتهي وقت ({{ .ExpiredTimeCount }})
+        </a>
+        <a href="/subscribers?status=expired_quota&limit={{ .Limit }}&q={{ .SearchQuery }}" class="btn btn-sm {{ if eq .FilterStatus "expired_quota" }}btn-warning text-dark fw-bold{{ else }}btn-outline-warning text-dark{{ end }}">
+            <i class="bi bi-pie-chart-fill me-1"></i> منتهي كوتة ({{ .ExpiredQuotaCount }})
+        </a>
+    </div>
+
+    {{ if .FilterStatus }}
+    <div>
+        <a href="/subscribers?limit={{ .Limit }}" class="badge bg-light text-dark text-decoration-none border p-2">
+            إلغاء الفلتر: {{ if eq .FilterStatus "online" }}متصلين فقط{{ else if eq .FilterStatus "offline" }}غير متصلين{{ else if eq .FilterStatus "loan" }}مستلفين فقط{{ else if eq .FilterStatus "expired_time" }}منتهي وقت{{ else if eq .FilterStatus "expired_quota" }}منتهي كوتة{{ else }}{{ .FilterStatus }}{{ end }} <i class="bi bi-x-circle ms-1"></i>
+        </a>
+    </div>
+    </div>
+    {{ end }}
+</div>
+
+<!-- Search, Page Size & Column Customization Filter -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
         <form method="GET" action="/subscribers" id="filterForm" class="row g-2 align-items-center">
             <input type="hidden" name="status" value="{{ .FilterStatus }}">
             <div class="col-md-4">
                 <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="{{ tr .Lang "بحث بالاسم، اسم المستخدم، رقم العقد، أو الموبايل..." "Search by name, username, contract, or phone..." }}" value="{{ .SearchQuery }}">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="بحث باسم العميل، اسم المستخدم، رقم العقد، أو رقم الهاتف..." value="{{ .SearchQuery }}">
                 </div>
             </div>
             {{ if .Resellers }}
             <div class="col-md-2">
                 <select name="reseller_id" class="form-select font-monospace" onchange="document.getElementById('filterForm').submit()">
-                    <option value="0">{{ tr .Lang "كل الموزعين والوكلاء" "All Resellers" }}</option>
+                    <option value="0">كل الموزعين والوكلاء</option>
                     {{ range .Resellers }}
                     <option value="{{ .ID }}" {{ if eq $.SelectedReseller .ID }}selected{{ end }}>{{ .Name }}</option>
                     {{ end }}
@@ -344,10 +301,10 @@
 </div>
 
 <!-- Subscribers Table -->
-<div class="noc-bento-card overflow-hidden">
-    <div class="table-responsive">
-        <table class="table-enterprise align-middle mb-0 text-nowrap">
-            <thead>
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
                 <tr>
                     <th style="width: 40px;" class="text-center">
                         <input type="checkbox" id="selectAllCheckbox" class="form-check-input" title="تحديد / إلغاء تحديد الكل في هذه الصفحة">
@@ -391,9 +348,9 @@
                     <td class="col-online">
                         {{ if .IsOnline }}
                         <div>
-                            <span class="kpi-pill-badge" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;">
-                                <span class="live-pulse-dot bg-success" style="width: 5px; height: 5px;"></span>
-                                <span>متصل الآن</span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold">
+                                <span class="spinner-grow spinner-grow-sm text-success me-1" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                                متصل الآن
                             </span>
                         </div>
                         <div class="font-monospace text-primary fw-bold small mt-1">
@@ -401,8 +358,8 @@
                         </div>
                         {{ else }}
                         <div>
-                            <span class="badge bg-light text-secondary border">
-                                <i class="bi bi-circle-fill text-muted me-1" style="font-size: 0.5rem;"></i> غير متصل
+                            <span class="badge bg-light text-muted border">
+                                <i class="bi bi-circle-fill text-secondary me-1" style="font-size: 0.55rem;"></i> غير متصل
                             </span>
                         </div>
                         {{ if .IPAddress }}
@@ -412,17 +369,10 @@
                     </td>
                     <td class="col-contract"><span class="badge bg-light text-dark border font-monospace">{{ .ContractNo }}</span></td>
                     <td class="col-name">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="sub-avatar-circle" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5;">
-                                {{ printf "%.1s" .FullName }}
-                            </span>
-                            <div>
-                                <div class="fw-bold text-dark">{{ .FullName }}</div>
-                                <div class="d-flex flex-wrap align-items-center gap-1 mt-0.5">
-                                    {{ if .Address }}<small class="text-secondary" style="font-size: 0.73rem;"><i class="bi bi-geo-alt"></i> {{ .Address }}</small>{{ end }}
-                                    {{ if .ResellerName }}<a href="/subscribers?reseller_id={{ .ResellerID }}" class="badge bg-secondary-subtle text-secondary border text-decoration-none" title="تصفية حسب هذا الموزع" style="font-size: 0.7rem;"><i class="bi bi-shop me-1"></i>{{ .ResellerName }}</a>{{ end }}
-                                </div>
-                            </div>
+                        <div class="fw-bold">{{ .FullName }}</div>
+                        <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                            {{ if .Address }}<small class="text-muted"><i class="bi bi-geo-alt"></i> {{ .Address }}</small>{{ end }}
+                            {{ if .ResellerName }}<a href="/subscribers?reseller_id={{ .ResellerID }}" class="badge bg-secondary-subtle text-secondary border text-decoration-none" title="تصفية حسب هذا الموزع"><i class="bi bi-shop me-1"></i>{{ .ResellerName }}</a>{{ end }}
                         </div>
                     </td>
                     <td class="col-username">
@@ -536,7 +486,7 @@
 
     <!-- Pagination Footer -->
     {{ if gt .TotalCount 0 }}
-    <div class="py-3 px-4 border-top d-flex flex-wrap align-items-center justify-content-between gap-3 bg-light-subtle">
+    <div class="card-footer bg-white py-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div class="text-muted small">
             عرض المشتركين من <b class="text-dark">{{ .FromIndex }}</b> إلى <b class="text-dark">{{ .ToIndex }}</b> من إجمالي <b class="text-primary">{{ .TotalCount }}</b> مشترك
             (صفحة <b class="text-dark">{{ .Page }}</b> من <b class="text-dark">{{ .TotalPages }}</b>)

@@ -1,188 +1,142 @@
 {{ define "content" }}
-<div class="mb-4">
-    <!-- Header & Action Toolbar -->
-    <div class="component-card mb-4 p-3 p-md-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-0">
-            <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="nav-icon-bubble" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5; width: 32px; height: 32px;">
-                        <i class="bi bi-sliders2-vertical"></i>
-                    </span>
-                    <h4 class="fw-bold mb-0 text-dark fs-5">
-                        {{ tr .Lang "باقات السرعات والخدمات (MikroTik Profiles)" "Bandwidth & Service Profiles (MikroTik AAA)" }}
-                    </h4>
-                    <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.72rem; border-radius: 6px;">
-                        {{ len .Profiles }} {{ tr .Lang "باقات معرفة" "Profiles Active" }}
-                    </span>
-                </div>
-                <p class="text-secondary small mb-0">
-                    {{ tr .Lang "تحديد سرعات التحميل والرفع، الكوتة الكلية، مدة الصلاحية، وسلوك انتهاء الكوتة أو الوقت" "Bandwidth rate-limits, quota policies, validity durations, and expiration fallback automation" }}
-                </p>
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <a href="/profiles/speed-control" class="noc-action-btn text-decoration-none">
-                    <span class="nav-icon-bubble" style="background: #FFFBEB; color: #D97706; width: 22px; height: 22px; font-size: 0.75rem;">
-                        <i class="bi bi-speedometer2"></i>
-                    </span>
-                    <span>{{ tr .Lang "التحكم بالسرعات" "Speed Control" }}</span>
-                </a>
-                <button class="noc-action-btn primary" data-bs-toggle="modal" data-bs-target="#addProfileModal">
-                    <i class="bi bi-plus-circle"></i>
-                    <span>{{ tr .Lang "إضافة باقة جديدة" "Add Profile" }}</span>
-                </button>
-            </div>
-        </div>
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">باقات السرعات والخدمات (MikroTik Profiles)</h3>
+        <p class="text-muted small mb-0">تحديد سرعات التحميل والرفع، الكوتة الكلية، مدة الصلاحية، وسلوك انتهاء الكوتة أو الوقت</p>
     </div>
+    <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addProfileModal">
+        <i class="bi bi-plus-circle me-1"></i> إضافة باقة جديدة
+    </button>
+</div>
 
-    <!-- Profiles Table Card -->
-    <div class="noc-bento-card overflow-hidden">
-        <div class="table-responsive">
-            <table class="table-enterprise align-middle mb-0 text-nowrap">
-                <thead>
-                    <tr>
-                        <th>كود الباقة</th>
-                        <th>الاسم المعروض</th>
-                        <th>السرعة (Rate-Limit)</th>
-                        <th>الكوتة الممنوحة</th>
-                        <th>مدة الصلاحية</th>
-                        <th>عند نفاد الكوتة</th>
-                        <th>عند انتهاء الوقت</th>
-                        <th>نظام السلفة</th>
-                        <th>صفحة المشترك</th>
-                        <th>سعر الجمهور</th>
-                        <th>سعر التكلفة</th>
-                        <th class="text-end">خيارات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{ range .Profiles }}
-                    <tr>
-                        <td>
-                            <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.82rem; border-radius: 6px;">
-                                {{ .Name }}
-                            </span>
-                        </td>
-                        <td>
-                            <strong class="text-dark">{{ .DisplayName }}</strong>
-                        </td>
-                        <td>
-                            <span class="badge font-monospace px-2 py-1" style="background: #ECFEFF; color: #0891B2; border: 1px solid #A5F3FC; font-size: 0.8rem; border-radius: 6px;">
-                                ⚡ {{ .RateLimit }}
-                            </span>
-                        </td>
-                        <td>
-                            {{ if gt .QuotaGB 0.0 }}
-                            <span class="badge font-monospace px-2 py-1" style="background: #F0F9FF; color: #0284C7; border: 1px solid #BAE6FD; font-size: 0.8rem; border-radius: 6px;">
-                                <i class="bi bi-hdd-network me-1"></i>{{ printf "%.1f" .QuotaGB }} GB
-                            </span>
-                            {{ else }}
-                            <span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="border-radius: 6px;">مفتوح ∞</span>
-                            {{ end }}
-                        </td>
-                        <td>
-                            <span class="badge font-monospace px-2 py-1" style="background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; font-size: 0.8rem; border-radius: 6px;">
-                                <i class="bi bi-clock-history me-1"></i>{{ .ValidityDisplay }}
-                            </span>
-                        </td>
-                        <td>
-                            {{ if eq .OnQuotaAction "profile" }}
-                            <span class="badge bg-light text-primary border font-monospace px-2 py-1" style="border-radius: 6px;">
-                                <i class="bi bi-arrow-repeat me-1"></i>{{ .OnQuotaProfile }}
-                            </span>
-                            {{ else if eq .OnQuotaAction "pool" }}
-                            <span class="badge bg-light text-danger border font-monospace px-2 py-1" style="border-radius: 6px;">
-                                <i class="bi bi-signpost-2 me-1"></i>Pool: {{ .OnQuotaPool }}
-                            </span>
-                            {{ else }}
-                            <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px;">فصل الخدمة</span>
-                            {{ end }}
-                        </td>
-                        <td>
-                            {{ if eq .OnTimeAction "profile" }}
-                            <span class="badge bg-light text-primary border font-monospace px-2 py-1" style="border-radius: 6px;">
-                                <i class="bi bi-arrow-repeat me-1"></i>{{ .OnTimeProfile }}
-                            </span>
-                            {{ else if eq .OnTimeAction "pool" }}
-                            <span class="badge bg-light text-danger border font-monospace px-2 py-1" style="border-radius: 6px;">
-                                <i class="bi bi-signpost-2 me-1"></i>Pool: {{ .OnTimePool }}
-                            </span>
-                            {{ else }}
-                            <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px;">فصل الخدمة</span>
-                            {{ end }}
-                        </td>
-                        <td>
-                            {{ if .LoanEnabled }}
-                            <span class="badge font-monospace px-2 py-1" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.78rem; border-radius: 6px;" title="سلفة مفعلة: {{ .LoanHours }} ساعة | {{ printf "%.1f" .LoanQuotaGB }} GB | خصم {{ if eq .LoanDeductionType "partial" }}جزئي{{ else }}كلي{{ end }}">
-                                <i class="bi bi-clock-history me-1"></i>{{ .LoanHours }}h / {{ printf "%.0f" .LoanQuotaGB }}G
-                            </span>
-                            {{ else }}
-                            <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px;">معطل</span>
-                            {{ end }}
-                        </td>
-                        <td>
-                            {{ if .PortalEnabled }}
-                            <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.78rem; border-radius: 6px;" title="صفحة المشترك متاحة لمشتركي هذه الباقة">
-                                <i class="bi bi-person-check-fill me-1"></i>متاحة
-                            </span>
-                            {{ else }}
-                            <span class="badge bg-light text-secondary border px-2 py-1" style="border-radius: 6px;" title="صفحة المشترك معطلة لمشتركي هذه الباقة">
-                                <i class="bi bi-person-x-fill me-1"></i>معطلة
-                            </span>
-                            {{ end }}
-                        </td>
-                        <td><strong class="text-success font-monospace">{{ printf "%.2f" .Price }} ج.م</strong></td>
-                        <td><span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="border-radius: 6px;">{{ printf "%.2f" .CostPrice }} ج.م</span></td>
-                        <td class="text-end">
-                            <div class="d-flex align-items-center justify-content-end gap-1">
-                                <button class="btn btn-sm btn-light border text-primary py-1 px-2 btn-edit-profile" style="border-radius: 6px;"
-                                    data-id="{{ .ID }}"
-                                    data-name="{{ .Name }}"
-                                    data-display="{{ .DisplayName }}"
-                                    data-ratelimit="{{ .RateLimit }}"
-                                    data-pool="{{ .PoolName }}"
-                                    data-costprice="{{ .CostPrice }}"
-                                    data-price="{{ .Price }}"
-                                    data-quotagb="{{ .QuotaGB }}"
-                                    data-validityval="{{ .ValidityValue }}"
-                                    data-validityunit="{{ .ValidityUnit }}"
-                                    data-onquotaaction="{{ .OnQuotaAction }}"
-                                    data-onquotaprofile="{{ .OnQuotaProfile }}"
-                                    data-onquotapool="{{ .OnQuotaPool }}"
-                                    data-ontimeaction="{{ .OnTimeAction }}"
-                                    data-ontimeprofile="{{ .OnTimeProfile }}"
-                                    data-ontimepool="{{ .OnTimePool }}"
-                                    data-loanenabled="{{ if .LoanEnabled }}1{{ else }}0{{ end }}"
-                                    data-loanhours="{{ .LoanHours }}"
-                                    data-loanquota="{{ printf "%.1f" .LoanQuotaGB }}"
-                                    data-loandeduction="{{ .LoanDeductionType }}"
-                                    data-portalenabled="{{ if .PortalEnabled }}1{{ else }}0{{ end }}">
-                                    <i class="bi bi-pencil-square"></i>
-                                </button>
-                                <a href="/profiles/delete?id={{ .ID }}" class="btn btn-sm btn-light border text-danger py-1 px-2" style="border-radius: 6px;" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة نهائياً من النظام؟');">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                    {{ else }}
-                    <tr>
-                        <td colspan="12" class="text-center py-5 text-muted">
-                            <div class="py-4">
-                                <span class="nav-icon-bubble mx-auto mb-3" style="background: #F1F5F9; color: #94A3B8; width: 56px; height: 56px; font-size: 1.5rem;">
-                                    <i class="bi bi-sliders2-vertical"></i>
-                                </span>
-                                <h6 class="fw-bold text-dark">{{ tr .Lang "لا توجد باقات سرعات مضافة حالياً" "No Profiles Registered" }}</h6>
-                                <p class="text-secondary small mb-3">{{ tr .Lang "أضف باقات السرعات لتخصيصها للمشتركين وكروت الشحن" "Add service profiles to assign to subscribers and cards" }}</p>
-                                <button class="btn btn-sm btn-primary fw-bold px-3 py-1.5" data-bs-toggle="modal" data-bs-target="#addProfileModal" style="border-radius: 8px;">
-                                    <i class="bi bi-plus-circle me-1"></i> {{ tr .Lang "إضافة باقة جديدة الآن" "Add Profile Now" }}
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {{ end }}
-                </tbody>
-            </table>
-        </div>
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="table-light">
+                <tr>
+                    <th>كود الباقة</th>
+                    <th>الاسم المعروض</th>
+                    <th>السرعة (Rate-Limit)</th>
+                    <th>الكوتة الممنوحة</th>
+                    <th>مدة الصلاحية</th>
+                    <th>عند نفاد الكوتة</th>
+                    <th>عند انتهاء الوقت</th>
+                    <th>نظام السلفة</th>
+                    <th>صفحة المشترك</th>
+                    <th>سعر الجمهور</th>
+                    <th>سعر التكلفة</th>
+                    <th class="text-end">خيارات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Profiles }}
+                <tr>
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ .Name }}</span></td>
+                    <td><strong>{{ .DisplayName }}</strong></td>
+                    <td><span class="badge bg-info text-dark font-monospace">{{ .RateLimit }}</span></td>
+                    <td>
+                        {{ if gt .QuotaGB 0.0 }}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">
+                            <i class="bi bi-hdd-network me-1"></i>{{ printf "%.1f" .QuotaGB }} GB
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-secondary-subtle text-secondary border">مفتوح ∞</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle">
+                            <i class="bi bi-clock-history me-1"></i>{{ .ValidityDisplay }}
+                        </span>
+                    </td>
+                    <td>
+                        {{ if eq .OnQuotaAction "profile" }}
+                        <span class="badge bg-light text-primary border">
+                            <i class="bi bi-arrow-repeat me-1"></i>بروفايل: <strong>{{ .OnQuotaProfile }}</strong>
+                        </span>
+                        {{ else if eq .OnQuotaAction "pool" }}
+                        <span class="badge bg-light text-danger border">
+                            <i class="bi bi-signpost-2 me-1"></i>Pool: <code>{{ .OnQuotaPool }}</code>
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">فصل الخدمة</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if eq .OnTimeAction "profile" }}
+                        <span class="badge bg-light text-primary border">
+                            <i class="bi bi-arrow-repeat me-1"></i>بروفايل: <strong>{{ .OnTimeProfile }}</strong>
+                        </span>
+                        {{ else if eq .OnTimeAction "pool" }}
+                        <span class="badge bg-light text-danger border">
+                            <i class="bi bi-signpost-2 me-1"></i>Pool: <code>{{ .OnTimePool }}</code>
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">فصل الخدمة</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if .LoanEnabled }}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold" title="سلفة مفعلة: {{ .LoanHours }} ساعة | {{ printf "%.1f" .LoanQuotaGB }} GB | خصم {{ if eq .LoanDeductionType "partial" }}جزئي{{ else }}كلي{{ end }}">
+                            <i class="bi bi-clock-history me-1"></i>{{ .LoanHours }}h / {{ printf "%.0f" .LoanQuotaGB }}G
+                            <small class="d-block text-muted">({{ if eq .LoanDeductionType "partial" }}سداد جزئي{{ else }}سداد كلي{{ end }})</small>
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-light text-muted border">معطل</span>
+                        {{ end }}
+                    </td>
+                    <td>
+                        {{ if .PortalEnabled }}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold" title="صفحة المشترك متاحة لمشتركي هذه الباقة">
+                            <i class="bi bi-person-check-fill me-1"></i>متاحة
+                        </span>
+                        {{ else }}
+                        <span class="badge bg-secondary-subtle text-secondary border" title="صفحة المشترك معطلة لمشتركي هذه الباقة">
+                            <i class="bi bi-person-x-fill me-1"></i>معطلة
+                        </span>
+                        {{ end }}
+                    </td>
+                    <td><strong class="text-success">{{ printf "%.2f" .Price }} ج.م</strong></td>
+                    <td><span class="badge bg-light text-secondary border font-monospace">{{ printf "%.2f" .CostPrice }} ج.م</span></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1 btn-edit-profile"
+                            data-id="{{ .ID }}"
+                            data-name="{{ .Name }}"
+                            data-display="{{ .DisplayName }}"
+                            data-ratelimit="{{ .RateLimit }}"
+                            data-pool="{{ .PoolName }}"
+                            data-costprice="{{ .CostPrice }}"
+                            data-price="{{ .Price }}"
+                            data-quotagb="{{ .QuotaGB }}"
+                            data-validityval="{{ .ValidityValue }}"
+                            data-validityunit="{{ .ValidityUnit }}"
+                            data-onquotaaction="{{ .OnQuotaAction }}"
+                            data-onquotaprofile="{{ .OnQuotaProfile }}"
+                            data-onquotapool="{{ .OnQuotaPool }}"
+                            data-ontimeaction="{{ .OnTimeAction }}"
+                            data-ontimeprofile="{{ .OnTimeProfile }}"
+                            data-ontimepool="{{ .OnTimePool }}"
+                            data-loanenabled="{{ if .LoanEnabled }}1{{ else }}0{{ end }}"
+                            data-loanhours="{{ .LoanHours }}"
+                            data-loanquota="{{ printf "%.1f" .LoanQuotaGB }}"
+                            data-loandeduction="{{ .LoanDeductionType }}"
+                            data-portalenabled="{{ if .PortalEnabled }}1{{ else }}0{{ end }}">
+                            <i class="bi bi-pencil-square"></i> تعديل
+                        </button>
+                        <a href="/profiles/delete?id={{ .ID }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الباقة نهائياً من النظام؟');">
+                            <i class="bi bi-trash"></i> حذف
+                        </a>
+                    </td>
+                </tr>
+                {{ else }}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                        لا توجد باقات سرعات مضافة حالياً
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
     </div>
 </div>
 

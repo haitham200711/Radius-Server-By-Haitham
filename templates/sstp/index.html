@@ -1,42 +1,28 @@
 {{ define "content" }}
-<div class="mb-4">
-    <!-- Top Action Toolbar -->
-    <div class="component-card mb-4 p-3 p-md-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-0">
-            <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="nav-icon-bubble" style="background: rgba(16, 185, 129, 0.1); color: #10B981; width: 32px; height: 32px;">
-                        <i class="bi bi-shield-lock"></i>
-                    </span>
-                    <h4 class="fw-bold mb-0 text-dark fs-5">
-                        {{ tr .Lang "إدارة سيرفر SSTP VPN المشفر (Accel-PPP Core)" "Encrypted SSTP VPN Core (Accel-PPP)" }}
-                    </h4>
-                    <span class="badge font-monospace px-2 py-1" style="background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 0.72rem; border-radius: 6px;">
-                        <span class="live-pulse-dot bg-success" style="width: 5px; height: 5px;"></span> Port {{ .Settings.Port }} Active
-                    </span>
-                </div>
-                <p class="text-secondary small mb-0">
-                    {{ tr .Lang "ربط راوترات المايكروتك بنفق مشفر وإدارتها والتوجيه الثابت للشبكات عبر كيرنل لينكس" "Secure point-to-point SSTP tunnels connecting remote MikroTik gateways directly to the RADIUS host" }}
-                </p>
-            </div>
-
-            <!-- Top Action Buttons -->
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <button class="noc-action-btn primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
-                    <i class="bi bi-plus-circle"></i>
-                    <span>{{ tr .Lang "إضافة راوتر جديد" "Add Client" }}</span>
-                </button>
-                <button class="noc-action-btn" data-bs-toggle="modal" data-bs-target="#settingsModal">
-                    <i class="bi bi-gear"></i>
-                    <span>{{ tr .Lang "إعدادات السيرفر" "Settings" }}</span>
-                </button>
-                <a href="/sstp/routes/apply" class="noc-action-btn text-decoration-none" title="{{ tr .Lang "إعادة تطبيق ومزامنة المسارات في كيرنل لينكس" "Apply Linux Kernel Routes" }}">
-                    <i class="bi bi-arrow-clockwise"></i>
-                    <span>{{ tr .Lang "مزامنة المسارات" "Sync Routes" }}</span>
-                </a>
-            </div>
-        </div>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="fw-bold mb-1 d-flex align-items-center gap-2">
+            <span class="p-1.5 bg-primary-subtle text-primary rounded-2 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                <i class="bi bi-shield-lock"></i>
+            </span>
+            <span>إدارة سيرفر SSTP VPN (Accel-PPP)</span>
+        </h4>
+        <p class="text-muted small mb-0">ربط راوترات المايكروتك بنفق مشفر وإدارتها والتوجيه الثابت للشبكات</p>
     </div>
+
+    <!-- Top Action Buttons -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <button class="btn btn-sm btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addClientModal">
+            <i class="bi bi-plus-circle me-1"></i> إضافة راوتر جديد
+        </button>
+        <button class="btn btn-sm btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#settingsModal">
+            <i class="bi bi-gear me-1"></i> إعدادات السيرفر
+        </button>
+        <a href="/sstp/routes/apply" class="btn btn-sm btn-outline-secondary" title="إعادة تطبيق ومزامنة المسارات في كيرنل لينكس">
+            <i class="bi bi-arrow-clockwise me-1"></i> مزامنة المسارات
+        </a>
+    </div>
+</div>
 
 <!-- Compact Stats Ribbon -->
 <div class="row g-2 mb-3">
@@ -673,7 +659,6 @@
             </div>
         </div>
     </div>
-</div>
 </div>
 {{ end }}
 

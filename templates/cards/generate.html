@@ -1,36 +1,13 @@
 {{ define "content" }}
-<div class="mb-4">
-    <!-- Header & Action Toolbar -->
-    <div class="component-card mb-4 p-3 p-md-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-0">
-            <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="nav-icon-bubble" style="{{ if eq .CardType "cafe" }}background: rgba(225, 29, 72, 0.1); color: #E11D48;{{ else }}background: rgba(217, 119, 6, 0.1); color: #D97706;{{ end }} width: 32px; height: 32px;">
-                        <i class="bi {{ if eq .CardType "cafe" }}bi-cup-hot-fill{{ else }}bi-credit-card-2-front-fill{{ end }}"></i>
-                    </span>
-                    <h4 class="fw-bold mb-0 text-dark fs-5">
-                        {{ if eq .CardType "cafe" }}
-                            {{ tr .Lang "توليد دفعة كروت كافيهات جديدة (Hotspot Batches)" "Generate Cafe Hotspot Vouchers" }}
-                        {{ else }}
-                            {{ tr .Lang "توليد دفعة كروت شحن جديدة (Cards Generator)" "Generate Recharge Voucher Batch" }}
-                        {{ end }}
-                    </h4>
-                    <span class="badge font-monospace px-2 py-1" style="background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-size: 0.72rem; border-radius: 6px;">
-                        {{ tr .Lang "محرك التوليد الفوري" "High-Speed Generator" }}
-                    </span>
-                </div>
-                <p class="text-secondary small mb-0">
-                    {{ tr .Lang "توليد دفعات الكروت بدقة وسرعة فائقة مع الربط المباشر بقواعد بيانات FreeRADIUS ومايكروتك" "Generate voucher batches with cryptographically secure credentials and automated RADIUS AAA sync" }}
-                </p>
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <a href="/cards{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="noc-action-btn text-decoration-none">
-                    <i class="bi bi-arrow-right"></i>
-                    <span>{{ tr .Lang "رجوع للدفعات" "Back to Batches" }}</span>
-                </a>
-            </div>
-        </div>
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">{{ if eq .CardType "cafe" }}توليد دفعة كروت كافيهات جديدة (Hotspot){{ else }}توليد دفعة كروت جديدة (Cards Generator){{ end }}</h3>
+        <p class="text-muted small mb-0">توليد دفعات الكروت بدقة عالية وربطها الكامل بالراديوس والمايكروتك</p>
     </div>
+    <a href="/cards{{ if eq .CardType "cafe" }}?type=cafe{{ end }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-right me-1"></i> رجوع للدفعات
+    </a>
+</div>
 
 <form method="POST" action="/cards/generate" id="advancedCardGenForm">
     <input type="hidden" name="card_type" value="{{ if .CardType }}{{ .CardType }}{{ else }}charge{{ end }}">
@@ -360,7 +337,6 @@
         </div>
     </div>
 </form>
-</div>
 
 <script>
 function setCount(n) {

@@ -20,51 +20,47 @@
     --text-muted: #64748b;
     --text-light: #94a3b8;
     
-    /* Adv Radius PRO Palette */
-    --primary: #3598dc;
-    --primary-hover: #2a80b9;
-    --primary-subtle: #edf6fd;
-    --primary-border: #bce1f7;
+    /* Design #2 Enterprise Colors (Royal Indigo & Emerald) */
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-subtle: #eef2ff;
+    --primary-border: #c7d2fe;
     
-    --success: #26c281;
-    --success-hover: #20a870;
-    --success-subtle: #ebfaf3;
-    --success-border: #a3ecc9;
+    --success: #10b981;
+    --success-hover: #059669;
+    --success-subtle: #ecfdf5;
+    --success-border: #a7f3d0;
     
-    --warning: #dfba49;
-    --warning-hover: #c9a334;
-    --warning-subtle: #fcf8ec;
-    --warning-border: #f4e3aa;
+    --warning: #f59e0b;
+    --warning-hover: #d97706;
+    --warning-subtle: #fffbeb;
+    --warning-border: #fde68a;
     
-    --danger: #e7505a;
-    --danger-hover: #d2323d;
-    --danger-subtle: #fdf0f1;
-    --danger-border: #f6b5b9;
+    --danger: #f43f5e;
+    --danger-hover: #e11d48;
+    --danger-subtle: #fff1f2;
+    --danger-border: #fecdd3;
     
-    --info: #3598dc;
-    --info-subtle: #edf6fd;
-    --info-border: #bce1f7;
+    --info: #0284c7;
+    --info-subtle: #f0f9ff;
+    --info-border: #bae6fd;
     
-    --purple: #8e44ad;
-    --purple-subtle: #f6effa;
-    --purple-border: #dcbfe7;
-
-    --teal: #1bbc9b;
-    --teal-subtle: #ebf9f6;
-    --teal-border: #9ee5d6;
+    --purple: #8b5cf6;
+    --purple-subtle: #f5f3ff;
+    --purple-border: #ddd6fe;
     
     /* Clean Hairline Borders & Soft Micro-Shadows */
     --border-color: #e2e8f0;
     --border-subtle: #f1f5f9;
-    --border-focus: #3598dc;
+    --border-focus: #4f46e5;
     
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
     --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.07);
     --shadow-dropdown: 0 10px 30px rgba(0, 0, 0, 0.08);
     
     /* Layout Dimensions */
-    --sidebar-w: 215px;
-    --header-h: 60px;
+    --sidebar-w: 260px;
+    --header-h: 64px;
     --radius-base: 10px;
     --radius-sm: 8px;
     --radius-lg: 14px;
@@ -161,18 +157,18 @@ a:hover {
 }
 
 /* ==========================================================================
-   Top Header (Enterprise Sleek Dark Navy Header - Seamless with Sidebar)
+   Top Header (Enterprise Crisp White Topbar)
    ========================================================================== */
 .app-header {
     height: var(--header-h);
-    background: #141b27 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid var(--border-color) !important;
     position: sticky;
     top: 0;
     z-index: 1030;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
     padding: 0 1.5rem;
-    color: #ffffff !important;
+    color: #0f172a !important;
 }
 
 .header-brand {
@@ -180,17 +176,17 @@ a:hover {
     align-items: center;
     gap: 10px;
     text-decoration: none;
-    color: #ffffff !important;
+    color: #0f172a !important;
 }
 .header-brand .brand-title {
     font-size: 1.05rem;
     font-weight: 800;
-    color: #ffffff !important;
+    color: #0f172a !important;
     margin: 0;
 }
 .header-brand .brand-subtitle {
     font-size: 0.72rem;
-    color: #38bdf8 !important;
+    color: var(--primary) !important;
     font-weight: 700;
     margin: 0;
 }
@@ -198,14 +194,14 @@ a:hover {
 .brand-icon-box {
     width: 38px;
     height: 38px;
-    background: linear-gradient(135deg, #3598dc 0%, #26c281 100%) !important;
+    background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%) !important;
     border-radius: 10px !important;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #ffffff !important;
     font-size: 1.25rem;
-    box-shadow: 0 2px 8px rgba(53, 152, 220, 0.35) !important;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3) !important;
     flex-shrink: 0;
 }
 
@@ -214,19 +210,19 @@ a:hover {
     align-items: center;
     gap: 6px;
     padding: 5px 12px;
-    background: rgba(255, 255, 255, 0.06) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: #f8fafc !important;
+    border: 1px solid var(--border-color) !important;
     border-radius: 9999px;
     font-size: 0.8rem;
     font-weight: 600;
-    color: #cbd5e1 !important;
+    color: #475569 !important;
     text-decoration: none;
     transition: all 0.15s ease;
 }
 .status-pill:hover {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border-color: rgba(255, 255, 255, 0.22) !important;
-    color: #ffffff !important;
+    background: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
 }
 
 .pulse-dot-green {
@@ -235,13 +231,13 @@ a:hover {
     height: 8px;
     border-radius: 50%;
     background-color: var(--success);
-    box-shadow: 0 0 0 0 rgba(38, 194, 129, 0.5);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
     animation: pulseGreenAnim 2s infinite;
 }
 @keyframes pulseGreenAnim {
-    0% { box-shadow: 0 0 0 0 rgba(38, 194, 129, 0.5); }
-    70% { box-shadow: 0 0 0 6px rgba(38, 194, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(38, 194, 129, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
 .pulse-dot-primary {
@@ -250,18 +246,18 @@ a:hover {
     height: 8px;
     border-radius: 50%;
     background-color: var(--primary);
-    box-shadow: 0 0 0 0 rgba(53, 152, 220, 0.5);
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.5);
     animation: pulseBlueAnim 2s infinite;
 }
 @keyframes pulseBlueAnim {
-    0% { box-shadow: 0 0 0 0 rgba(53, 152, 220, 0.5); }
-    70% { box-shadow: 0 0 0 6px rgba(53, 152, 220, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(53, 152, 220, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
 }
 
 .user-btn {
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid var(--border-color) !important;
+    background: #f8fafc !important;
     border-radius: 9999px;
     padding: 4px 12px 4px 6px;
     display: flex;
@@ -269,13 +265,12 @@ a:hover {
     gap: 7px;
     font-weight: 700;
     font-size: 0.85rem;
-    color: #ffffff !important;
+    color: #0f172a !important;
     transition: all 0.15s ease;
 }
 .user-btn:hover {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
-    color: #ffffff !important;
+    background: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
 }
 .user-avatar-circle {
     width: 26px;
@@ -290,58 +285,17 @@ a:hover {
 }
 
 /* ==========================================================================
-   Compact Low-Profile Stat Cards (Dense & Clean)
-   ========================================================================== */
-.compact-stat-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 8px 12px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    transition: all 0.15s ease;
-    min-height: 56px;
-}
-.compact-stat-card:hover {
-    border-color: #cbd5e1;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-    transform: translateY(-1px);
-}
-.compact-stat-card .stat-label {
-    font-size: 0.74rem;
-    font-weight: 600;
-    color: #64748b;
-    margin-bottom: 1px;
-    white-space: nowrap;
-}
-.compact-stat-card .stat-num {
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: #0f172a;
-    font-family: 'Inter', -apple-system, sans-serif;
-    line-height: 1.1;
-    letter-spacing: -0.5px;
-}
-.compact-stat-card .stat-icon {
-    font-size: 1.25rem;
-    color: #94a3b8;
-    flex-shrink: 0;
-}
-
-/* ==========================================================================
-   Slim High-Density Sidebar Navigation (Dark Slate #0f172a)
+   Sidebar Navigation (Enterprise Pure White)
    ========================================================================== */
 .app-sidebar {
     width: var(--sidebar-w) !important;
     min-width: var(--sidebar-w) !important;
     max-width: var(--sidebar-w) !important;
     flex: 0 0 var(--sidebar-w) !important;
-    background-color: #0f172a !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background-color: #ffffff !important;
+    border-left: 1px solid var(--border-color) !important;
     min-height: calc(100vh - var(--header-h));
-    padding: 0.5rem 0.4rem;
+    padding: 0.85rem 0.65rem;
     display: flex;
     flex-direction: column;
     position: sticky;
@@ -351,46 +305,59 @@ a:hover {
     overflow-x: hidden;
     z-index: 100;
 }
-html[dir="ltr"] .app-sidebar {
-    border-left: none !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+
+.sidebar-section-title {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-muted) !important;
+    letter-spacing: 0.08em;
+    padding: 0 10px;
+    margin-top: 1.15rem;
+    margin-bottom: 0.35rem;
+    white-space: nowrap !important;
 }
 
 .sidebar-nav-link {
     display: flex;
     align-items: center;
-    gap: 9px;
-    padding: 8px 11px !important;
-    color: #94a3b8 !important;
+    justify-content: space-between;
+    padding: 9px 12px !important;
+    color: #475569 !important;
     text-decoration: none;
     font-weight: 600;
-    font-size: 0.84rem;
-    border-radius: 6px !important;
-    margin-bottom: 2px;
-    transition: all 0.12s ease;
+    font-size: 0.88rem;
+    border-radius: 8px !important;
+    margin-bottom: 3px;
+    transition: all 0.15s ease;
     white-space: nowrap !important;
 }
-.sidebar-nav-link i {
-    font-size: 1rem;
-    width: 18px;
-    text-align: center;
-    color: inherit;
-    flex-shrink: 0;
-}
 .sidebar-nav-link:hover {
-    color: #ffffff !important;
-    background-color: rgba(255, 255, 255, 0.06) !important;
+    color: var(--primary) !important;
+    background-color: #f1f5f9 !important;
 }
 .sidebar-nav-link.active {
-    background-color: #1e293b !important;
-    color: #38bdf8 !important;
-    border-right: 3px solid #38bdf8 !important;
+    background-color: #eef2ff !important;
+    color: var(--primary) !important;
+    border-right: 3px solid var(--primary) !important;
     font-weight: 700;
 }
-html[dir="ltr"] .sidebar-nav-link.active {
-    border-right: none !important;
-    border-left: 3px solid #38bdf8 !important;
+.sidebar-nav-link.active i {
+    color: var(--primary) !important;
 }
+.sidebar-nav-link.active-parent {
+    color: var(--primary) !important;
+    background-color: #f8fafc !important;
+}
+
+.sidebar-submenu {
+    background-color: #f8fafc !important;
+    border-right: 2px solid var(--border-color) !important;
+    border-radius: 8px;
+    margin-right: 12px;
+    padding: 4px 6px !important;
+    margin-top: 4px;
+    margin-bottom: 6px;
 }
 .sidebar-sub-link {
     display: flex !important;
@@ -1137,498 +1104,4 @@ html[dir="ltr"] .subscriber-row.active-selected {
     border-radius: 9999px;
     font-family: var(--font-main);
 }
-
-
-/* ==========================================================================
-   2026 Next-Gen Network RADIUS Enterprise Design System
-   Inspired by UniFi OS, Cloudflare One, Linear & Apple macOS
-   ========================================================================== */
-
-/* Enhanced Sidebar Category Headers */
-.sidebar-category-header {
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #94A3B8;
-    padding: 14px 16px 6px;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.sidebar-category-header::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: #F1F5F9;
-}
-
-/* Sidebar Navigation Link Upgrade */
-.sidebar-nav-link {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 9px 14px !important;
-    margin: 2px 10px !important;
-    border-radius: 10px !important;
-    color: #334155 !important;
-    font-weight: 600 !important;
-    font-size: 0.88rem !important;
-    transition: all 0.16s ease !important;
-    text-decoration: none !important;
-    position: relative;
-}
-.sidebar-nav-link:hover {
-    background-color: #F8FAFC !important;
-    color: #0F172A !important;
-    transform: translateX(-2px);
-}
-html[dir="ltr"] .sidebar-nav-link:hover {
-    transform: translateX(2px);
-}
-.sidebar-nav-link.active {
-    background: #EEF2FF !important;
-    color: #4F46E5 !important;
-    font-weight: 700 !important;
-    box-shadow: 0 1px 2px rgba(79, 70, 229, 0.08) !important;
-}
-.sidebar-nav-link.active::before {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 6px;
-    bottom: 6px;
-    width: 3.5px;
-    background: #4F46E5;
-    border-radius: 4px 0 0 4px;
-}
-html[dir="ltr"] .sidebar-nav-link.active::before {
-    right: auto;
-    left: 0;
-    border-radius: 0 4px 4px 0;
-}
-
-.sidebar-nav-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* Icon Box Bubble inside Sidebar & Cards */
-.nav-icon-bubble {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.95rem;
-    flex-shrink: 0;
-    transition: transform 0.18s ease;
-}
-.sidebar-nav-link:hover .nav-icon-bubble {
-    transform: scale(1.08);
-}
-
-/* Submenu links */
-.sidebar-submenu {
-    padding: 4px 0 4px 18px !important;
-    margin: 0 12px !important;
-    border-right: 2px solid #E2E8F0 !important;
-}
-html[dir="ltr"] .sidebar-submenu {
-    padding: 4px 18px 4px 0 !important;
-    border-right: none !important;
-    border-left: 2px solid #E2E8F0 !important;
-}
-.sidebar-sub-link {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 6px 12px !important;
-    margin: 2px 0 !important;
-    font-size: 0.83rem !important;
-    font-weight: 600 !important;
-    color: #64748B !important;
-    border-radius: 8px !important;
-    text-decoration: none !important;
-    transition: all 0.15s ease !important;
-}
-.sidebar-sub-link:hover {
-    color: #0F172A !important;
-    background-color: #F8FAFC !important;
-}
-.sidebar-sub-link.active {
-    color: #4F46E5 !important;
-    font-weight: 700 !important;
-    background-color: #EEF2FF !important;
-}
-
-/* Sidebar Server Health Mini Widget */
-.sidebar-health-widget {
-    background: #F8FAFC;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 12px;
-    margin: 12px 10px 6px;
-}
-
-/* Live Pulse Animation */
-.live-pulse-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    position: relative;
-}
-.live-pulse-dot.green {
-    background-color: #10B981;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    animation: pulseGreen 1.8s infinite;
-}
-.live-pulse-dot.primary {
-    background-color: #4F46E5;
-    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7);
-    animation: pulsePrimary 1.8s infinite;
-}
-.live-pulse-dot.warning {
-    background-color: #F59E0B;
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-    animation: pulseWarning 1.8s infinite;
-}
-
-@keyframes pulseGreen {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-@keyframes pulsePrimary {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
-}
-
-/* NOC Bento Card with Top Gradient Border Accent */
-.noc-bento-card {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 16px;
-    padding: 20px 22px;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    position: relative;
-    overflow: hidden;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-.noc-bento-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3.5px;
-    background: var(--card-accent, #4F46E5);
-}
-.noc-bento-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.08);
-    border-color: #CBD5E1;
-}
-
-/* Quick Action Toolbar Buttons */
-.noc-action-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 10px;
-    padding: 7px 14px;
-    font-size: 0.84rem;
-    font-weight: 700;
-    color: #334155;
-    text-decoration: none;
-    transition: all 0.16s ease;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-.noc-action-btn:hover {
-    background: #F8FAFC;
-    color: #0F172A;
-    border-color: #CBD5E1;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
-}
-.noc-action-btn.primary {
-    background: #4F46E5;
-    color: #FFFFFF;
-    border-color: #4338CA;
-    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
-}
-.noc-action-btn.primary:hover {
-    background: #4338CA;
-    color: #FFFFFF;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
-}
-
-/* Enterprise Datatable Polish */
-.table-enterprise {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-.table-enterprise thead th {
-    background-color: #F8FAFC !important;
-    color: #475569 !important;
-    font-weight: 700 !important;
-    font-size: 0.78rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.04em !important;
-    padding: 12px 16px !important;
-    border-bottom: 1px solid #E2E8F0 !important;
-    border-top: none !important;
-    white-space: nowrap !important;
-}
-.table-enterprise tbody td {
-    padding: 13px 16px !important;
-    border-bottom: 1px solid #F1F5F9 !important;
-    vertical-align: middle !important;
-    font-size: 0.88rem !important;
-    color: #1E293B !important;
-    transition: background-color 0.12s ease !important;
-}
-.table-enterprise tbody tr:hover td {
-    background-color: #F8FAFC !important;
-}
-.table-enterprise tbody tr:last-child td {
-    border-bottom: none !important;
-}
-
-/* User Avatar Ring */
-.avatar-ring {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    font-size: 0.88rem;
-    position: relative;
-    flex-shrink: 0;
-}
-.avatar-ring .status-dot {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    border: 2px solid #FFFFFF;
-}
-
-/* Custom Sleek Scrollbar */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-::-webkit-scrollbar-track {
-    background: #F1F5F9;
-}
-::-webkit-scrollbar-thumb {
-    background: #CBD5E1;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #94A3B8;
-}
-
-/* ==========================================================================
-   Adv Radius (SAS4 / AdminLTE) Iconic Theme Styles
-   ========================================================================== */
-
-/* ==========================================================================
-   Adv Radius Modern Pro Stat Card (Clean Elevated SaaS)
-   ========================================================================== */
-.adv-stat-card {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 14px !important;
-    padding: 1.25rem 1.35rem !important;
-    margin-bottom: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02) !important;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    height: 100%;
-}
-.adv-stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
-    border-color: #cbd5e1 !important;
-}
-.adv-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3.5px;
-    background: var(--card-accent, #3598dc);
-}
-.adv-stat-card .card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
-}
-.adv-stat-card .card-title {
-    font-size: 0.88rem !important;
-    font-weight: 700 !important;
-    color: #475569 !important;
-    margin: 0 !important;
-}
-.adv-stat-card .card-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    background: var(--card-accent-subtle, rgba(53, 152, 220, 0.1));
-    color: var(--card-accent, #3598dc);
-    flex-shrink: 0;
-}
-.adv-stat-card .card-value {
-    font-size: 2.2rem !important;
-    font-weight: 800 !important;
-    color: #0f172a !important;
-    font-family: 'Inter', -apple-system, sans-serif !important;
-    line-height: 1.15;
-    margin-bottom: 0.65rem !important;
-    letter-spacing: -0.5px;
-}
-.adv-stat-card .card-footer-link {
-    font-size: 0.8rem !important;
-    font-weight: 700 !important;
-    color: var(--card-accent, #3598dc) !important;
-    text-decoration: none !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding-top: 0.65rem;
-    border-top: 1px solid #f1f5f9;
-    transition: all 0.15s ease;
-}
-.adv-stat-card .card-footer-link:hover {
-    color: #0f172a !important;
-    transform: translateX(-3px);
-}
-html[dir="ltr"] .adv-stat-card .card-footer-link:hover {
-    transform: translateX(3px);
-}
-
-/* 1. Classic Small-Box Stat Cards */
-.small-box {
-    border-radius: 12px;
-    position: relative;
-    display: block;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    color: #ffffff !important;
-    overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    text-decoration: none !important;
-}
-.small-box:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-    color: #ffffff !important;
-}
-.small-box .inner {
-    padding: 18px 20px 18px 75px;
-    position: relative;
-    z-index: 2;
-}
-html[dir="ltr"] .small-box .inner {
-    padding: 18px 75px 18px 20px;
-}
-.small-box h3 {
-    font-size: 34px !important;
-    font-weight: 800 !important;
-    margin: 0 0 6px 0 !important;
-    white-space: nowrap !important;
-    padding: 0 !important;
-    font-family: 'Inter', -apple-system, sans-serif !important;
-    color: #ffffff !important;
-    letter-spacing: -0.5px;
-}
-.small-box p {
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    margin: 0 !important;
-    opacity: 0.95;
-    color: #ffffff !important;
-}
-.small-box .icon {
-    position: absolute;
-    top: 12px;
-    left: 18px;
-    z-index: 1;
-    font-size: 74px;
-    color: rgba(0, 0, 0, 0.16);
-    transition: all 0.2s linear;
-    line-height: 1;
-    pointer-events: none;
-}
-html[dir="ltr"] .small-box .icon {
-    left: auto;
-    right: 18px;
-}
-.small-box:hover .icon {
-    font-size: 80px;
-    color: rgba(0, 0, 0, 0.25);
-}
-.small-box-footer {
-    position: relative;
-    text-align: center;
-    padding: 8px 0;
-    color: rgba(255, 255, 255, 0.92) !important;
-    display: block;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.15);
-    text-decoration: none !important;
-    font-size: 13px;
-    font-weight: 700;
-    transition: all 0.15s ease;
-}
-.small-box-footer:hover {
-    color: #ffffff !important;
-    background: rgba(0, 0, 0, 0.28);
-}
-.small-box-footer i {
-    transition: transform 0.2s ease;
-}
-.small-box:hover .small-box-footer i {
-    transform: translateX(-4px);
-}
-html[dir="ltr"] .small-box:hover .small-box-footer i {
-    transform: translateX(4px);
-}
-
-/* 2. Adv Radius Color Palette */
-.bg-blue-steel { background-color: #3598dc !important; }
-.bg-green-adv { background-color: #26c281 !important; }
-.bg-yellow-adv { background-color: #dfba49 !important; }
-.bg-red-adv { background-color: #e7505a !important; }
-.bg-purple-adv { background-color: #8e44ad !important; }
-.bg-teal-adv { background-color: #1bbc9b !important; }
-
 

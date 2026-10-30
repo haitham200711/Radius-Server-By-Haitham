@@ -31,33 +31,42 @@
                 <i class="bi bi-list fs-3 text-dark"></i>
             </button>
             <a class="header-brand" href="/dashboard">
-                <div class="brand-icon-box" style="background: linear-gradient(135deg, #3598dc 0%, #26c281 100%); color: #FFFFFF; border-radius: 10px;">
-                    <span style="font-size: 0.92rem; font-weight: 900; letter-spacing: -0.5px;">ADV</span>
+                <div class="brand-icon-box">
+                    <i class="bi bi-router-fill"></i>
                 </div>
                 <div>
-                    <div class="d-flex align-items-center gap-2">
-                        <h1 class="brand-title mb-0">{{ tr .Lang "Adv Radius PRO" "Adv Radius PRO" }}</h1>
-                        <span class="badge" style="background: #3598dc; color: #ffffff; font-size: 0.68rem; font-weight: 800; border-radius: 6px;">ADV v3</span>
-                    </div>
-                    <p class="brand-subtitle">{{ tr .Lang "نظام إدارة سيرفرات الراديوس والمايكروتك" "Network & Subscriber AAA Core Platform" }}</p>
+                    <h1 class="brand-title">{{ tr .Lang "راديوس مايكروتك PRO" "RADIUS MikroTik PRO" }}</h1>
+                    <p class="brand-subtitle">{{ tr .Lang "نظام إدارة الشبكات والمشتركين السحابي" "Cloud Network & Subscriber Management" }}</p>
                 </div>
             </a>
         </div>
 
-        <!-- System Status Live Badge -->
-        <div class="d-none d-md-flex align-items-center gap-2 font-monospace small text-light opacity-75">
-            <span class="live-pulse-dot green" style="width: 7px; height: 7px;"></span>
-            <span>FreeRADIUS v3 & Go Core | 100% Active</span>
+        <!-- System Status Quick Pills -->
+        <div class="d-none d-md-flex align-items-center gap-2">
+            <a href="/sstp" class="status-pill text-decoration-none">
+                <span class="pulse-dot-green"></span>
+                <span>{{ tr .Lang "خادم SSTP VPN نشط" "SSTP VPN Active" }}</span>
+            </a>
+
+            <a href="/whatsapp" class="status-pill text-decoration-none">
+                <i class="bi bi-whatsapp text-success fs-6"></i>
+                <span>{{ tr .Lang "بوت الواتساب" "WhatsApp Bot" }}</span>
+            </a>
+
+            <a href="/sessions" class="status-pill text-decoration-none d-none d-xl-inline-flex">
+                <span class="pulse-dot-primary"></span>
+                <span>{{ tr .Lang "المشتركين المتصلين" "Online Users" }}</span>
+            </a>
         </div>
 
         <!-- Language Switcher & User Profile Dropdown -->
         <div class="d-flex align-items-center gap-2">
             <!-- Language Switcher Dropdown -->
             <div class="dropdown">
-                <button class="btn border d-flex align-items-center gap-1.5 px-2.5 py-1.5 shadow-sm rounded-pill fw-semibold text-white" style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15) !important;" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ tr .Lang "تبديل اللغة" "Change Language" }}">
-                    <i class="bi bi-globe2 text-info fs-6"></i>
+                <button class="btn btn-light border d-flex align-items-center gap-1.5 px-2.5 py-1.5 shadow-sm rounded-pill fw-semibold text-dark" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ tr .Lang "تبديل اللغة" "Change Language" }}">
+                    <i class="bi bi-globe2 text-primary fs-6"></i>
                     <span style="font-size: 0.83rem;">{{ if eq .Lang "en" }}English{{ else }}العربية{{ end }}</span>
-                    <i class="bi bi-chevron-down text-light opacity-75" style="font-size: 0.65rem;"></i>
+                    <i class="bi bi-chevron-down text-muted" style="font-size: 0.65rem;"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-1.5 mt-1" style="border-radius: 12px; min-width: 155px; z-index: 1060;">
                     <li>
@@ -78,14 +87,14 @@
             <!-- User Profile Dropdown -->
             <div class="dropdown">
                 <button class="user-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <div class="user-avatar-circle" style="background: linear-gradient(135deg, #3598dc 0%, #26c281 100%); color: #FFFFFF;">
+                    <div class="user-avatar-circle">
                         <i class="bi bi-person-fill"></i>
                     </div>
-                    <span class="d-none d-sm-inline fw-bold text-white">{{ .CurrentUser.Username }}</span>
-                    <span class="badge {{ if eq .CurrentUser.Role "admin" }}bg-primary text-white{{ else }}bg-info text-white{{ end }} d-none d-md-inline-block" style="font-size: 0.68rem; border-radius: 6px;">
+                    <span class="d-none d-sm-inline">{{ .CurrentUser.Username }}</span>
+                    <span class="badge {{ if eq .CurrentUser.Role "admin" }}bg-primary-subtle text-primary border border-primary-subtle{{ else }}bg-info-subtle text-info border border-info-subtle{{ end }} d-none d-md-inline-block">
                         {{ if eq .CurrentUser.Role "admin" }}{{ tr .Lang "مدير النظام" "Admin" }}{{ else }}{{ tr .Lang "موزع معتمد" "Reseller" }}{{ end }}
                     </span>
-                    <i class="bi bi-chevron-down text-light opacity-75" style="font-size: 0.75rem;"></i>
+                    <i class="bi bi-chevron-down text-muted" style="font-size: 0.75rem;"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-2 mt-2" style="border-radius: 14px; min-width: 220px; z-index: 1060;">
                     <li class="px-3 py-2 border-bottom mb-1">
@@ -133,70 +142,174 @@
     <!-- Main Container (Sidebar + Content) -->
     <div class="container-fluid px-0">
         <div class="d-flex flex-column flex-lg-row">
-            <!-- Slim & High-Density Enterprise Sidebar -->
-            <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex flex-column justify-content-between">
-                <div class="nav flex-column py-2">
+            <!-- Sidebar Navigation -->
+            <nav id="sidebarMenu" class="app-sidebar collapse d-lg-flex" style="width: 260px; min-width: 260px; max-width: 260px; flex: 0 0 260px;">
+                <div class="nav flex-column">
+                    <!-- 1. الرئيسية -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "dashboard" }}active{{ end }}" href="/dashboard">
-                        <i class="bi bi-grid-1x2"></i>
-                        <span>{{ tr .Lang "الرئيسية" "Dashboard" }}</span>
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-grid-1x2-fill text-primary"></i>
+                            <span>{{ tr .Lang "الرئيسية" "Dashboard" }}</span>
+                        </span>
+                        {{ if eq .ActiveMenu "dashboard" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
 
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "subscribers" }}active{{ end }}" href="/subscribers">
-                        <i class="bi bi-people"></i>
-                        <span>{{ tr .Lang "المشتركين" "Subscribers" }}</span>
-                    </a>
+                    <!-- 2. المشتركين (Dropdown: قائمة المشتركين + المشتركين المتصلين) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#subscribersSubmenu" role="button" 
+                           aria-expanded="{{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-people-fill text-primary"></i>
+                                <span>{{ tr .Lang "المشتركين" "Subscribers" }}</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if or (eq .ActiveMenu "subscribers") (eq .ActiveMenu "sessions") }}show{{ end }} sidebar-submenu flex-column" id="subscribersSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "subscribers" }}active{{ end }}" href="/subscribers">
+                                <i class="bi bi-person-lines-fill text-primary"></i>
+                                <span>{{ tr .Lang "قائمة المشتركين" "Subscribers List" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "sessions" }}active{{ end }}" href="/sessions">
+                                <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                                <span>{{ tr .Lang "المشتركين المتصلين" "Online Users" }}</span>
+                            </a>
+                        </div>
+                    </div>
 
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "sessions" }}active{{ end }}" href="/sessions">
-                        <i class="bi bi-broadcast"></i>
-                        <span>{{ tr .Lang "الجلسات الحية" "Live Sessions" }}</span>
-                    </a>
+                    <!-- 3. العروض (Dropdown: البروفايلات + التحكم بالسرعات) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "profiles") (eq .ActiveMenu "speed_control") }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#offersSubmenu" role="button" 
+                           aria-expanded="{{ if or (eq .ActiveMenu "profiles") (eq .ActiveMenu "speed_control") }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-tags-fill text-warning"></i>
+                                <span>{{ tr .Lang "العروض" "Offers & Speeds" }}</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if or (eq .ActiveMenu "profiles") (eq .ActiveMenu "speed_control") }}show{{ end }} sidebar-submenu flex-column" id="offersSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "profiles" }}active{{ end }}" href="/profiles">
+                                <i class="bi bi-sliders text-warning"></i>
+                                <span>{{ tr .Lang "البروفايلات" "Profiles" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "speed_control" }}active{{ end }}" href="/profiles/speed-control">
+                                <i class="bi bi-speedometer2 text-primary"></i>
+                                <span>{{ tr .Lang "التحكم بالسرعات" "Speed Control" }}</span>
+                            </a>
+                        </div>
+                    </div>
 
+                    <!-- 4. كروت (Dropdown: كروت الشحن + كروت الكافيهات + أشكال الكروت) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "cards") (or (eq .ActiveMenu "cafe_cards") (eq .ActiveMenu "card_templates")) }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#cardsSubmenu" role="button" 
+                           aria-expanded="{{ if or (eq .ActiveMenu "cards") (or (eq .ActiveMenu "cafe_cards") (eq .ActiveMenu "card_templates")) }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-credit-card-2-front-fill text-warning"></i>
+                                <span>{{ tr .Lang "كروت" "Cards" }}</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if or (eq .ActiveMenu "cards") (or (eq .ActiveMenu "cafe_cards") (eq .ActiveMenu "card_templates")) }}show{{ end }} sidebar-submenu flex-column" id="cardsSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "cards" }}active{{ end }}" href="/cards">
+                                <i class="bi bi-wallet2 text-primary"></i>
+                                <span>{{ tr .Lang "كروت الشحن" "Recharge Cards" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "cafe_cards" }}active{{ end }}" href="/cards/cafe">
+                                <i class="bi bi-cup-hot text-warning"></i>
+                                <span>{{ tr .Lang "كروت الكافيهات" "Cafe Hotspot Cards" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "card_templates" }}active{{ end }}" href="/card-templates">
+                                <i class="bi bi-palette-fill" style="color: #8b5cf6;"></i>
+                                <span>{{ tr .Lang "اشكال الكروت" "Card Templates" }}</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 6. NAS -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "routers" }}active{{ end }}" href="/routers">
-                        <i class="bi bi-router"></i>
-                        <span>{{ tr .Lang "راوترات NAS" "NAS Routers" }}</span>
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-hdd-network-fill text-success"></i>
+                            <span>{{ tr .Lang "NAS" "NAS Routers" }}</span>
+                        </span>
+                        {{ if eq .ActiveMenu "routers" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
 
-                    <a class="sidebar-nav-link {{ if or (eq .ActiveMenu "cards") (eq .ActiveMenu "cafe_cards") }}active{{ end }}" href="/cards">
-                        <i class="bi bi-credit-card-2-front"></i>
-                        <span>{{ tr .Lang "كروت الشحن" "Voucher Cards" }}</span>
+                    <!-- 7. SSTP Server -->
+                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "sstp" }}active{{ end }}" href="/sstp">
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-shield-lock-fill text-info"></i>
+                            <span>{{ tr .Lang "SSTP Server" "SSTP Server" }}</span>
+                        </span>
+                        {{ if eq .ActiveMenu "sstp" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
 
-                    <a class="sidebar-nav-link {{ if or (eq .ActiveMenu "profiles") (eq .ActiveMenu "speed_control") }}active{{ end }}" href="/profiles">
-                        <i class="bi bi-sliders"></i>
-                        <span>{{ tr .Lang "باقات السرعات" "Profiles & Speeds" }}</span>
-                    </a>
-
+                    <!-- 8. تقارير النظام -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "reports" }}active{{ end }}" href="/reports">
-                        <i class="bi bi-bar-chart"></i>
-                        <span>{{ tr .Lang "التقارير والماليات" "Reports Hub" }}</span>
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-file-earmark-bar-graph-fill text-primary"></i>
+                            <span>{{ tr .Lang "تقارير النظام" "System Reports" }}</span>
+                        </span>
+                        {{ if eq .ActiveMenu "reports" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
 
                     {{ if eq .CurrentUser.Role "admin" }}
+                    <!-- 9. الموزعين -->
                     <a class="sidebar-nav-link {{ if eq .ActiveMenu "resellers" }}active{{ end }}" href="/resellers">
-                        <i class="bi bi-shop"></i>
-                        <span>{{ tr .Lang "الموزعين والأرصدة" "Resellers & Debt" }}</span>
+                        <span class="sidebar-nav-content">
+                            <i class="bi bi-shop-window text-primary"></i>
+                            <span>{{ tr .Lang "الموزعين" "Resellers" }}</span>
+                        </span>
+                        {{ if eq .ActiveMenu "resellers" }}<i class="bi {{ if eq $.Lang "en" }}bi-chevron-right{{ else }}bi-chevron-left{{ end }} small"></i>{{ end }}
                     </a>
                     {{ end }}
 
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "sstp" }}active{{ end }}" href="/sstp">
-                        <i class="bi bi-shield-lock"></i>
-                        <span>{{ tr .Lang "سيرفر SSTP VPN" "SSTP VPN" }}</span>
-                    </a>
-
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "whatsapp" }}active{{ end }}" href="/whatsapp">
-                        <i class="bi bi-whatsapp"></i>
-                        <span>{{ tr .Lang "بوت الواتساب" "WhatsApp Bot" }}</span>
-                    </a>
-
-                    <a class="sidebar-nav-link {{ if eq .ActiveMenu "settings" }}active{{ end }}" href="/settings">
-                        <i class="bi bi-gear"></i>
-                        <span>{{ tr .Lang "إعدادات النظام" "Settings" }}</span>
-                    </a>
+                    <!-- 10. الإعدادات (Dropdown) -->
+                    <div class="sidebar-nav-group">
+                        <a class="sidebar-nav-link d-flex align-items-center justify-content-between {{ if or (eq .ActiveMenu "settings") (eq .ActiveMenu "whatsapp") }}active-parent{{ end }}" 
+                           data-bs-toggle="collapse" href="#settingsSubmenu" role="button" 
+                           aria-expanded="{{ if or (eq .ActiveMenu "settings") (eq .ActiveMenu "whatsapp") }}true{{ else }}false{{ end }}">
+                            <span class="sidebar-nav-content">
+                                <i class="bi bi-gear-wide-connected text-secondary"></i>
+                                <span>{{ tr .Lang "الإعدادات" "Settings" }}</span>
+                            </span>
+                            <i class="bi bi-chevron-down submenu-arrow"></i>
+                        </a>
+                        <div class="collapse {{ if or (eq .ActiveMenu "settings") (eq .ActiveMenu "whatsapp") }}show{{ end }} sidebar-submenu flex-column" id="settingsSubmenu">
+                            <a class="sidebar-sub-link {{ if eq .ActiveMenu "whatsapp" }}active{{ end }}" href="/whatsapp">
+                                <i class="bi bi-whatsapp text-success"></i>
+                                <span>{{ tr .Lang "إعدادات وبوت الواتساب" "WhatsApp Bot & Alerts" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link" href="/settings#system">
+                                <i class="bi bi-shield-lock-fill text-primary"></i>
+                                <span>{{ tr .Lang "إعدادات النظام والأمان" "System & Security" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link" href="/settings#portal-settings">
+                                <i class="bi bi-person-workspace text-success"></i>
+                                <span>{{ tr .Lang "صفحة المشترك" "Subscriber Portal" }}</span>
+                            </a>
+                            {{ if eq .CurrentUser.Role "admin" }}
+                            <a class="sidebar-sub-link" href="/settings#backups">
+                                <i class="bi bi-cloud-arrow-down-fill text-info"></i>
+                                <span>{{ tr .Lang "النسخ الاحتياطي" "Backups" }}</span>
+                            </a>
+                            <a class="sidebar-sub-link" href="/settings#adv">
+                                <i class="bi bi-database-fill-up text-warning"></i>
+                                <span>{{ tr .Lang "استيراد ADV&SAS" "Import ADV&SAS" }}</span>
+                            </a>
+                            {{ end }}
+                            <a class="sidebar-sub-link" href="/settings#maintenance">
+                                <i class="bi bi-tools text-danger"></i>
+                                <span>{{ tr .Lang "صيانة النظام والخدمات" "System Maintenance" }}</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Simple Bottom Logout -->
-                <div class="p-2 border-top border-secondary border-opacity-10">
-                    <a href="/auth/logout" class="sidebar-nav-link text-danger py-2 mb-0">
+                <!-- Sidebar Footer -->
+                <div class="sidebar-bottom">
+                    <a href="/auth/logout" class="btn btn-sm btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2">
                         <i class="bi bi-box-arrow-right"></i>
                         <span>{{ tr .Lang "تسجيل الخروج" "Logout" }}</span>
                     </a>
