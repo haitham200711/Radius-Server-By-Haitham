@@ -1421,6 +1421,91 @@ html[dir="ltr"] .sidebar-submenu {
    Adv Radius (SAS4 / AdminLTE) Iconic Theme Styles
    ========================================================================== */
 
+/* ==========================================================================
+   Adv Radius Modern Pro Stat Card (Clean Elevated SaaS)
+   ========================================================================== */
+.adv-stat-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 1.25rem 1.35rem !important;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+.adv-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+    border-color: #cbd5e1 !important;
+}
+.adv-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3.5px;
+    background: var(--card-accent, #3598dc);
+}
+.adv-stat-card .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+.adv-stat-card .card-title {
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    margin: 0 !important;
+}
+.adv-stat-card .card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    background: var(--card-accent-subtle, rgba(53, 152, 220, 0.1));
+    color: var(--card-accent, #3598dc);
+    flex-shrink: 0;
+}
+.adv-stat-card .card-value {
+    font-size: 2.2rem !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+    line-height: 1.15;
+    margin-bottom: 0.65rem !important;
+    letter-spacing: -0.5px;
+}
+.adv-stat-card .card-footer-link {
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    color: var(--card-accent, #3598dc) !important;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding-top: 0.65rem;
+    border-top: 1px solid #f1f5f9;
+    transition: all 0.15s ease;
+}
+.adv-stat-card .card-footer-link:hover {
+    color: #0f172a !important;
+    transform: translateX(-3px);
+}
+html[dir="ltr"] .adv-stat-card .card-footer-link:hover {
+    transform: translateX(3px);
+}
+
 /* 1. Classic Small-Box Stat Cards */
 .small-box {
     border-radius: 12px;
