@@ -161,18 +161,18 @@ a:hover {
 }
 
 /* ==========================================================================
-   Top Header (Enterprise Crisp White Topbar)
+   Top Header (Enterprise Sleek Dark Navy Header - Seamless with Sidebar)
    ========================================================================== */
 .app-header {
     height: var(--header-h);
-    background: #ffffff !important;
-    border-bottom: 1px solid var(--border-color) !important;
+    background: #141b27 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
     position: sticky;
     top: 0;
     z-index: 1030;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25) !important;
     padding: 0 1.5rem;
-    color: #0f172a !important;
+    color: #ffffff !important;
 }
 
 .header-brand {
@@ -180,17 +180,17 @@ a:hover {
     align-items: center;
     gap: 10px;
     text-decoration: none;
-    color: #0f172a !important;
+    color: #ffffff !important;
 }
 .header-brand .brand-title {
     font-size: 1.05rem;
     font-weight: 800;
-    color: #0f172a !important;
+    color: #ffffff !important;
     margin: 0;
 }
 .header-brand .brand-subtitle {
     font-size: 0.72rem;
-    color: var(--primary) !important;
+    color: #38bdf8 !important;
     font-weight: 700;
     margin: 0;
 }
@@ -214,19 +214,19 @@ a:hover {
     align-items: center;
     gap: 6px;
     padding: 5px 12px;
-    background: #f8fafc !important;
-    border: 1px solid var(--border-color) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 9999px;
     font-size: 0.8rem;
     font-weight: 600;
-    color: #475569 !important;
+    color: #cbd5e1 !important;
     text-decoration: none;
     transition: all 0.15s ease;
 }
 .status-pill:hover {
-    background: #f1f5f9 !important;
-    border-color: #cbd5e1 !important;
-    color: #0f172a !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.22) !important;
+    color: #ffffff !important;
 }
 
 .pulse-dot-green {
@@ -235,13 +235,13 @@ a:hover {
     height: 8px;
     border-radius: 50%;
     background-color: var(--success);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 0 rgba(38, 194, 129, 0.5);
     animation: pulseGreenAnim 2s infinite;
 }
 @keyframes pulseGreenAnim {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-    70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(38, 194, 129, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(38, 194, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(38, 194, 129, 0); }
 }
 
 .pulse-dot-primary {
@@ -260,8 +260,8 @@ a:hover {
 }
 
 .user-btn {
-    border: 1px solid var(--border-color) !important;
-    background: #f8fafc !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
     border-radius: 9999px;
     padding: 4px 12px 4px 6px;
     display: flex;
@@ -269,12 +269,13 @@ a:hover {
     gap: 7px;
     font-weight: 700;
     font-size: 0.85rem;
-    color: #0f172a !important;
+    color: #ffffff !important;
     transition: all 0.15s ease;
 }
 .user-btn:hover {
-    background: #f1f5f9 !important;
-    border-color: #cbd5e1 !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
 }
 .user-avatar-circle {
     width: 26px;
@@ -1612,16 +1613,22 @@ html[dir="ltr"] .app-sidebar {
     border-right: 1px solid #141b27 !important;
 }
 .app-sidebar .nav-icon-bubble {
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: #e2e8f0 !important;
+    background: transparent !important;
+    color: #94a3b8 !important;
+    width: 26px !important;
+    height: 26px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem !important;
+    margin-inline-end: 8px !important;
+    transition: color 0.15s ease;
 }
 .app-sidebar .sidebar-nav-link:hover .nav-icon-bubble {
-    background: rgba(53, 152, 220, 0.22) !important;
     color: #38bdf8 !important;
 }
 .app-sidebar .sidebar-nav-link.active .nav-icon-bubble {
-    background: #3598dc !important;
-    color: #ffffff !important;
+    color: #38bdf8 !important;
 }
 .sidebar-category-header {
     color: #64748b !important;

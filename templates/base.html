@@ -61,8 +61,8 @@
                 <span>{{ tr .Lang "المشتركين المتصلين" "Online Users" }}</span>
             </a>
 
-            <a href="/reports" class="status-pill text-decoration-none d-none d-xxl-inline-flex" style="background: #FAF5FF; border-color: #E9D5FF; color: #7E22CE;">
-                <i class="bi bi-bar-chart-fill" style="color: #9333EA;"></i>
+            <a href="/reports" class="status-pill text-decoration-none d-none d-xxl-inline-flex">
+                <i class="bi bi-bar-chart-fill text-info"></i>
                 <span>{{ tr .Lang "14 تبويب تقارير" "14 Report Tabs" }}</span>
             </a>
         </div>
@@ -71,10 +71,10 @@
         <div class="d-flex align-items-center gap-2">
             <!-- Language Switcher Dropdown -->
             <div class="dropdown">
-                <button class="btn btn-light border d-flex align-items-center gap-1.5 px-2.5 py-1.5 shadow-sm rounded-pill fw-semibold text-dark" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ tr .Lang "تبديل اللغة" "Change Language" }}">
-                    <i class="bi bi-globe2 text-primary fs-6"></i>
+                <button class="btn border d-flex align-items-center gap-1.5 px-2.5 py-1.5 shadow-sm rounded-pill fw-semibold text-white" style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15) !important;" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ tr .Lang "تبديل اللغة" "Change Language" }}">
+                    <i class="bi bi-globe2 text-info fs-6"></i>
                     <span style="font-size: 0.83rem;">{{ if eq .Lang "en" }}English{{ else }}العربية{{ end }}</span>
-                    <i class="bi bi-chevron-down text-muted" style="font-size: 0.65rem;"></i>
+                    <i class="bi bi-chevron-down text-light opacity-75" style="font-size: 0.65rem;"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-1.5 mt-1" style="border-radius: 12px; min-width: 155px; z-index: 1060;">
                     <li>
@@ -95,14 +95,14 @@
             <!-- User Profile Dropdown -->
             <div class="dropdown">
                 <button class="user-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <div class="user-avatar-circle" style="background: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%); color: #FFFFFF;">
+                    <div class="user-avatar-circle" style="background: linear-gradient(135deg, #3598dc 0%, #26c281 100%); color: #FFFFFF;">
                         <i class="bi bi-person-fill"></i>
                     </div>
-                    <span class="d-none d-sm-inline fw-bold">{{ .CurrentUser.Username }}</span>
-                    <span class="badge {{ if eq .CurrentUser.Role "admin" }}bg-primary-subtle text-primary border border-primary-subtle{{ else }}bg-info-subtle text-info border border-info-subtle{{ end }} d-none d-md-inline-block">
+                    <span class="d-none d-sm-inline fw-bold text-white">{{ .CurrentUser.Username }}</span>
+                    <span class="badge {{ if eq .CurrentUser.Role "admin" }}bg-primary text-white{{ else }}bg-info text-white{{ end }} d-none d-md-inline-block" style="font-size: 0.68rem; border-radius: 6px;">
                         {{ if eq .CurrentUser.Role "admin" }}{{ tr .Lang "مدير النظام" "Admin" }}{{ else }}{{ tr .Lang "موزع معتمد" "Reseller" }}{{ end }}
                     </span>
-                    <i class="bi bi-chevron-down text-muted" style="font-size: 0.75rem;"></i>
+                    <i class="bi bi-chevron-down text-light opacity-75" style="font-size: 0.75rem;"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-2 mt-2" style="border-radius: 14px; min-width: 220px; z-index: 1060;">
                     <li class="px-3 py-2 border-bottom mb-1">
