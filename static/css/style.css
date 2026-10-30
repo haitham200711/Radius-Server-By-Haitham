@@ -1412,3 +1412,176 @@ html[dir="ltr"] .sidebar-submenu {
 ::-webkit-scrollbar-thumb:hover {
     background: #94A3B8;
 }
+
+/* ==========================================================================
+   Adv Radius (SAS4 / AdminLTE) Iconic Theme Styles
+   ========================================================================== */
+
+/* 1. Classic Small-Box Stat Cards */
+.small-box {
+    border-radius: 12px;
+    position: relative;
+    display: block;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    color: #ffffff !important;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none !important;
+}
+.small-box:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    color: #ffffff !important;
+}
+.small-box .inner {
+    padding: 20px 22px;
+    position: relative;
+    z-index: 2;
+}
+.small-box h3 {
+    font-size: 34px !important;
+    font-weight: 800 !important;
+    margin: 0 0 6px 0 !important;
+    white-space: nowrap !important;
+    padding: 0 !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+    color: #ffffff !important;
+    letter-spacing: -0.5px;
+}
+.small-box p {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    opacity: 0.95;
+    color: #ffffff !important;
+}
+.small-box .icon {
+    position: absolute;
+    top: 12px;
+    left: 18px;
+    z-index: 1;
+    font-size: 74px;
+    color: rgba(0, 0, 0, 0.16);
+    transition: all 0.2s linear;
+    line-height: 1;
+    pointer-events: none;
+}
+html[dir="ltr"] .small-box .icon {
+    left: auto;
+    right: 18px;
+}
+.small-box:hover .icon {
+    font-size: 80px;
+    color: rgba(0, 0, 0, 0.25);
+}
+.small-box-footer {
+    position: relative;
+    text-align: center;
+    padding: 8px 0;
+    color: rgba(255, 255, 255, 0.92) !important;
+    display: block;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.15);
+    text-decoration: none !important;
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+.small-box-footer:hover {
+    color: #ffffff !important;
+    background: rgba(0, 0, 0, 0.28);
+}
+.small-box-footer i {
+    transition: transform 0.2s ease;
+}
+.small-box:hover .small-box-footer i {
+    transform: translateX(-4px);
+}
+html[dir="ltr"] .small-box:hover .small-box-footer i {
+    transform: translateX(4px);
+}
+
+/* 2. Adv Radius Color Palette */
+.bg-blue-steel { background-color: #3598dc !important; }
+.bg-green-adv { background-color: #26c281 !important; }
+.bg-yellow-adv { background-color: #dfba49 !important; }
+.bg-red-adv { background-color: #e7505a !important; }
+.bg-purple-adv { background-color: #8e44ad !important; }
+.bg-teal-adv { background-color: #1bbc9b !important; }
+
+/* 3. Adv Radius Dark Navy Sidebar Theme */
+.app-sidebar {
+    background-color: #1a2332 !important;
+    border-left: 1px solid #141b27 !important;
+}
+html[dir="ltr"] .app-sidebar {
+    border-left: none !important;
+    border-right: 1px solid #141b27 !important;
+}
+.app-sidebar .nav-icon-bubble {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #e2e8f0 !important;
+}
+.app-sidebar .sidebar-nav-link:hover .nav-icon-bubble {
+    background: rgba(53, 152, 220, 0.22) !important;
+    color: #38bdf8 !important;
+}
+.app-sidebar .sidebar-nav-link.active .nav-icon-bubble {
+    background: #3598dc !important;
+    color: #ffffff !important;
+}
+.sidebar-category-header {
+    color: #64748b !important;
+    font-weight: 800;
+}
+.sidebar-nav-link {
+    color: #cbd5e1 !important;
+}
+.sidebar-nav-link:hover {
+    background-color: #141b27 !important;
+    color: #ffffff !important;
+}
+.sidebar-nav-link.active {
+    background-color: #141b27 !important;
+    color: #ffffff !important;
+    border-right: 4px solid #3598dc !important;
+}
+html[dir="ltr"] .sidebar-nav-link.active {
+    border-right: none !important;
+    border-left: 4px solid #3598dc !important;
+}
+.sidebar-submenu {
+    background-color: #141b27 !important;
+    border-right: 2px solid #3598dc !important;
+}
+html[dir="ltr"] .sidebar-submenu {
+    border-right: none !important;
+    border-left: 2px solid #3598dc !important;
+}
+.sidebar-sub-link {
+    color: #94a3b8 !important;
+}
+.sidebar-sub-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+}
+.sidebar-sub-link.active {
+    color: #38bdf8 !important;
+    background-color: rgba(56, 189, 248, 0.12) !important;
+    font-weight: 700;
+}
+.core-health-widget {
+    background: #141b27 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.core-health-widget .text-dark {
+    color: #f1f5f9 !important;
+}
+.core-health-widget .text-secondary {
+    color: #94a3b8 !important;
+}
+.core-health-widget span[style*="background: #FFFFFF"] {
+    background: #1e293b !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
